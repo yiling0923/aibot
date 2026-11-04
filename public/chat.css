@@ -100,3 +100,4 @@ pre.json{margin:0;background:var(--surface2);border-radius:8px;padding:9px 11px;
 /* Inside the control panel's Test chat tab the panel already has a heading. */
 body.embedded .top > div:first-child{display:none}
 body.embedded .top{justify-content:flex-end}
+body.embedded .wrap{max-width:none}

@@ -149,7 +149,7 @@ function vKB(){
     ${list.map(e=>`<tr class="row" data-edit="${e.id}"><td><b>${esc(e.intent_key)}</b></td>
       <td>${e.topic?`<span class="pill info">${esc(e.topic)}</span>`:'<span class="pill bad">missing</span>'}${S.adv&&e.aspect?` <span class="pill">${esc(e.aspect)}${e.topic_optional?' (alone)':''}</span>`:''}</td>
       <td><div class="dots">${LANGS.map(l=>`<span class="dot ${langState(e,l)}" title="${LN[l]}: ${langState(e,l)==='on'?'complete':langState(e,l)==='part'?'needs 3+ examples or an answer':'empty'}">${LN[l]}</span>`).join('')}</div></td>
-      <td style="max-width:340px">${esc(((e.translations.en||{}).answer_text||'').slice(0,110))}</td>
+      <td>${esc(((e.translations.en||{}).answer_text||'').slice(0,110))}</td>
       <td><span class="pill ${e.status==='live'?'ok':'warn'}">${e.status}</span>${e.dirty?' <span class="pill info">edited</span>':''}</td></tr>`).join('')||'<tr><td colspan="5" class="sub">No entries match.</td></tr>'}
     </tbody></table></div>`;
   $('#kbq').oninput=e=>{S.kbFilter=e.target.value; vKB(); const q=$('#kbq'); q.focus(); q.setSelectionRange(q.value.length,q.value.length);};
