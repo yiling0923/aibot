@@ -1,32 +1,31 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getPool, closePool } from './pool';
+import type { RowDataPacket } from 'mysql2/promise';
+import { getPool, closePool, type Pool } from './pool';
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
 
-/** Runs every .sql file in db/migrations once, in name order. Files ending in .optional.sql may fail without stopping. */
-export async function migrate(pool = getPool(), opts: { reset?: boolean } = {}) {
-  if (opts.reset) await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-  await pool.query('CREATE TABLE IF NOT EXISTS schema_migrations (name TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())');
-  const done = new Set((await pool.query('SELECT name FROM schema_migrations')).rows.map((r) => r.name));
+/** Runs every .sql file in db/migrations once, in name order.
+ *  MySQL cannot undo table changes, so if a file fails halfway run `npm run db:reset` and fix the file. */
+export async function migrate(pool: Pool = getPool(), opts: { reset?: boolean } = {}) {
+  if (opts.reset) {
+    const [tables] = await pool.query<RowDataPacket[]>('SELECT table_name AS t FROM information_schema.tables WHERE table_schema = DATABASE()');
+    if (tables.length) {
+      await pool.query('SET FOREIGN_KEY_CHECKS = 0');
+      for (const r of tables) await pool.query(`DROP TABLE IF EXISTS \`${r.t}\``);
+      await pool.query('SET FOREIGN_KEY_CHECKS = 1');
+    }
+  }
+  await pool.query('CREATE TABLE IF NOT EXISTS schema_migrations (name VARCHAR(200) PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+  const [rows] = await pool.query<RowDataPacket[]>('SELECT name FROM schema_migrations');
+  const done = new Set(rows.map((r) => r.name as string));
   const applied: string[] = [];
   for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
     if (done.has(file)) continue;
-    const sql = fs.readFileSync(path.join(dir, file), 'utf8');
-    const optional = file.endsWith('.optional.sql');
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      await client.query(sql);
-      await client.query('INSERT INTO schema_migrations(name) VALUES ($1)', [file]);
-      await client.query('COMMIT');
-      applied.push(file);
-    } catch (err) {
-      await client.query('ROLLBACK');
-      if (!optional) throw err;
-      console.warn(`skipped optional migration ${file}: ${(err as Error).message}`);
-    } finally { client.release(); }
+    await pool.query(fs.readFileSync(path.join(dir, file), 'utf8'));
+    await pool.query('INSERT INTO schema_migrations(name) VALUES (?)', [file]);
+    applied.push(file);
   }
   return applied;
 }

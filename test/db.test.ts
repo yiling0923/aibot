@@ -1,6 +1,7 @@
 import 'dotenv/config';
-import pg from 'pg';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import type { RowDataPacket } from 'mysql2/promise';
+import { createPool, type Pool } from '../src/db/pool';
 import { migrate } from '../src/db/migrate';
 import { seed } from '../src/db/seed';
 import { loadKnowledge } from '../src/db/loadKnowledge';
@@ -8,10 +9,10 @@ import { Engine, knowledgeFromSeed } from '../src/engine';
 import { seedJson, accountsJson, evalCases, judge } from './helpers';
 
 const url = process.env.TEST_DATABASE_URL;
-let pool: pg.Pool | null = null;
+let pool: Pool | null = null;
 let reachable = false;
 if (url) {
-  pool = new pg.Pool({ connectionString: url, max: 4 });
+  pool = createPool(url, 4);
   try { await pool.query('select 1'); reachable = true; } catch { /* tests below are skipped */ }
 }
 const d = describe.skipIf(!reachable);
@@ -26,12 +27,12 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
   afterAll(async () => { await pool?.end(); });
 
   it('migrations are recorded', async () => {
-    const r = await pool!.query('SELECT name FROM schema_migrations ORDER BY name');
-    expect(r.rows.map((x) => x.name)).toContain('001_init.sql');
+    const [r] = await pool!.query<RowDataPacket[]>('SELECT name FROM schema_migrations ORDER BY name');
+    expect(r.map((x) => x.name)).toContain('001_init.sql');
   });
 
   it('seeds the three fake merchants and all acceptance cases', async () => {
-    const c = async (t: string) => Number((await pool!.query(`SELECT count(*) FROM ${t}`)).rows[0].count);
+    const c = async (t: string) => Number((await pool!.query<RowDataPacket[]>(`SELECT count(*) AS n FROM ${t}`))[0][0].n);
     expect(await c('merchants')).toBe(3);
     expect(await c('kb_entries')).toBe(seedJson.kb_entries.length);
     expect(await c('eval_cases')).toBe(evalCases.length);
@@ -55,13 +56,13 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
 
   it('keeps merchants apart', async () => {
     for (const code of ['MERCH_A', 'MERCH_B', 'MERCH_C']) expect(engine.entriesOf(code).every((e) => e.merchant === code)).toBe(true);
-    await expect(pool!.query(`INSERT INTO kb_entries(merchant_id,intent_key,topic) SELECT id,'deposit_how','deposit' FROM merchants WHERE code='MERCH_A'`)).rejects.toThrow(/unique/i);
+    await expect(pool!.query(`INSERT INTO kb_entries(merchant_id,intent_key,topic) SELECT id,'deposit_how','deposit' FROM merchants WHERE code='MERCH_A'`)).rejects.toThrow(/duplicate/i);
     const a = engine.analyze('depo how', 'MERCH_A'), b = engine.analyze('depo how', 'MERCH_B');
     expect(a.top.id).not.toBe(b.top.id);                     // each merchant answers from its own entry
   });
 
   it('ignores draft entries until they are set live', async () => {
-    const q = `UPDATE kb_entries SET status=$1 WHERE intent_key='promo_bonus' AND merchant_id=(SELECT id FROM merchants WHERE code='MERCH_A')`;
+    const q = `UPDATE kb_entries SET status=? WHERE intent_key='promo_bonus' AND merchant_id=(SELECT id FROM merchants WHERE code='MERCH_A')`;
     await pool!.query(q, ['draft']);
     expect(new Engine(await loadKnowledge(pool!)).analyze('any promo for new member?', 'MERCH_A').decision).not.toBe('ANSWER');
     await pool!.query(q, ['live']);

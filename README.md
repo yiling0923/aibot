@@ -19,12 +19,12 @@ Everything here runs on your own computer. Nothing is connected to LiveChat yet 
 
 ## Set it up on your machine
 
-You need **Node.js 20 or newer** and **Docker** (for the database).
+You need **Node.js 20 or newer** and **MySQL 8**. Install MySQL from https://dev.mysql.com/downloads/installer/ (Windows) or `brew install mysql` (Mac) / `apt install mysql-server` (Linux).
 
 ```bash
-cd livechat-bot
-cp .env.example .env              # default values work for localhost
-docker compose up -d              # starts PostgreSQL (also creates a separate test database)
+cd aibot
+cp .env.example .env              # default values work for localhost (Windows: copy .env.example .env)
+mysql -u root -p < db/setup.sql   # creates the databases and the "bot" user (asks for your MySQL root password)
 npm install
 npm run db:migrate                # creates the tables
 npm run db:seed                   # loads the 3 fake merchants (LuckyPay, SwiftWallet, MegaPlay)
@@ -45,7 +45,7 @@ curl -X POST localhost:3000/api/analyze -H 'content-type: application/json' \
 ## Tests
 
 * `npm test` runs the engine tests (no database needed): the 149 acceptance messages plus extra checks.
-* The database tests run too when `TEST_DATABASE_URL` is set (it is in `.env.example`). They wipe that database every time,
+* The database tests run too when `TEST_DATABASE_URL` is set (it is in `.env.example`, and `db/setup.sql` creates it). They wipe that database every time,
   so it must be the separate `livechat_bot_test` database, never your real data.
 * `npm run typecheck` checks the TypeScript.
 
@@ -55,7 +55,8 @@ curl -X POST localhost:3000/api/analyze -H 'content-type: application/json' \
 src/engine/    the decision logic (no network, no AI): normalize, keywords, guards, greetings, amounts, buttons
 src/db/        connection, migrations, seed loader, loadKnowledge() (database -> engine)
 src/server/    the API (Fastify)
-db/migrations/ SQL files, run in name order. *.optional.sql may be skipped (pgvector)
+db/migrations/ SQL files, run in name order
+db/setup.sql   creates the databases and the user (run once)
 data/          the fake template data (kb_seed.json, fake_accounts.json)
 test/          acceptance cases + database tests
 ```
