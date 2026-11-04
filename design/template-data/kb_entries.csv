@@ -1,0 +1,97 @@
+﻿merchant,intent_key,category,language,question_examples,answer_text
+MERCH_A,deposit_how,Deposit,en,how to deposit | how to dep | depo how | how topup | deps how to do | cara nak top up,"To deposit, go to Wallet > Deposit, choose a payment method and follow the steps."
+MERCH_A,deposit_how,Deposit,ms,macam mana nak deposit | cara depo | nak dep macam mana | cara top up,"Untuk deposit, pergi ke Wallet > Deposit, pilih kaedah pembayaran dan ikut langkah yang diberi."
+MERCH_A,deposit_how,Deposit,zh,怎么存款 | 如何充值 | 怎样存钱 | 充值方法,存款请前往Wallet > Deposit，选择付款方式并按步骤操作。
+MERCH_A,deposit_time,Deposit,en,how long deposit take | dep not arrive | depo still pending | when deposit arrive,"Deposits are usually credited within 5 minutes. If it takes longer, please send us your payment receipt."
+MERCH_A,deposit_time,Deposit,ms,berapa lama deposit masuk | depo belum masuk | deposit lambat,"Deposit biasanya dikreditkan dalam masa 5 minit. Jika lebih lama, sila hantar resit pembayaran anda."
+MERCH_A,deposit_time,Deposit,zh,存款多久到账 | 充值还没到 | 存款怎么还没到账,存款通常在5分钟内到账。如果超过这个时间，请把付款凭证发给我们。
+MERCH_A,deposit_limit,Deposit,en,minimum deposit | min dep | max deposit | deposit limit,"The minimum deposit is MYR 10 and the maximum per transaction is MYR 30,000."
+MERCH_A,deposit_limit,Deposit,ms,deposit minimum berapa | min depo | had deposit,"Deposit minimum ialah MYR 10 dan maksimum setiap transaksi ialah MYR 30,000."
+MERCH_A,deposit_limit,Deposit,zh,最低存款 | 最少充值多少 | 存款限额,"最低存款金额为MYR 10，单笔最高为MYR 30,000。"
+MERCH_A,withdraw_how,Withdrawal,en,how to withdraw | how wd | how to wdraw | cash out how,"To withdraw, go to Wallet > Withdraw, enter the amount and your bank account, then submit."
+MERCH_A,withdraw_how,Withdrawal,ms,macam mana nak tarik duit | cara wd | nak withdraw macam mana,"Untuk pengeluaran, pergi ke Wallet > Withdraw, masukkan jumlah dan akaun bank anda, kemudian hantar."
+MERCH_A,withdraw_how,Withdrawal,zh,怎么提款 | 如何取款 | 提现方法,提款请前往Wallet > Withdraw，输入金额和银行账户后提交。
+MERCH_A,withdraw_time,Withdrawal,en,how long withdraw take | wd not received | withdrawal pending | wd lambat,Withdrawals are processed within 30 minutes.
+MERCH_A,withdraw_time,Withdrawal,ms,berapa lama withdraw | wd belum masuk | tarikan lambat,Pengeluaran diproses dalam masa 30 minit.
+MERCH_A,withdraw_time,Withdrawal,zh,提款多久到账 | 取款还没到 | 提现怎么还没到,提款将在30分钟内处理完成。
+MERCH_A,withdraw_limit,Withdrawal,en,minimum withdraw | min wd | max withdrawal | withdraw limit,"The minimum withdrawal is MYR 20 and the maximum per transaction is MYR 20,000."
+MERCH_A,withdraw_limit,Withdrawal,ms,had minimum tarik duit | min wd berapa | had pengeluaran,"Pengeluaran minimum ialah MYR 20 dan maksimum setiap transaksi ialah MYR 20,000."
+MERCH_A,withdraw_limit,Withdrawal,zh,最低提款 | 最少取款多少 | 提款限额,"最低提款金额为MYR 20，单笔最高为MYR 20,000。"
+MERCH_A,forgot_password,Account,en,forgot password | cant login | reset pw | lost my password,Tap 'Forgot password' on the login page and follow the steps to reset it via SMS.
+MERCH_A,forgot_password,Account,ms,lupa kata laluan | lupa password | tak boleh login,Tekan 'Lupa kata laluan' di halaman log masuk dan ikut langkah untuk menetapkan semula melalui SMS.
+MERCH_A,forgot_password,Account,zh,忘记密码 | 登录不了 | 重置密码,请在登录页面点击“忘记密码”，并通过短信重置密码。
+MERCH_A,verify_account,Account,en,how to verify account | kyc | verify ic | account verification,"To verify your account, upload your ID at Profile > Verification. Verification takes up to 24 hours."
+MERCH_A,verify_account,Account,ms,macam mana nak verify akaun | kyc | sahkan akaun,"Untuk mengesahkan akaun, muat naik kad pengenalan anda di Profile > Verification. Pengesahan mengambil masa sehingga 24 jam."
+MERCH_A,verify_account,Account,zh,怎么验证账号 | 实名认证 | 身份验证,验证账号请在Profile > Verification上传身份证件。审核需要最长24小时。
+MERCH_A,change_bank,Account,en,change bank account | wrong bank number | update bank | change bank card,"To change your bank account, please contact our agent and be ready to verify your identity."
+MERCH_A,change_bank,Account,ms,tukar akaun bank | salah nombor bank | kemaskini bank,"Untuk menukar akaun bank, sila hubungi ejen kami dan sediakan pengesahan identiti anda."
+MERCH_A,change_bank,Account,zh,更改银行账户 | 银行卡号填错了 | 换银行卡,如需更改银行账户，请联系客服人员，并准备好进行身份验证。
+MERCH_A,contact_hours,General,en,what time are you open | customer service hours | is cs 24 hours | cs online?,Our customer service is available 24/7.
+MERCH_A,contact_hours,General,ms,waktu operasi cs | cs buka pukul berapa | cs 24 jam ke,Khidmat pelanggan kami tersedia 24 jam setiap hari.
+MERCH_A,contact_hours,General,zh,客服几点上班 | 客服时间 | 几点营业,我们的客服服务时间为全天24小时。
+MERCH_A,promo_bonus,Promotion,en,any promotion | new member bonus | promo? | got bonus,Current promotion: 100% welcome bonus up to MYR 100 on your first deposit.
+MERCH_A,promo_bonus,Promotion,ms,ada promosi tak | bonus ahli baru | ada bonus tak,Promosi semasa: bonus alu-aluan 100% sehingga MYR 100 untuk deposit pertama anda.
+MERCH_A,promo_bonus,Promotion,zh,有什么优惠 | 新会员奖励 | 有没有活动,当前优惠：首次存款享100%迎新奖励，最高MYR 100。
+MERCH_B,deposit_how,Deposit,en,how to deposit | how to dep | depo how | how topup | deps how to do | cara nak top up,"To deposit, go to Account > Top-up, choose a payment method and follow the steps."
+MERCH_B,deposit_how,Deposit,ms,macam mana nak deposit | cara depo | nak dep macam mana | cara top up,"Untuk deposit, pergi ke Account > Top-up, pilih kaedah pembayaran dan ikut langkah yang diberi."
+MERCH_B,deposit_how,Deposit,zh,怎么存款 | 如何充值 | 怎样存钱 | 充值方法,存款请前往Account > Top-up，选择付款方式并按步骤操作。
+MERCH_B,deposit_time,Deposit,en,how long deposit take | dep not arrive | depo still pending | when deposit arrive,"Deposits are usually credited within 15 minutes. If it takes longer, please send us your payment receipt."
+MERCH_B,deposit_time,Deposit,ms,berapa lama deposit masuk | depo belum masuk | deposit lambat,"Deposit biasanya dikreditkan dalam masa 15 minit. Jika lebih lama, sila hantar resit pembayaran anda."
+MERCH_B,deposit_time,Deposit,zh,存款多久到账 | 充值还没到 | 存款怎么还没到账,存款通常在15分钟内到账。如果超过这个时间，请把付款凭证发给我们。
+MERCH_B,deposit_limit,Deposit,en,minimum deposit | min dep | max deposit | deposit limit,"The minimum deposit is MYR 30 and the maximum per transaction is MYR 50,000."
+MERCH_B,deposit_limit,Deposit,ms,deposit minimum berapa | min depo | had deposit,"Deposit minimum ialah MYR 30 dan maksimum setiap transaksi ialah MYR 50,000."
+MERCH_B,deposit_limit,Deposit,zh,最低存款 | 最少充值多少 | 存款限额,"最低存款金额为MYR 30，单笔最高为MYR 50,000。"
+MERCH_B,withdraw_how,Withdrawal,en,how to withdraw | how wd | how to wdraw | cash out how,"To withdraw, go to Account > Cash Out, enter the amount and your bank account, then submit."
+MERCH_B,withdraw_how,Withdrawal,ms,macam mana nak tarik duit | cara wd | nak withdraw macam mana,"Untuk pengeluaran, pergi ke Account > Cash Out, masukkan jumlah dan akaun bank anda, kemudian hantar."
+MERCH_B,withdraw_how,Withdrawal,zh,怎么提款 | 如何取款 | 提现方法,提款请前往Account > Cash Out，输入金额和银行账户后提交。
+MERCH_B,withdraw_time,Withdrawal,en,how long withdraw take | wd not received | withdrawal pending | wd lambat,Withdrawals are processed within 2 hours on working days.
+MERCH_B,withdraw_time,Withdrawal,ms,berapa lama withdraw | wd belum masuk | tarikan lambat,Pengeluaran diproses dalam masa 2 jam pada hari bekerja.
+MERCH_B,withdraw_time,Withdrawal,zh,提款多久到账 | 取款还没到 | 提现怎么还没到,提款将在工作日2小时内处理完成。
+MERCH_B,withdraw_limit,Withdrawal,en,minimum withdraw | min wd | max withdrawal | withdraw limit,"The minimum withdrawal is MYR 50 and the maximum per transaction is MYR 30,000."
+MERCH_B,withdraw_limit,Withdrawal,ms,had minimum tarik duit | min wd berapa | had pengeluaran,"Pengeluaran minimum ialah MYR 50 dan maksimum setiap transaksi ialah MYR 30,000."
+MERCH_B,withdraw_limit,Withdrawal,zh,最低提款 | 最少取款多少 | 提款限额,"最低提款金额为MYR 50，单笔最高为MYR 30,000。"
+MERCH_B,forgot_password,Account,en,forgot password | cant login | reset pw | lost my password,Tap 'Forgot password' on the login page and follow the steps to reset it via email.
+MERCH_B,forgot_password,Account,ms,lupa kata laluan | lupa password | tak boleh login,Tekan 'Lupa kata laluan' di halaman log masuk dan ikut langkah untuk menetapkan semula melalui e-mel.
+MERCH_B,forgot_password,Account,zh,忘记密码 | 登录不了 | 重置密码,请在登录页面点击“忘记密码”，并通过电子邮件重置密码。
+MERCH_B,verify_account,Account,en,how to verify account | kyc | verify ic | account verification,"To verify your account, upload your ID at Settings > Identity. Verification takes 1 to 3 working days."
+MERCH_B,verify_account,Account,ms,macam mana nak verify akaun | kyc | sahkan akaun,"Untuk mengesahkan akaun, muat naik kad pengenalan anda di Settings > Identity. Pengesahan mengambil masa 1 hingga 3 hari bekerja."
+MERCH_B,verify_account,Account,zh,怎么验证账号 | 实名认证 | 身份验证,验证账号请在Settings > Identity上传身份证件。审核需要1至3个工作日。
+MERCH_B,change_bank,Account,en,change bank account | wrong bank number | update bank | change bank card,"To change your bank account, please contact our agent and be ready to verify your identity."
+MERCH_B,change_bank,Account,ms,tukar akaun bank | salah nombor bank | kemaskini bank,"Untuk menukar akaun bank, sila hubungi ejen kami dan sediakan pengesahan identiti anda."
+MERCH_B,change_bank,Account,zh,更改银行账户 | 银行卡号填错了 | 换银行卡,如需更改银行账户，请联系客服人员，并准备好进行身份验证。
+MERCH_B,contact_hours,General,en,what time are you open | customer service hours | is cs 24 hours | cs online?,Our customer service is available daily from 09:00 to 21:00 (GMT+8).
+MERCH_B,contact_hours,General,ms,waktu operasi cs | cs buka pukul berapa | cs 24 jam ke,Khidmat pelanggan kami tersedia setiap hari dari 9:00 pagi hingga 9:00 malam (GMT+8).
+MERCH_B,contact_hours,General,zh,客服几点上班 | 客服时间 | 几点营业,我们的客服服务时间为每天09:00至21:00（GMT+8）。
+MERCH_C,deposit_how,Deposit,en,how to deposit | how to dep | depo how | how topup | deps how to do | cara nak top up,"To deposit, go to Menu > Deposit, choose a payment method and follow the steps."
+MERCH_C,deposit_how,Deposit,ms,macam mana nak deposit | cara depo | nak dep macam mana | cara top up,"Untuk deposit, pergi ke Menu > Deposit, pilih kaedah pembayaran dan ikut langkah yang diberi."
+MERCH_C,deposit_how,Deposit,zh,怎么存款 | 如何充值 | 怎样存钱 | 充值方法,存款请前往Menu > Deposit，选择付款方式并按步骤操作。
+MERCH_C,deposit_time,Deposit,en,how long deposit take | dep not arrive | depo still pending | when deposit arrive,"Deposits are usually credited within 10 minutes. If it takes longer, please send us your payment receipt."
+MERCH_C,deposit_time,Deposit,ms,berapa lama deposit masuk | depo belum masuk | deposit lambat,"Deposit biasanya dikreditkan dalam masa 10 minit. Jika lebih lama, sila hantar resit pembayaran anda."
+MERCH_C,deposit_time,Deposit,zh,存款多久到账 | 充值还没到 | 存款怎么还没到账,存款通常在10分钟内到账。如果超过这个时间，请把付款凭证发给我们。
+MERCH_C,deposit_limit,Deposit,en,minimum deposit | min dep | max deposit | deposit limit,"The minimum deposit is MYR 20 and the maximum per transaction is MYR 10,000."
+MERCH_C,deposit_limit,Deposit,ms,deposit minimum berapa | min depo | had deposit,"Deposit minimum ialah MYR 20 dan maksimum setiap transaksi ialah MYR 10,000."
+MERCH_C,deposit_limit,Deposit,zh,最低存款 | 最少充值多少 | 存款限额,"最低存款金额为MYR 20，单笔最高为MYR 10,000。"
+MERCH_C,withdraw_how,Withdrawal,en,how to withdraw | how wd | how to wdraw | cash out how,"To withdraw, go to Menu > Withdrawal, enter the amount and your bank account, then submit."
+MERCH_C,withdraw_how,Withdrawal,ms,macam mana nak tarik duit | cara wd | nak withdraw macam mana,"Untuk pengeluaran, pergi ke Menu > Withdrawal, masukkan jumlah dan akaun bank anda, kemudian hantar."
+MERCH_C,withdraw_how,Withdrawal,zh,怎么提款 | 如何取款 | 提现方法,提款请前往Menu > Withdrawal，输入金额和银行账户后提交。
+MERCH_C,withdraw_time,Withdrawal,en,how long withdraw take | wd not received | withdrawal pending | wd lambat,Withdrawals are processed within 1 hour.
+MERCH_C,withdraw_time,Withdrawal,ms,berapa lama withdraw | wd belum masuk | tarikan lambat,Pengeluaran diproses dalam masa 1 jam.
+MERCH_C,withdraw_time,Withdrawal,zh,提款多久到账 | 取款还没到 | 提现怎么还没到,提款将在1小时内处理完成。
+MERCH_C,withdraw_limit,Withdrawal,en,minimum withdraw | min wd | max withdrawal | withdraw limit,"The minimum withdrawal is MYR 100 and the maximum per transaction is MYR 10,000."
+MERCH_C,withdraw_limit,Withdrawal,ms,had minimum tarik duit | min wd berapa | had pengeluaran,"Pengeluaran minimum ialah MYR 100 dan maksimum setiap transaksi ialah MYR 10,000."
+MERCH_C,withdraw_limit,Withdrawal,zh,最低提款 | 最少取款多少 | 提款限额,"最低提款金额为MYR 100，单笔最高为MYR 10,000。"
+MERCH_C,forgot_password,Account,en,forgot password | cant login | reset pw | lost my password,Tap 'Forgot password' on the login page and follow the steps to reset it via WhatsApp OTP.
+MERCH_C,forgot_password,Account,ms,lupa kata laluan | lupa password | tak boleh login,Tekan 'Lupa kata laluan' di halaman log masuk dan ikut langkah untuk menetapkan semula melalui OTP WhatsApp.
+MERCH_C,forgot_password,Account,zh,忘记密码 | 登录不了 | 重置密码,请在登录页面点击“忘记密码”，并通过WhatsApp验证码重置密码。
+MERCH_C,verify_account,Account,en,how to verify account | kyc | verify ic | account verification,"To verify your account, upload your ID at Menu > My Account > KYC. Verification takes up to 12 hours."
+MERCH_C,verify_account,Account,ms,macam mana nak verify akaun | kyc | sahkan akaun,"Untuk mengesahkan akaun, muat naik kad pengenalan anda di Menu > My Account > KYC. Pengesahan mengambil masa sehingga 12 jam."
+MERCH_C,verify_account,Account,zh,怎么验证账号 | 实名认证 | 身份验证,验证账号请在Menu > My Account > KYC上传身份证件。审核需要最长12小时。
+MERCH_C,change_bank,Account,en,change bank account | wrong bank number | update bank | change bank card,"To change your bank account, please contact our agent and be ready to verify your identity."
+MERCH_C,change_bank,Account,ms,tukar akaun bank | salah nombor bank | kemaskini bank,"Untuk menukar akaun bank, sila hubungi ejen kami dan sediakan pengesahan identiti anda."
+MERCH_C,change_bank,Account,zh,更改银行账户 | 银行卡号填错了 | 换银行卡,如需更改银行账户，请联系客服人员，并准备好进行身份验证。
+MERCH_C,contact_hours,General,en,what time are you open | customer service hours | is cs 24 hours | cs online?,Our customer service is available daily from 10:00 to 02:00.
+MERCH_C,contact_hours,General,ms,waktu operasi cs | cs buka pukul berapa | cs 24 jam ke,Khidmat pelanggan kami tersedia setiap hari dari 10:00 pagi hingga 2:00 pagi.
+MERCH_C,contact_hours,General,zh,客服几点上班 | 客服时间 | 几点营业,我们的客服服务时间为每天10:00至次日02:00。
+MERCH_C,promo_bonus,Promotion,en,any promotion | new member bonus | promo? | got bonus,Current promotion: weekly 10% cashback every Monday.
+MERCH_C,promo_bonus,Promotion,ms,ada promosi tak | bonus ahli baru | ada bonus tak,Promosi semasa: pulangan tunai 10% mingguan setiap hari Isnin.
+MERCH_C,promo_bonus,Promotion,zh,有什么优惠 | 新会员奖励 | 有没有活动,当前优惠：每周一享10%每周返现。
