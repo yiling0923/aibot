@@ -211,3 +211,42 @@ td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px}
 .legend div{background:var(--surface2);border-radius:8px;padding:8px 10px;font-size:12.5px}
 .nav button{justify-content:flex-start}.nav .cnt{margin-left:auto}
+
+/* ---------- layout: sidebar on the left, a slim bar on top ---------- */
+body{padding:0}
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100vh}
+.side{position:sticky;top:0;height:100vh;overflow-y:auto;background:var(--surface);border-right:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:18px}
+.side .brandwrap{padding:0 6px}
+.brand{font-weight:700;font-size:15px;line-height:1.2}
+.brand small{display:block;font-weight:500;font-size:12px;color:var(--muted)}
+.side .merch select{width:100%;font-weight:600}
+.nav{background:none;border:0;border-radius:0;padding:0;position:static;display:flex;flex-direction:column;gap:16px;flex:1}
+.nav .grp{display:flex;flex-direction:column;gap:2px}
+.nav .gl{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:0 10px 4px}
+.nav button{gap:10px;padding:8px 10px;font-weight:600;font-size:14px;justify-content:flex-start}
+.nav button svg{flex:none;opacity:.75}
+.nav button[aria-current="page"] svg{opacity:1}
+.nav .cnt{margin-left:auto}
+.side-foot{display:flex;flex-direction:column;gap:12px;border-top:1px solid var(--line);padding-top:14px}
+.side-foot select{width:100%}
+.content{min-width:0;display:flex;flex-direction:column}
+.topbar{position:sticky;top:0;z-index:5;display:flex;justify-content:flex-end;align-items:center;gap:12px;padding:10px 28px;background:var(--bg);border-bottom:1px solid var(--line)}
+.topbar .vers{height:auto}
+.main{padding:22px 28px 60px;max-width:1240px;width:100%;gap:16px}
+@media (max-width:860px){
+  .shell{grid-template-columns:minmax(0,1fr)}
+  .side{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:12px 14px;gap:12px}
+  .nav{flex-direction:row;flex-wrap:wrap;gap:6px 14px;flex:none}
+  .nav .grp{flex-direction:row;flex-wrap:wrap;align-items:center;gap:4px}
+  .nav .gl{display:none}
+  .side-foot{flex-direction:row;flex-wrap:wrap;align-items:center}
+  .topbar,.main{padding-inline:16px}
+}
+/* calmer pages: one clear heading, quiet numbers */
+.card{padding:18px}
+.quiet{color:var(--muted);font-size:13px;margin-top:6px}
+.quiet b{color:var(--fg)}
+
+details.fold>summary{cursor:pointer;font-weight:600;color:var(--accent);padding:6px 0;list-style:none}
+details.fold>summary::-webkit-details-marker{display:none}
+details.fold[open]>summary{margin-bottom:8px}

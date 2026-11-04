@@ -123,13 +123,15 @@ function toast(t){ const el=$('#toast'); el.textContent=t; el.hidden=false; clea
 const LABEL={deposit:'Deposit',withdraw:'Withdrawal',password:'Password',verify:'Verification',customer_service:'Customer service',promotion:'Promotion',bank_account:'Bank account'};
 
 /* ---------- chrome ---------- */
-const VIEWS=[['kb','Knowledge base'],['imp','Import'],['chat','Test chat'],['kw','Topics'],['store','Keywords'],['rank','Keyword ranking'],['set','Merchant settings'],['rev','Needs review'],['test','Tests'],['hist','History']];
+const NAV_ICON={kb:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M9 8h6"/></svg>',imp:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',kw:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20 4 12V4h8z"/><circle cx="8.5" cy="8.5" r="1"/></svg>',store:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',rank:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>',chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',test:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg>',rev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',set:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',hist:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'};
+/* The menu, in four groups. */
+const NAV_GROUPS=[['Answers',[['kb','Knowledge base'],['imp','Import']]],['Words',[['kw','Topics'],['store','Keywords'],['rank','Keyword ranking']]],['Check',[['chat','Test chat'],['test','Tests'],['rev','Needs review']]],['Setup',[['set','Merchant settings'],['hist','History']]]];
 function revCount(){ const r=S.review; return ['unmatched','handoff','abuse'].reduce((n,k)=>n+(r[k][S.merchant]||[]).filter((_,i)=>!r.done[S.merchant+k+i]).length,0); }
 function renderChrome(){
   $('#merchant').innerHTML=D.merchants.filter(m=>isAdmin()||m.code==='MERCH_A').map(m=>`<option value="${m.code}" ${m.code===S.merchant?'selected':''}>${esc(m.name)}</option>`).join('');
   $('#ver').innerHTML='<span class="vchip"><i></i>Live v'+S.ver+'</span>'+(S.changes.length?'<span class="vchip warn">Draft · '+S.changes.length+' change'+(S.changes.length>1?'s':'')+'</span><button class="btn sm ghost" data-act="discardDraft" type="button">Discard</button>':'');
   $('#publish').disabled=!S.changes.length; $('#publish').innerHTML='Publish'+(S.changes.length?' <span class="badge">'+S.changes.length+'</span>':'');
-  $('#nav').innerHTML=VIEWS.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${l}${k==='rev'&&revCount()?`<span class="cnt">${revCount()}</span>`:''}${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('');
+  $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='rev'&&revCount()?`<span class="cnt">${revCount()}</span>`:''}${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
 }
 async function render(){ renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,rev:vREV,test:vTEST,hist:vHIST})[S.view](); }
 
@@ -140,15 +142,15 @@ function vKB(){
   const all=entries(); const live=all.filter(e=>e.status==='live').length, miss=all.filter(e=>LANGS.some(l=>langState(e,l)!=='on')).length;
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Knowledge base · ${esc(M().name)}</h2><div class="sub">What the bot may answer for this merchant. Only live entries are used.</div></div>
     <button class="btn pri" data-act="newEntry" type="button">Add entry</button></div>
-    <div class="stats" style="margin-top:10px"><div class="stat"><b>${live}</b>live</div><div class="stat"><b>${all.length-live}</b>draft or off</div><div class="stat"><b>${miss}</b>missing a language or examples</div></div>
+    <div class="quiet"><b>${live}</b> live${all.length-live?` · <b>${all.length-live}</b> draft`:''}${miss?` · <b>${miss}</b> missing a language or examples`:''}</div>
     <div class="filt-row" style="margin-top:10px"><input type="search" id="kbq" placeholder="Search entries or answers" value="${esc(S.kbFilter)}" aria-label="Search" style="min-width:220px">
       <select id="kbs" aria-label="Status"><option value="all">All</option><option value="live" ${S.kbStatus==='live'?'selected':''}>Live</option><option value="draft" ${S.kbStatus==='draft'?'selected':''}>Draft</option></select></div></div>
-    <div class="card scroll"><table><thead><tr><th>Entry</th><th>Topic${S.adv?' · question':''}</th><th>Languages</th><th>Answer (English)</th><th>Status</th><th>Updated</th></tr></thead><tbody>
+    <div class="card scroll"><table><thead><tr><th>Entry</th><th>Topic${S.adv?' · question':''}</th><th>Languages</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
     ${list.map(e=>`<tr class="row" data-edit="${e.id}"><td><b>${esc(e.intent_key)}</b></td>
       <td>${e.topic?`<span class="pill info">${esc(e.topic)}</span>`:'<span class="pill bad">missing</span>'}${S.adv&&e.aspect?` <span class="pill">${esc(e.aspect)}${e.topic_optional?' (alone)':''}</span>`:''}</td>
       <td><div class="dots">${LANGS.map(l=>`<span class="dot ${langState(e,l)}" title="${LN[l]}: ${langState(e,l)==='on'?'complete':langState(e,l)==='part'?'needs 3+ examples or an answer':'empty'}">${LN[l]}</span>`).join('')}</div></td>
       <td style="max-width:340px">${esc(((e.translations.en||{}).answer_text||'').slice(0,110))}</td>
-      <td><span class="pill ${e.status==='live'?'ok':'warn'}">${e.status}</span>${e.dirty?' <span class="pill info">edited</span>':''}</td><td class="sub">${esc(e.dirty?'just now':e.updated)}</td></tr>`).join('')||'<tr><td colspan="6" class="sub">No entries match.</td></tr>'}
+      <td><span class="pill ${e.status==='live'?'ok':'warn'}">${e.status}</span>${e.dirty?' <span class="pill info">edited</span>':''}</td></tr>`).join('')||'<tr><td colspan="5" class="sub">No entries match.</td></tr>'}
     </tbody></table></div>`;
   $('#kbq').oninput=e=>{S.kbFilter=e.target.value; vKB(); const q=$('#kbq'); q.focus(); q.setSelectionRange(q.value.length,q.value.length);};
   $('#kbs').onchange=e=>{S.kbStatus=e.target.value; vKB();};
@@ -277,7 +279,7 @@ function vIMP(){
   const dots=g=>LANGS.map(l=>{ const x=g.langs[l]; const st=x?(x.answer&&x.examples.length>=3?'on':'part'):(g.existing&&(g.existing.translations[l]||{}).answer_text?'on':''); return `<span class="dot ${st}">${LN[l]}</span>`; }).join('');
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Import knowledge base · ${esc(M().name)}</h2><div class="sub">Load a whole set from a file instead of typing it. Each merchant has its own file. Nothing goes live until you publish.</div></div></div>
     <div class="steps" style="margin-top:12px">
-      <div class="step"><span class="n">1</span><div><b>Merchant</b><div class="sub">The file is imported into <b>${esc(M().name)}</b>. Change it in the top bar. If the file has a <span class="mono">merchant</span> column, rows for other merchants are skipped.</div></div></div>
+      <div class="step"><span class="n">1</span><div><b>Merchant</b><div class="sub">The file is imported into <b>${esc(M().name)}</b>. Change it in the sidebar. If the file has a <span class="mono">merchant</span> column, rows for other merchants are skipped.</div></div></div>
       <div class="step"><span class="n">2</span><div style="display:flex;flex-direction:column;gap:8px"><b>Add the file</b>
         <div class="drop"><div class="tools"><input type="file" id="imp_file" accept=".csv,.tsv,.txt" aria-label="Choose a CSV file"><button class="btn sm" data-act="impSample" type="button">Load a sample file</button><button class="btn sm" data-act="impTpl" type="button">Copy blank template</button><button class="btn sm" data-act="impKb" type="button">Copy this merchant's KB as CSV</button></div>
           <textarea id="imp_text" placeholder="Or paste CSV here (from Excel or Google Sheets works too)" aria-label="Paste CSV">${esc(I.text)}</textarea>
@@ -342,11 +344,11 @@ window.addEventListener('message',async e=>{ const d=e.data; if(!d||d.kind!=='bo
   await loadMerchantData(); renderChrome(); liveInfo(); if(d.fresh&&d.fresh.length) toast('Saved to Keywords: '+d.fresh.slice(0,5).join(', ')+(d.fresh.length>5?'…':'')); });
 function vCHAT(){
   const inc=S.simDraft!==false;
-  $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Test chat</h2><div class="sub">The bot talks using your current draft: imported entries, edited answers, new keywords and settings. Nothing is published.</div></div>
+  $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Test chat</h2><div class="sub">Chat with your unpublished changes. Nothing goes live.</div></div>
     <div class="tools"><label class="tog" style="padding:0"><input type="checkbox" id="sim_draft" ${inc?'checked':''}> Include draft entries</label><button class="btn pri" data-act="simReload" type="button">Reload with my latest changes</button></div></div>
-    <div class="note" style="margin-top:10px" id="sim_info"></div>
-    <div class="note" style="margin-top:8px;background:var(--okbg)" id="sim_live"></div>
-    <div class="sub" style="margin-top:8px">After you change something in another screen, come back here and press Reload. Reloading starts a new chat. Every word you type here is saved automatically in Keywords. You can then make a word a topic, or add it to a topic. Messages the bot does not understand appear in Needs review.</div></div>
+    <div class="quiet" id="sim_info"></div>
+    <div class="quiet" id="sim_live"></div>
+  </div>
     <iframe id="sim" title="Chat test" style="width:100%;height:820px;border:1px solid var(--line);border-radius:12px;background:var(--bg)"></iframe>`;
   loadSim(); liveInfo(); clearInterval(simTimer);
   simTimer=setInterval(()=>{ const f=document.getElementById('sim'); if(!f){ clearInterval(simTimer); return; } try{ const h=f.contentDocument.documentElement.scrollHeight; if(h>300) f.style.height=(h+4)+'px'; }catch(e){} },700);
@@ -443,7 +445,7 @@ function vKW(){
   const tab=S.kwTab; const lock=!isAdmin();
   let inner='';
   {
-    inner=`<div class="addbox"><b>Add</b>${kwAdd(tab)}</div>
+    inner=`<details class="fold"><summary>＋ Add a topic or keyword</summary><div class="addbox">${kwAdd(tab)}</div></details>
     ${S.kwJust.length?`<div class="note" style="background:var(--okbg)"><b>Just added to the draft:</b> ${S.kwJust.map(x=>`<span class="chip new ro">${esc(x)}</span>`).join(' ')}</div>`:''}
     <div class="filt"><input type="search" id="kwq" placeholder="Filter words" aria-label="Filter words" value="${esc(S.kwQ)}" style="min-width:220px"><select id="kwl" aria-label="Language">${[['all','All languages'],['en','English'],['ms','Malay'],['zh','Chinese']].map(([v,l])=>`<option value="${v}" ${S.kwLang===v?'selected':''}>${l}</option>`).join('')}</select><span class="sub" id="kwcount"></span></div>
     <div id="kwlists">${kwLists()}</div>`;
@@ -488,16 +490,7 @@ function vRANK(){
   const tabOf=t=>t==='filler'?'filler':t==='slang'?'slang':t==='rude'?'rude':'meaning';
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Keyword ranking</h2><div class="sub">The words customers wrote most in ${esc(M().name)} chats. Find fillers, short forms and rude words, and tell the bot what each one is.</div></div>
       <div class="tools"><button class="btn sm" data-rkweek="-1" type="button" ${S.rankWeek<=-4?'disabled':''} aria-label="Previous week">‹</button><span class="stat" style="padding:5px 12px"><b style="font-size:13px">Date</b>${dateLabel()}</span><button class="btn sm" data-rkweek="1" type="button" ${S.rankWeek>=0?'disabled':''} aria-label="Next week">›</button></div></div></div>
-    <div class="card"><div class="tiles">
-      <div class="tile"><b>${total.toLocaleString()}</b><span>words written this week</span></div>
-      <div class="tile"><b>${vis.length}</b><span>different keywords</span></div>
-      <div class="tile"><b>${fillerShare}%</b><span>are fillers or short forms</span></div>
-      <button class="tile ${counts.unset?'warn':''}" type="button" data-rktab="unset"><b>${counts.unset}</b><span>keywords need a decision</span></button></div>
-      <div class="mixbar" style="margin-top:14px" role="img" aria-label="Share of words by type">${Object.entries(RANK_TYPES).filter(([k])=>byType[k]).map(([k,v])=>`<i class="tc-${k}" style="width:${(byType[k]/sumN*100).toFixed(2)}%" title="${v[0]}: ${Math.round(byType[k]/sumN*100)}%"></i>`).join('')}</div>
-      <div class="mixleg">${Object.entries(RANK_TYPES).filter(([k])=>byType[k]).map(([k,v])=>`<button type="button" data-rktab="${tabOf(k)}" title="${esc(RK_TIPS[k])}"><i class="tc-${k}"></i>${v[0]} <b>${Math.round(byType[k]/sumN*100)}%</b></button>`).join('')}</div></div>
-    <div class="rk-top">${top.map((r,i)=>`<div class="topc"><div class="r1"><span class="rkbadge b${i+1}">${i+1}</span><span class="nm" data-rkopen="${esc(r.w)}">${esc(r.w)}</span>${chgPill(r.c)}</div>
-      <div class="meta"><span class="sub">${r.n} times · ${r.share.toFixed(2)}%</span>${spark(r.series,120,30)}</div>
-      <div class="foot"><span class="pill ${r.st.c}">${esc(r.st.t)}</span><span class="tools"><button class="btn sm pri" data-rkset="${esc(r.w)}" type="button">Set…</button><button class="btn sm ghost" data-rkex="${esc(r.w)}" type="button">Exclude</button></span></div></div>`).join('')}</div>
+    <div class="quiet" style="margin:-4px 2px 0"><b>${total.toLocaleString()}</b> words written this week · <b>${vis.length}</b> different keywords · <b>${counts.unset}</b> need a decision</div>
     <div class="card rkfilter"><div class="head"><div class="segs" role="group" aria-label="Show">${RK_TABS.map(([k,l])=>`<button type="button" data-rktab="${k}" aria-pressed="${S.rankTab===k}">${l} <span class="n">${counts[k]}</span></button>`).join('')}</div>
       <div class="filt"><input type="search" id="rkq" placeholder="Filter keywords" aria-label="Filter keywords" value="${esc(S.rankQ)}" style="min-width:180px">
       <select id="rkl" aria-label="Language"><option value="all">All languages</option>${[['en','English'],['ms','Malay'],['zh','Chinese']].map(([v,l])=>`<option value="${v}" ${S.rankLang===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -506,17 +499,16 @@ function vRANK(){
   const drawT=()=>{
     const q=S.rankQ.trim().toLowerCase();
     let list=vis.filter(r=>inTab(r,S.rankTab)&&(!q||r.w.toLowerCase().includes(q)||r.h.toLowerCase().includes(q))&&(S.rankLang==='all'||r.lg===S.rankLang));
-    if(S.rankTab==='all'&&!q&&S.rankLang==='all') list=list.filter(r=>r.pos>3);
     const k=S.rankSort.k, d=S.rankSort.d; const key={rank:r=>-r.n,n:r=>r.n,share:r=>r.share,c:r=>r.c,type:r=>r.t,st:r=>r.st.t,w:r=>r.w}[k];
     list=list.slice().sort((a,b)=>{ const x=key(a),y=key(b); const rv=(x>y?1:x<y?-1:0); return k==='rank'?rv*d:rv*(-d); });
     const maxShare=Math.max(...list.map(r=>r.share),1); const sel=S.rankSel; const allSel=list.length&&list.every(r=>sel.has(r.w));
     const th=(k,l,tip,cls)=>`<th class="sort ${cls||''}" data-rksort="${k}" title="${esc(tip||'')}">${l}${S.rankSort.k===k?(S.rankSort.d===1?' ▴':' ▾'):''}</th>`;
     const lock=!isAdmin();
     $('#rktable').innerHTML=`<div id="rkbulk"></div>
-    <table style="min-width:940px"><thead><tr><th style="width:34px"><input type="checkbox" data-rkall="1" ${allSel?'checked':''} aria-label="Select all shown"></th>${th('rank','Rank','Position by count',' ')}${th('w','Keyword')}${th('type','Type')}<th>Trend</th>${th('n','Count','How many times customers wrote it. Repeating the same message counts.','num')}${th('share','Share','Part of all keywords this week.')}${th('c','Change','Compared with the previous 7 days.')}${th('st','Status','What the bot does with this word now.')}<th></th></tr></thead><tbody>
+    <table style="min-width:940px"><thead><tr><th style="width:34px"><input type="checkbox" data-rkall="1" ${allSel?'checked':''} aria-label="Select all shown"></th>${th('rank','Rank','Position by count',' ')}${th('w','Keyword')}${th('type','Type')}<th>Trend</th>${th('n','Count','How many times customers wrote it. Repeating the same message counts.','num')}${th('c','Change','Compared with the previous 7 days.')}${th('st','Status','What the bot does with this word now.')}<th></th></tr></thead><tbody>
     ${list.map(r=>{ const ex=S.rankExcluded.has(r.w); const ty=RANK_TYPES[r.t]; const todo=r.st.t==='Not set yet';
       return `<tr class="${ex?'excl':''} ${todo&&!ex?'todo':''}"><td><input type="checkbox" data-rkcheck="${esc(r.w)}" ${sel.has(r.w)?'checked':''} aria-label="Select ${esc(r.w)}"></td><td>${r.pos}</td><td>${r.isNew?'<span class="pill info">New</span> ':''}<span class="kwlink" data-rkopen="${esc(r.w)}">${esc(r.w)}</span><div class="sub">${esc(r.h)}${r.live&&!r.isNew?' · +'+r.live+' from Test chat':''}${r.isNew&&r.live>1?' · '+r.live+' times':''}</div></td><td><span class="pill ${ty[1]}" title="${esc(RK_TIPS[r.t])}">${ty[0]}</span></td><td>${spark(r.series,110,28)}</td><td class="num">${r.n}</td>
-      <td><div class="sharebar"><span>${r.share.toFixed(2)}%</span><i style="width:${Math.max(3,r.share/maxShare*70)}px"></i></div></td><td>${chgPill(r.c)}</td><td><span class="pill ${r.st.c}">${esc(r.st.t)}</span></td>
+      <td>${chgPill(r.c)}</td><td><span class="pill ${r.st.c}">${esc(r.st.t)}</span></td>
       <td style="white-space:nowrap;text-align:right">${ex?`<button class="btn sm" data-rkrestore="${esc(r.w)}" type="button">Restore</button>`:`<button class="btn sm" data-rkset="${esc(r.w)}" type="button">Set…</button> <button class="btn sm ghost" data-rkex="${esc(r.w)}" type="button">Exclude</button>`}</td></tr>`; }).join('')||'<tr><td colspan="10" class="sub">No keyword matches.</td></tr>'}</tbody></table>`;
     $('#rkcount').textContent=list.length+' keywords shown';
     window.__rkshown=list; drawBulk();
@@ -606,25 +598,25 @@ function vSTORE(){
   const all=storeRows(); const counts={}; ST_TABS.forEach(([k])=>counts[k]=all.filter(r=>stIn(r,k)).length);
   const fresh=all.filter(r=>r.isNew).length;
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Keywords</h2><div class="sub">Every word customers type is saved here automatically. Make a keyword a topic, or add it to a topic.</div></div>
-      <div class="stats"><div class="stat"><b>${all.length}</b>keywords saved</div><div class="stat"><b>${counts.unassigned}</b>not assigned</div><div class="stat"><b>${fresh}</b>new from Test chat</div></div></div></div>
+      </div><div class="quiet"><b>${all.length}</b> keywords saved · <b>${counts.unassigned}</b> not assigned yet</div></div>
     <div class="card rkfilter"><div class="head"><div class="segs" role="group" aria-label="Show">${ST_TABS.map(([k,l])=>`<button type="button" data-sttab="${k}" aria-pressed="${S.stTab===k}">${l} <span class="n">${counts[k]}</span></button>`).join('')}</div>
       <div class="filt"><input type="search" id="stq" placeholder="Filter keywords" aria-label="Filter keywords" value="${esc(S.stQ)}">
       <select id="stl" aria-label="Language"><option value="all">All languages</option>${[['en','English'],['ms','Malay'],['zh','Chinese']].map(([v,l])=>`<option value="${v}" ${S.stLang===v?'selected':''}>${l}</option>`).join('')}</select>
-      <select id="stf" aria-label="From"><option value="all">All sources</option><option value="Live chat" ${S.stFrom==='Live chat'?'selected':''}>Live chat</option><option value="Test chat" ${S.stFrom==='Test chat'?'selected':''}>Test chat</option></select><span class="sub" id="stcount"></span></div></div></div>
+      <span class="sub" id="stcount"></span></div></div></div>
     <div class="card scroll"><div id="stbulk"></div><div id="sttable"></div></div>`;
   const draw=()=>{
     const q=S.stQ.trim().toLowerCase();
-    const list=all.filter(r=>stIn(r,S.stTab)&&(!q||r.w.toLowerCase().includes(q)||r.h.toLowerCase().includes(q))&&(S.stLang==='all'||r.lg===S.stLang)&&(S.stFrom==='all'||r.from===S.stFrom)).sort((a,b)=>b.n-a.n||a.w.localeCompare(b.w));
+    const list=all.filter(r=>stIn(r,S.stTab)&&(!q||r.w.toLowerCase().includes(q)||r.h.toLowerCase().includes(q))&&(S.stLang==='all'||r.lg===S.stLang)).sort((a,b)=>b.n-a.n||a.w.localeCompare(b.w));
     window.__stshown=list; const sel=S.newSel, allSel=list.length&&list.every(r=>sel.has(r.w)); const lock=!isAdmin();
-    $('#sttable').innerHTML=`<table style="min-width:960px"><thead><tr><th style="width:34px"><input type="checkbox" data-nkall="1" ${allSel?'checked':''} aria-label="Select all shown"></th><th>Keyword</th><th class="num">Heard</th><th>Language</th><th>First heard</th><th>Last heard</th><th>From</th><th>Status</th><th></th></tr></thead><tbody>
+    $('#sttable').innerHTML=`<table style="min-width:960px"><thead><tr><th style="width:34px"><input type="checkbox" data-nkall="1" ${allSel?'checked':''} aria-label="Select all shown"></th><th>Keyword</th><th class="num">Heard</th><th>Language</th><th>Status</th><th></th></tr></thead><tbody>
     ${list.map(r=>{ const fresh=r.isNew||r.live; const todo=!r.ignored&&r.st.t==='Not set yet'; const stt=r.ignored?{c:'',t:'Ignored'}:r.st;
       const acts=r.ignored?`<button class="btn sm" data-strestore="${esc(r.w)}" type="button">Restore</button>`:todo?`<button class="btn sm pri" data-nkmk="${esc(r.w)}" type="button" ${lock?'disabled':''}>Make a topic</button> <button class="btn sm" data-nkadd="${esc(r.w)}" type="button">Add to a topic</button> <button class="btn sm ghost" data-stignore="${esc(r.w)}" type="button">Ignore</button>`:`<button class="btn sm" data-rkset="${esc(r.w)}" type="button">Change…</button> <button class="btn sm ghost" data-stignore="${esc(r.w)}" type="button">Ignore</button>`;
-      return `<tr class="${r.ignored?'excl':''} ${todo?'todo':''}"><td><input type="checkbox" data-nkcheck="${esc(r.w)}" ${sel.has(r.w)?'checked':''} aria-label="Select ${esc(r.w)}"></td><td>${r.isNew?'<span class="pill info">New</span> ':''}<span class="kwlink" data-rkopen="${esc(r.w)}">${esc(r.w)}</span>${r.h&&!r.isNew?`<div class="sub">${esc(r.h)}</div>`:''}</td><td class="num">${r.n}${r.live&&!r.isNew?` <span class="sub">(+${r.live})</span>`:''}</td><td>${LN[r.lg]||r.lg}</td><td class="sub">${r.isNew?'Just now':'Oct 1'}</td><td class="sub">${fresh?'Just now':'Today'}</td><td class="sub">${r.from}</td><td><span class="pill ${stt.c}">${esc(stt.t)}</span></td><td style="white-space:nowrap;text-align:right">${acts}</td></tr>`; }).join('')||'<tr><td colspan="9" class="sub">No keywords match. Words customers type are saved here automatically.</td></tr>'}</tbody></table>`;
+      return `<tr class="${r.ignored?'excl':''} ${todo?'todo':''}"><td><input type="checkbox" data-nkcheck="${esc(r.w)}" ${sel.has(r.w)?'checked':''} aria-label="Select ${esc(r.w)}"></td><td>${r.isNew?'<span class="pill info">New</span> ':''}<span class="kwlink" data-rkopen="${esc(r.w)}">${esc(r.w)}</span>${r.h&&!r.isNew?`<div class="sub">${esc(r.h)}</div>`:''}</td><td class="num">${r.n}${r.live&&!r.isNew?` <span class="sub">(+${r.live})</span>`:''}</td><td>${LN[r.lg]||r.lg}</td><td><span class="pill ${stt.c}">${esc(stt.t)}</span></td><td style="white-space:nowrap;text-align:right">${acts}</td></tr>`; }).join('')||'<tr><td colspan="6" class="sub">No keywords match. Words customers type are saved here automatically.</td></tr>'}</tbody></table>`;
     $('#stcount').textContent=list.length+' keywords shown'; window.__stbulk();
   };
   window.__stbulk=()=>{ $('#stbulk').innerHTML=stBulkHTML(); const all2=document.querySelector('[data-nkall]'); const l=window.__stshown||[]; if(all2) all2.checked=!!l.length&&l.every(r=>S.newSel.has(r.w)); document.querySelectorAll('[data-nkcheck]').forEach(c=>{ c.checked=S.newSel.has(c.dataset.nkcheck); }); };
   draw();
-  $('#stq').oninput=e=>{ S.stQ=e.target.value; draw(); }; $('#stl').onchange=e=>{ S.stLang=e.target.value; draw(); }; $('#stf').onchange=e=>{ S.stFrom=e.target.value; draw(); };
+  $('#stq').oninput=e=>{ S.stQ=e.target.value; draw(); }; $('#stl').onchange=e=>{ S.stLang=e.target.value; draw(); };
 }
 /* ---------- Merchant settings ---------- */
 function vSET(){
@@ -667,7 +659,7 @@ function vTEST(){
   const pass=all.filter(t=>t.ok).length; const kinds=[...new Set(all.map(t=>t.expected))];
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Tests</h2><div class="sub">Sample customer messages with the result the bot should give. Run them before every publish.</div></div><button class="btn pri" data-act="runTests" type="button">Run all tests</button></div>
     <div class="prog" style="margin-top:12px"><i id="prog" style="width:${S.testsRun?100:5}%"></i></div>
-    <div class="stats" style="margin-top:10px"><div class="stat"><b id="tp">${S.testsRun?pass:0}</b>passed</div><div class="stat"><b id="tf">${S.testsRun?all.length-pass:0}</b>failed</div><div class="stat"><b>${all.length}</b>total</div></div>
+    <div class="quiet"><b id="tp">${S.testsRun?pass:0}</b> passed · <b id="tf">${S.testsRun?all.length-pass:0}</b> failed · ${all.length} total</div>
     <div class="tools" style="margin-top:10px"><select id="tfil" aria-label="Filter"><option value="all">All results</option><option value="fail" ${f==='fail'?'selected':''}>Failed only</option>${kinds.map(k=>`<option value="${k}" ${f===k?'selected':''}>Should be ${k}</option>`).join('')}</select></div></div>
     <div class="card scroll"><table><thead><tr><th>Customer message</th><th>Merchant</th><th>Should be</th><th>Bot gave</th><th></th></tr></thead><tbody>
     ${list.map(t=>`<tr><td>${esc(t.message)}</td><td class="sub">${esc((D.merchants.find(m=>m.code===t.merchant)||{}).name)}</td><td><span class="pill info">${t.expected}</span>${t.expIntent?` <span class="mono sub">${esc(t.expIntent)}</span>`:''}</td><td><span class="pill ${t.ok?'ok':'bad'}">${t.got}</span>${t.gotIntent?` <span class="mono sub">${esc(t.gotIntent)}</span>`:''}</td><td>${t.ok?'<span class="pill ok">pass</span>':'<span class="pill bad">fail</span>'}</td></tr>`).join('')}</tbody></table></div>`;
