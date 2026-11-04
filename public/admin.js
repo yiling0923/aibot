@@ -26,7 +26,7 @@ function makeState(srv) {
     adv: false, rankExcluded: new Set(), rankWeek: 0, rankSort: { k: 'rank', d: 1 }, rankTab: 'all', rankSel: new Set(), rankQ: '', rankType: 'all', rankStatus: 'all', rankLang: 'all', rankShowEx: false,
     kwQ: '', kwLang: 'all', changes: [], kbFilter: '', kbStatus: 'all', kwTab: 'short', newSel: new Set(), stTab: 'all', stQ: '', stLang: 'all', stFrom: 'all', revTab: 'unmatched',
     kwJust: [], kwNew: new Set(), kwScroll: false, testsRun: false, testsStale: true, testFilter: 'all',
-    review: { unmatched: {}, handoff: {}, abuse: {}, done: {} }, history: srv.history,
+    history: srv.history,
   };
 }
 function saveDraft() {
@@ -43,7 +43,7 @@ function restoreDraft() {
 }
 function discardDraft() { if (confirm('Throw away all unpublished changes?')) { clearDraft(); location.reload(); } }
 
-/* ---------- keywords, ranking and review come from the server ---------- */
+/* ---------- keywords and ranking come from the server ---------- */
 let KW = [], KWMAP = {}, RKC = {};
 const RANK_TYPES_CLASS = (st) => st === 'Filler' ? 'filler' : st.startsWith('Question word') ? 'question' : st.startsWith('Greeting') ? 'greeting' : st.startsWith('Rude') ? 'rude' : 'other';
 function classify(w) {
@@ -61,23 +61,7 @@ async function loadKeywords() {
 async function loadRanking() {
   if (!RKC[S.rankWeek]) RKC[S.rankWeek] = await api(`/api/admin/ranking?merchant=${encodeURIComponent(S.merchant)}&week=${S.rankWeek}`);
 }
-async function loadReview() {
-  const m = S.merchant, r = await api('/api/admin/review?merchant=' + encodeURIComponent(m)), R = S.review;
-  R.unmatched[m] = r.unmatched.map((x) => [x.text, x.lang, x.hits, x.hint, x.isNew, x.id]);
-  R.handoff[m] = r.handoff.map((x) => [x.text, x.lang, x.why, x.when, x.id]);
-  R.abuse[m] = r.abuse.map((x) => [x.text, x.why, x.when, x.outcome, x.id]);
-  Object.keys(R.done).forEach((k) => { if (k.startsWith(m)) delete R.done[k]; });
-  r.unmatched.forEach((x, i) => { if (x.done) R.done[m + 'unmatched' + i] = x.done; });
-  r.handoff.forEach((x, i) => { if (x.done) R.done[m + 'handoff' + i] = x.done; });
-  r.abuse.forEach((x, i) => { if (x.done) R.done[m + 'abuse' + i] = x.done; });
-}
-async function loadMerchantData() { RKC = {}; await Promise.all([loadKeywords(), loadReview()]); }
-const idCol = { unmatched: 5, handoff: 4, abuse: 4 };
-function markDone(kind, i, label) {
-  S.review.done[S.merchant + kind + i] = label;
-  const row = (S.review[kind][S.merchant] || [])[i];
-  if (row) api('/api/admin/review/resolve', { kind, id: row[idCol[kind]], label }).catch(() => toast('Could not save that'));
-}
+async function loadMerchantData() { RKC = {}; await loadKeywords(); }
 function ignoreWord(w) { S.rankExcluded.add(w); api('/api/admin/keywords/ignore', { merchant: S.merchant, words: [w], ignored: true }).catch(() => toast('Could not save that')); }
 function unignoreWord(w) { S.rankExcluded.delete(w); api('/api/admin/keywords/ignore', { merchant: S.merchant, words: [w], ignored: false }).catch(() => toast('Could not save that')); }
 function rankRows(offArg) {
@@ -97,7 +81,6 @@ async function fetchTests() {
 async function prefetch() {
   if (S.view === 'rank') { await loadRanking(); }
   if (S.view === 'rank' || S.view === 'store') await loadKeywords();
-  if (S.view === 'rev') await loadReview();
   if (S.view === 'test' && (S.testsStale || !D.tests.length)) await fetchTests();
 }
 async function reloadAll() {
@@ -125,15 +108,14 @@ const LABEL={deposit:'Deposit',withdraw:'Withdrawal',password:'Password',verify:
 /* ---------- chrome ---------- */
 const NAV_ICON={kb:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M9 8h6"/></svg>',imp:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',kw:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20 4 12V4h8z"/><circle cx="8.5" cy="8.5" r="1"/></svg>',store:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',rank:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>',chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',test:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg>',rev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',set:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',hist:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'};
 /* The menu, in four groups. */
-const NAV_GROUPS=[['Answers',[['kb','Knowledge base'],['imp','Import']]],['Words',[['kw','Topics'],['store','Keywords'],['rank','Keyword ranking']]],['Check',[['chat','Test chat'],['test','Tests'],['rev','Needs review']]],['Setup',[['set','Merchant settings'],['hist','History']]]];
-function revCount(){ const r=S.review; return ['unmatched','handoff','abuse'].reduce((n,k)=>n+(r[k][S.merchant]||[]).filter((_,i)=>!r.done[S.merchant+k+i]).length,0); }
+const NAV_GROUPS=[['Answers',[['kb','Knowledge base'],['imp','Import']]],['Words',[['kw','Topics'],['store','Keywords'],['rank','Keyword ranking']]],['Check',[['chat','Test chat'],['test','Tests']]],['Setup',[['set','Merchant settings'],['hist','History']]]];
 function renderChrome(){
   $('#merchant').innerHTML=D.merchants.filter(m=>isAdmin()||m.code==='MERCH_A').map(m=>`<option value="${m.code}" ${m.code===S.merchant?'selected':''}>${esc(m.name)}</option>`).join('');
   $('#ver').innerHTML='<span class="vchip"><i></i>Live v'+S.ver+'</span>'+(S.changes.length?'<span class="vchip warn">Draft · '+S.changes.length+' change'+(S.changes.length>1?'s':'')+'</span><button class="btn sm ghost" data-act="discardDraft" type="button">Discard</button>':'');
   $('#publish').disabled=!S.changes.length; $('#publish').innerHTML='Publish'+(S.changes.length?' <span class="badge">'+S.changes.length+'</span>':'');
-  $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='rev'&&revCount()?`<span class="cnt">${revCount()}</span>`:''}${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
+  $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
 }
-async function render(){ renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,rev:vREV,test:vTEST,hist:vHIST})[S.view](); }
+async function render(){ renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,test:vTEST,hist:vHIST})[S.view](); }
 
 /* ---------- Knowledge base ---------- */
 function langState(e,l){ const t=e.translations[l]||{}; const a=(t.answer_text||'').trim(), n=(t.question_examples||[]).length; return a&&n>=3?'on':(a||n)?'part':''; }
@@ -338,7 +320,7 @@ async function loadSim(){
 }
 async function liveInfo(){ const el=document.getElementById('sim_live'); if(!el) return;
   try{ const s=await api('/api/keywords/summary?merchant='+encodeURIComponent(S.merchant));
-    el.innerHTML='Saved to Keywords for '+esc(M().name)+': <b>'+s.words+'</b> word'+(s.words===1?'':'s')+' · <b>'+s.unmatched+'</b> message'+(s.unmatched===1?'':'s')+' the bot did not understand. <button class="btn sm pri" data-kwgo="1" type="button">Keywords</button> <button class="btn sm" data-view="rank" type="button">Keyword ranking</button> <button class="btn sm" data-view="rev" type="button">Needs review</button>';
+    el.innerHTML='Saved to Keywords for '+esc(M().name)+': <b>'+s.words+'</b> word'+(s.words===1?'':'s')+' · <b>'+s.unmatched+'</b> message'+(s.unmatched===1?'':'s')+' the bot did not understand. <button class="btn sm pri" data-kwgo="1" type="button">Keywords</button> <button class="btn sm" data-view="rank" type="button">Keyword ranking</button>';
   }catch(e){ el.textContent=''; } }
 window.addEventListener('message',async e=>{ const d=e.data; if(!d||d.kind!=='botlog') return; const f=document.getElementById('sim'); if(!f||e.source!==f.contentWindow) return;
   await loadMerchantData(); renderChrome(); liveInfo(); if(d.fresh&&d.fresh.length) toast('Saved to Keywords: '+d.fresh.slice(0,5).join(', ')+(d.fresh.length>5?'…':'')); });
@@ -639,20 +621,6 @@ function vSET(){
       <label class="fld full"><span>Message when transferring to a human</span><textarea id="s_hand" lang="${S.mtab||'en'}">${esc(s.handoff[S.mtab||'en'])}</textarea></label></div></div>`;
 }
 
-/* ---------- Needs review ---------- */
-function vREV(){
-  const R=S.review, m=S.merchant, tab=S.revTab; const mk=(k)=>(R[k][m]||[]);
-  const cnt=k=>mk(k).filter((_,i)=>!R.done[m+k+i]).length;
-  let body='';
-  if(tab==='unmatched') body=mk('unmatched').map((r,i)=>[r,i]).sort((a,b)=>(b[0][4]?1:0)-(a[0][4]?1:0)).map(([r,i])=>`<div class="q ${R.done[m+'unmatched'+i]?'done':''}"><div><div class="t">${r[4]?'<span class="pill info">New</span> ':''}“${esc(r[0])}”</div><div class="sub">${LN[r[1]]} · asked ${r[2]} times this week · Suggestion: ${esc(r[3])}</div></div>
-      <div class="acts">${R.done[m+'unmatched'+i]?`<span class="pill ok">${esc(R.done[m+'unmatched'+i])}</span>`:`<button class="btn sm pri" data-newfrom="${i}" type="button">Write entry</button><button class="btn sm" data-kwfrom="${i}" type="button">Add as keyword</button><button class="btn sm" data-ign="unmatched${i}" type="button">Ignore</button>`}</div></div>`).join('')||'<div class="sub">Nothing to review.</div>';
-  if(tab==='handoff') body=mk('handoff').map((r,i)=>`<div class="q ${R.done[m+'handoff'+i]?'done':''}"><div><div class="t">“${esc(r[0])}”</div><div class="sub">${r[3]} · Why a human: ${esc(r[2])}</div></div><div class="acts">${R.done[m+'handoff'+i]?`<span class="pill ok">${esc(R.done[m+'handoff'+i])}</span>`:`<button class="btn sm" data-ign="handoff${i}" type="button">Mark as reviewed</button>`}</div></div>`).join('')||'<div class="sub">Nothing to review.</div>';
-  if(tab==='abuse') body=mk('abuse').map((r,i)=>`<div class="q ${R.done[m+'abuse'+i]?'done':''}"><div><div class="t">“${esc(r[0])}”</div><div class="sub">${r[2]} · ${esc(r[1])} · <b>${esc(r[3])}</b></div></div><div class="acts">${R.done[m+'abuse'+i]?`<span class="pill ok">${esc(R.done[m+'abuse'+i])}</span>`:`<button class="btn sm" data-ign="abuse${i}" data-lab="Reviewed" type="button">Reviewed</button>${/^Closed/.test(r[3])?`<button class="btn sm" data-reopen="${i}" type="button">Reopen chat</button>`:''}`}</div></div>`).join('')||'<div class="sub">Nothing to review.</div>';
-  $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Needs review · ${esc(M().name)}</h2><div class="sub">The fastest way to make the bot better is to check these every week.</div></div></div>
-    <div class="tabs" role="tablist" style="margin-top:8px">${[['unmatched','Not understood'],['handoff','Handed to a human'],['abuse','Rude messages']].map(([k,l])=>`<button type="button" role="tab" data-rev="${k}" aria-selected="${k===tab}">${l} (${cnt(k)})</button>`).join('')}</div>
-    <div style="margin-top:6px">${body}</div></div>`;
-}
-
 /* ---------- Tests ---------- */
 function vTEST(){
   const all=D.tests; const f=S.testFilter; const list=all.filter(t=>f==='all'||(f==='fail'?!t.ok:t.expected===f));
@@ -731,7 +699,6 @@ document.addEventListener('click',e=>{
   if(el=g('[data-rkweek]')){ S.rankWeek=Math.min(0,Math.max(-4,S.rankWeek+(+el.dataset.rkweek))); vRANK(); return; }
   if(el=g('[data-rksort]')){ const k=el.dataset.rksort; S.rankSort=S.rankSort.k===k?{k,d:-S.rankSort.d}:{k,d:1}; window.__rkdraw&&window.__rkdraw(); return; }
   if(el=g('[data-kw]')){ S.kwTab=el.dataset.kw; S.kwQ=''; S.kwJust=[]; S.kwNew=new Set(); vKW(); return; }
-  if(el=g('[data-rev]')){ S.revTab=el.dataset.rev; vREV(); return; }
   if(el=g('[data-mtab]')){ S.mtab=el.dataset.mtab; vSET(); return; }
   if(el=g('[data-rm]')){ const k=el.dataset.rm, i=+el.dataset.i, kk=el.dataset.k, l=el.dataset.l;
     if(k==='alias'){ const w=S.aliases[kk][l].splice(i,1)[0]; change('Removed short form "'+w+'" → '+kk); }
@@ -741,16 +708,7 @@ document.addEventListener('click',e=>{
     if(k==='small'){ const w=S.smalltalk[kk][l].splice(i,1)[0]; change('Removed greeting phrase "'+w+'"'); }
     if(k==='guard'){ const w=S.guard[kk][l].splice(i,1)[0]; change('Removed from block list "'+w+'" ('+kk+')'); }
     vKW(); return; }
-  if(el=g('[data-newfrom]')){ const r=S.review.unmatched[S.merchant][+el.dataset.newfrom]; markDone('unmatched',+el.dataset.newfrom,'entry drafted'); S.view='kb'; render(); openEditor(0,{lang:r[1],text:r[0]}); return; }
-  if(el=g('[data-kwfrom]')){ const i=+el.dataset.kwfrom; const r=S.review.unmatched[S.merchant][i]; openKwPop(i,r); return; }
-  if(el=g('[data-ign]')){ { const mm=/^([a-z]+)(\d+)$/.exec(el.dataset.ign); markDone(mm[1],+mm[2],el.dataset.lab||'reviewed'); } vREV(); renderChrome(); return; }
-  if(el=g('[data-reopen]')){ markDone('abuse',+el.dataset.reopen,'reopened'); vREV(); renderChrome(); toast('Chat reopened. Consider moving that word to the mild list.'); return; }
   if(el=g('[data-roll]')){ rollBack(el.dataset.roll); return; }
-  if(el=g('[data-pk]')){ const i=+el.dataset.pk, r=S.review.unmatched[S.merchant][i]; const v=$('#pk_v').value.trim(), kind=$('#pk_k').value; if(!v) return;
-    const lang=r[1];
-    if(kind==='alias'){ const k=$('#pk_m').value; S.mAliases[S.merchant].push({language:lang,variant:v.toLowerCase(),canonical:k}); change('Added short form "'+v+'" → '+k+' ('+M().name+')'); }
-    else { const k=$('#pk_a').value; if(!isAdmin()){ toast('Only admins can add question words'); return; } S.aspects[k][lang].push(v.toLowerCase()); change('Added question word "'+v+'" ('+k+')'); }
-    markDone('unmatched',i,'keyword added'); $('#layer').innerHTML=''; vREV(); return; }
   if(el=g('[data-act]')){ const a=el.dataset.act;
     if(a==='newEntry') openEditor(0);
     if(a==='closeEd'){ ED=null; $('#layer').innerHTML=''; }
@@ -781,14 +739,6 @@ document.addEventListener('click',e=>{
 document.addEventListener('input',e=>{ const t=e.target;
   if(t.id==='s_ans'){ t.closest('.full').querySelector('.fld span').textContent='Answer when the match is at least '+(+t.value).toFixed(2); }
   if(t.id==='s_cl'){ t.closest('.full').querySelector('.fld span').textContent='Ask with buttons when the match is at least '+(+t.value).toFixed(2); } });
-function openKwPop(i,r){
-  $('#layer').innerHTML=`<div class="ov c" data-close="1"><div class="pane modal" role="dialog" aria-label="Add keyword"><h2>Add as keyword</h2><div class="sub">From “${esc(r[0])}” (${LN[r[1]]})</div>
-    <div class="form"><label class="fld full"><span>Word or phrase from the message</span><input type="text" id="pk_v" value="${esc(r[0].split(' ')[0])}"></label>
-    <label class="fld"><span>It is a</span><select id="pk_k"><option value="alias">Short form of a topic</option><option value="aspect" ${isAdmin()?'':'disabled'}>Question word (admin)</option></select></label>
-    <label class="fld"><span>Topic it means</span><select id="pk_m">${Object.keys(S.aliases).map(k=>`<option>${k}</option>`).join('')}</select></label>
-    <label class="fld"><span>Or question type</span><select id="pk_a">${Object.keys(S.aspects).map(k=>`<option>${k}</option>`).join('')}</select></label></div>
-    <div class="head"><button class="btn" data-act="closeEd" type="button">Cancel</button><button class="btn pri" data-pk="${i}" type="button">Add to draft</button></div></div></div>`;
-}
 $('#merchant').onchange=async e=>{S.merchant=e.target.value; S.newSel.clear(); S.rankSel.clear(); await loadMerchantData(); render();};
 $('#role').onchange=async e=>{S.role=e.target.value; if(S.role==='staff'&&S.merchant!=='MERCH_A'){ S.merchant='MERCH_A'; await loadMerchantData(); } render();};
 $('#publish').onclick=openPublish;

@@ -11,12 +11,6 @@ export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: M
 
 const q = async <T extends RowDataPacket = RowDataPacket>(pool: Pool, sql: string, p: unknown[] = []) => (await pool.query<T[]>(sql, p))[0];
 
-/** "Today 10:42", "Yesterday 21:03", "3 days ago" */
-function whenLabel(d: Date): string {
-  const now = new Date(), day = (x: Date) => Math.floor(new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime() / 86400000);
-  const diff = day(now) - day(d), hm = d.toTimeString().slice(0, 5);
-  return diff <= 0 ? `Today ${hm}` : diff === 1 ? `Yesterday ${hm}` : `${diff} days ago`;
-}
 const ago = (d: Date) => {
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
   return s < 90 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} hours ago` : `${Math.round(s / 86400)} days ago`;
@@ -136,25 +130,5 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     }).sort((a, b) => b.n - a.n || a.w.localeCompare(b.w));
     const [d] = await q(pool, 'SELECT DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL ? DAY), "%b %e") AS a, DATE_FORMAT(DATE_ADD(CURDATE(), INTERVAL ? DAY), "%b %e") AS b', [week * 7 - 6, week * 7]);
     return { rows, total, from: d.a, to: d.b };
-  });
-
-  /* ---------- needs review ---------- */
-  app.get<{ Querystring: { merchant: string } }>(`${A}/review`, async (req) => {
-    const m = req.query.merchant;
-    const unmatched = (await q(pool, `SELECT u.id, u.text, u.language, u.hits, u.suggestion, u.resolution, u.first_seen FROM unmatched_messages u JOIN merchants m ON m.id = u.merchant_id
-      WHERE m.code = ? ORDER BY u.last_seen DESC LIMIT 100`, [m])).map((r) => ({ id: Number(r.id), text: r.text, lang: r.language ?? 'en', hits: Number(r.hits), hint: r.suggestion ?? 'Write a new entry, or add a keyword', done: r.resolution, isNew: Date.now() - r.first_seen.getTime() < 86400000 }));
-    const decisions = async (kind: string) => q(pool, `SELECT d.id, d.why, d.reviewed, d.created_at, cm.text, cs.language FROM bot_decisions d JOIN chat_messages cm ON cm.id = d.message_id
-      JOIN chat_sessions cs ON cs.id = cm.session_id JOIN merchants m ON m.id = cs.merchant_id WHERE m.code = ? AND d.decision = ? ORDER BY d.created_at DESC LIMIT 100`, [m, kind]);
-    const handoff = (await decisions('HANDOFF')).map((r) => ({ id: Number(r.id), text: r.text, lang: r.language ?? 'en', why: r.why ?? '', when: whenLabel(r.created_at), done: r.reviewed }));
-    const abuse = (await decisions('ABUSE')).map((r) => { const [why, outcome] = String(r.why ?? '').split(' || '); return { id: Number(r.id), text: r.text, why: why ?? '', outcome: outcome ?? '', when: whenLabel(r.created_at), done: r.reviewed }; });
-    return { unmatched, handoff, abuse };
-  });
-
-  app.post<{ Body: { kind: 'unmatched' | 'handoff' | 'abuse'; id: number; label: string | null } }>(`${A}/review/resolve`, async (req, reply) => {
-    const { kind, id, label } = req.body;
-    if (kind === 'unmatched') await pool.query('UPDATE unmatched_messages SET resolution = ? WHERE id = ?', [label, id]);
-    else if (kind === 'handoff' || kind === 'abuse') await pool.query('UPDATE bot_decisions SET reviewed = ? WHERE id = ?', [label, id]);
-    else return reply.code(400).send({ error: 'unknown kind' });
-    return { ok: true };
   });
 }
