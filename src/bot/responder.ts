@@ -11,10 +11,10 @@ const T: any = Texts;
 /** One chat. The server keeps this between messages; the website only sends the signed token once. */
 export interface Session {
   id: string; merchant: string; token: string | null;
-  abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
+  draft: string | null; abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
 }
-export const newSession = (id: string, merchant: string, token: string | null): Session =>
-  ({ id, merchant, token, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
+export const newSession = (id: string, merchant: string, token: string | null, draft: string | null = null): Session =>
+  ({ id, merchant, token, draft, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
 
 export interface BotMsg { kind: 'bot' | 'sys' | 'sys warn' | 'sys bad'; text: string }
 export interface Button { kind: 'intent' | 'topic' | 'status' | 'amt' | 'agent'; key: string; label: string; amt?: number }

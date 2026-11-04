@@ -11,7 +11,7 @@ import type {
 
 const CJK_RE = /[一-鿿]/;
 const escRe = (p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-const THRESH = { answer: 0.72, gap: 0.05, clarify: 0.45 };
+const GAP = 0.05;   // the best match must beat the second by this much (the answer / clarify limits are per merchant)
 const ASPECT_ORDER = ['time', 'limit', 'change', 'hours', 'how'];
 const ACCT_TOPICS = ['balance', 'transactions', 'points'];
 const TOOLNAME: Record<string, string> = { balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
@@ -218,7 +218,7 @@ export class Engine {
 
     let small: string | null = (abuseHit.length || guard) ? null : this.smalltalk(raw); let smallFallback = false;
     const remTok = (n.text.match(/[a-z0-9_]+|[一-鿿]/g) || []).length;
-    if (!small && !abuseHit.length && !guard && stripped !== raw && top.score < THRESH.clarify && remTok <= 3 && !ks.strong.length && !Tav.length && !acctKinds.length) { small = 'greeting'; smallFallback = true; }
+    if (!small && !abuseHit.length && !guard && stripped !== raw && top.score < m.clarifyThreshold && remTok <= 3 && !ks.strong.length && !Tav.length && !acctKinds.length) { small = 'greeting'; smallFallback = true; }
 
     let decision: Decision, why: string, options: Option[] = [], topic: string | null = null, conf = top.score;
     let via: 'similarity' | 'keywords' = 'similarity'; let dir: 'deposit' | 'withdraw' | null = null; let ctxDir: string | null = null;
@@ -249,13 +249,13 @@ export class Engine {
     }
     else if (Tav.length === 1) { decision = 'CHOICE'; via = 'keywords'; conf = 0.9; topic = Tav[0]; options = this.availIntents(m, topic).map((k): Option => ({ kind: 'intent', key: k })); why = 'The sentence has the topic "' + topic + '" but not what the customer wants to know, so show buttons instead of guessing.'; }
     else if (Tav.length > 1) { decision = 'CHOICE'; via = 'keywords'; conf = 0.9; options = Tav.map((x): Option => ({ kind: 'topic', key: x })); why = 'The sentence names several topics, so let the customer pick one.'; }
-    else if (ks.A.length && shortMsg && ks.partial.some((p) => p.aOk) && !(top.score >= THRESH.answer && top.score - second.score >= THRESH.gap)) {
+    else if (ks.A.length && shortMsg && ks.partial.some((p) => p.aOk) && !(top.score >= m.answerThreshold && top.score - second.score >= GAP)) {
       decision = 'CLARIFY'; via = 'keywords'; options = ks.partial.filter((p) => p.aOk).slice(0, 3).map((p): Option => ({ kind: 'intent', key: p.intent }));
       why = 'A keyword ("' + ks.A.join('", "') + '") but no topic, so show the matching questions as buttons.';
     }
-    else if (top.score >= THRESH.answer && top.score - second.score >= THRESH.gap) { decision = 'ANSWER'; why = 'No keywords, but the sentence is very close to a KB example.'; }
-    else if (top.score >= THRESH.clarify) {
-      if (clarifyCount < 1) { decision = 'CLARIFY'; options = [cands[0], cands[1]].map((c): Option => ({ kind: 'intent', key: c.intent })); why = top.score >= THRESH.answer ? 'Two topics score almost the same, so show both as buttons.' : 'Score is in the middle, so show the two closest as buttons.'; }
+    else if (top.score >= m.answerThreshold && top.score - second.score >= GAP) { decision = 'ANSWER'; why = 'No keywords, but the sentence is very close to a KB example.'; }
+    else if (top.score >= m.clarifyThreshold) {
+      if (clarifyCount < 1) { decision = 'CLARIFY'; options = [cands[0], cands[1]].map((c): Option => ({ kind: 'intent', key: c.intent })); why = top.score >= m.answerThreshold ? 'Two topics score almost the same, so show both as buttons.' : 'Score is in the middle, so show the two closest as buttons.'; }
       else { decision = 'HANDOFF'; why = 'Still unclear after one round of buttons, so a human takes over.'; }
     } else { decision = 'HANDOFF'; why = 'No keywords found and no KB entry is close enough.'; }
 

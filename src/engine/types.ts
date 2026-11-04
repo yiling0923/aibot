@@ -21,7 +21,7 @@ export interface MerchantCfg {
   code: string; name: string; tone: 'friendly' | 'formal'; defaultLanguage: Lang;
   livechatGroupId: number | null; handoffGroupId: number | null;
   closing: Partial<Record<Lang, string>>; handoff: Partial<Record<Lang, string>>;
-  abuseCloseAfter: number; kindReply: Partial<Record<Lang, string>>;
+  abuseCloseAfter: number; answerThreshold: number; clarifyThreshold: number; kindReply: Partial<Record<Lang, string>>;
   aliases: { language: string; variant: string; canonical: string }[];   // merchant-only keywords
   tools: string[];                                                      // enabled account tools
   limits: Partial<Record<'deposit' | 'withdraw', [number, number]>>;

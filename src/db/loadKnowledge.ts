@@ -12,7 +12,7 @@ const group = (rows: RowDataPacket[]): WordMap => {
 export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
   const q = async (sql: string) => (await pool.query<RowDataPacket[]>(sql))[0];
   const [merchants, aliases, limits, tools, entries, trans, aspects, small, guard, fillers] = await Promise.all([
-    q(`SELECT m.id, m.code, m.name, m.default_language, m.livechat_group_id, m.handoff_group_id, s.tone, s.closing_msg, s.handoff_msg, s.abuse_close_after, s.kind_reply
+    q(`SELECT m.id, m.code, m.name, m.default_language, m.livechat_group_id, m.handoff_group_id, s.tone, s.closing_msg, s.handoff_msg, s.abuse_close_after, s.answer_threshold, s.clarify_threshold, s.kind_reply
        FROM merchants m JOIN merchant_settings s ON s.merchant_id = m.id WHERE m.status = 'active' ORDER BY m.id`),
     q('SELECT merchant_id, language, variant, canonical FROM aliases ORDER BY id'),
     q('SELECT merchant_id, kind, CAST(min_amount AS DOUBLE) AS lo, CAST(max_amount AS DOUBLE) AS hi FROM merchant_limits'),
@@ -32,7 +32,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
     const cfg: MerchantCfg = {
       code: m.code, name: m.name, tone: m.tone, defaultLanguage: m.default_language,
       livechatGroupId: m.livechat_group_id, handoffGroupId: m.handoff_group_id,
-      closing: asJson(m.closing_msg, {}), handoff: asJson(m.handoff_msg, {}), abuseCloseAfter: m.abuse_close_after, kindReply: asJson(m.kind_reply, {}),
+      closing: asJson(m.closing_msg, {}), handoff: asJson(m.handoff_msg, {}), abuseCloseAfter: m.abuse_close_after, answerThreshold: Number(m.answer_threshold), clarifyThreshold: Number(m.clarify_threshold), kindReply: asJson(m.kind_reply, {}),
       aliases: [], tools: [], limits: {},
     };
     byMerchantId.set(Number(m.id), cfg);

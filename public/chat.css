@@ -96,3 +96,7 @@ pre.json{margin:0;background:var(--surface2);border-radius:8px;padding:9px 11px;
 .rule{display:flex;flex-wrap:wrap;gap:6px}
 .note{font-size:12px;color:var(--muted)}
 .foot{font-size:12px;color:var(--muted);max-width:90ch}
+
+/* Inside the control panel's Test chat tab the panel already has a heading. */
+body.embedded .top > div:first-child{display:none}
+body.embedded .top{justify-content:flex-end}

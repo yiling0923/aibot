@@ -12,7 +12,7 @@ Everything here runs on your own computer. Nothing is connected to LiveChat yet 
 | 2. Bot engine in TypeScript, **all 149 acceptance cases pass** | done |
 | 3. AI layer (Claude picks, ChatGPT writes) | next |
 | 4. Chat test page + automatic keyword saving | done |
-| 5. Control panel | |
+| 5. Control panel | done |
 | 6. Account lookup and login token | |
 | 7. Hardening | |
 | 8. LiveChat connection | |
@@ -34,6 +34,10 @@ npm run dev                       # starts the bot on http://localhost:3000
 
 Open **http://localhost:3000** for the test chat page: pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
 Every word you type is saved to the keyword store, and messages the bot did not understand are saved for review.
+
+Open **http://localhost:3000/admin** for the control panel. Edit entries, topics, keywords and settings, try them in the Test chat tab,
+run the tests, and press **Publish**: the bot uses the new version straight away. Every publish is saved in History and can be rolled back.
+Your edits stay a draft in the browser until you publish. "Signed in as" only changes what the screens show; real logins come in phase 7.
 
 Or try the API directly:
 

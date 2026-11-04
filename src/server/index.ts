@@ -10,6 +10,7 @@ import { Bot, newSession, type Session, type Turn } from '../bot/responder';
 import { makeToken, checkToken } from '../bot/token';
 import { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
+import { adminRoutes, ensureVersion } from '../admin/routes';
 
 const app = Fastify({ logger: true });
 await app.register(fastifyStatic, { root: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public') });
@@ -17,12 +18,18 @@ await app.register(fastifyStatic, { root: path.resolve(path.dirname(fileURLToPat
 let bot: Bot | null = null;
 const store = new Store(getPool());
 const sessions = new Map<string, Session>();
+const drafts = new Map<string, Bot>();      // copies of the bot built from the control panel's unpublished changes
 async function getBot(reload = false) {
   if (!bot || reload) bot = new Bot(await loadKnowledge(getPool()));
   return bot;
 }
+/** The bot a chat talks to: the published one, or a draft copy when the control panel's Test chat opened it. */
+async function botFor(s: Session) { return (s.draft && drafts.get(s.draft)) || (await getBot()); }
+adminRoutes(app, { pool: getPool(), reloadBot: () => getBot(true), drafts });
+await ensureVersion(getPool()).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
 app.get('/', async (_req, reply) => reply.redirect('/chat.html'));
+app.get('/admin', async (_req, reply) => reply.redirect('/admin.html'));
 
 app.get('/health', async () => {
   let db = 'down';
@@ -31,8 +38,8 @@ app.get('/health', async () => {
 });
 
 /** Merchants for the chat page selector. */
-app.get('/api/merchants', async () => {
-  const b = await getBot();
+app.get<{ Querystring: { draft?: string } }>('/api/merchants', async (req) => {
+  const b = (req.query.draft && drafts.get(req.query.draft)) || (await getBot());
   return b.knowledge.merchants.map((m) => ({ code: m.code, name: m.name, tone: m.tone, defaultLanguage: m.defaultLanguage }));
 });
 
@@ -49,36 +56,46 @@ app.get('/api/dev/customers', async (_req, reply) => {
   ];
 });
 
+/** The short reason saved with a decision (shown in Needs review). */
+function whyOf(tr: Record<string, unknown>): string {
+  if (tr.decision === 'ABUSE') {
+    const hit = (tr.abuseHit as string[]).join(', ');
+    return `Rude word: ${hit} || ${tr.close ? `Closed after ${tr.strike} rude messages` : `Replied kindly (${tr.strike} of ${tr.limit || 'no limit'})`}`;
+  }
+  return String(tr.why ?? '');
+}
 const turnJson = (s: Session, t: Turn | null) => ({ closed: s.closed, handed: s.handed, turn: t });
 
 /** Starts a chat. The website sends the merchant code and (if the customer is logged in) the signed token. */
-app.post<{ Body: { merchant: string; token?: string | null } }>('/api/chat/start', async (req, reply) => {
-  const b = await getBot(); const { merchant, token = null } = req.body ?? ({} as never);
+app.post<{ Body: { merchant: string; token?: string | null; draft?: string | null } }>('/api/chat/start', async (req, reply) => {
+  const { merchant, token = null, draft = null } = req.body ?? ({} as never);
+  const b = (draft && drafts.get(draft)) || (await getBot());
   if (!merchant || !b.engine.hasMerchant(merchant)) return reply.code(404).send({ error: `unknown merchant ${merchant}` });
-  const s = newSession(randomUUID(), merchant, token); sessions.set(s.id, s);
+  const s = newSession(randomUUID(), merchant, token, draft && drafts.has(draft) ? draft : null); sessions.set(s.id, s);
   return { sessionId: s.id, greeting: b.greeting(s), identity: checkToken(token), merchant: { code: merchant, name: b.engine.merchant(merchant).name } };
 });
 
 /** A typed message. */
 app.post<{ Body: { sessionId: string; text: string; silent?: boolean } }>('/api/chat/message', async (req, reply) => {
-  const b = await getBot(); const { sessionId, text, silent } = req.body ?? ({} as never);
+  const { sessionId, text, silent } = req.body ?? ({} as never);
   const s = sessions.get(sessionId); if (!s) return reply.code(404).send({ error: 'unknown session, start a new chat' });
+  const b = await botFor(s);
   const t = b.message(s, String(text ?? ''));
   if (!t) return { closed: s.closed, handed: s.handed, turn: null };
   let saved: { fresh: string[]; unmatched: boolean } = { fresh: [], unmatched: false };
   if (t.log && !silent) {
     saved = await store.hear(s.merchant, t.log.text, t.log.lang as Lang, t.log.notUnderstood);
     void store.logTurn({ merchant: s.merchant, sessionKey: s.id, customerRef: null, text: t.log.text, lang: t.log.lang as Lang, decision: t.log.decision,
-      confidence: Number(t.trace.conf ?? 0), reply: t.messages.map((m) => m.text).join('\n'), matchedKbId: (t.trace.decision === 'ANSWER' ? (t.trace.top as { id: number }).id : null) });
+      confidence: Number(t.trace.conf ?? 0), reply: t.messages.map((m) => m.text).join('\n'), matchedKbId: (t.trace.decision === 'ANSWER' ? (t.trace.top as { id: number }).id : null), why: whyOf(t.trace) });
   }
   return { closed: s.closed, handed: s.handed, turn: t, saved };
 });
 
 /** A tapped button. */
 app.post<{ Body: { sessionId: string; kind: string; key: string; amt?: number; label: string; lang: Lang } }>('/api/chat/pick', async (req, reply) => {
-  const b = await getBot(); const body = req.body ?? ({} as never);
+  const body = req.body ?? ({} as never);
   const s = sessions.get(body.sessionId); if (!s) return reply.code(404).send({ error: 'unknown session, start a new chat' });
-  const t = b.pick(s, body);
+  const t = (await botFor(s)).pick(s, body);
   return turnJson(s, t);
 });
 

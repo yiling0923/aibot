@@ -28,15 +28,16 @@ export class Store {
   }
 
   /** Returns the words that were new to this merchant's keyword store. */
-  async hear(merchant: string, text: string, lang: Lang, notUnderstood: boolean): Promise<{ fresh: string[]; unmatched: boolean }> {
+  async hear(merchant: string, text: string, lang: Lang, notUnderstood: boolean, source: 'live' | 'test' = 'test'): Promise<{ fresh: string[]; unmatched: boolean }> {
     try {
       const mid = await this.merchantId(merchant); if (mid == null) return { fresh: [], unmatched: false };
       const words = tokensOf(text); const fresh: string[] = [];
       for (const w of words) {
         const wl: Lang = /[一-鿿]/.test(w) ? 'zh' : lang;
         const [r] = await this.pool.query<ResultSetHeader>(
-          'INSERT INTO keyword_store(merchant_id, word, language) VALUES(?,?,?) ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = CURRENT_TIMESTAMP', [mid, w, wl]);
+          'INSERT INTO keyword_store(merchant_id, word, language, source) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = CURRENT_TIMESTAMP', [mid, w, wl, source]);
         if (r.affectedRows === 1) fresh.push(w);          // 1 = inserted, 2 = updated an existing row
+        await this.pool.query('INSERT INTO keyword_daily(merchant_id, word, day, hits) VALUES(?,?,CURDATE(),1) ON DUPLICATE KEY UPDATE hits = hits + 1', [mid, w]);
       }
       if (notUnderstood) await this.pool.query(
         'INSERT INTO unmatched_messages(merchant_id, text, language) VALUES(?,?,?) ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = CURRENT_TIMESTAMP, resolved = false',
@@ -46,15 +47,15 @@ export class Store {
   }
 
   /** Writes the conversation log (used for review and, later, for LiveChat). */
-  async logTurn(p: { merchant: string; sessionKey: string; customerRef: string | null; text: string; lang: Lang; decision: string; confidence: number; reply: string; matchedKbId: number | null }) {
+  async logTurn(p: { merchant: string; sessionKey: string; customerRef: string | null; text: string; lang: Lang; decision: string; confidence: number; reply: string; matchedKbId: number | null; why?: string }) {
     try {
       const mid = await this.merchantId(p.merchant); if (mid == null) return;
       await this.pool.query('INSERT INTO chat_sessions(merchant_id, livechat_chat_id, customer_ref, language, status) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE language = VALUES(language)',
         [mid, p.sessionKey, p.customerRef, p.lang, 'open']);
       const [s] = await this.pool.query<RowDataPacket[]>('SELECT id FROM chat_sessions WHERE livechat_chat_id = ?', [p.sessionKey]);
       const [m] = await this.pool.query<ResultSetHeader>('INSERT INTO chat_messages(session_id, role, text) VALUES(?,?,?)', [s[0].id, 'customer', p.text]);
-      await this.pool.query('INSERT INTO bot_decisions(message_id, decision, matched_kb_id, confidence, reply_text) VALUES(?,?,?,?,?)',
-        [m.insertId, p.decision, p.matchedKbId, p.confidence, p.reply]);
+      await this.pool.query('INSERT INTO bot_decisions(message_id, decision, matched_kb_id, confidence, reply_text, why) VALUES(?,?,?,?,?,?)',
+        [m.insertId, p.decision, p.matchedKbId, p.confidence, p.reply, (p.why ?? '').slice(0, 500)]);
     } catch (e) { console.error('store.logTurn failed', e); }
   }
 
