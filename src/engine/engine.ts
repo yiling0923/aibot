@@ -81,6 +81,11 @@ export class Engine {
   hasMerchant(code: string) { return this.merchants.has(code); }
   merchant(code: string) { return this.merchants.get(code)!; }
   entriesOf(code: string) { return this.entries.get(code) ?? []; }
+  entry(code: string, intentKey: string) { return this.entriesOf(code).find((e) => e.intentKey === intentKey); }
+  /** The intents of a topic that this merchant has an answer for (the buttons shown after a topic word). */
+  intentsOfTopic(code: string, topic: string) { const m = this.merchants.get(code); return m ? this.availIntents(m, topic) : []; }
+  /** The first-level topic buttons (deposit, withdraw...) this merchant can answer. */
+  topicButtons(code: string): Option[] { return ['deposit', 'withdraw', 'password', 'promotion'].filter((x) => this.intentsOfTopic(code, x).length).map((x): Option => ({ kind: 'topic', key: x })); }
 
   /* ---------- text helpers ---------- */
   private aliasesFor(m: MerchantCfg): [string, string][] {

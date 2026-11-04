@@ -16,7 +16,7 @@ export async function seed(pool: Pool = getPool()) {
   try {
     // TRUNCATE ends any transaction in MySQL, so clear the tables first (ids restart at 1), then load everything in one transaction.
     await c.query('SET FOREIGN_KEY_CHECKS = 0');
-    for (const t of ['feedback', 'bot_decisions', 'chat_messages', 'chat_sessions', 'eval_cases', 'kb_translations', 'kb_entries', 'kb_categories',
+    for (const t of ['keyword_store', 'unmatched_messages', 'feedback', 'bot_decisions', 'chat_messages', 'chat_sessions', 'eval_cases', 'kb_translations', 'kb_entries', 'kb_categories',
       'aliases', 'aspects', 'smalltalk_phrases', 'guard_phrases', 'filler_words', 'merchant_tools', 'merchant_limits', 'merchant_settings', 'merchants'])
       await c.query(`TRUNCATE TABLE ${t}`);
     await c.query('SET FOREIGN_KEY_CHECKS = 1');

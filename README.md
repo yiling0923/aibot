@@ -11,7 +11,7 @@ Everything here runs on your own computer. Nothing is connected to LiveChat yet 
 | 1. Database (schema, migrations, fake template data) | done |
 | 2. Bot engine in TypeScript, **all 149 acceptance cases pass** | done |
 | 3. AI layer (Claude picks, ChatGPT writes) | next |
-| 4. Chat test page + automatic keyword saving | |
+| 4. Chat test page + automatic keyword saving | done |
 | 5. Control panel | |
 | 6. Account lookup and login token | |
 | 7. Hardening | |
@@ -29,10 +29,13 @@ npm install
 npm run db:migrate                # creates the tables
 npm run db:seed                   # loads the 3 fake merchants (LuckyPay, SwiftWallet, MegaPlay)
 npm test                          # runs the tests
-npm run dev                       # starts the API on http://localhost:3000
+npm run dev                       # starts the bot on http://localhost:3000
 ```
 
-Try it:
+Open **http://localhost:3000** for the test chat page: pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
+Every word you type is saved to the keyword store, and messages the bot did not understand are saved for review.
+
+Or try the API directly:
 
 ```bash
 curl localhost:3000/health

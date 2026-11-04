@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>LiveChat AI bot, test chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap">
+<link rel="stylesheet" href="/chat.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>LiveChat AI bot, test chat</h1>
+      <p>Pick a merchant and type like a customer. The panel on the right shows each step the bot takes. When the message is too short to tell, the bot shows buttons and the customer taps one. Choose who is chatting (as the merchant website would send it) to see account lookups. This runs on your own computer with the data in your database. Every word you type is saved to Keywords automatically.</p>
+    </div>
+    <div class="seg" id="merchants" role="group" aria-label="Merchant"></div>
+  </div>
+
+  <div class="grid">
+    <div class="col">
+      <section class="who" aria-label="Data the merchant website sends with the chat">
+        <div class="who-h"><b>Website sends with the chat</b><span class="note">fake customers, signed with your secret</span></div>
+        <div class="seg small" id="whoBtns" role="group" aria-label="Who is chatting"></div>
+        <div class="whoinfo" id="whoInfo"></div>
+      </section>
+      <section class="chat" aria-label="Customer chat window">
+        <div class="chat-h">
+          <div class="av" id="av">LP</div>
+          <div><div class="nm" id="mname">LuckyPay</div><div class="st"><span class="dot"></span><span id="mstat">Online</span></div></div>
+          <span class="badge">AI assistant</span>
+        </div>
+        <div class="msgs" id="msgs" aria-live="polite"></div>
+        <form class="in" id="form">
+          <input id="inp" autocomplete="off" placeholder="Type a message…" aria-label="Message">
+          <button id="send" type="submit">Send</button>
+        </form>
+      </section>
+      <section class="try">
+        <h2>Try these messages</h2>
+        <div id="chips"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="btn ghost" id="reset" type="button">New chat</button><span class="note" id="saved">Nothing saved yet.</span></div>
+      </section>
+    </div>
+
+    <section class="brain" aria-label="Bot reasoning">
+      <div class="brain-h"><h2>What the bot did with the last message</h2><span class="tag">live</span></div>
+      <div id="brain"></div>
+    </section>
+  </div>
+</div>
+<script src="/chat.js"></script>
+</body>
+</html>
