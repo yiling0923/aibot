@@ -272,3 +272,6 @@ details.fold[open]>summary{margin-bottom:8px}
 .pod-trend svg{width:100%;max-width:260px;height:auto}
 .pod-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .pods{display:flex;gap:6px;flex-wrap:wrap}
+
+/* an element marked hidden must really be hidden, even where a rule above sets its display */
+[hidden]{display:none !important}
