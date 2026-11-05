@@ -5,7 +5,7 @@ const fmtAmt = (n) => 'RM' + Number(n).toLocaleString('en-US');
 const ACC = { MERCH_A: '#0E7C86', MERCH_B: '#3A4FA3', MERCH_C: '#B4541A' };
 const LANGN = { zh: '中文', ms: 'Bahasa Melayu', en: 'English' };
 const DEC = { AMOUNT: ['info', 'Amount message'], ACCOUNT: ['info', 'Account lookup'], REFUSE: ['warn', 'Refuse for security'], SMALLTALK: ['info', 'Greeting'], ANSWER: ['ok', 'Answer'],
-  CLARIFY: ['warn', 'Show 2 buttons'], CHOICE: ['info', 'Show choice buttons'], HANDOFF: ['warn', 'Hand off to human'], ABUSE: ['warn', 'Reply kindly'] };
+  CLARIFY: ['warn', 'Show 2 buttons'], CHOICE: ['info', 'Show choice buttons'], HANDOFF: ['warn', 'Hand off to human'], REASK: ['warn', 'Ask again first'], ABUSE: ['warn', 'Reply kindly'] };
 const CHIPS = [['Answer', ['depo how', 'dep belum masuk lah', '怎么充值', 'wd lambat sangat', 'any promo for new member?', 'cs buka pukul berapa']],
   ['My account', ['my deposit still pending', 'wd lambat sangat', '我的存款还没到账', 'how long deposit take']],
   ['Account data', ['my balance', 'baki akaun saya berapa', '我的余额是多少', 'show my transaction history', 'my points', 'my bonus points']],
@@ -120,6 +120,7 @@ function renderBrain(t) {
   if (t.decision === 'REFUSE') html += stepHTML(3, 'Polite refusal', '<span class="pill warn">security</span>', '<span class="sub">Fixed refusal message and an agent button. No lookup is made, and nothing is read out even for a verified customer.</span>');
   else if (t.decision === 'ANSWER' && !t.acct) html += stepHTML(6, 'Reply written (tone: ' + tone + ')', '<span class="pill ok">KB answer only</span>', `<span class="sub">Uses only the KB answer: “${esc(t.kbAnswer)}”</span>`);
   if (t.decision === 'CHOICE' || t.decision === 'CLARIFY') html += stepHTML(6, 'Bot shows buttons', '', `<span class="sub">${t.options.map((o) => esc(o.label)).join(' · ')} · ${esc(t.agentLabel)}</span><div class="sub" style="margin-top:3px">A tap sends a fixed value, so the next step needs no guessing.</div>`);
+  if (t.decision === 'REASK') html += stepHTML(6, 'Bot asks again', '', `<span class="sub">${t.options.map((o) => esc(o.label)).join(' · ')} · ${esc(t.agentLabel)}</span><div class="sub" style="margin-top:3px">This was the first miss. If the next message is also not understood, the chat goes to a human.</div>`);
   if (t.decision === 'HANDOFF') html += stepHTML(t.guard ? 3 : 6, 'Transfer', '', `<span class="sub">Chat goes to human group ${esc(m.handoffGroupId)} with a short summary.</span>`);
   if (t.decision === 'ABUSE') html += stepHTML(3, t.close ? 'Close' : 'Kind reply', t.close ? '' : '<span class="pill ok">friendly tone</span>',
     `<span class="sub">${t.close ? 'The customer was rude ' + t.strike + ' times, so the closing message is sent and the chat is closed. Logged for review.' : 'A calm, friendly reply that asks for the problem and offers an agent. The chat stays open. It closes after ' + (t.limit ? t.limit : 'no') + ' rude messages.'}</span>`);

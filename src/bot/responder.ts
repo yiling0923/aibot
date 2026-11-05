@@ -11,10 +11,10 @@ const T: any = Texts;
 /** One chat. The server keeps this between messages; the website only sends the signed token once. */
 export interface Session {
   id: string; merchant: string; token: string | null;
-  draft: string | null; abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
+  draft: string | null; misses: number; abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
 }
 export const newSession = (id: string, merchant: string, token: string | null, draft: string | null = null): Session =>
-  ({ id, merchant, token, draft, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
+  ({ id, merchant, token, draft, misses: 0, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
 
 export interface BotMsg { kind: 'bot' | 'sys' | 'sys warn' | 'sys bad'; text: string }
 export interface Button { kind: 'intent' | 'topic' | 'status' | 'amt' | 'agent'; key: string; label: string; amt?: number }
@@ -139,6 +139,11 @@ export class Bot {
     const r = this.engine.analyze(query, s.merchant, s.clarifyCount, { lastTopic: s.lastTopic }); r.raw = text;
     if (r.decision === 'ANSWER' && /^(deposit|withdraw)/.test(r.top.intent)) s.lastTopic = r.top.intent.startsWith('deposit') ? 'deposit' : 'withdraw';
     if (r.decision === 'CHOICE' && (r.topic === 'deposit' || r.topic === 'withdraw')) s.lastTopic = r.topic;
+    // Not understood = no topic or question word was found at all. The first time, ask again; only a second miss goes to a human.
+    // (A message that names a topic the merchant has no answer for is not a miss: it goes to a human straight away.)
+    const miss = r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard && !r.ks.T.length && !r.ks.A.length;
+    const reask = miss && s.misses < 1 && s.clarifyCount === 0;
+    if (miss) s.misses++; else if (r.decision !== 'HANDOFF') s.misses = 0;
     const lang = r.lang;
     const out: { kbAnswer?: string; acct?: AccountInfo; small?: string; strike?: number; limit?: number; close?: boolean } = {};
     if (r.decision === 'ANSWER') out.kbAnswer = this.ans(s.merchant, r.top.intent, lang);
@@ -180,7 +185,15 @@ export class Bot {
       case 'CLARIFY': {
         s.clarifyCount++; s.pending = query;
         const [a, b] = r.options.map((o) => T.lblOf(o.key, lang)); say(T.CLARIFY_TXT[lang](a, b)); turn.buttons = this.buttons(r.options, lang); break; }
-      case 'HANDOFF': { const h = this.handoff(s, lang); turn.messages.push(...h.messages); turn.status = h.status; break; }
+      case 'HANDOFF': {
+        if (reask) {
+          s.pending = query;                                      // the next message is read together with this one
+          say(T.REASK_TXT[c.tone][lang]); turn.buttons = this.buttons(this.engine.topicButtons(s.merchant), lang);
+          turn.trace = { ...turn.trace, decision: 'REASK', why: 'Nothing in the message matched a topic or a question, so the bot asks again once before it hands off. A second miss goes to a human.',
+            options: this.engine.topicButtons(s.merchant).map((o) => ({ ...o, label: this.label(o, lang) })) };
+          break;
+        }
+        const h = this.handoff(s, lang); turn.messages.push(...h.messages); turn.status = h.status; break; }
       case 'ABUSE':
         if (out.close) {
           s.closed = true; say(c.closing[lang] ?? c.closing.en ?? ''); turn.messages.push({ kind: 'sys bad', text: `Chat closed after ${out.strike} rude messages` });
@@ -188,7 +201,7 @@ export class Bot {
         } else { say(this.kindReply(s, lang, out.strike!)); turn.buttons = this.buttons(this.engine.topicButtons(s.merchant), lang); }
         break;
     }
-    turn.log = { text, lang, decision: r.decision, notUnderstood: r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard };
+    turn.log = { text, lang, decision: reask ? 'REASK' : r.decision, notUnderstood: r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard };
     return turn;
   }
 

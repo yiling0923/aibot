@@ -81,3 +81,12 @@ export const KIND_DEF={
  formal:{en:['We apologise for the inconvenience. We would like to assist you. Could you please describe the issue? We kindly ask that our conversation remain respectful.','We understand your frustration and apologise. We will help as quickly as possible. You may also request an agent.'],
          ms:['Kami memohon maaf atas kesulitan ini. Kami ingin membantu anda. Boleh anda terangkan masalahnya? Kami mohon perbualan ini kekal sopan.','Kami faham kekecewaan anda dan memohon maaf. Kami akan membantu secepat mungkin. Anda juga boleh meminta ejen.'],
          zh:['对于给您带来的不便，我们深表歉意。我们很乐意协助您，请问具体是什么问题？也恳请保持礼貌交流。','我们理解您的心情并深表歉意，会尽快为您处理。您也可以要求转接人工客服。']}};
+
+export const REASK_TXT = {
+  friendly: { en: "Sorry, I didn't quite catch that 😅 Could you tell me a bit more, or tap what you need help with?",
+              ms: 'Maaf, saya kurang faham 😅 Boleh terangkan sikit lagi, atau tekan yang anda perlukan?',
+              zh: '抱歉，我没太明白 😅 可以再详细说一下吗？或者点选您需要的帮助。' },
+  formal: { en: 'Sorry, we did not quite understand your message. Could you please tell us a little more, or choose from the options below?',
+            ms: 'Maaf, kami kurang faham mesej anda. Boleh anda terangkan dengan lebih lanjut, atau pilih daripada pilihan di bawah?',
+            zh: '抱歉，我们没有完全理解您的消息。请您再详细说明一下，或从下方选项中选择。' },
+};
