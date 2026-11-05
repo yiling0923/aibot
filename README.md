@@ -3,6 +3,8 @@
 A multi-merchant bot for a LiveChat account. Each merchant has its own knowledge base, topics, keywords and settings.
 Everything here runs on your own computer. Nothing is connected to LiveChat yet (that is phase 8).
 
+**Full system document** (how it works, technology, database design, screens and layout): [docs/SYSTEM_DESIGN.pdf](docs/SYSTEM_DESIGN.pdf), also as [docs/SYSTEM.md](docs/SYSTEM.md).
+
 ## What is built so far
 
 | Phase | Status |
