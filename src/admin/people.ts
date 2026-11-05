@@ -6,6 +6,7 @@ import { checkLogin, upsertUser } from '../auth/users';
 import type { Bot } from '../bot/responder';
 import { readSnapshot } from './snapshot';
 import { merchantSlice, recordVersion } from './versions';
+import { Tenants, tbl } from '../db/tenants';
 import '../auth/types';
 
 export interface PeopleCtx { pool: Pool; reloadBot: () => Promise<Bot> }
@@ -25,8 +26,12 @@ export function peopleRoutes(app: FastifyInstance, ctx: PeopleCtx) {
 
   app.get(`${A}/people`, async (req, reply) => {
     if (!adminOnly(req, reply)) return;
-    const merchants = await q(pool, `SELECT m.code, m.name, m.default_language, m.livechat_group_id, m.handoff_group_id, s.tone,
-      (SELECT COUNT(*) FROM kb_entries e WHERE e.merchant_id = m.id) AS entries FROM merchants m JOIN merchant_settings s ON s.merchant_id = m.id ORDER BY m.id`);
+    const merchants: RowDataPacket[] = [];
+    for (const t of await new Tenants(pool).list(true)) {                      // each merchant's own database is asked
+      const [m] = await q(pool, 'SELECT code, name, default_language, livechat_group_id, handoff_group_id FROM merchants WHERE id = ?', [t.id]);
+      const [st] = await q(pool, `SELECT tone FROM ${tbl(t.db, 'settings')} WHERE id = 1`); const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
+      merchants.push({ ...m, tone: st?.tone ?? 'friendly', entries: n.n } as RowDataPacket);
+    }
     const users = await q(pool, 'SELECT u.username, u.role, m.code AS merchant FROM admin_users u LEFT JOIN merchants m ON m.id = u.merchant_id ORDER BY u.role, u.username');
     return {
       merchants: merchants.map((m) => ({ code: m.code, name: m.name, language: m.default_language, tone: m.tone, entries: Number(m.entries), livechatGroup: m.livechat_group_id, handoffGroup: m.handoff_group_id,
@@ -48,22 +53,26 @@ export function peopleRoutes(app: FastifyInstance, ctx: PeopleCtx) {
     if (b.login && (!b.login.username || !b.login.password)) return fail(reply, 400, 'Login: enter a username and a password, or leave both empty.');
 
     // Fixed messages start from the first merchant's wording, so the new merchant works straight away.
-    const [first] = await q(pool, 'SELECT closing_msg, handoff_msg FROM merchant_settings ORDER BY merchant_id LIMIT 1');
+    const tenants = new Tenants(pool); const firstTenant = (await tenants.list(true))[0];
+    const [first] = firstTenant ? await q(pool, `SELECT closing_msg, handoff_msg FROM ${tbl(firstTenant.db, 'settings')} WHERE id = 1`) : [];
     const closing = first?.closing_msg ?? JSON.stringify(FALLBACK_MSG.closing), handoff = first?.handoff_msg ?? JSON.stringify(FALLBACK_MSG.handoff);
     const asText = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v));
 
-    const c = await pool.getConnection();
     try {
-      await c.beginTransaction();
-      const id = (await c.query<ResultSetHeader>('INSERT INTO merchants(code, name, default_language, livechat_group_id, handoff_group_id) VALUES(?,?,?,?,?)', [code, name, language, group(b.livechatGroup), group(b.handoffGroup)]))[0].insertId;
-      await c.query('INSERT INTO merchant_settings(merchant_id, tone, closing_msg, handoff_msg, kind_reply) VALUES(?,?,?,?,?)', [id, tone, asText(closing), asText(handoff), '{}']);
-      for (const t of TOOLS) await c.query('INSERT INTO merchant_tools(merchant_id, tool, enabled) VALUES(?,?,?)', [id, t, t.endsWith('_status')]);
-      await c.commit();
+      await pool.query('INSERT INTO merchants(code, name, default_language, livechat_group_id, handoff_group_id) VALUES(?,?,?,?,?)', [code, name, language, group(b.livechatGroup), group(b.handoffGroup)]);
     } catch (e) {
-      await c.rollback();
       if ((e as { code?: string }).code === 'ER_DUP_ENTRY') return fail(reply, 409, `A merchant with the code ${code} already exists.`);
       throw e;
-    } finally { c.release(); }
+    }
+    try {
+      const dbName = await tenants.ensure(code);                              // the merchant's own database, with all its tables
+      const D = (t: string) => tbl(dbName, t);
+      await pool.query(`INSERT INTO ${D('settings')}(id, tone, closing_msg, handoff_msg, kind_reply) VALUES(1,?,?,?,?)`, [tone, asText(closing), asText(handoff), '{}']);
+      for (const t of TOOLS) await pool.query(`INSERT INTO ${D('tools')}(tool, enabled) VALUES(?,?)`, [t, t.endsWith('_status')]);
+    } catch (e) {
+      await pool.query('DELETE FROM merchants WHERE code = ?', [code]);        // do not leave a half-made merchant behind
+      return fail(reply, 500, (e as Error).message);
+    }
 
     if (b.login) {
       try { await upsertUser(pool, { username: b.login.username, password: b.login.password, role: 'staff', merchant: code }); }

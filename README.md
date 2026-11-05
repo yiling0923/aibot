@@ -26,7 +26,7 @@ You need **Node.js 20 or newer** and **MySQL 8**. Install MySQL from https://dev
 ```bash
 cd aibot
 cp .env.example .env              # default values work for localhost (Windows: copy .env.example .env)
-mysql -u root -p < db/setup.sql   # creates the databases and the "bot" user (asks for your MySQL root password)
+mysql -u root -p < db/setup.sql   # creates the databases and the "bot" user (asks for your MySQL root password; in PowerShell use: mysql -u root -p -e "source db/setup.sql")
 npm install
 npm run db:migrate                # creates the tables
 npm run db:seed                   # loads the 6 fake merchants (LuckyPay, SwiftWallet, MegaPlay, BetKing, CashPoint, GameHub)
@@ -90,7 +90,7 @@ Put the keys in `.env` (see `.env.example`) and restart. Without keys nothing ch
 ## Tests
 
 * `npm test` runs the engine tests (no database needed): the 149 acceptance messages plus extra checks.
-* The database tests run too when `TEST_DATABASE_URL` is set (it is in `.env.example`, and `db/setup.sql` creates it). They wipe that database every time,
+* The database tests run too when `TEST_DATABASE_URL` is set (it is in `.env.example`, and `db/setup.sql` creates it). They wipe that database (and the merchant databases that start with `livechat_bot_test_m_`) every time,
   so it must be the separate `livechat_bot_test` database, never your real data.
 * `npm run typecheck` checks the TypeScript (back end and front end).
 * Front end tests are in `web/src` (React Testing Library). They run with `npm test` too.
@@ -122,9 +122,14 @@ test/          acceptance cases + database tests
 
 Each decision comes with a plain-language reason (`why`), which the control panel will show.
 
-## Merchants in the database
+## One database for each merchant
 
-Everything belongs to a merchant: every table with merchant data has a `merchant_id`, and the database refuses a row filed under the wrong merchant.
-To look at one merchant in phpMyAdmin, open a table (for example `kb_entries`) and filter `merchant_id`, or start from the `merchants` table.
-Each merchant also has its own publish history (`kb_versions`), so every merchant publishes and rolls back on its own.
-After pulling, run `npm run db:migrate` once (it adds migration `006_merchant_scope`; no data is lost).
+The main database (`livechat_bot`) holds the merchant list, the logins and the words all merchants share.
+Every merchant has its own database, `livechat_bot_m_<code>` (for example `livechat_bot_m_luckypay`), with that merchant's knowledge base, settings, keywords, chats, tests and publish history.
+Adding a merchant in the control panel creates its database. Each merchant publishes and rolls back on its own.
+
+**Updating from an older version (important):** the database user needs the right to create these databases. Run `db/setup.sql` again once as the MySQL admin (it is safe to repeat), then `npm run db:migrate`.
+The migrate step moves the data of an older single-database installation into merchant databases. Nothing is lost, ids are kept.
+
+To see the databases grouped in phpMyAdmin, add this line to `config.inc.php`:
+`$cfg['NavigationTreeDbSeparator'] = '_m_';`

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { dbNameFor, tbl } from '../src/db/tenants';
 import { createAi, checkReply, type AiService, type PickInput } from '../src/ai';
 import { Bot, newSession } from '../src/bot/responder';
 import { knowledgeFromSeed } from '../src/engine';
@@ -234,7 +235,7 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
   });
 
   it('the "Describe new words" button fills the words that have no note, and says so when AI is off', async () => {
-    await pool!.query("UPDATE keyword_store SET note = NULL WHERE word IN ('dh','nk')");
+    await pool!.query(`UPDATE ${tbl(dbNameFor('livechat_bot_test', 'MERCH_A'), 'keyword_store')} SET note = NULL WHERE word IN ('dh','nk')`);
     const r = await post(app, cookie, '/api/admin/keywords/describe', { merchant: 'MERCH_A' });
     expect(r.statusCode).toBe(200); expect(r.json().done).toBeGreaterThanOrEqual(2);
     const rows = (await get(app, cookie, '/api/admin/keywords?merchant=MERCH_A')).json();

@@ -4,6 +4,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { createPool, type Pool } from '../src/db/pool';
 import { migrate } from '../src/db/migrate';
 import { seed } from '../src/db/seed';
+import { dbNameFor, tbl } from '../src/db/tenants';
 import { loadKnowledge } from '../src/db/loadKnowledge';
 import { Engine, knowledgeFromSeed } from '../src/engine';
 import { seedJson, accountsJson, evalCases, judge } from './helpers';
@@ -31,26 +32,31 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
     expect(r.map((x) => x.name)).toContain('001_init.sql');
   });
 
-  it('every row sits under a merchant, and the database refuses a row under the wrong merchant', async () => {
-    const q = async (sql: string, p: unknown[] = []) => (await pool!.query<RowDataPacket[]>(sql, p))[0];
-    for (const t of ['kb_translations', 'chat_messages', 'bot_decisions', 'feedback', 'kb_entries', 'keyword_store', 'chat_sessions'])
-      expect(Number((await q(`SELECT COUNT(*) AS n FROM ${t} WHERE merchant_id IS NULL`))[0].n)).toBe(0);
-    const [a, b] = (await q('SELECT id FROM merchants ORDER BY id')).map((r) => r.id);
-    const [entry] = await q('SELECT id FROM kb_entries WHERE merchant_id = ? LIMIT 1', [a]);
-    // an answer for merchant A's entry cannot be filed under merchant B
-    await expect(pool!.query('INSERT INTO kb_translations(merchant_id,kb_id,language,question_examples,answer_text) VALUES(?,?,?,?,?)', [b, entry.id, 'xx', '[]', 'wrong'])).rejects.toThrow();
-    // each merchant counts its own versions
-    await pool!.query("INSERT INTO kb_versions(kind,merchant_id,version,actor,summary,snapshot) VALUES('merchant',?,1,'t','a','{}'),('merchant',?,1,'t','b','{}')", [a, b]);
-    await expect(pool!.query("INSERT INTO kb_versions(kind,merchant_id,version,actor,summary,snapshot) VALUES('merchant',?,1,'t','dup','{}')", [a])).rejects.toThrow();
-    await pool!.query("DELETE FROM kb_versions WHERE actor = 't'");
+  const dbOf = (code: string) => dbNameFor('livechat_bot_test', code);
+  const count = async (code: string, table: string) => Number((await pool!.query<RowDataPacket[]>(`SELECT COUNT(*) AS n FROM ${tbl(dbOf(code), table)}`))[0][0].n);
+
+  it('every merchant has its own database with all its tables, and the main database holds only what is shared', async () => {
+    const names = async (db: string) => (await pool!.query<RowDataPacket[]>('SELECT table_name AS t FROM information_schema.tables WHERE table_schema = ?', [db]))[0].map((r) => r.t as string).sort();
+    const main = await names('livechat_bot_test');
+    expect(main).toEqual(expect.arrayContaining(['merchants', 'admin_users', 'aspects', 'filler_words', 'shared_aliases', 'shared_smalltalk', 'shared_guard', 'shared_versions']));
+    for (const t of ['kb_entries', 'kb_translations', 'keyword_store', 'chat_messages', 'eval_cases', 'settings']) expect(main).not.toContain(t);     // merchant data is not in the main database
+    const dbs = (await pool!.query<RowDataPacket[]>('SELECT code, db_name FROM merchants ORDER BY id'))[0];
+    expect(dbs.map((r) => r.db_name)).toEqual(seedJson.merchants.map((m: { code: string }) => dbOf(m.code)));
+    for (const r of dbs) {
+      const own = await names(r.db_name);
+      expect(own).toEqual(expect.arrayContaining(['kb_entries', 'kb_translations', 'keyword_store', 'keyword_daily', 'unmatched_messages', 'chat_sessions', 'chat_messages', 'bot_decisions', 'feedback', 'eval_cases', 'settings', 'limits', 'tools', 'aliases', 'versions']));
+      const col = await pool!.query<RowDataPacket[]>("SELECT 1 FROM information_schema.columns WHERE table_schema = ? AND column_name = 'merchant_id'", [r.db_name]);
+      expect(col[0]).toHaveLength(0);                                              // inside a merchant database the database itself is the merchant
+    }
   });
 
-  it('seeds the three fake merchants and all acceptance cases', async () => {
-    const c = async (t: string) => Number((await pool!.query<RowDataPacket[]>(`SELECT count(*) AS n FROM ${t}`))[0][0].n);
-    expect(await c('merchants')).toBe(seedJson.merchants.length);
-    expect(await c('kb_entries')).toBe(seedJson.kb_entries.length);
-    expect(await c('eval_cases')).toBe(evalCases.length);
-    expect(await c('merchant_limits')).toBe(seedJson.merchants.length * 2);      // a deposit and a withdraw limit each
+  it('entry ids never repeat across merchants, and each merchant keeps only its own entries', async () => {
+    const all: number[] = [];
+    for (const m of seedJson.merchants) {
+      const ids = (await pool!.query<RowDataPacket[]>(`SELECT id FROM ${tbl(dbOf(m.code), 'kb_entries')}`))[0].map((r) => Number(r.id)); all.push(...ids);
+      expect(ids.length).toBe(seedJson.kb_entries.filter((e: { merchant: string }) => e.merchant === m.code).length);
+    }
+    expect(new Set(all).size).toBe(all.length);
   });
 
   it('loads the same knowledge as the seed file', async () => {
@@ -70,13 +76,13 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
 
   it('keeps merchants apart', async () => {
     for (const code of ['MERCH_A', 'MERCH_B', 'MERCH_C']) expect(engine.entriesOf(code).every((e) => e.merchant === code)).toBe(true);
-    await expect(pool!.query(`INSERT INTO kb_entries(merchant_id,intent_key,topic) SELECT id,'deposit_how','deposit' FROM merchants WHERE code='MERCH_A'`)).rejects.toThrow(/duplicate/i);
+    await expect(pool!.query(`INSERT INTO ${tbl(dbOf('MERCH_A'), 'kb_entries')}(intent_key,topic) VALUES('deposit_how','deposit')`)).rejects.toThrow(/duplicate/i);   // a name is used once inside a merchant, but may repeat in another merchant
     const a = engine.analyze('depo how', 'MERCH_A'), b = engine.analyze('depo how', 'MERCH_B');
     expect(a.top.id).not.toBe(b.top.id);                     // each merchant answers from its own entry
   });
 
   it('ignores draft entries until they are set live', async () => {
-    const q = `UPDATE kb_entries SET status=? WHERE intent_key='promo_bonus' AND merchant_id=(SELECT id FROM merchants WHERE code='MERCH_A')`;
+    const q = `UPDATE ${tbl(dbOf('MERCH_A'), 'kb_entries')} SET status=? WHERE intent_key='promo_bonus'`;
     await pool!.query(q, ['draft']);
     expect(new Engine(await loadKnowledge(pool!)).analyze('any promo for new member?', 'MERCH_A').decision).not.toBe('ANSWER');
     await pool!.query(q, ['live']);

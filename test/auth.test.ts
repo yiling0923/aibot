@@ -106,12 +106,10 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
   });
 
   it('staff can only roll back their own merchant, never the shared lists or another merchant; only an admin can reload', async () => {
-    const hist = (await get('/api/admin/state', admin)).json().history as { id: number; kind: string; merchant: string | null }[];
-    const shared = hist.find((h) => h.kind === 'shared')!, other = hist.find((h) => h.merchant === 'MERCH_B')!, mine = hist.find((h) => h.merchant === 'MERCH_A')!;
-    expect((await post('/api/admin/rollback', { id: shared.id }, staffA)).statusCode).toBe(403);
-    expect((await post('/api/admin/rollback', { id: other.id }, staffA)).statusCode).toBe(403);
-    expect((await post('/api/admin/rollback', { id: mine.id }, staffA)).statusCode).toBe(200);        // their own merchant is allowed
-    expect((await post('/api/admin/rollback', { id: 999999 }, admin)).statusCode).toBe(404);
+    expect((await post('/api/admin/rollback', { merchant: null, version: 1 }, staffA)).statusCode).toBe(403);       // the shared word lists
+    expect((await post('/api/admin/rollback', { merchant: 'MERCH_B', version: 1 }, staffA)).statusCode).toBe(403);  // another merchant
+    expect((await post('/api/admin/rollback', { merchant: 'MERCH_A', version: 1 }, staffA)).statusCode).toBe(200);  // their own merchant is allowed
+    expect((await post('/api/admin/rollback', { merchant: 'MERCH_A', version: 999 }, admin)).statusCode).toBe(404);
     expect((await post('/api/reload', {}, staffA)).statusCode).toBe(403);
     expect((await post('/api/reload', {}, admin)).statusCode).toBe(200);
   });

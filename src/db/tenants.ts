@@ -1,0 +1,74 @@
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import type { RowDataPacket } from 'mysql2/promise';
+import type { Pool } from './pool';
+
+/** Each merchant has its own database (named <main database>_m_<code>), so a merchant's knowledge base, keywords, chats and settings
+ *  are all inside it. The main database keeps what is shared: the merchant list, the logins and the shared word lists. */
+export interface Tenant { id: number; code: string; name: string; status: string; db: string }
+
+const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db/merchant');
+
+/** `db`.`table`, safe to put into a query. */
+export const ident = (name: string) => '`' + name.replace(/`/g, '``') + '`';
+export const tbl = (db: string, table: string) => `${ident(db)}.${ident(table)}`;
+
+/** The database name for a merchant code. Only letters, digits and underscores survive, so the name is always safe. */
+export const dbNameFor = (control: string, code: string) => `${control}_m_${code.toLowerCase().replace(/[^a-z0-9_]/g, '_')}`.slice(0, 64);
+
+export class Tenants {
+  private control: string | null = null;
+  constructor(readonly pool: Pool) {}
+
+  async controlDb(): Promise<string> {
+    if (!this.control) this.control = String((await this.pool.query<RowDataPacket[]>('SELECT DATABASE() AS d'))[0][0].d);
+    return this.control;
+  }
+
+  async list(includeInactive = false): Promise<Tenant[]> {
+    const control = await this.controlDb();
+    const rows = (await this.pool.query<RowDataPacket[]>(`SELECT id, code, name, status, db_name FROM merchants ${includeInactive ? '' : "WHERE status = 'active'"} ORDER BY id`))[0];
+    return rows.map((r) => ({ id: Number(r.id), code: r.code, name: r.name, status: r.status, db: r.db_name || dbNameFor(control, r.code) }));
+  }
+
+  async get(code: string): Promise<Tenant | null> { return (await this.list(true)).find((t) => t.code === code) ?? null; }
+
+  /** Creates the merchant's database if it is missing and brings its tables up to date. Returns the database name. */
+  async ensure(code: string): Promise<string> {
+    const db = dbNameFor(await this.controlDb(), code);
+    try { await this.pool.query(`CREATE DATABASE IF NOT EXISTS ${ident(db)} CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci`); }
+    catch (e) {
+      if ((e as { code?: string }).code === 'ER_DBACCESS_DENIED_ERROR' || (e as { code?: string }).code === 'ER_SPECIFIC_ACCESS_DENIED_ERROR')
+        throw new Error(`The database user may not create the database ${db}. Ask the MySQL admin to run db/setup.sql once (it grants the bot user the right to create merchant databases).`);
+      throw e;
+    }
+    await migrateMerchantDb(this.pool, db);
+    await this.pool.query('UPDATE merchants SET db_name = ? WHERE code = ?', [db, code]);
+    return db;
+  }
+
+  /** Every database that belongs to this installation's merchants (also leftovers of merchants that were removed). */
+  async allMerchantDbs(): Promise<string[]> {
+    const control = await this.controlDb();
+    const like = `${control.replace(/[\\%_]/g, '\\$&')}\\_m\\_%`;
+    return (await this.pool.query<RowDataPacket[]>('SELECT schema_name AS n FROM information_schema.schemata WHERE schema_name LIKE ?', [like]))[0].map((r) => r.n as string);
+  }
+}
+
+/** Runs the files in db/merchant that this merchant database has not had yet. */
+export async function migrateMerchantDb(pool: Pool, db: string): Promise<string[]> {
+  const c = await pool.getConnection(); const applied: string[] = [];
+  const back = String((await c.query<RowDataPacket[]>('SELECT DATABASE() AS d'))[0][0].d);
+  try {
+    await c.query(`USE ${ident(db)}`);
+    await c.query('CREATE TABLE IF NOT EXISTS schema_migrations (name VARCHAR(200) PRIMARY KEY, applied_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+    const done = new Set((await c.query<RowDataPacket[]>('SELECT name FROM schema_migrations'))[0].map((r) => r.name as string));
+    for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()) {
+      if (done.has(file)) continue;
+      await c.query(fs.readFileSync(path.join(dir, file), 'utf8'));
+      await c.query('INSERT INTO schema_migrations(name) VALUES (?)', [file]); applied.push(file);
+    }
+  } finally { await c.query(`USE ${ident(back)}`); c.release(); }   // give the connection back pointing at the main database again
+  return applied;
+}

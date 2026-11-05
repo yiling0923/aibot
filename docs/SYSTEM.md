@@ -88,7 +88,7 @@ Dashed boxes in the picture are not connected yet or are optional.
 | **Settings** | `dotenv` | Reads the `.env` file. |
 | **AI** | `@anthropic-ai/sdk` (Claude) and `openai` (ChatGPT), official libraries | Answers from Claude are checked with **zod** (a schema checker) before use. |
 | **Passwords and signatures** | Node's built-in `crypto` | scrypt for password hashing, HMAC-SHA256 for signed cookies and tokens. |
-| **Tests** | **Vitest 5**, run with `tsx` (front end tests use **jsdom** and **Testing Library**) | 2,013 automatic tests. |
+| **Tests** | **Vitest 5**, run with `tsx` (front end tests use **jsdom** and **Testing Library**) | 2,017 automatic tests. |
 | **Front end** | **React 19 + TypeScript + Vite 8**, with **React Router 7** | A real single-page app. Vite builds it into `web/dist`, and the bot server serves that folder. The front end shares its data types with the back end (`src/admin/snapshotTypes.ts`), so a mismatch is caught when the code is checked. |
 | **Front end look** | CSS variables, Google Fonts (Instrument Sans, JetBrains Mono), inline SVG icons | Light and dark mode follow the computer's setting. Works on phones. |
 
@@ -276,43 +276,41 @@ Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_T
 
 **Principles**
 
-- **One database, many merchants.** Every row that belongs to a merchant carries a `merchant_id`. Rows with an empty `merchant_id` (some word lists) are shared by all merchants.
-- **Merchant data is cut off by `ON DELETE CASCADE`**: removing a merchant removes its rows.
+- **A main database, and one database for each merchant.** The main database (`livechat_bot`) holds only what is shared: the merchant list (`merchants`), the logins, the word lists shared by all merchants, and their version history. Every merchant has its **own database**, named `livechat_bot_m_<code>` (for example `livechat_bot_m_luckypay`). It holds that merchant's knowledge base, settings, own short forms, keywords, unmatched messages, chats, sample tests and publish history.
+- **Inside a merchant database there is no `merchant_id`**: the database itself is the merchant, so one merchant's data can never be mixed with another's, and a query can only ever reach the database it names.
+- **Adding a merchant creates its database** with all tables (from the files in `db/merchant`). The list of merchants records the database name in `merchants.db_name`.
 - **Languages** are stored per row (`en`, `ms`, `zh`), not as separate columns, so a language can be added without changing the tables.
 - **Flexible parts use JSON columns** (example questions, fixed messages, settings), so they can grow without new columns.
-- **Versions are snapshots per merchant.** Publishing writes that merchant's knowledge as one JSON document into `kb_versions`, which makes roll back simple and safe.
-- **Numbered migrations** (`001` to `006` in `db/migrations`) create and change the tables. A table `schema_migrations` records which ones have run, so running them again is safe.
+- **Versions are kept per merchant.** Publishing writes a new row in that merchant's own `versions` table only if its data really changed. The shared word lists have their own history (`shared_versions`). Each merchant counts its own `v1`, `v2`, ... and is rolled back on its own; other merchants are not touched.
+- **Entry ids never repeat across merchants.** New entries get their number from `kb_id_seq` in the main database, so the control panel can find an entry by its id.
+- **Numbered migrations** create and change the tables: `001` to `008` in `db/migrations` for the main database (`008` is a one-time step that moved the data of an older single-database installation into merchant databases), and the files in `db/merchant` for every merchant database. Each database has a `schema_migrations` table that records which ones have run, so running them again is safe.
+- **The database user needs one grant**, in `db/setup.sql`: the right to create and use databases that start with `livechat_bot_`. It is run once as the MySQL admin.
 - Text is stored as **utf8mb4** so Chinese, Malay and emoji work.
 
 ![Database map](img/database.svg)
 
-Every table in the picture is linked to **`merchants`** through `merchant_id` (dashed lines), except the shared word lists and the housekeeping tables.
-
 **How the main parts work together**
 
-- A **merchant** has settings (`merchant_settings`), amount limits (`merchant_limits`) and a list of account tools (`merchant_tools`).
-- The **knowledge base** is `kb_entries` (one answerable question, with a topic and an optional question type), grouped by `kb_categories`, with the examples and the answer for each language in `kb_translations`.
-- The **words** the engine uses live in `aliases` (topic keywords and short forms), `aspects` (question words), `smalltalk_phrases`, `guard_phrases` and `filler_words`.
-- **What the bot learns**: every typed word goes to `keyword_store` and `keyword_daily` (counts per day, used by the ranking).
-- **Chats** are logged in `chat_sessions`, `chat_messages` and `bot_decisions`.
-- **`eval_cases`** are the sample customer messages with the result the bot should give. They are the automatic tests.
-- **`kb_versions`** holds every published version. **`admin_users`** holds the logins.
+- The **main database** knows who the merchants are and where each one's database is, who may sign in (and for which merchant), and the words every merchant shares (`shared_aliases`, `aspects`, `shared_smalltalk`, `shared_guard`, `filler_words`).
+- In a **merchant database**: the merchant's settings (`settings`), amount limits (`limits`) and account tools (`tools`); the **knowledge base** (`kb_entries` with a topic and an optional question type, grouped by `kb_categories`, with the examples and the answer for each language in `kb_translations`); its own short forms (`aliases`); **what the bot learns** (every typed word goes to `keyword_store` and `keyword_daily`, which the ranking uses); the **chat log** (`chat_sessions`, `chat_messages`, `bot_decisions`); the sample customer messages with the result the bot should give (`eval_cases`, the automatic tests); and the publish history (`versions`).
 
-**Everything sits under a merchant.** Every table that holds merchant data carries `merchant_id`, including the ones that used to reach a merchant only through another table (`kb_translations`, `chat_messages`, `bot_decisions`, `feedback`). A **composite foreign key** such as `(kb_id, merchant_id)` makes the database refuse an answer filed under a different merchant than its entry. Indexes start with `merchant_id`, so a merchant's data stays quick to read when there are many merchants.
+**Seeing it in phpMyAdmin.** phpMyAdmin can group databases by their name. Add this line to `config.inc.php` (below the `host` line) and the left list shows `livechat_bot` with all the merchant databases under it:
 
-**Versions are per merchant.** Publishing writes a new row in `kb_versions` for each merchant whose data really changed (kind `merchant`, with that merchant's entries, short forms and settings). Changes to the word lists shared by all merchants get their own history (kind `shared`). Each merchant counts its own versions (`v1`, `v2`, ...) and is rolled back on its own; other merchants are not touched. Old rows saved before this change are kept as kind `legacy` and are no longer used.
+```
+$cfg['NavigationTreeDbSeparator'] = '_m_';
+```
 
-To look at one merchant in phpMyAdmin, open a table and filter `merchant_id`, or open `merchants` first and follow the links.
+Without it the databases are simply listed one after another (`livechat_bot`, `livechat_bot_m_luckypay`, ...).
 
-### The tables
+### The main database (`livechat_bot`)
 
-There are **23 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
+There are **10 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
 
 
-#### Merchants
+#### Merchants and logins
 
 
-**`merchants`**. One row per merchant: its code (for example `MERCH_D`), name, main language, the LiveChat group and the human group chats are handed to.
+**`merchants`**. One row per merchant: its code (for example `MERCH_D`), name, main language, the LiveChat group and the human group chats are handed to, and `db_name`, the name of the merchant's own database.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -324,314 +322,9 @@ There are **23 tables**. For each column: the type, and what is special about it
 | `livechat_group_id` | int |  |
 | `handoff_group_id` | int |  |
 | `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+| `db_name` | varchar(64) | unique |
 
-Indexes: `code` (unique).
-
-
-**`merchant_settings`**. How the bot behaves for one merchant: tone, the two similarity limits, how many rude messages before closing, and the fixed messages (as JSON, one text per language).
-
-| Column | Type | Notes |
-|---|---|---|
-| `merchant_id` | bigint | primary key; links to `merchants.id` |
-| `tone` | varchar(20) | default `friendly` |
-| `answer_threshold` | double | default `0.72` |
-| `clarify_threshold` | double | default `0.45` |
-| `abuse_close_after` | int | default `3` |
-| `closing_msg` | json | required |
-| `handoff_msg` | json | required |
-| `kind_reply` | json | required |
-| `business_hours` | json |  |
-
-
-**`merchant_limits`**. Minimum and maximum amount for deposit and withdraw, per merchant. Used to answer "wd 500".
-
-| Column | Type | Notes |
-|---|---|---|
-| `merchant_id` | bigint | primary key (with kind); links to `merchants.id` |
-| `kind` | varchar(20) | primary key (with merchant_id) |
-| `min_amount` | decimal(18,2) | required |
-| `max_amount` | decimal(18,2) | required |
-
-
-**`merchant_tools`**. Which account lookups are switched on for a merchant (balance, transactions, points, deposit and withdraw status).
-
-| Column | Type | Notes |
-|---|---|---|
-| `merchant_id` | bigint | primary key (with tool); links to `merchants.id` |
-| `tool` | varchar(50) | primary key (with merchant_id) |
-| `enabled` | tinyint(1) | default `1` |
-
-
-#### Knowledge base
-
-
-**`kb_categories`**. Groups of entries per merchant (Deposit, Withdraw, Support...). Used for display.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `parent_id` | bigint | links to `kb_categories.id` |
-| `name` | varchar(200) | required |
-
-Indexes: `merchant_id`, `parent_id`.
-
-
-**`kb_entries`**. One answerable question per merchant. `topic` is required, `aspect` is the optional question type, `status` is `live` or `draft`. A merchant cannot have two entries with the same `intent_key`.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `category_id` | bigint | links to `kb_categories.id` |
-| `intent_key` | varchar(100) | required |
-| `title` | varchar(255) |  |
-| `tags` | json |  |
-| `topic` | varchar(100) | required |
-| `aspect` | varchar(50) |  |
-| `topic_optional` | tinyint(1) | default `0` |
-| `status` | varchar(20) | default `live` |
-| `version` | int | default `1` |
-| `valid_from` | timestamp |  |
-| `valid_to` | timestamp |  |
-| `updated_at` | timestamp | default `CURRENT_TIMESTAMP` |
-
-Indexes: `category_id`, `id, merchant_id` (unique), `merchant_id, status`, `merchant_id, intent_key` (unique).
-
-
-**`kb_translations`**. For each entry and language: the example questions (JSON list) and the answer text.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `kb_id` | bigint | links to `kb_entries.id`; required |
-| `language` | varchar(10) | required |
-| `question_examples` | json | required |
-| `answer_text` | text | required |
-
-Indexes: `kb_id, merchant_id`, `merchant_id, language`, `kb_id, language` (unique).
-
-
-**`eval_cases`**. Sample customer messages and the result the bot should give (`expected_decision`, and for answers `expected_intent`). These are the automatic tests.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `message` | text | required |
-| `language` | varchar(10) |  |
-| `expected_decision` | varchar(20) | required |
-| `expected_kb_id` | bigint | links to `kb_entries.id` |
-| `expected_intent` | varchar(100) |  |
-
-Indexes: `expected_kb_id`, `merchant_id`.
-
-
-#### Words the bot knows
-
-
-**`aliases`**. Topic keywords and short forms. `canonical` is the topic name (for example `deposit`) and `variant` is a way to write it (`dep`, `depo`, `充值`). An empty `merchant_id` means shared by all merchants.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id` |
-| `language` | varchar(10) |  |
-| `variant` | varchar(200) | required |
-| `canonical` | varchar(100) | required |
-| `weight` | double | default `1` |
-| `source` | varchar(20) | default `manual` |
-| `approved` | tinyint(1) | default `1` |
-
-Indexes: `merchant_id`.
-
-
-**`aspects`**. Shared question words by kind: `time`, `limit`, `how`, `change`, `hours`, plus `problem` (goes to a human) and `help` (ignored).
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `kind` | varchar(30) | required |
-| `language` | varchar(10) |  |
-| `keyword` | varchar(200) | required |
-
-
-**`smalltalk_phrases`**. Greetings, thanks, goodbyes, calling for attention. `kind` says which. An empty `merchant_id` means shared.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id` |
-| `kind` | varchar(30) | required |
-| `language` | varchar(10) |  |
-| `phrase` | varchar(255) | required |
-
-Indexes: `merchant_id`.
-
-
-**`guard_phrases`**. The safety lists: rude words, mild words, rule-change attempts, secret requests, and asking for a person. An empty `merchant_id` means shared.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id` |
-| `kind` | varchar(30) | required |
-| `language` | varchar(10) |  |
-| `phrase` | varchar(255) | required |
-
-Indexes: `merchant_id`.
-
-
-**`filler_words`**. Words with no meaning of their own (`lah`, `啦`, `please`). They are ignored when looking for keywords.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `language` | varchar(10) |  |
-| `word` | varchar(100) | required |
-
-
-#### What the bot learns
-
-
-**`keyword_store`**. Every word customers typed, per merchant: how many times (`hits`), when first and last seen, its status (`new` or `ignored`), where it came from (`live` or `test`), an optional note, and a suggested type (`guess`).
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `word` | varchar(100) | required |
-| `language` | varchar(10) |  |
-| `hits` | int | default `1` |
-| `status` | varchar(20) | default `new` |
-| `first_seen` | timestamp | default `CURRENT_TIMESTAMP` |
-| `last_seen` | timestamp | default `CURRENT_TIMESTAMP` |
-| `source` | varchar(20) | default `live` |
-| `note` | varchar(200) |  |
-| `guess` | varchar(20) |  |
-
-Indexes: `merchant_id, word` (unique).
-
-
-**`keyword_daily`**. How many times each word was written on each day. The Keyword ranking screen adds these up per week.
-
-| Column | Type | Notes |
-|---|---|---|
-| `merchant_id` | bigint | primary key (with word, day); links to `merchants.id` |
-| `word` | varchar(100) | primary key (with merchant_id, day) |
-| `day` | date | primary key (with merchant_id, word) |
-| `hits` | int | default `0` |
-
-
-**`unmatched_messages`**. Messages the bot did not understand, counted when repeated. No screen uses it at the moment.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `text` | varchar(500) | required |
-| `language` | varchar(10) |  |
-| `hits` | int | default `1` |
-| `resolved` | tinyint(1) | default `0` |
-| `first_seen` | timestamp | default `CURRENT_TIMESTAMP` |
-| `last_seen` | timestamp | default `CURRENT_TIMESTAMP` |
-| `suggestion` | varchar(300) |  |
-| `resolution` | varchar(100) |  |
-
-Indexes: `merchant_id, text` (unique).
-
-
-#### Chat log
-
-
-**`chat_sessions`**. One row per chat: merchant, language, status.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `livechat_chat_id` | varchar(100) | unique |
-| `customer_ref` | varchar(200) |  |
-| `language` | varchar(10) |  |
-| `status` | varchar(20) |  |
-| `clarify_count` | int | default `0` |
-| `closed_reason` | varchar(100) |  |
-| `started_at` | timestamp | default `CURRENT_TIMESTAMP` |
-
-Indexes: `id, merchant_id` (unique), `livechat_chat_id` (unique), `merchant_id`.
-
-
-**`chat_messages`**. What was written in a chat.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `chat_sessions.merchant_id`; required |
-| `session_id` | bigint | links to `chat_sessions.id`; required |
-| `livechat_event_id` | varchar(100) | unique |
-| `role` | varchar(20) |  |
-| `text` | text |  |
-| `normalized_text` | text |  |
-| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
-
-Indexes: `id, merchant_id` (unique), `merchant_id, created_at`, `session_id, merchant_id`, `livechat_event_id` (unique).
-
-
-**`bot_decisions`**. What the bot decided for a message (decision, matched entry, confidence, reason, reply text).
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `chat_messages.merchant_id`; required |
-| `message_id` | bigint | links to `chat_messages.id` |
-| `decision` | varchar(20) | required |
-| `matched_kb_id` | bigint | links to `kb_entries.id` |
-| `confidence` | double |  |
-| `candidates` | json |  |
-| `reply_text` | text |  |
-| `claude_ms` | int |  |
-| `gpt_ms` | int |  |
-| `validator_ok` | tinyint(1) |  |
-| `why` | varchar(500) |  |
-| `reviewed` | varchar(100) |  |
-| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
-
-Indexes: `id, merchant_id` (unique), `merchant_id`, `message_id, merchant_id`, `matched_kb_id`.
-
-
-**`feedback`**. For marking a decision right or wrong. Not used by any screen yet.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `merchant_id` | bigint | links to `merchants.id`; required |
-| `decision_id` | bigint | links to `bot_decisions.id` |
-| `agent_id` | varchar(100) |  |
-| `verdict` | varchar(20) |  |
-| `correct_kb_id` | bigint | links to `kb_entries.id` |
-| `note` | text |  |
-
-Indexes: `correct_kb_id`, `decision_id, merchant_id`, `merchant_id`.
-
-
-#### Control panel
-
-
-**`kb_versions`**. Every published version of one merchant (or of the shared word lists): number, who published, a short summary, and the knowledge of that merchant as one JSON document so it can be rolled back to. Each merchant counts its own version numbers.
-
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigint | primary key; numbers itself |
-| `kind` | enum('merchant','shared','legacy') | default `merchant` |
-| `merchant_id` | bigint | links to `merchants.id` |
-| `version` | int | required |
-| `actor` | varchar(100) | required |
-| `summary` | varchar(500) | required |
-| `snapshot` | longtext | required |
-| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
-
-Indexes: `merchant_id`, `kind, merchant_id, version` (unique).
+Indexes: `code` (unique), `db_name` (unique).
 
 
 **`admin_users`**. Logins: username, password hash (scrypt), role (`admin` or `staff`), and for staff the merchant they belong to.
@@ -648,7 +341,344 @@ Indexes: `merchant_id`, `kind, merchant_id, version` (unique).
 Indexes: `merchant_id`, `username` (unique).
 
 
+#### Words shared by all merchants
+
+
+**`shared_aliases`**. Topic keywords and short forms. `canonical` is the topic name (for example `deposit`) and `variant` is a way to write it (`dep`, `depo`, `充值`). A merchant's own short forms are in its own database.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `language` | varchar(10) |  |
+| `variant` | varchar(200) | required |
+| `canonical` | varchar(100) | required |
+| `weight` | double | default `1` |
+| `source` | varchar(20) | default `manual` |
+| `approved` | tinyint(1) | default `1` |
+
+
+**`aspects`**. Question words by kind: `time`, `limit`, `how`, `change`, `hours`, plus `problem` (goes to a human) and `help` (ignored).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `kind` | varchar(30) | required |
+| `language` | varchar(10) |  |
+| `keyword` | varchar(200) | required |
+
+
+**`shared_smalltalk`**. Greetings, thanks, goodbyes, calling for attention. `kind` says which.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `kind` | varchar(30) | required |
+| `language` | varchar(10) |  |
+| `phrase` | varchar(255) | required |
+
+
+**`shared_guard`**. The safety lists: rude words, mild words, rule-change attempts, secret requests, and asking for a person.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `kind` | varchar(30) | required |
+| `language` | varchar(10) |  |
+| `phrase` | varchar(255) | required |
+
+
+**`filler_words`**. Words with no meaning of their own (`lah`, `啦`, `please`). They are ignored when looking for keywords.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `language` | varchar(10) |  |
+| `word` | varchar(100) | required |
+
+
+#### Housekeeping
+
+
+**`shared_versions`**. Every published version of the shared word lists: number, who published, a short summary, and the lists as one JSON document so they can be rolled back to.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `version` | int | unique; required |
+| `actor` | varchar(100) | required |
+| `summary` | varchar(500) | required |
+| `snapshot` | longtext | required |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `version` (unique).
+
+
+**`kb_id_seq`**. Hands out entry numbers, so an entry id never repeats across merchants (the control panel finds entries by id).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+
+
 **`schema_migrations`**. Which migration files have already run.
+
+| Column | Type | Notes |
+|---|---|---|
+| `name` | varchar(200) | primary key |
+| `applied_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+
+### Inside each merchant database (for example `livechat_bot_m_luckypay`)
+
+Every merchant database has these tables and holds only that merchant's data. The tables are described once here; the tables shown are from the sample merchant `MERCH_A`.
+
+There are **17 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
+
+
+#### Settings
+
+
+**`settings`**. How the bot behaves for this merchant: tone, the two similarity limits, how many rude messages before closing, and the fixed messages (as JSON, one text per language). Always one row.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | tinyint | primary key |
+| `tone` | varchar(20) | default `friendly` |
+| `answer_threshold` | double | default `0.72` |
+| `clarify_threshold` | double | default `0.45` |
+| `abuse_close_after` | int | default `3` |
+| `closing_msg` | json | required |
+| `handoff_msg` | json | required |
+| `kind_reply` | json | required |
+| `business_hours` | json |  |
+
+
+**`limits`**. Minimum and maximum amount for deposit and withdraw. Used to answer "wd 500".
+
+| Column | Type | Notes |
+|---|---|---|
+| `kind` | varchar(20) | primary key |
+| `min_amount` | decimal(18,2) | required |
+| `max_amount` | decimal(18,2) | required |
+
+
+**`tools`**. Which account lookups are switched on (balance, transactions, points, deposit and withdraw status).
+
+| Column | Type | Notes |
+|---|---|---|
+| `tool` | varchar(50) | primary key |
+| `enabled` | tinyint(1) | default `1` |
+
+
+**`aliases`**. This merchant's own short forms for topic words (`canonical` is the topic, `variant` the way to write it).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `language` | varchar(10) |  |
+| `variant` | varchar(200) | required |
+| `canonical` | varchar(100) | required |
+| `weight` | double | default `1` |
+| `source` | varchar(20) | default `manual` |
+| `approved` | tinyint(1) | default `1` |
+
+
+#### Knowledge base
+
+
+**`kb_categories`**. Groups of entries (Deposit, Withdraw, Support...). Used for display.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `parent_id` | bigint | links to `kb_categories.id` |
+| `name` | varchar(200) | unique; required |
+
+Indexes: `name` (unique), `parent_id`.
+
+
+**`kb_entries`**. One answerable question. `topic` is required, `aspect` is the optional question type, `status` is `live` or `draft`. Two entries cannot have the same `intent_key`.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `category_id` | bigint | links to `kb_categories.id` |
+| `intent_key` | varchar(100) | unique; required |
+| `title` | varchar(255) |  |
+| `tags` | json |  |
+| `topic` | varchar(100) | required |
+| `aspect` | varchar(50) |  |
+| `topic_optional` | tinyint(1) | default `0` |
+| `status` | varchar(20) | default `live` |
+| `version` | int | default `1` |
+| `valid_from` | timestamp |  |
+| `valid_to` | timestamp |  |
+| `updated_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `category_id`, `status`, `intent_key` (unique).
+
+
+**`kb_translations`**. For each entry and language: the example questions (JSON list) and the answer text.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `kb_id` | bigint | links to `kb_entries.id`; required |
+| `language` | varchar(10) | required |
+| `question_examples` | json | required |
+| `answer_text` | text | required |
+
+Indexes: `kb_id, language` (unique).
+
+
+**`eval_cases`**. Sample customer messages and the result the bot should give (`expected_decision`, and for answers `expected_intent`). These are the automatic tests.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `message` | text | required |
+| `language` | varchar(10) |  |
+| `expected_decision` | varchar(20) | required |
+| `expected_kb_id` | bigint | links to `kb_entries.id` |
+| `expected_intent` | varchar(100) |  |
+
+Indexes: `expected_kb_id`.
+
+
+#### What the bot learns
+
+
+**`keyword_store`**. Every word customers typed: how many times (`hits`), when first and last seen, its status (`new` or `ignored`), where it came from (`live` or `test`), a short note and a suggested type.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `word` | varchar(100) | unique; required |
+| `language` | varchar(10) |  |
+| `hits` | int | default `1` |
+| `status` | varchar(20) | default `new` |
+| `first_seen` | timestamp | default `CURRENT_TIMESTAMP` |
+| `last_seen` | timestamp | default `CURRENT_TIMESTAMP` |
+| `source` | varchar(20) | default `live` |
+| `note` | varchar(200) |  |
+| `guess` | varchar(20) |  |
+
+Indexes: `word` (unique).
+
+
+**`keyword_daily`**. How many times each word was written on each day. The Keyword ranking screen adds these up per week.
+
+| Column | Type | Notes |
+|---|---|---|
+| `word` | varchar(100) | primary key (with day) |
+| `day` | date | primary key (with word) |
+| `hits` | int | default `0` |
+
+
+**`unmatched_messages`**. Messages the bot did not understand, counted when repeated.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `text` | varchar(500) | unique; required |
+| `language` | varchar(10) |  |
+| `hits` | int | default `1` |
+| `resolved` | tinyint(1) | default `0` |
+| `first_seen` | timestamp | default `CURRENT_TIMESTAMP` |
+| `last_seen` | timestamp | default `CURRENT_TIMESTAMP` |
+| `suggestion` | varchar(300) |  |
+| `resolution` | varchar(100) |  |
+
+Indexes: `text` (unique).
+
+
+#### Chat log
+
+
+**`chat_sessions`**. One row per chat: language, status.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `livechat_chat_id` | varchar(100) | unique |
+| `customer_ref` | varchar(200) |  |
+| `language` | varchar(10) |  |
+| `status` | varchar(20) |  |
+| `clarify_count` | int | default `0` |
+| `closed_reason` | varchar(100) |  |
+| `started_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `livechat_chat_id` (unique).
+
+
+**`chat_messages`**. What was written in a chat.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `session_id` | bigint | links to `chat_sessions.id`; required |
+| `livechat_event_id` | varchar(100) | unique |
+| `role` | varchar(20) |  |
+| `text` | text |  |
+| `normalized_text` | text |  |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `created_at`, `livechat_event_id` (unique), `session_id`.
+
+
+**`bot_decisions`**. What the bot decided for a message (decision, matched entry, confidence, reason, reply text).
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `message_id` | bigint | links to `chat_messages.id` |
+| `decision` | varchar(20) | required |
+| `matched_kb_id` | bigint | links to `kb_entries.id` |
+| `confidence` | double |  |
+| `candidates` | json |  |
+| `reply_text` | text |  |
+| `claude_ms` | int |  |
+| `gpt_ms` | int |  |
+| `validator_ok` | tinyint(1) |  |
+| `why` | varchar(500) |  |
+| `reviewed` | varchar(100) |  |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `matched_kb_id`, `message_id`.
+
+
+**`feedback`**. For marking a decision right or wrong. Not used by any screen yet.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `decision_id` | bigint | links to `bot_decisions.id` |
+| `agent_id` | varchar(100) |  |
+| `verdict` | varchar(20) |  |
+| `correct_kb_id` | bigint | links to `kb_entries.id` |
+| `note` | text |  |
+
+Indexes: `correct_kb_id`, `decision_id`.
+
+
+#### Publish history
+
+
+**`versions`**. Every published version of this merchant: number, who published, a short summary, and the merchant's knowledge as one JSON document so it can be rolled back to.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `version` | int | unique; required |
+| `actor` | varchar(100) | required |
+| `summary` | varchar(500) | required |
+| `snapshot` | longtext | required |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `version` (unique).
+
+
+**`schema_migrations`**. Which migration files have already run for this merchant database.
 
 | Column | Type | Notes |
 |---|---|---|
@@ -787,9 +817,11 @@ aibot/
     admin/              routes.ts, snapshot.ts (read and write the whole knowledge),
                         scope.ts (what staff may see and change), people.ts
     auth/               passwords.ts, session.ts, users.ts, addUser.ts
-    db/                 pool, migrate, seed, loadKnowledge
+    db/                 pool, migrate, seed, loadKnowledge, tenants.ts (finds each merchant's database)
     config.ts           reads .env
-  db/migrations/        001 to 005 (the tables), setup.sql (creates the databases)
+  db/migrations/        001 to 008 for the main database (008 moves old data into merchant databases)
+  db/merchant/          the tables every merchant database gets
+  db/setup.sql          creates the databases and the bot user (run once as the MySQL admin)
   data/                 fake merchants, entries, accounts and sample messages (JSON)
   scripts/              evalReport.ts (lists wrong sample messages)
   test/                 automatic tests
@@ -834,7 +866,7 @@ Useful commands: `npm run eval:report` (lists sample messages the bot gets wrong
 
 ## 15. Testing and quality
 
-- **2,013 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
+- **2,017 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
 - Tests also cover the database, the control panel API, login and the merchant lock (with forged requests), merchants and logins, the AI layer (on a fake network), and the reply builder.
 - `npm run eval:report` runs all sample messages and prints every one that gives a different result than expected.
 

@@ -11,7 +11,8 @@ import type { SessionUser } from '../auth/session';
 import type { AiService } from '../ai/types';
 import { Store } from '../bot/store';
 import { knowledgeFromSnapshot, readMerchants, readSnapshot, writeSnapshot, type MerchantMeta, type Snapshot } from './snapshot';
-import { ensureVersions, merchantSig, merchantSlice, recordVersion, sharedSig, sharedSlice, versionState, withMerchantSlice, withSharedSlice, type MerchantSlice, type SharedSlice } from './versions';
+import { Tenants, tbl } from '../db/tenants';
+import { ensureVersions, readVersion, merchantSig, merchantSlice, recordVersion, sharedSig, sharedSlice, versionState, withMerchantSlice, withSharedSlice, type MerchantSlice, type SharedSlice } from './versions';
 
 export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: Map<string, Bot>; ai: AiService }
 
@@ -22,15 +23,20 @@ const ago = (d: Date) => {
   return s < 90 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} hours ago` : `${Math.round(s / 86400)} days ago`;
 };
 
-/** Runs every sample message of every merchant through the engine built from this knowledge. */
+/** Runs every sample message of every merchant (each merchant's own test cases) through the engine built from this knowledge. */
 export async function runTests(pool: Pool, engine: Engine) {
-  const cases = await q(pool, 'SELECT ec.message, ec.language, ec.expected_decision, ec.expected_intent, m.code AS merchant FROM eval_cases ec JOIN merchants m ON m.id = ec.merchant_id ORDER BY ec.id');
-  return cases.filter((c) => engine.hasMerchant(c.merchant)).map((c) => {
-    const r = engine.analyze(c.message, c.merchant, 0);
-    const got = r.decision, gotIntent = got === 'ANSWER' ? r.top.intent : null;
-    const ok = got === c.expected_decision && (c.expected_decision !== 'ANSWER' || gotIntent === c.expected_intent);
-    return { merchant: c.merchant, message: c.message, language: c.language, expected: c.expected_decision, expIntent: c.expected_intent, got, gotIntent, ok };
-  });
+  const out: { merchant: string; message: string; language: string; expected: string; expIntent: string | null; got: string; gotIntent: string | null; ok: boolean }[] = [];
+  for (const t of await new Tenants(pool).list()) {
+    if (!engine.hasMerchant(t.code)) continue;
+    const cases = await q(pool, `SELECT message, language, expected_decision, expected_intent FROM ${tbl(t.db, 'eval_cases')} ORDER BY id`);
+    for (const c of cases) {
+      const r = engine.analyze(c.message, t.code, 0);
+      const got = r.decision, gotIntent = got === 'ANSWER' ? r.top.intent : null;
+      const ok = got === c.expected_decision && (c.expected_decision !== 'ANSWER' || gotIntent === c.expected_intent);
+      out.push({ merchant: t.code, message: c.message, language: c.language, expected: c.expected_decision, expIntent: c.expected_intent, got, gotIntent, ok });
+    }
+  }
+  return out;
 }
 
 /** The merchants a person may work with: all of them for an admin, only their own for merchant staff. */
@@ -58,7 +64,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     await ensureVersions(pool);
     const merchants = await merchantsFor(pool, user);
     const v = await versionState(pool, user, merchants.map((m) => m.code));
-    const history = v.history.map((h) => ({ id: h.id, kind: h.kind, merchant: h.merchant, version: h.version, actor: h.actor, summary: h.summary, ago: ago(h.created_at) }));
+    const history = v.history.map((h) => ({ kind: h.kind, merchant: h.merchant, version: h.version, actor: h.actor, summary: h.summary, ago: ago(h.created_at) }));
     return { versions: v.versions, sharedVer: v.sharedVer, stamp: v.stamp, merchants, snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
       user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe } };
   });
@@ -94,27 +100,23 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     return { published, pass: tests.filter((t) => t.ok).length, total: tests.length };
   });
 
-  /** Rolls one merchant (or the shared word lists) back to a saved version. Other merchants are not touched.
+  /** Rolls one merchant (or the shared word lists, when no merchant is given) back to a saved version. Other merchants are not touched.
    *  Staff may roll back their own merchant; the shared lists are for admins. */
-  app.post<{ Body: { id: number } }>(`${A}/rollback`, async (req, reply) => {
-    const user = req.user!;
-    const [row] = await q(pool, 'SELECT v.id, v.kind, v.version, v.snapshot, m.code AS merchant FROM kb_versions v LEFT JOIN merchants m ON m.id = v.merchant_id WHERE v.id = ?', [req.body?.id]);
+  app.post<{ Body: { merchant?: string | null; version: number } }>(`${A}/rollback`, async (req, reply) => {
+    const user = req.user!; const merchant = req.body?.merchant || null;
+    if (merchant ? !mayUse(req, merchant) : user.role !== 'admin') return reply.code(403).send({ error: merchant ? 'You can only roll back your own merchant.' : 'Only an admin can roll back the shared word lists.' });
+    if (merchant && !(await new Tenants(pool).get(merchant))) return reply.code(404).send({ error: 'unknown merchant' });
+    const scope = merchant ? ({ kind: 'merchant', code: merchant } as const) : ({ kind: 'shared' } as const);
+    const row = await readVersion(pool, scope, Number(req.body?.version));
     if (!row) return reply.code(404).send({ error: 'unknown version' });
-    if (row.kind === 'legacy') return reply.code(400).send({ error: 'This version was saved before versions were kept per merchant, so it cannot be rolled back to.' });
-    if (row.kind === 'shared' ? user.role !== 'admin' : !mayUse(req, row.merchant)) return reply.code(403).send({ error: row.kind === 'shared' ? 'Only an admin can roll back the shared word lists.' : 'You can only roll back your own merchant.' });
     const current = await readSnapshot(pool);
     const slice = JSON.parse(row.snapshot);
     const summary = `Rolled back to v${row.version}`;
-    let ver: number;
-    if (row.kind === 'merchant') {
-      await writeSnapshot(pool, withMerchantSlice(current, row.merchant, slice as MerchantSlice), { merchants: [row.merchant], shared: false });
-      ver = await recordVersion(pool, { kind: 'merchant', code: row.merchant }, user.username, summary, slice);
-    } else {
-      await writeSnapshot(pool, withSharedSlice(current, slice as SharedSlice), { merchants: [], shared: true });
-      ver = await recordVersion(pool, { kind: 'shared' }, user.username, summary, slice);
-    }
+    if (merchant) await writeSnapshot(pool, withMerchantSlice(current, merchant, slice as MerchantSlice), { merchants: [merchant], shared: false });
+    else await writeSnapshot(pool, withSharedSlice(current, slice as SharedSlice), { merchants: [], shared: true });
+    const ver = await recordVersion(pool, scope, user.username, summary, slice);
     await ctx.reloadBot();
-    return { ver, scope: row.kind, merchant: row.merchant };
+    return { ver, scope: scope.kind, merchant };
   });
 
   /** A copy of the bot built from the panel's draft, so the Test chat tab can try changes before they are published.
@@ -130,12 +132,16 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     return { draftId: id };
   });
 
-  /* ---------- keywords ---------- */
+  /* ---------- keywords (each merchant's words are in its own database) ---------- */
+  const tenants = new Tenants(pool);
+  /** The merchant's own table, or null when there is no such merchant. */
+  const mt = async (code: string | undefined, table: string) => { const t = code ? await tenants.get(code) : null; return t ? tbl(t.db, table) : null; };
+
   app.get<{ Querystring: { merchant: string } }>(`${A}/keywords`, async (req, reply) => {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);
-    const rows = await q(pool, `SELECT k.word, k.language, k.hits, k.status, k.source, k.note, k.guess, k.first_seen, k.last_seen FROM keyword_store k JOIN merchants m ON m.id = k.merchant_id
-      WHERE m.code = ? ORDER BY k.hits DESC, k.word`, [req.query.merchant]);
-    return rows.map((r) => ({ w: r.word, lg: r.language, n: Number(r.hits), ignored: r.status === 'ignored', from: r.source === 'test' ? 'Test chat' : 'Live chat', h: r.note ?? '', guess: r.guess ?? null, isNew: r.source === 'test', first: ago(r.first_seen), last: ago(r.last_seen), lastTs: r.last_seen.getTime() }));
+    const T = await mt(req.query.merchant, 'keyword_store'); if (!T) return [];
+    const rows = await q(pool, `SELECT word, language, hits, status, source, note, guess, first_seen, last_seen FROM ${T} ORDER BY hits DESC, word`);
+    return rows.map((r) => ({ w: r.word, lg: r.language, n: Number(r.hits), ignored: r.status === 'ignored', from: r.source === 'test' ? 'Test chat' : 'Live chat', h: r.note ?? '', guess: r.guess ?? null, isNew: r.source === 'test', first: ago(r.first_seen), last: ago(r.last_seen), lastTs: new Date(r.last_seen).getTime() }));
   });
 
   /** Asks Claude to describe the keywords that have no description yet (the newest first), a few at a time. */
@@ -146,11 +152,11 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const known = await loadKnowledge(pool);
     const merchantName = known.merchants.find((m) => m.code === merchant)?.name ?? merchant;
     const topics = Object.keys(known.globalAliases);
-    const rows = await q(pool, `SELECT k.word FROM keyword_store k JOIN merchants m ON m.id = k.merchant_id WHERE m.code = ? AND k.note IS NULL AND k.status <> 'ignored' ORDER BY k.last_seen DESC LIMIT 15`, [merchant]);
+    const K = await mt(merchant, 'keyword_store'), M = await mt(merchant, 'chat_messages'); if (!K || !M) return { done: 0, tried: 0 };
+    const rows = await q(pool, `SELECT word FROM ${K} WHERE note IS NULL AND status <> 'ignored' ORDER BY last_seen DESC LIMIT 15`);
     const store = new Store(pool); let done = 0;
     for (const r of rows) {
-      const sample = (await q(pool, `SELECT cm.text FROM chat_messages cm JOIN chat_sessions cs ON cs.id = cm.session_id JOIN merchants m ON m.id = cs.merchant_id
-        WHERE m.code = ? AND cm.text LIKE ? ORDER BY cm.created_at DESC LIMIT 1`, [merchant, `%${String(r.word).replace(/[%_\\]/g, '\\$&')}%`]))[0]?.text ?? String(r.word);
+      const sample = (await q(pool, `SELECT text FROM ${M} WHERE text LIKE ? ORDER BY created_at DESC LIMIT 1`, [`%${String(r.word).replace(/[%_\\]/g, '\\$&')}%`]))[0]?.text ?? String(r.word);
       const d = await ctx.ai.describeWord({ word: r.word, sample, merchantName, topics });
       if (d) { await store.setNote(merchant, r.word, d.note, d.type); done++; }
     }
@@ -160,9 +166,9 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
   /** Recent customer messages that contain a word (the "Recent chats with this word" list). */
   app.get<{ Querystring: { merchant: string; word: string } }>(`${A}/keywords/samples`, async (req, reply) => {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);
+    const M = await mt(req.query.merchant, 'chat_messages'); if (!M) return [];
     const like = `%${String(req.query.word ?? '').replace(/[%_\\]/g, '\\$&')}%`;
-    const rows = await q(pool, `SELECT cm.text, cm.created_at FROM chat_messages cm JOIN chat_sessions cs ON cs.id = cm.session_id JOIN merchants m ON m.id = cs.merchant_id
-      WHERE m.code = ? AND cm.role = 'customer' AND cm.text LIKE ? ORDER BY cm.created_at DESC LIMIT 5`, [req.query.merchant, like]);
+    const rows = await q(pool, `SELECT text FROM ${M} WHERE role = 'customer' AND text LIKE ? ORDER BY created_at DESC LIMIT 5`, [like]);
     return rows.map((r) => r.text as string);
   });
 
@@ -170,7 +176,8 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const { merchant, words, ignored } = req.body;
     if (!mayUse(req, merchant)) return forbidden(reply);
     if (!words?.length) return { ok: true };
-    await pool.query('UPDATE keyword_store k JOIN merchants m ON m.id = k.merchant_id SET k.status = ? WHERE m.code = ? AND k.word IN (?)', [ignored ? 'ignored' : 'new', merchant, words]);
+    const K = await mt(merchant, 'keyword_store'); if (!K) return { ok: true };
+    await pool.query(`UPDATE ${K} SET status = ? WHERE word IN (?)`, [ignored ? 'ignored' : 'new', words]);
     return { ok: true };
   });
 
@@ -178,15 +185,15 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
   app.get<{ Querystring: { merchant: string; week?: string } }>(`${A}/ranking`, async (req, reply) => {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);
     const week = Math.min(0, Math.max(-12, Number(req.query.week ?? 0) || 0));
-    const [mer] = await q(pool, 'SELECT id FROM merchants WHERE code = ?', [req.query.merchant]);
-    if (!mer) return { rows: [], total: 0, from: '', to: '' };
-    const range = async (w: number) => q(pool, `SELECT word, DATEDIFF(DATE_ADD(CURDATE(), INTERVAL ? DAY), day) AS back, hits FROM keyword_daily
-      WHERE merchant_id = ? AND day BETWEEN DATE_ADD(CURDATE(), INTERVAL ? DAY) AND DATE_ADD(CURDATE(), INTERVAL ? DAY)`, [w * 7, mer.id, w * 7 - 6, w * 7]);
+    const DAILY = await mt(req.query.merchant, 'keyword_daily'), K = await mt(req.query.merchant, 'keyword_store');
+    if (!DAILY || !K) return { rows: [], total: 0, from: '', to: '' };
+    const range = async (w: number) => q(pool, `SELECT word, DATEDIFF(DATE_ADD(CURDATE(), INTERVAL ? DAY), day) AS back, hits FROM ${DAILY}
+      WHERE day BETWEEN DATE_ADD(CURDATE(), INTERVAL ? DAY) AND DATE_ADD(CURDATE(), INTERVAL ? DAY)`, [w * 7, w * 7 - 6, w * 7]);
     const [cur, prev] = [await range(week), await range(week - 1)];
     const series = new Map<string, number[]>(); let total = 0;
     for (const r of cur) { const a = series.get(r.word) ?? Array(7).fill(0); a[6 - Number(r.back)] += Number(r.hits); series.set(r.word, a); total += Number(r.hits); }
     const before = new Map<string, number>(); for (const r of prev) before.set(r.word, (before.get(r.word) ?? 0) + Number(r.hits));
-    const meta = new Map((await q(pool, 'SELECT word, language, note, status FROM keyword_store WHERE merchant_id = ?', [mer.id])).map((r) => [r.word as string, r]));
+    const meta = new Map((await q(pool, `SELECT word, language, note, status FROM ${K}`)).map((r) => [r.word as string, r]));
     const rows = [...series.entries()].map(([w, s]) => {
       const n = s.reduce((a, b) => a + b, 0), p = before.get(w) ?? 0, m = meta.get(w);
       return { w, n, c: p ? Math.round(((n - p) / p) * 100) : 100, lg: m?.language ?? 'en', h: m?.note ?? '', series: s, ignored: m?.status === 'ignored' };

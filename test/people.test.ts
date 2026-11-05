@@ -80,17 +80,14 @@ describe.skipIf(!reachable)('merchants and logins (needs TEST_DATABASE_URL)', ()
     expect(pub.published).toEqual([{ scope: 'merchant', code: 'W88', ver: st0.versions.W88 + 1 }]);   // only W88 got a version, not MERCH_A, not the shared lists
 
     // roll MERCH_A back to its first version: W88 keeps its entry and short form
-    const a1 = st0.history.find((h: { merchant: string }) => h.merchant === 'MERCH_A');
-    expect((await post('/api/admin/rollback', { id: a1.id }, admin)).statusCode).toBe(200);
+    expect((await post('/api/admin/rollback', { merchant: 'MERCH_A', version: 1 }, admin)).statusCode).toBe(200);
     let snap = (await get('/api/admin/state', admin)).json().snapshot;
     expect(snap.kb.some((e: { merchant: string; intent_key: string }) => e.merchant === 'W88' && e.intent_key === 'deposit_how')).toBe(true);
     expect(snap.mAliases.W88.some((a: { variant: string }) => a.variant === 'topup88')).toBe(true);
     expect(snap.kb.filter((e: { merchant: string }) => e.merchant === 'MERCH_A').length).toBe(11);
 
     // roll W88 back to when it was added: its entry goes, the other merchants stay as they are
-    const hist = (await get('/api/admin/state', admin)).json().history as { id: number; merchant: string; version: number }[];
-    const first = hist.find((h) => h.merchant === 'W88' && h.version === 1)!;
-    expect((await post('/api/admin/rollback', { id: first.id }, admin)).statusCode).toBe(200);
+    expect((await post('/api/admin/rollback', { merchant: 'W88', version: 1 }, admin)).statusCode).toBe(200);
     snap = (await get('/api/admin/state', admin)).json().snapshot;
     expect(snap.kb.some((e: { merchant: string }) => e.merchant === 'W88')).toBe(false);
     expect(snap.kb.filter((e: { merchant: string }) => e.merchant === 'MERCH_A').length).toBe(11);
