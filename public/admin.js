@@ -119,7 +119,8 @@ function renderChrome(){
   $('#publish').disabled=!S.changes.length; $('#publish').innerHTML='Publish'+(S.changes.length?' <span class="badge">'+S.changes.length+'</span>':'');
   $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
 }
-async function render(){ renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,test:vTEST,hist:vHIST})[S.view](); }
+const VIEW_KEYS=['kb','imp','chat','kw','store','rank','set','test','hist'];
+async function render(){ if(location.hash!=='#'+S.view) location.hash=S.view; try{ if(isAdmin()) localStorage.setItem('aibot_panel_merchant_'+ME.username,S.merchant); }catch(e){} renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,test:vTEST,hist:vHIST})[S.view](); }
 
 /* ---------- Knowledge base ---------- */
 function langState(e,l){ const t=e.translations[l]||{}; const a=(t.answer_text||'').trim(), n=(t.question_examples||[]).length; return a&&n>=3?'on':(a||n)?'part':''; }
@@ -758,7 +759,11 @@ document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.matches&&e
 (async function boot(){
   try{
     const srv=await api('/api/admin/state'); ME=srv.user; DRAFT_KEY+='_'+ME.username; D.merchants=srv.merchants; S=makeState(srv); S.role=ME.role; if(ME.merchant) S.merchant=ME.merchant;
+    { const hv=location.hash.slice(1); if(VIEW_KEYS.includes(hv)) S.view=hv;
+      if(isAdmin()){ try{ const m=localStorage.getItem('aibot_panel_merchant_'+ME.username); if(m&&D.merchants.some(x=>x.code===m)) S.merchant=m; }catch(e){} } }
     const restored=restoreDraft(); await loadMerchantData(); render();
     if(restored) toast('Restored your unpublished changes');
   }catch(e){ document.getElementById('main').innerHTML='<div class="card"><h2>Cannot reach the bot server</h2><div class="sub">'+esc(e.message)+'. Start it with <span class="mono">npm run dev</span> and refresh this page.</div></div>'; }
 })();
+/* Back and forward buttons move between pages too. */
+window.addEventListener('hashchange',()=>{ const v=location.hash.slice(1); if(S&&VIEW_KEYS.includes(v)&&v!==S.view){ S.view=v; render(); } });
