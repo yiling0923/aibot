@@ -71,9 +71,9 @@ The system has two parts:
 | **Bot engine** | The decision logic. Pure rules, no AI and no network. |
 | **AI layer (optional)** | Claude can pick an entry when no keyword matches, ChatGPT can phrase a reply, and a checker guards the facts. Off until keys are added. |
 | **Storage helpers** | Load the knowledge from the database into memory, save the words customers type, write versions and logins. |
-| **MySQL database** | Keeps everything: merchants, knowledge, words, versions, logins. |
+| **MySQL databases** | A main database (merchant list, logins, shared words) and one database for each merchant (its knowledge base, keywords, chats, settings, versions). |
 | **Merchant API** | Where each merchant's account data lives (balance, transactions, points). Read only. Fake JSON data for now. |
-| **Browser pages** | The control panel, the test chat page and the login page. |
+| **Browser pages** | The control panel, the test chat page and the login page (a React app, built by Vite). |
 
 Dashed boxes in the picture are not connected yet or are optional.
 
@@ -106,14 +106,14 @@ Dashed boxes in the picture are not connected yet or are optional.
 | Area | Lines |
 |---|---|
 | Bot engine | about 380 |
-| Reply builder and texts | about 490 |
+| Reply builder and texts | about 370 |
 | AI layer | about 190 |
-| Control panel back end | about 510 |
+| Control panel back end (`src/admin`) | about 640 |
 | Login | about 120 |
-| Database helpers and server | about 430 |
-| Control panel front end (React, `web/src/admin`) | about 1,500 |
+| Database, migrations, server and helpers | about 1,100 |
+| Control panel front end (React, `web/src/admin`) | about 1,400 |
 | Test chat page, login page, shared code and style sheets (React, `web/src`) | about 900 |
-| Automatic tests | about 860 |
+| Automatic tests (back end and front end) | about 1,100 |
 
 ---
 
@@ -243,13 +243,13 @@ The control panel is a web page at `/admin`. Staff change the bot here without t
 | | Tests | Runs the sample customer messages and shows what passed or failed |
 | **Setup** | Merchant settings | Tone, handoff group, answer limits, account tools, how many rude messages before closing, fixed messages |
 | | Merchants and logins (admin) | Add a merchant (starts empty), add or remove logins, reset passwords |
-| | History | Every published version, with roll back |
+| | History | Every published version of the merchant that is open (an admin also sees the versions of the shared word lists), with roll back |
 
 **Draft, test, publish**
 
 1. Edits stay a **draft in the browser** (saved there, so a refresh does not lose them).
 2. **Test chat** uses a temporary copy of the bot built from the draft. The live bot is not touched.
-3. **Publish** runs all sample messages on the draft first and shows the result. Then it saves everything in **one database transaction**, writes a **new version** (a full copy of the knowledge) and reloads the live bot in memory.
+3. **Publish** runs all sample messages on the draft first and shows the result. Then it saves everything in **one database transaction**, writes a **new version for each merchant whose data really changed** (a full copy of that merchant's knowledge, kept in the merchant's own database, plus one for the shared word lists if those changed) and reloads the live bot in memory.
 4. **Roll back** restores an older version of **one merchant**. Other merchants are not touched. Staff can roll back their own merchant; the shared word lists can only be rolled back by an admin.
 
 **Roles**
@@ -712,14 +712,14 @@ The panel has **three areas**:
    - the **merchant**: a picker for admins, a fixed name for staff,
    - the **menu in four groups**: *Answers*, *Words*, *Check* and *Setup*, each item with a small icon and a count badge where something needs attention,
    - at the bottom: who is signed in, **Sign out**, **Change my password**, and the **Advanced options** switch.
-2. **Top bar**: the live version (`Live v1`), a draft chip with **Discard** when there are unpublished changes, and the **Publish** button.
+2. **Top bar**: the live version of the open merchant (`Live v1`; every merchant counts its own versions), a draft chip with **Discard** when there are unpublished changes, and the **Publish** button.
 3. **Content area**: uses the **full width**. Each screen is made of white cards on a light grey background, with one clear heading per card.
 
 Other design rules:
 
 - **One accent colour** (teal) for the main action; green, amber and red only for status.
 - **Light and dark mode** follow the computer's setting.
-- The page you are on is kept in the address bar (`#rank`), so a **refresh stays on the same page** and the Back button works.
+- The page you are on is kept in the address bar (for example `/admin/rank`), so a **refresh stays on the same page** and the Back button works.
 - On a **phone**, the sidebar moves above the content and the menu wraps; the page never scrolls sideways.
 
 ![On a phone](img/panel-phone.png)
@@ -825,16 +825,18 @@ aibot/
     bot/                responder.ts (reply builder), texts.ts (3 languages x 2 tones),
                         token.ts (customer token), merchantApi.ts (fake account data), store.ts
     ai/                 claude.ts, openai.ts, validator.ts (fact checker), index.ts
-    admin/              routes.ts, snapshot.ts (read and write the whole knowledge),
-                        scope.ts (what staff may see and change), people.ts
+    admin/              routes.ts, snapshot.ts (read and write the knowledge of every merchant),
+                        versions.ts (each merchant's own publish history), scope.ts (what staff may see
+                        and change), people.ts (merchants and logins)
     auth/               passwords.ts, session.ts, users.ts, addUser.ts
-    db/                 pool, migrate, seed, loadKnowledge, tenants.ts (finds each merchant's database)
+    db/                 pool, migrate, seed, loadKnowledge, tenants.ts (finds each merchant's database),
+                        steps/ (one-time data moves between database layouts)
     config.ts           reads .env
   db/migrations/        001 to 008 for the main database (008 moves old data into merchant databases)
   db/merchant/          the tables every merchant database gets
   db/setup.sql          creates the databases and the bot user (run once as the MySQL admin)
   data/                 fake merchants, entries, accounts and sample messages (JSON)
-  scripts/              evalReport.ts (lists wrong sample messages)
+  scripts/              evalReport.ts (lists wrong sample messages), cleanWeb.mjs (clears the old front end build)
   test/                 automatic tests
   docs/                 this document
   design/               the original mockups
@@ -846,9 +848,9 @@ aibot/
 
 | Setting | Meaning |
 |---|---|
-| `DATABASE_URL` | Where the database is, for example `mysql://bot:bot@localhost:3306/livechat_bot` |
+| `DATABASE_URL` | Where the main database is, for example `mysql://bot:bot@localhost:3306/livechat_bot`. Use the port of your own MySQL (here 3310). The merchant databases are found on the same server. |
 | `PORT` | Port of the web server (3000) |
-| `TEST_DATABASE_URL` | A separate database for tests. It is wiped on every test run. |
+| `TEST_DATABASE_URL` | A separate database for tests (and the merchant databases that start with `livechat_bot_test_m_`). They are wiped on every test run. |
 | `SESSION_SECRET` | Signs the login cookie. Use a long random value. |
 | `CUSTOMER_TOKEN_SECRET` | Shared with the merchant website; signs the customer token. |
 | `DEV_TOOLS` | `on` shows the fake-customer buttons; set `off` for real use |
@@ -906,6 +908,8 @@ Every miss was then fixed and kept as a test. A fair expectation for messages th
 | **Two admins at once** | Each publish saves a new version of the merchants that changed, so if two admins edit the same merchant at the same time, the later publish wins. |
 | **Unused tables** | `feedback`, `unmatched_messages`, and the columns `business_hours`, `valid_from` and `valid_to` exist but no screen uses them. |
 | **"Suggest with AI" button** | A placeholder: it only adds simple variations of the first example question. It does not call an AI. |
+| **Production start** | The back end runs through `tsx` (TypeScript is run directly). That is fine on your own computer; for a server it should be compiled to JavaScript first. Not done. |
+| **Many merchants** | Every merchant has its own database, so backups, upgrades and monitoring must handle many databases. `npm run db:migrate` updates all of them. No automatic backups yet. |
 | **Languages in the panel** | The control panel is in English only. |
 
 ---

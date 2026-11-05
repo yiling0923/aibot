@@ -28,7 +28,7 @@ cd aibot
 cp .env.example .env              # default values work for localhost (Windows: copy .env.example .env)
 mysql -u root -p < db/setup.sql   # creates the databases and the "bot" user (asks for your MySQL root password; in PowerShell use: mysql -u root -p -e "source db/setup.sql")
 npm install
-npm run db:migrate                # creates the tables
+npm run db:migrate                # creates the tables, and one database for each merchant
 npm run db:seed                   # loads the 6 fake merchants (LuckyPay, SwiftWallet, MegaPlay, BetKing, CashPoint, GameHub)
 npm test                          # runs the tests
 npm run dev                       # builds the front end, then starts the bot on http://localhost:3000
@@ -37,10 +37,8 @@ npm run dev                       # builds the front end, then starts the bot on
 The front end (React + TypeScript + Vite) lives in `web/`. `npm run build` builds it into `web/dist`, which the bot serves.
 While you work on the screens, run `npm run dev:web` in a second terminal for instant reloads on http://localhost:5173 (it passes API calls to the bot on port 3000).
 
-Open **http://localhost:3000** for the test chat page: pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
-Every word you type is saved to the keyword store, and messages the bot did not understand are saved for review.
-
-Open **http://localhost:3000** and sign in. Demo logins (loaded by `npm run db:seed`):
+Open **http://localhost:3000** and sign in. The control panel is at `/admin`; the test chat page is `/chat` (and the **Test chat** screen inside the panel): pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
+Every word you type is saved to that merchant's keyword store, and messages the bot did not understand are saved too. Demo logins (loaded by `npm run db:seed`):
 
 | Username | Password | Can do |
 |---|---|---|
@@ -48,7 +46,7 @@ Open **http://localhost:3000** and sign in. Demo logins (loaded by `npm run db:s
 | `luckypay`, `swiftwallet`, `megaplay`, `betking`, `cashpoint`, `gamehub` | `demo123` | only their own merchant: the merchant is fixed, there is no picker |
 
 Merchant staff can change their own entries, short forms, tone and fixed messages. The server refuses everything else
-(other merchants, shared word lists, limits, tools, roll back), even if a request is sent by hand.
+(other merchants, shared word lists, limits, tools, rolling back the shared lists), even if a request is sent by hand.
 An admin adds merchants and logins in the panel under **Setup > Merchants & logins**: a new merchant starts with an empty knowledge base,
 and its first staff login can be created in the same step. Everyone can change their own password with **Change my password**.
 The same can be done from the command line (the merchant must already exist):
