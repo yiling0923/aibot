@@ -8,6 +8,7 @@ import { buildApp } from '../src/server/app';
 import { hashPassword, verifyPassword } from '../src/auth/passwords';
 import { makeSession, readSession } from '../src/auth/session';
 import { upsertUser } from '../src/auth/users';
+import { seedJson } from './helpers';
 
 describe('passwords and session cookies', () => {
   it('hashes passwords and checks them', () => {
@@ -83,9 +84,9 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     expect(Object.keys(st.snapshot.settings)).toEqual(['MERCH_A']);
     expect(Object.keys(st.snapshot.mAliases)).toEqual(['MERCH_A']);
     const all = (await get('/api/admin/state', admin)).json();
-    expect(all.merchants.length).toBe(3); expect(Object.keys(all.snapshot.settings).length).toBe(3);
+    expect(all.merchants.length).toBe(seedJson.merchants.length); expect(Object.keys(all.snapshot.settings).length).toBe(seedJson.merchants.length);
     expect((await get('/api/merchants', staffA)).json().map((m: { code: string }) => m.code)).toEqual(['MERCH_A']);
-    expect((await get('/api/merchants', admin)).json().length).toBe(3);
+    expect((await get('/api/merchants', admin)).json().length).toBe(seedJson.merchants.length);
   });
 
   it('staff cannot reach another merchant by any route', async () => {

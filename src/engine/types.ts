@@ -45,8 +45,8 @@ export interface Option { kind: 'intent' | 'topic'; key: string }
 export interface Amount { n: number; text: string; hasCur: boolean }
 export interface Candidate { id: number; intent: string; score: number; example: string }
 export interface KeywordRow { id: number; intent: string; topic: string; aspect: string | null; opt: boolean; tOk?: boolean; aOk?: boolean }
-export interface KeywordScan { T: string[]; A: string[]; strong: KeywordRow[]; partial: KeywordRow[] }
-export interface Guard { kind: 'injection' | 'other-merchant' | 'sensitive'; hit: string[]; why: string }
+export interface KeywordScan { T: string[]; A: string[]; rest: string; strong: KeywordRow[]; partial: KeywordRow[] }
+export interface Guard { kind: 'injection' | 'other-merchant' | 'sensitive' | 'human'; hit: string[]; why: string }
 
 export interface AnalyzeResult {
   raw: string; lang: Lang; normalized: string; hits: [string, string][];

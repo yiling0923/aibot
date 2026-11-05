@@ -27,7 +27,7 @@ cp .env.example .env              # default values work for localhost (Windows: 
 mysql -u root -p < db/setup.sql   # creates the databases and the "bot" user (asks for your MySQL root password)
 npm install
 npm run db:migrate                # creates the tables
-npm run db:seed                   # loads the 3 fake merchants (LuckyPay, SwiftWallet, MegaPlay)
+npm run db:seed                   # loads the 6 fake merchants (LuckyPay, SwiftWallet, MegaPlay, BetKing, CashPoint, GameHub)
 npm test                          # runs the tests
 npm run dev                       # starts the bot on http://localhost:3000
 ```
@@ -40,7 +40,7 @@ Open **http://localhost:3000** and sign in. Demo logins (loaded by `npm run db:s
 | Username | Password | Can do |
 |---|---|---|
 | `admin` | `admin123` | everything, all merchants |
-| `luckypay`, `swiftwallet`, `megaplay` | `demo123` | only their own merchant: the merchant is fixed, there is no picker |
+| `luckypay`, `swiftwallet`, `megaplay`, `betking`, `cashpoint`, `gamehub` | `demo123` | only their own merchant: the merchant is fixed, there is no picker |
 
 Merchant staff can change their own entries, short forms, tone and fixed messages. The server refuses everything else
 (other merchants, shared word lists, limits, tools, roll back), even if a request is sent by hand.
@@ -88,6 +88,10 @@ Put the keys in `.env` (see `.env.example`) and restart. Without keys nothing ch
 * The database tests run too when `TEST_DATABASE_URL` is set (it is in `.env.example`, and `db/setup.sql` creates it). They wipe that database every time,
   so it must be the separate `livechat_bot_test` database, never your real data.
 * `npm run typecheck` checks the TypeScript.
+* `npm run eval:report` runs all ~1,900 sample customer messages (English, Malay, Chinese, slang and short forms) through the engine and lists every one that gets a different result than expected.
+  Add a message by adding an entry to `eval_cases` in `data/kb_seed.json`.
+
+The six fake merchants differ on purpose (tone, main language, limits, which entries and account tools they have), so a message can be answered by one merchant and handed to a human by another.
 
 ## How it is organised
 

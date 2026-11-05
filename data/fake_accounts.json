@@ -1,223 +1,511 @@
 {
-  "MERCH_A": {
-    "8841": {
-      "name": "Tom",
-      "deposits": [
-        {
-          "ref": "D-20931",
-          "amount": "MYR 100",
-          "day": "today",
-          "hm": "14:02",
-          "status": "pending"
-        },
-        {
-          "ref": "D-20877",
-          "amount": "MYR 50",
-          "day": "yesterday",
-          "hm": "21:15",
-          "status": "success"
-        }
-      ],
-      "withdrawals": [
-        {
-          "ref": "W-5512",
-          "amount": "MYR 200",
-          "day": "today",
-          "hm": "09:30",
-          "status": "processing"
-        },
-        {
-          "ref": "W-5490",
-          "amount": "MYR 80",
-          "day": "3d",
-          "hm": "",
-          "status": "success"
-        }
-      ],
-      "balance": "MYR 1,250.00",
-      "points": "1,280",
-      "level": "Gold",
-      "transactions": [
-        {
-          "ref": "D-20931",
-          "type": "deposit",
-          "amount": "MYR 100",
-          "day": "today",
-          "hm": "14:02",
-          "status": "pending"
-        },
-        {
-          "ref": "W-5512",
-          "type": "withdraw",
-          "amount": "MYR 200",
-          "day": "today",
-          "hm": "09:30",
-          "status": "processing"
-        },
-        {
-          "ref": "D-20877",
-          "type": "deposit",
-          "amount": "MYR 50",
-          "day": "yesterday",
-          "hm": "21:15",
-          "status": "success"
-        }
-      ]
+ "MERCH_A": {
+  "8841": {
+   "name": "Tom",
+   "deposits": [
+    {
+     "ref": "D-20931",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
     },
-    "9120": {
-      "name": "Mary",
-      "deposits": [
-        {
-          "ref": "D-21002",
-          "amount": "MYR 300",
-          "day": "today",
-          "hm": "10:11",
-          "status": "success"
-        }
-      ],
-      "withdrawals": [],
-      "balance": "MYR 3,400.50",
-      "points": "540",
-      "level": "Silver",
-      "transactions": [
-        {
-          "ref": "D-21002",
-          "type": "deposit",
-          "amount": "MYR 300",
-          "day": "today",
-          "hm": "10:11",
-          "status": "success"
-        }
-      ]
+    {
+     "ref": "D-20877",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
     }
-  },
-  "MERCH_B": {
-    "8841": {
-      "name": "Tom",
-      "deposits": [
-        {
-          "ref": "D-7741",
-          "amount": "MYR 500",
-          "day": "today",
-          "hm": "11:20",
-          "status": "success"
-        }
-      ],
-      "withdrawals": [
-        {
-          "ref": "W-3302",
-          "amount": "MYR 150",
-          "day": "today",
-          "hm": "08:45",
-          "status": "processing"
-        }
-      ],
-      "balance": "MYR 780.00",
-      "points": null,
-      "level": null,
-      "transactions": [
-        {
-          "ref": "D-7741",
-          "type": "deposit",
-          "amount": "MYR 500",
-          "day": "today",
-          "hm": "11:20",
-          "status": "success"
-        },
-        {
-          "ref": "W-3302",
-          "type": "withdraw",
-          "amount": "MYR 150",
-          "day": "today",
-          "hm": "08:45",
-          "status": "processing"
-        }
-      ]
+   ],
+   "withdrawals": [
+    {
+     "ref": "W-5512",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
     },
-    "9120": {
-      "name": "Mary",
-      "deposits": [
-        {
-          "ref": "D-7650",
-          "amount": "MYR 60",
-          "day": "yesterday",
-          "hm": "16:40",
-          "status": "failed"
-        }
-      ],
-      "withdrawals": [],
-      "balance": "MYR 20.00",
-      "points": null,
-      "level": null,
-      "transactions": [
-        {
-          "ref": "D-7650",
-          "type": "deposit",
-          "amount": "MYR 60",
-          "day": "yesterday",
-          "hm": "16:40",
-          "status": "failed"
-        }
-      ]
+    {
+     "ref": "W-5490",
+     "amount": "MYR 80",
+     "day": "3d",
+     "hm": "",
+     "status": "success"
     }
-  },
-  "MERCH_C": {
-    "8841": {
-      "name": "Tom",
-      "deposits": [
-        {
-          "ref": "D-90311",
-          "amount": "MYR 40",
-          "day": "today",
-          "hm": "13:55",
-          "status": "pending"
-        }
-      ],
-      "withdrawals": [
-        {
-          "ref": "W-1180",
-          "amount": "MYR 300",
-          "day": "yesterday",
-          "hm": "22:05",
-          "status": "success"
-        }
-      ],
-      "balance": "MYR 95.50",
-      "points": "4,210",
-      "level": "Platinum",
-      "transactions": []
+   ],
+   "balance": "MYR 1,250.00",
+   "points": "1,280",
+   "level": "Gold",
+   "transactions": [
+    {
+     "ref": "D-20931",
+     "type": "deposit",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
     },
-    "9120": {
-      "name": "Mary",
-      "deposits": [],
-      "withdrawals": [
-        {
-          "ref": "W-1201",
-          "amount": "MYR 150",
-          "day": "today",
-          "hm": "12:30",
-          "status": "processing"
-        }
-      ],
-      "balance": "MYR 410.00",
-      "points": "120",
-      "level": "Bronze",
-      "transactions": []
+    {
+     "ref": "W-5512",
+     "type": "withdraw",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "D-20877",
+     "type": "deposit",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
     }
+   ]
   },
-  "_tools": {
-    "MERCH_A": [
-      "balance",
-      "transactions",
-      "points"
-    ],
-    "MERCH_B": [
-      "balance",
-      "transactions"
-    ],
-    "MERCH_C": [
-      "balance",
-      "points"
-    ]
+  "9120": {
+   "name": "Mary",
+   "deposits": [
+    {
+     "ref": "D-21002",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [],
+   "balance": "MYR 3,400.50",
+   "points": "540",
+   "level": "Silver",
+   "transactions": [
+    {
+     "ref": "D-21002",
+     "type": "deposit",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ]
   }
+ },
+ "MERCH_B": {
+  "8841": {
+   "name": "Tom",
+   "deposits": [
+    {
+     "ref": "D-7741",
+     "amount": "MYR 500",
+     "day": "today",
+     "hm": "11:20",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [
+    {
+     "ref": "W-3302",
+     "amount": "MYR 150",
+     "day": "today",
+     "hm": "08:45",
+     "status": "processing"
+    }
+   ],
+   "balance": "MYR 780.00",
+   "points": null,
+   "level": null,
+   "transactions": [
+    {
+     "ref": "D-7741",
+     "type": "deposit",
+     "amount": "MYR 500",
+     "day": "today",
+     "hm": "11:20",
+     "status": "success"
+    },
+    {
+     "ref": "W-3302",
+     "type": "withdraw",
+     "amount": "MYR 150",
+     "day": "today",
+     "hm": "08:45",
+     "status": "processing"
+    }
+   ]
+  },
+  "9120": {
+   "name": "Mary",
+   "deposits": [
+    {
+     "ref": "D-7650",
+     "amount": "MYR 60",
+     "day": "yesterday",
+     "hm": "16:40",
+     "status": "failed"
+    }
+   ],
+   "withdrawals": [],
+   "balance": "MYR 20.00",
+   "points": null,
+   "level": null,
+   "transactions": [
+    {
+     "ref": "D-7650",
+     "type": "deposit",
+     "amount": "MYR 60",
+     "day": "yesterday",
+     "hm": "16:40",
+     "status": "failed"
+    }
+   ]
+  }
+ },
+ "MERCH_C": {
+  "8841": {
+   "name": "Tom",
+   "deposits": [
+    {
+     "ref": "D-90311",
+     "amount": "MYR 40",
+     "day": "today",
+     "hm": "13:55",
+     "status": "pending"
+    }
+   ],
+   "withdrawals": [
+    {
+     "ref": "W-1180",
+     "amount": "MYR 300",
+     "day": "yesterday",
+     "hm": "22:05",
+     "status": "success"
+    }
+   ],
+   "balance": "MYR 95.50",
+   "points": "4,210",
+   "level": "Platinum",
+   "transactions": []
+  },
+  "9120": {
+   "name": "Mary",
+   "deposits": [],
+   "withdrawals": [
+    {
+     "ref": "W-1201",
+     "amount": "MYR 150",
+     "day": "today",
+     "hm": "12:30",
+     "status": "processing"
+    }
+   ],
+   "balance": "MYR 410.00",
+   "points": "120",
+   "level": "Bronze",
+   "transactions": []
+  }
+ },
+ "_tools": {
+  "MERCH_A": [
+   "balance",
+   "transactions",
+   "points"
+  ],
+  "MERCH_B": [
+   "balance",
+   "transactions"
+  ],
+  "MERCH_C": [
+   "balance",
+   "points"
+  ],
+  "MERCH_D": [
+   "balance",
+   "transactions",
+   "points"
+  ],
+  "MERCH_E": [
+   "balance",
+   "transactions"
+  ],
+  "MERCH_F": [
+   "points"
+  ]
+ },
+ "MERCH_D": {
+  "8841": {
+   "name": "Tom",
+   "deposits": [
+    {
+     "ref": "DD-20931",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
+    },
+    {
+     "ref": "DD-20877",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [
+    {
+     "ref": "WD-5512",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "WD-5490",
+     "amount": "MYR 80",
+     "day": "3d",
+     "hm": "",
+     "status": "success"
+    }
+   ],
+   "balance": "MYR 1250.00",
+   "points": "1,280",
+   "level": "Gold",
+   "transactions": [
+    {
+     "ref": "DD-20931",
+     "type": "deposit",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
+    },
+    {
+     "ref": "WD-5512",
+     "type": "withdraw",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "DD-20877",
+     "type": "deposit",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
+    }
+   ]
+  },
+  "9120": {
+   "name": "Mary",
+   "deposits": [
+    {
+     "ref": "DD-21002",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [],
+   "balance": "MYR 80.00",
+   "points": "540",
+   "level": "Silver",
+   "transactions": [
+    {
+     "ref": "DD-21002",
+     "type": "deposit",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ]
+  }
+ },
+ "MERCH_E": {
+  "8841": {
+   "name": "Tom",
+   "deposits": [
+    {
+     "ref": "DE-20931",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
+    },
+    {
+     "ref": "DE-20877",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [
+    {
+     "ref": "WE-5512",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "WE-5490",
+     "amount": "MYR 80",
+     "day": "3d",
+     "hm": "",
+     "status": "success"
+    }
+   ],
+   "balance": "MYR 1590.00",
+   "points": "1,280",
+   "level": "Gold",
+   "transactions": [
+    {
+     "ref": "DE-20931",
+     "type": "deposit",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
+    },
+    {
+     "ref": "WE-5512",
+     "type": "withdraw",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "DE-20877",
+     "type": "deposit",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
+    }
+   ]
+  },
+  "9120": {
+   "name": "Mary",
+   "deposits": [
+    {
+     "ref": "DE-21002",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [],
+   "balance": "MYR 135.00",
+   "points": "540",
+   "level": "Silver",
+   "transactions": [
+    {
+     "ref": "DE-21002",
+     "type": "deposit",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ]
+  }
+ },
+ "MERCH_F": {
+  "8841": {
+   "name": "Tom",
+   "deposits": [
+    {
+     "ref": "DF-20931",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
+    },
+    {
+     "ref": "DF-20877",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [
+    {
+     "ref": "WF-5512",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "WF-5490",
+     "amount": "MYR 80",
+     "day": "3d",
+     "hm": "",
+     "status": "success"
+    }
+   ],
+   "balance": "MYR 1930.00",
+   "points": "1,280",
+   "level": "Gold",
+   "transactions": [
+    {
+     "ref": "DF-20931",
+     "type": "deposit",
+     "amount": "MYR 100",
+     "day": "today",
+     "hm": "14:02",
+     "status": "pending"
+    },
+    {
+     "ref": "WF-5512",
+     "type": "withdraw",
+     "amount": "MYR 200",
+     "day": "today",
+     "hm": "09:30",
+     "status": "processing"
+    },
+    {
+     "ref": "DF-20877",
+     "type": "deposit",
+     "amount": "MYR 50",
+     "day": "yesterday",
+     "hm": "21:15",
+     "status": "success"
+    }
+   ]
+  },
+  "9120": {
+   "name": "Mary",
+   "deposits": [
+    {
+     "ref": "DF-21002",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ],
+   "withdrawals": [],
+   "balance": "MYR 190.00",
+   "points": "540",
+   "level": "Silver",
+   "transactions": [
+    {
+     "ref": "DF-21002",
+     "type": "deposit",
+     "amount": "MYR 300",
+     "day": "today",
+     "hm": "10:11",
+     "status": "success"
+    }
+   ]
+  }
+ }
 }

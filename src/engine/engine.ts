@@ -12,7 +12,8 @@ import type {
 const CJK_RE = /[一-鿿]/;
 const escRe = (p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GAP = 0.05;   // the best match must beat the second by this much (the answer / clarify limits are per merchant)
-const ASPECT_ORDER = ['time', 'limit', 'change', 'hours', 'how'];
+// Kinds of question words. "problem" (rejected, failed, complaint) always goes to a human; "help" (what to do) is just noise.
+const ASPECT_ORDER = ['time', 'limit', 'change', 'hours', 'how', 'problem', 'help'];
 const ACCT_TOPICS = ['balance', 'transactions', 'points'];
 const TOOLNAME: Record<string, string> = { balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
 const SMALL_KINDS = ['morning', 'greeting', 'callout', 'thanks', 'bye', 'ack'];
@@ -29,9 +30,12 @@ const BASE_SMALL_FILL = ['ok', 'okay', 'ya', 'la', 'lah', 'boss', 'bos', 'sir', 
 const flat = (m: Record<string, Record<string, string[]>> | undefined, key?: string): string[] =>
   key ? Object.values(m?.[key] ?? {}).flat() : Object.values(m ?? {}).flatMap((x) => Object.values(x).flat());
 const compact = (s: string) => s.toLowerCase().replace(/[4@]/g, 'a').replace(/1/g, 'i').replace(/3/g, 'e').replace(/0/g, 'o').replace(/\$/g, 's').replace(/[^a-z]/g, '');
+const SIM_STOP = new Set('what is the a an to of do does i my me you your it its this that are can will be for and or if so at in on'.split(' '));
 const toks = (t: string): Set<string> => {
   const s = new Set<string>();
-  (t.match(/[a-z0-9_]+/g) || []).forEach((w) => s.add(w));
+  const words = t.match(/[a-z0-9_]+/g) || [];
+  const keep = words.filter((w) => !SIM_STOP.has(w));
+  (keep.length ? keep : words).forEach((w) => s.add(w));          // never remove every word
   (t.match(/[一-鿿]+/g) || []).forEach((r) => { if (r.length === 1) s.add(r); else for (let i = 0; i < r.length - 1; i++) s.add(r.slice(i, i + 2)); });
   return s;
 };
@@ -53,7 +57,7 @@ export class Engine {
   private topicIntents: Record<string, string[]> = {};
   private FILLER: Set<string>; private SMALL_FILL: Set<string>; private DATA_FILLERS: string[];
   private abuseWords: string[]; private abuseSoft: string[]; private injection: string[]; private abuseCompact: string[];
-  private aspectRes: [string, [string, RegExp][]][];
+  private aspectWords: [string, RegExp][] = [];
   private allSmall: [string, string][]; private greetRe: RegExp; private tailRe: RegExp;
 
   constructor(private k: Knowledge) {
@@ -69,9 +73,10 @@ export class Engine {
     this.abuseWords = flat(k.guard, 'abuse'); this.abuseSoft = flat(k.guard, 'abuse_soft'); this.injection = flat(k.guard, 'injection');
     this.abuseCompact = this.abuseWords.filter((w) => /^[a-z]{5,}$/.test(w) || w === 'fuck');
 
-    this.aspectRes = ASPECT_ORDER.map((a) => [a, flat(k.aspects, a).map((w) => w.toLowerCase()).sort((x, y) => y.length - x.length)
-      .map((w): [string, RegExp] => [w, CJK_RE.test(w) ? new RegExp(escRe(w), 'g') : new RegExp('(?<![a-z0-9_])' + escRe(w) + '(?![a-z0-9_])', 'g')])]);
-
+    // every question word of every kind, longest first, so "what time" (opening hours) wins over "time", and "how much" over "how"
+    const all: [string, string][] = ASPECT_ORDER.flatMap((a) => flat(k.aspects, a).map((w): [string, string] => [a, w.toLowerCase()]));
+    all.sort((x, y) => y[1].length - x[1].length);
+    this.aspectWords = all.map(([a, w]): [string, RegExp] => [a, CJK_RE.test(w) ? new RegExp(escRe(w), 'g') : new RegExp('(?<![a-z0-9_])' + escRe(w) + '(?![a-z0-9_])', 'g')]);
     const sp = (kind: string) => flat(k.smalltalk, kind);
     this.allSmall = SMALL_KINDS.flatMap((kind) => sp(kind).map((p): [string, string] => [p, kind])).sort((a, b) => b[0].length - a[0].length);
     this.greetRe = new RegExp('^(?:\\s*(?:' + [...sp('greeting'), ...sp('morning'), ...CALL_PREFIX].sort((a, b) => b.length - a.length).map(reEsc).join('|') + ')[\\s,.!?，。！、:-]*)+', 'i');
@@ -147,14 +152,18 @@ export class Engine {
   }
 
   /* ---------- keywords: topic word + question type, found ANYWHERE in the sentence ---------- */
-  private findAspects(text: string): Set<string> {
+  private findAspects(text: string, hasTopic: boolean): { found: Set<string>; rest: string } {
     let rest = ' ' + text + ' '; const found = new Set<string>();
-    for (const [a, list] of this.aspectRes) for (const [, re] of list) { re.lastIndex = 0; if (re.test(rest)) { found.add(a); re.lastIndex = 0; rest = rest.replace(re, ' '); } }
-    return found;
+    // A number with a unit (2 hours, 30 minit, 3天) is about time, when the sentence also names a topic (deposit 2 hours already).
+    // "24 hours" is opening hours and is left for the word list, and an amount such as rm500 is not a number of days.
+    const duration = /(?<![\d/]|rm|myr)(?!24\s*(?:hours?|hrs?|jam|小时))\d+(?:\.\d+)?\s*(?:hours?(?![a-z])|hrs?(?![a-z])|minutes?(?![a-z])|mins?(?![a-z])|days?(?![a-z])|jam(?![a-z])|minit(?![a-z])|hari(?![a-z])|小时|分钟|天)/g;
+    if (hasTopic && duration.test(rest)) { found.add('time'); rest = rest.replace(duration, ' '); }
+    for (const [a, re] of this.aspectWords) { re.lastIndex = 0; if (re.test(rest)) { found.add(a); re.lastIndex = 0; rest = rest.replace(re, ' '); } }
+    return { found, rest };
   }
   private keywordScan(text: string, m: MerchantCfg): KeywordScan {
     const T = [...new Set((text.match(/[a-z0-9_]+/g) || []).filter((x) => this.topics.includes(x)))];
-    const A = this.findAspects(text); const strong: KeywordRow[] = [], partial: KeywordRow[] = [];
+    const { found: A, rest } = this.findAspects(text, T.length > 0); const strong: KeywordRow[] = [], partial: KeywordRow[] = [];
     for (const e of this.entriesOf(m.code)) {
       const tOk = T.includes(e.topic), aOk = !!e.aspect && A.has(e.aspect);
       const s = !e.aspect ? tOk : (e.topicOptional ? aOk : (tOk && aOk));
@@ -162,7 +171,7 @@ export class Engine {
       if (s) strong.push(row); else if (tOk || aOk) partial.push({ ...row, tOk, aOk });
     }
     const nonOpt = strong.filter((s) => !s.opt);       // an "aspect only" match (hours) gives way to topic + aspect
-    return { T, A: [...A], strong: nonOpt.length ? nonOpt : strong, partial };
+    return { T, A: [...A], rest, strong: nonOpt.length ? nonOpt : strong, partial };
   }
 
   /* ---------- guards: rule-change attempts, other merchants, secrets ---------- */
@@ -179,6 +188,9 @@ export class Engine {
     const sp = g('secret_phrase').filter(hasP), ob = g('secret_object').filter(hasP);
     if (sp.length || (g('reveal_verb').some(hasP) && ob.length && !g('reveal_except').some(hasP)))
       return { kind: 'sensitive', hit: [...sp, ...ob], why: 'The customer asks to see a secret (password, OTP, or a full bank, card or ID number). The bot never shows these in chat.' };
+    // asking for a person: hand over straight away instead of showing buttons
+    const hr = g('human_request').filter(hasP);
+    if (hr.length) return { kind: 'human', hit: hr, why: 'The customer asks for a human agent, so the chat is handed over.' };
     return null;
   }
 
@@ -209,6 +221,10 @@ export class Engine {
     const nonFill = (n.text.match(/[a-z0-9_]+/g) || []).filter((x) => !this.FILLER.has(x));
     const cjkLeft = (n.text.replace(/[我想要请问一下的吗啊呢]/g, '').match(/[一-鿿]/g) || []).length;
     const shortMsg = nonFill.length + Math.ceil(cjkLeft / 2) <= 3;
+    // A question word with nothing else (how long?) can show buttons. With other unknown words around it (bila cuti sekolah) it cannot.
+    const leftTok = (ks.rest.match(/[a-z0-9_]+/g) || []).filter((x) => !this.FILLER.has(x)).length;
+    const leftCJK = Math.ceil((ks.rest.replace(/[我想要请问一下的吗啊呢]/g, '').match(/[一-鿿]/g) || []).length / 2);
+    const aspectOnly = leftTok + leftCJK <= 1;
     const guard = abuseHit.length ? null : this.guardHit(raw, m);
     const amt = extractAmount(raw);
     const restRaw = amt ? raw.replace(AMT_RE, ' ').toLowerCase().replace(/[钱现金块元我要想请]/g, ' ') : '';
@@ -234,6 +250,10 @@ export class Engine {
       else if (!this.toolOn(m, kd)) { decision = 'HANDOFF'; why = m.name + ' has not turned on the "' + TOOLNAME[kd] + '" tool, so a human takes over.'; }
       else { decision = 'ACCOUNT'; why = 'The customer asks for personal account data ("' + kd + '"). This needs a verified customer and a lookup.'; }
     }
+    else if (ks.A.includes('problem') && !acctKinds.length) {
+      decision = 'HANDOFF'; via = 'keywords'; conf = 0.9; topic = ks.T[0] ?? null;
+      why = 'The customer reports a problem (a rejected or failed transaction, an error, or a complaint). The bot cannot see the reason, so a human takes over.';
+    }
     else if (ks.strong.length === 1) {
       const s = ks.strong[0]; decision = 'ANSWER'; via = 'keywords'; conf = 0.97; top = { id: s.id, intent: s.intent, score: 1, example: '(keywords)' }; topic = s.topic;
       why = 'Keywords found in the sentence: topic "' + s.topic + '"' + (s.aspect ? ' + "' + s.aspect + '"' : '') + '. Other words are ignored.';
@@ -249,7 +269,11 @@ export class Engine {
     }
     else if (Tav.length === 1) { decision = 'CHOICE'; via = 'keywords'; conf = 0.9; topic = Tav[0]; options = this.availIntents(m, topic).map((k): Option => ({ kind: 'intent', key: k })); why = 'The sentence has the topic "' + topic + '" but not what the customer wants to know, so show buttons instead of guessing.'; }
     else if (Tav.length > 1) { decision = 'CHOICE'; via = 'keywords'; conf = 0.9; options = Tav.map((x): Option => ({ kind: 'topic', key: x })); why = 'The sentence names several topics, so let the customer pick one.'; }
-    else if (ks.A.length && shortMsg && ks.partial.some((p) => p.aOk) && !(top.score >= m.answerThreshold && top.score - second.score >= GAP)) {
+    else if (ks.T.length && !Tav.length) {
+      decision = 'HANDOFF'; via = 'keywords'; conf = 0.9; topic = ks.T[0];
+      why = 'The customer asks about "' + ks.T[0] + '", which ' + m.name + ' has no answer for, so a human takes over.';
+    }
+    else if (ks.A.length && shortMsg && aspectOnly && ks.partial.some((p) => p.aOk) && !(top.score >= m.answerThreshold && top.score - second.score >= GAP)) {
       decision = 'CLARIFY'; via = 'keywords'; options = ks.partial.filter((p) => p.aOk).slice(0, 3).map((p): Option => ({ kind: 'intent', key: p.intent }));
       why = 'A keyword ("' + ks.A.join('", "') + '") but no topic, so show the matching questions as buttons.';
     }

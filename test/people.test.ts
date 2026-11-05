@@ -5,6 +5,7 @@ import { createPool, type Pool } from '../src/db/pool';
 import { migrate } from '../src/db/migrate';
 import { seed, DEMO_ADMIN, DEMO_STAFF_PASSWORD } from '../src/db/seed';
 import { buildApp } from '../src/server/app';
+import { seedJson } from './helpers';
 
 const url = process.env.TEST_DATABASE_URL;
 let pool: Pool | null = null;
@@ -40,7 +41,7 @@ describe.skipIf(!reachable)('merchants and logins (needs TEST_DATABASE_URL)', ()
     const people = (await get('/api/admin/people', admin)).json();
     const w = people.merchants.find((m: { code: string }) => m.code === 'W88');
     expect(w).toMatchObject({ name: 'W88', entries: 0, tone: 'formal', handoffGroup: 201, logins: ['w88'] });
-    expect(people.merchants.length).toBe(4);
+    expect(people.merchants.length).toBe(seedJson.merchants.length + 1);
 
     const staff = await login('w88', 'w88pass1');
     expect(staff.status).toBe(200); expect(staff.body.user).toEqual({ username: 'w88', role: 'staff', merchant: 'W88' });
@@ -66,7 +67,7 @@ describe.skipIf(!reachable)('merchants and logins (needs TEST_DATABASE_URL)', ()
     expect((await post('/api/admin/merchants', { code: 'x', name: 'Short' }, admin)).statusCode).toBe(400);
     expect((await post('/api/admin/merchants', { code: 'has space', name: 'Bad' }, admin)).statusCode).toBe(400);
     expect((await post('/api/admin/merchants', { code: 'NONAME', name: '  ' }, admin)).statusCode).toBe(400);
-    expect((await get('/api/admin/people', admin)).json().merchants.length).toBe(4);
+    expect((await get('/api/admin/people', admin)).json().merchants.length).toBe(seedJson.merchants.length + 1);
   });
 
   it('a roll back never wipes a merchant that was added later', async () => {

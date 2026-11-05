@@ -2,7 +2,7 @@
 const $ = (s) => document.querySelector(s);
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 const fmtAmt = (n) => 'RM' + Number(n).toLocaleString('en-US');
-const ACC = { MERCH_A: '#0E7C86', MERCH_B: '#3A4FA3', MERCH_C: '#B4541A' };
+const ACC = { MERCH_A: '#0E7C86', MERCH_B: '#3A4FA3', MERCH_C: '#B4541A', MERCH_D: '#7A3E9D', MERCH_E: '#2E7D32', MERCH_F: '#C2185B' };
 const LANGN = { zh: '中文', ms: 'Bahasa Melayu', en: 'English' };
 const DEC = { AMOUNT: ['info', 'Amount message'], ACCOUNT: ['info', 'Account lookup'], REFUSE: ['warn', 'Refuse for security'], SMALLTALK: ['info', 'Greeting'], ANSWER: ['ok', 'Answer'],
   CLARIFY: ['warn', 'Show 2 buttons'], CHOICE: ['info', 'Show choice buttons'], HANDOFF: ['warn', 'Hand off to human'], REASK: ['warn', 'Ask again first'], ABUSE: ['warn', 'Reply kindly'] };

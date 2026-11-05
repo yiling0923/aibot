@@ -7,7 +7,9 @@ export const LABEL = {
   withdraw_time:{en:'withdrawal time',ms:'masa pengeluaran',zh:'提款到账时间'}, withdraw_limit:{en:'withdrawal limits',ms:'had pengeluaran',zh:'提款限额'},
   forgot_password:{en:'forgot password',ms:'lupa kata laluan',zh:'忘记密码'}, verify_account:{en:'account verification',ms:'pengesahan akaun',zh:'账号验证'},
   change_bank:{en:'changing bank account',ms:'tukar akaun bank',zh:'更改银行账户'}, contact_hours:{en:'service hours',ms:'waktu operasi',zh:'客服时间'},
-  promo_bonus:{en:'promotions',ms:'promosi',zh:'优惠活动'}
+  promo_bonus:{en:'promotions',ms:'promosi',zh:'优惠活动'},
+  turnover_how:{en:'turnover requirement',ms:'syarat turnover',zh:'流水要求'}, transfer_fee:{en:'transfer fees',ms:'yuran pindahan',zh:'转账手续费'},
+  refund_how:{en:'refunds',ms:'bayaran balik',zh:'退款'}, register_how:{en:'how to register',ms:'cara daftar',zh:'如何注册'}
 };
 export const TONE = {
   friendly:{pre:{en:'Hi! ',ms:'Hai! ',zh:'您好！'},post:{en:' Anything else I can help with? 😊',ms:' Ada apa-apa lagi yang boleh saya bantu? 😊',zh:' 还有其他需要帮忙的吗？😊'}},
@@ -24,7 +26,7 @@ export const GREET = {
   zh:n=>`您好，我是${n}的AI助手。可以问我存款、提款、账号或优惠方面的问题。`
 };
 export const fmtAmt=n=>'RM'+Number(n).toLocaleString('en-US');
-export const TOPIC_LABEL={deposit:{en:'deposits',ms:'deposit',zh:'存款'},withdraw:{en:'withdrawals',ms:'pengeluaran',zh:'提款'},password:{en:'your password',ms:'kata laluan',zh:'密码'},verify:{en:'verification',ms:'pengesahan akaun',zh:'账号验证'},customer_service:{en:'customer service',ms:'khidmat pelanggan',zh:'客服'},promotion:{en:'promotions',ms:'promosi',zh:'优惠'},bank_account:{en:'your bank account',ms:'akaun bank',zh:'银行账户'}};
+export const TOPIC_LABEL={turnover:{en:'turnover',ms:'turnover',zh:'流水'},transfer:{en:'transfers',ms:'pindahan',zh:'转账'},refund:{en:'refunds',ms:'bayaran balik',zh:'退款'},register:{en:'registration',ms:'pendaftaran',zh:'注册'},deposit:{en:'deposits',ms:'deposit',zh:'存款'},withdraw:{en:'withdrawals',ms:'pengeluaran',zh:'提款'},password:{en:'your password',ms:'kata laluan',zh:'密码'},verify:{en:'verification',ms:'pengesahan akaun',zh:'账号验证'},customer_service:{en:'customer service',ms:'khidmat pelanggan',zh:'客服'},promotion:{en:'promotions',ms:'promosi',zh:'优惠'},bank_account:{en:'your bank account',ms:'akaun bank',zh:'银行账户'}};
 export const CHOICE_TXT={en:t=>`Sure! What would you like to know about ${t}?`,ms:t=>`Baik! Apa yang anda ingin tahu tentang ${t}?`,zh:t=>`好的！您想了解${t}的哪方面？`};
 export const PICK_TXT={en:'Which one do you need help with?',ms:'Yang mana satu yang anda perlukan?',zh:'请问您需要哪方面的帮助？'};
 export const AGENT={en:'Talk to an agent',ms:'Cakap dengan ejen',zh:'转人工客服'};

@@ -33,10 +33,10 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
 
   it('seeds the three fake merchants and all acceptance cases', async () => {
     const c = async (t: string) => Number((await pool!.query<RowDataPacket[]>(`SELECT count(*) AS n FROM ${t}`))[0][0].n);
-    expect(await c('merchants')).toBe(3);
+    expect(await c('merchants')).toBe(seedJson.merchants.length);
     expect(await c('kb_entries')).toBe(seedJson.kb_entries.length);
     expect(await c('eval_cases')).toBe(evalCases.length);
-    expect(await c('merchant_limits')).toBe(6);
+    expect(await c('merchant_limits')).toBe(seedJson.merchants.length * 2);      // a deposit and a withdraw limit each
   });
 
   it('loads the same knowledge as the seed file', async () => {
@@ -69,5 +69,5 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
     expect(new Engine(await loadKnowledge(pool!)).analyze('any promo for new member?', 'MERCH_A').decision).toBe('ANSWER');
   });
 
-  it('can be seeded again', async () => { expect((await seed(pool!)).merchants).toBe(3); });
+  it('can be seeded again', async () => { expect((await seed(pool!)).merchants).toBe(seedJson.merchants.length); });
 });

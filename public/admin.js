@@ -95,7 +95,7 @@ async function reloadAll() {
 const $ = s => document.querySelector(s);
 const esc = s => String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 const LANGS=['en','ms','zh'];
-const ASPECT_LABEL={time:'time: how long it takes',limit:'limit: minimum or maximum',how:'how: how to do it',change:'change: update or fix',hours:'hours: opening hours'}; const LN={en:'EN',ms:'MS',zh:'ZH'};
+const ASPECT_LABEL={time:'time: how long it takes',limit:'limit: minimum or maximum',how:'how: how to do it',change:'change: update or fix',hours:'hours: opening hours',problem:'problem: rejected, failed, complaint (goes to a human)',help:'help: what to do (ignored)'}; const LN={en:'EN',ms:'MS',zh:'ZH'};
 const clone=o=>JSON.parse(JSON.stringify(o));
 
 /* ---------- state (everything edited here is a DRAFT until Publish) ---------- */
@@ -162,7 +162,7 @@ function drawEditor(){
       ${ED.topic==='__new'?`<label class="fld"><span>Name of the new topic</span><input type="text" id="ed_newtopic" placeholder="e.g. refund" value="${esc(ED.newTopic||'')}"></label>
       <label class="fld full"><span>Keywords for it (comma separated, any language, optional)</span><input type="text" id="ed_newtopicw" placeholder="e.g. refunds, bayaran balik, 退款" value="${esc(ED.newTopicW||'')}"></label>`:''}
       <label class="tog full" style="align-items:flex-start"><input type="checkbox" id="ed_useq" ${ED.useAspect?'checked':''} style="margin-top:3px"><span><b>Add a question type</b><br><span class="sub">Tick this only if the topic has more than one entry, for example deposit: how to, how long, limit. The question type tells the bot which one the customer means.</span></span></label>
-      ${ED.useAspect?`<label class="fld"><span>Question type</span><select id="ed_aspect"><option value="">Choose a question type…</option>${Object.keys(S.aspects).map(x=>`<option value="${x}" ${ED.aspect===x?'selected':''}>${esc(ASPECT_LABEL[x]||x)}</option>`).join('')}</select></label>
+      ${ED.useAspect?`<label class="fld"><span>Question type</span><select id="ed_aspect"><option value="">Choose a question type…</option>${Object.keys(S.aspects).filter(x=>!['problem','help'].includes(x)).map(x=>`<option value="${x}" ${ED.aspect===x?'selected':''}>${esc(ASPECT_LABEL[x]||x)}</option>`).join('')}</select></label>
       ${S.adv?`<label class="tog full"><input type="checkbox" id="ed_opt" ${ED.topic_optional?'checked':''}> The question type alone is enough (no topic word needed), for example opening hours</label>`:''}`:''}
     </div>
     <div class="note">The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.</div>
@@ -344,9 +344,10 @@ function vCHAT(){
 /* ---------- Keywords ---------- */
 const KW_TABS=[['short','Topics'],['aspect','Question words'],['small','Greetings'],['filler','Fillers'],['block','Block lists']];
 const SMALL_NAMES={morning:'Morning greetings',greeting:'Other greetings',callout:'Calling for attention',thanks:'Thanks',bye:'Goodbye',ack:'Short acknowledgements'};
-const ASPECT_NAMES={time:'Time (how long, pending, late)',limit:'Limit (minimum, maximum)',change:'Change (update, wrong)',hours:'Opening hours',how:'How to'};
+const ASPECT_NAMES={time:'Time (how long, pending, late)',limit:'Limit (minimum, maximum)',change:'Change (update, wrong)',hours:'Opening hours',how:'How to',problem:'Problem: rejected, failed, complaint (a human takes over)',help:'Help: "what to do" (ignored)'};
 const BLOCK_GROUPS=[['abuse','Rude words: reply kindly first','A message with any of these gets a friendly reply that asks for the problem. The chat closes only if the customer keeps being rude (see Merchant settings).'],
   ['abuse_soft','Mild words: only when alone or with other rude words','Harmless in names or normal text (md, cao, 吊). They count as rude only when they are the whole message, or come with another rude word.'],
+  ['human_request','Asking for a person: hand off','"talk to agent", "real person", "转人工": the chat goes to a human straight away.'],
   ['injection','Rule-change attempts: hand off','Messages that try to change the bot\'s rules go to a human.'],
   ['reveal_verb','Secret requests: asking words','Words like "show", "tell", "what is".'],
   ['secret_object','Secret requests: secret things','Password, full bank, card or ID number. Asking word + secret thing = polite refusal.'],

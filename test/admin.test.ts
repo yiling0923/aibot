@@ -46,17 +46,17 @@ describe.skipIf(!reachable)('control panel data (needs TEST_DATABASE_URL)', () =
     const next = clone(snap);
     next.kb = next.kb.filter((e) => !(e.merchant === 'MERCH_A' && e.intent_key === 'promo_bonus'));          // removed
     next.kb.find((e) => e.id === keep.id)!.translations.en!.answer_text = 'NEW ANSWER';                      // edited
-    next.kb.push({ id: 9999, merchant: 'MERCH_B', category: 'General', intent_key: 'refund_how', topic: 'deposit', aspect: 'how', topic_optional: false, status: 'live',
+    next.kb.push({ id: 9999, merchant: 'MERCH_B', category: 'General', intent_key: 'zz_new_entry', topic: 'deposit', aspect: 'how', topic_optional: false, status: 'live',
       translations: { en: { question_examples: ['refund how'], answer_text: 'Refunds take 3 days.' } } });   // added
     await writeSnapshot(pool!, next);
     const after = await readSnapshot(pool!);
     expect(after.kb.find((e) => e.intent_key === 'deposit_how' && e.merchant === 'MERCH_A')!.id).toBe(keep.id);
     expect(after.kb.find((e) => e.intent_key === 'deposit_how' && e.merchant === 'MERCH_A')!.translations.en!.answer_text).toBe('NEW ANSWER');
     expect(after.kb.some((e) => e.merchant === 'MERCH_A' && e.intent_key === 'promo_bonus')).toBe(false);
-    expect(after.kb.find((e) => e.intent_key === 'refund_how')!.merchant).toBe('MERCH_B');
+    expect(after.kb.find((e) => e.intent_key === 'zz_new_entry')!.merchant).toBe('MERCH_B');
     const engine = new Engine(await loadKnowledge(pool!));
-    expect(engine.entriesOf('MERCH_B').some((e) => e.intentKey === 'refund_how')).toBe(true);
-    expect(engine.entriesOf('MERCH_A').some((e) => e.intentKey === 'refund_how')).toBe(false);
+    expect(engine.entriesOf('MERCH_B').some((e) => e.intentKey === 'zz_new_entry')).toBe(true);
+    expect(engine.entriesOf('MERCH_A').some((e) => e.intentKey === 'zz_new_entry')).toBe(false);
   });
 
   it('settings, tools, keywords and fillers are saved', async () => {
