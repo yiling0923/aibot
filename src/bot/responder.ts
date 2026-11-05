@@ -3,6 +3,8 @@ import { Engine } from '../engine/engine';
 import { checkToken, type TokenCheck } from './token';
 import { fakeMerchantApi, type MerchantApi, type Tx } from './merchantApi';
 import * as Texts from './texts';
+import { PICK_MIN_CONFIDENCE, type AiService } from '../ai/types';
+import { checkReply } from '../ai/validator';
 
 /** The texts are looked up by language, tone and key at run time, so they are used untyped here. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -34,7 +36,7 @@ const sp = (lang: Lang) => (lang === 'zh' ? '' : ' ');
 
 export class Bot {
   readonly engine: Engine;
-  constructor(public readonly knowledge: Knowledge, private api: MerchantApi = fakeMerchantApi()) { this.engine = new Engine(knowledge); }
+  constructor(public readonly knowledge: Knowledge, private api: MerchantApi = fakeMerchantApi(), private ai?: AiService) { this.engine = new Engine(knowledge); }
 
   /* ---------- small helpers ---------- */
   private cfg(s: Session) { return this.engine.merchant(s.merchant); }
@@ -124,7 +126,7 @@ export class Bot {
   }
 
   /* ---------- a typed message ---------- */
-  message(s: Session, rawText: string): Turn | null {
+  async message(s: Session, rawText: string): Promise<Turn | null> {
     const text = rawText.trim(); if (!text || s.closed) return null;
     const c = this.cfg(s);
     if (s.handed) return {
@@ -136,7 +138,23 @@ export class Bot {
     let query = text;
     if (s.pending) { const alone = this.engine.analyze(text, s.merchant, s.clarifyCount); if (['CHOICE', 'CLARIFY', 'HANDOFF'].includes(alone.decision)) query = s.pending + ' ' + text; }
     s.pending = null;
-    const r = this.engine.analyze(query, s.merchant, s.clarifyCount, { lastTopic: s.lastTopic }); r.raw = text;
+    let r = this.engine.analyze(query, s.merchant, s.clarifyCount, { lastTopic: s.lastTopic }); r.raw = text;
+    // A second chance for a message no keyword matched: Claude may know which entry it is about. Its pick is checked
+    // against the real entry list, and a low confidence is ignored, so the bot then asks again or hands off as before.
+    let aiInfo: Record<string, unknown> | null = null;
+    const unclear = r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard && !r.ks.T.length && !r.ks.A.length;
+    if (unclear && this.ai?.canPick) {
+      const pick = await this.ai.pickEntry({
+        merchantName: c.name, text: query, lang: r.lang,
+        entries: this.engine.entriesOf(s.merchant).map((e) => ({ key: e.intentKey, topic: e.topic, aspect: e.aspect, examples: e.translations[r.lang]?.questionExamples ?? e.translations.en?.questionExamples ?? [] })),
+      });
+      const e = pick && pick.confidence >= PICK_MIN_CONFIDENCE ? this.engine.entry(s.merchant, pick.intent) : undefined;
+      if (pick && e) {
+        r = { ...r, decision: 'ANSWER', via: 'ai', conf: pick.confidence, topic: e.topic, options: [], top: { id: e.id, intent: e.intentKey, score: pick.confidence, example: '(Claude)' },
+          why: `No keyword matched, so Claude picked "${e.intentKey}" (${Math.round(pick.confidence * 100)}% sure).` };
+        aiInfo = { picked: e.intentKey, confidence: pick.confidence };
+      } else aiInfo = { picked: null, confidence: pick ? pick.confidence : null };
+    }
     if (r.decision === 'ANSWER' && /^(deposit|withdraw)/.test(r.top.intent)) s.lastTopic = r.top.intent.startsWith('deposit') ? 'deposit' : 'withdraw';
     if (r.decision === 'CHOICE' && (r.topic === 'deposit' || r.topic === 'withdraw')) s.lastTopic = r.topic;
     // Not understood = no topic or question word was found at all. The first time, ask again; only a second miss goes to a human.
@@ -166,7 +184,7 @@ export class Bot {
     switch (r.decision) {
       case 'ANSWER':
         s.clarifyCount = 0;
-        if (out.acct) { say(out.acct.text); if (out.acct.agent) turn.buttons = this.buttons([], lang); } else say(this.wrap(s, out.kbAnswer!, lang));
+        if (out.acct) { say(out.acct.text); if (out.acct.agent) turn.buttons = this.buttons([], lang); } else say(await this.composeReply(s, text, out.kbAnswer!, lang, turn));
         break;
       case 'AMOUNT':
         if (r.dir) { s.lastTopic = r.dir; say(this.amountAnswer(s, r.dir, r.amt!.n, lang)); }
@@ -201,8 +219,23 @@ export class Bot {
         } else { say(this.kindReply(s, lang, out.strike!)); turn.buttons = this.buttons(this.engine.topicButtons(s.merchant), lang); }
         break;
     }
-    turn.log = { text, lang, decision: reask ? 'REASK' : r.decision, notUnderstood: r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard };
+    if (aiInfo || turn.trace.ai) turn.trace.ai = { ...(aiInfo ?? {}), ...((turn.trace.ai as object) ?? {}) };
+    turn.log = { text, lang, decision: reask ? 'REASK' : r.decision, notUnderstood: unclear || (r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard) };
     return turn;
+  }
+
+  /** ChatGPT phrases the knowledge base answer. If it is off, fails, or the checker finds a changed fact, the standard wording is used. */
+  private async composeReply(s: Session, customerText: string, facts: string, lang: Lang, turn: Turn): Promise<string> {
+    const c = this.cfg(s);
+    if (this.ai?.canWrite && facts) {
+      const w = await this.ai.writeReply({ merchantName: c.name, tone: c.tone, lang, customerText, facts });
+      if (w) {
+        const v = checkReply(w, facts);
+        if (v.ok) { turn.trace.ai = { ...((turn.trace.ai as object) ?? {}), written: true }; return w.trim(); }
+        turn.trace.ai = { ...((turn.trace.ai as object) ?? {}), written: false, rejected: v.reason };
+      } else turn.trace.ai = { ...((turn.trace.ai as object) ?? {}), written: false };
+    }
+    return this.wrap(s, facts, lang);
   }
 
   private amountOptions(r: AnalyzeResult, lang: Lang) {

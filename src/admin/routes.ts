@@ -8,9 +8,11 @@ import { loadKnowledge } from '../db/loadKnowledge';
 import '../auth/types';
 import { effectiveSnapshot, scopeSnapshot } from './scope';
 import type { SessionUser } from '../auth/session';
+import type { AiService } from '../ai/types';
+import { Store } from '../bot/store';
 import { knowledgeFromSnapshot, readMerchants, readSnapshot, writeSnapshot, type MerchantMeta, type Snapshot } from './snapshot';
 
-export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: Map<string, Bot> }
+export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: Map<string, Bot>; ai: AiService }
 
 const q = async <T extends RowDataPacket = RowDataPacket>(pool: Pool, sql: string, p: unknown[] = []) => (await pool.query<T[]>(sql, p))[0];
 
@@ -65,7 +67,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const history = (await q(pool, 'SELECT version, actor, summary, created_at FROM kb_versions ORDER BY version DESC LIMIT 50'))
       .map((h) => [`v${h.version}`, h.actor, h.summary, ago(h.created_at)]);
     return { ver, merchants: await merchantsFor(pool, user), snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
-      user: { username: user.username, role: user.role, merchant: user.merchant } };
+      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe } };
   });
 
   app.post<{ Body: { snapshot: Snapshot; includeDrafts?: boolean } }>(`${A}/tests`, async (req) => {
@@ -110,7 +112,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const snap = effectiveSnapshot(user, await readSnapshot(pool), req.body.snapshot);
     const known = await loadKnowledge(pool);
     const limits = Object.fromEntries(known.merchants.map((m) => [m.code, m.limits]));
-    const bot = new Bot(knowledgeFromSnapshot(snap, await merchantsFor(pool, user), limits, !!req.body.includeDrafts));
+    const bot = new Bot(knowledgeFromSnapshot(snap, await merchantsFor(pool, user), limits, !!req.body.includeDrafts), undefined, ctx.ai);
     const id = randomUUID(); ctx.drafts.set(id, bot);
     while (ctx.drafts.size > 20) ctx.drafts.delete(ctx.drafts.keys().next().value!);
     return { draftId: id };
@@ -122,6 +124,25 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const rows = await q(pool, `SELECT k.word, k.language, k.hits, k.status, k.source, k.note, k.guess, k.first_seen, k.last_seen FROM keyword_store k JOIN merchants m ON m.id = k.merchant_id
       WHERE m.code = ? ORDER BY k.hits DESC, k.word`, [req.query.merchant]);
     return rows.map((r) => ({ w: r.word, lg: r.language, n: Number(r.hits), ignored: r.status === 'ignored', from: r.source === 'test' ? 'Test chat' : 'Live chat', h: r.note ?? '', guess: r.guess ?? null, isNew: r.source === 'test', first: ago(r.first_seen), last: ago(r.last_seen), lastTs: r.last_seen.getTime() }));
+  });
+
+  /** Asks Claude to describe the keywords that have no description yet (the newest first), a few at a time. */
+  app.post<{ Body: { merchant: string } }>(`${A}/keywords/describe`, async (req, reply) => {
+    const merchant = req.body?.merchant;
+    if (!mayUse(req, merchant)) return forbidden(reply);
+    if (!ctx.ai.canDescribe) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });
+    const known = await loadKnowledge(pool);
+    const merchantName = known.merchants.find((m) => m.code === merchant)?.name ?? merchant;
+    const topics = Object.keys(known.globalAliases);
+    const rows = await q(pool, `SELECT k.word FROM keyword_store k JOIN merchants m ON m.id = k.merchant_id WHERE m.code = ? AND k.note IS NULL AND k.status <> 'ignored' ORDER BY k.last_seen DESC LIMIT 15`, [merchant]);
+    const store = new Store(pool); let done = 0;
+    for (const r of rows) {
+      const sample = (await q(pool, `SELECT cm.text FROM chat_messages cm JOIN chat_sessions cs ON cs.id = cm.session_id JOIN merchants m ON m.id = cs.merchant_id
+        WHERE m.code = ? AND cm.text LIKE ? ORDER BY cm.created_at DESC LIMIT 1`, [merchant, `%${String(r.word).replace(/[%_\\]/g, '\\$&')}%`]))[0]?.text ?? String(r.word);
+      const d = await ctx.ai.describeWord({ word: r.word, sample, merchantName, topics });
+      if (d) { await store.setNote(merchant, r.word, d.note, d.type); done++; }
+    }
+    return { done, tried: rows.length };
   });
 
   /** Recent customer messages that contain a word (the "Recent chats with this word" list). */

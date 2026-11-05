@@ -11,6 +11,7 @@ import { makeToken, checkToken } from '../bot/token';
 import { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
 import { adminRoutes, ensureVersion } from '../admin/routes';
+import { createAi, type AiService } from '../ai';
 import { checkLogin } from '../auth/users';
 import { COOKIE, clearCookie, makeSession, parseCookies, readSession, sessionCookie, type SessionUser } from '../auth/session';
 import '../auth/types';
@@ -27,21 +28,23 @@ function whyOf(tr: Record<string, unknown>): string {
 const PUBLIC_API = new Set(['/api/auth/login', '/health']);
 const SIGNED_IN_PAGES = new Set(['/', '/admin', '/admin.html', '/chat.html']);
 
-export interface AppOptions { pool?: Pool; logger?: boolean }
+export interface AppOptions { pool?: Pool; logger?: boolean; ai?: AiService }
 
 export async function buildApp(opts: AppOptions = {}) {
   const pool = opts.pool ?? createPool();
   const app = Fastify({ logger: opts.logger ?? true });
+  // Claude and ChatGPT are optional: with no keys set, every AI step is off and the bot answers from its own rules.
+  const ai = opts.ai ?? createAi({ anthropicKey: config.anthropicKey, claudeModel: config.claudeModel, openaiKey: config.openaiKey, openaiModel: config.openaiModel, maxCallsPerHour: config.aiMaxCallsPerHour });
   await app.register(fastifyStatic, { root: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public') });
 
   let bot: Bot | null = null;
   const store = new Store(pool);
   const sessions = new Map<string, Session & { owner: string }>();
   const drafts = new Map<string, Bot>();      // copies of the bot built from the control panel's unpublished changes
-  const getBot = async (reload = false) => { if (!bot || reload) bot = new Bot(await loadKnowledge(pool)); return bot; };
+  const getBot = async (reload = false) => { if (!bot || reload) bot = new Bot(await loadKnowledge(pool), undefined, ai); return bot; };
   /** The bot a chat talks to: the published one, or a draft copy when the control panel's Test chat opened it. */
   const botFor = async (s: Session) => (s.draft && drafts.get(s.draft)) || (await getBot());
-  adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts });
+  adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
   await ensureVersion(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
   /* ---------- sign in ---------- */
@@ -102,6 +105,14 @@ export async function buildApp(opts: AppOptions = {}) {
     ];
   });
 
+  /** Claude writes a short note for each new keyword (a few per message), in the background so the customer never waits. */
+  const describeNew = async (b: Bot, merchant: string, words: string[], sample: string) => {
+    for (const word of words.slice(0, 5)) {
+      const d = await ai.describeWord({ word, sample, merchantName: b.engine.merchant(merchant).name, topics: Object.keys(b.knowledge.globalAliases) });
+      if (d) await store.setNote(merchant, word, d.note, d.type);
+    }
+  };
+
   const turnJson = (s: Session, t: Turn | null) => ({ closed: s.closed, handed: s.handed, turn: t });
   const own = (req: { user?: SessionUser }, s: (Session & { owner: string }) | undefined) => (s && s.owner === req.user!.username ? s : undefined);
 
@@ -120,11 +131,12 @@ export async function buildApp(opts: AppOptions = {}) {
     const { sessionId, text, silent } = req.body ?? ({} as never);
     const s = own(req, sessions.get(sessionId)); if (!s) return reply.code(404).send({ error: 'unknown session, start a new chat' });
     const b = await botFor(s);
-    const t = b.message(s, String(text ?? ''));
+    const t = await b.message(s, String(text ?? ''));
     if (!t) return { closed: s.closed, handed: s.handed, turn: null };
     let saved: { fresh: string[]; unmatched: boolean } = { fresh: [], unmatched: false };
     if (t.log && !silent) {
       saved = await store.hear(s.merchant, t.log.text, t.log.lang as Lang, t.log.notUnderstood);
+      if (ai.canDescribe && saved.fresh.length) void describeNew(b, s.merchant, saved.fresh, t.log.text);
       void store.logTurn({ merchant: s.merchant, sessionKey: s.id, customerRef: null, text: t.log.text, lang: t.log.lang as Lang, decision: t.log.decision,
         confidence: Number(t.trace.conf ?? 0), reply: t.messages.map((m) => m.text).join('\n'), matchedKbId: (t.trace.decision === 'ANSWER' ? (t.trace.top as { id: number }).id : null), why: whyOf(t.trace) });
     }

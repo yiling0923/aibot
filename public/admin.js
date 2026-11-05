@@ -87,7 +87,7 @@ async function prefetch() {
 }
 async function reloadAll() {
   const keep = { merchant: S.merchant, view: S.view, role: ME.role, adv: S.adv };
-  S = makeState(await api('/api/admin/state')); Object.assign(S, keep); await loadMerchantData(); render();
+  { const st = await api('/api/admin/state'); S = makeState(st); S.ai = st.ai; } Object.assign(S, keep); await loadMerchantData(); render();
 }
 
 /* ---------- screens (from the approved mockup) ---------- */
@@ -590,7 +590,7 @@ function vSTORE(){
   const all=storeRows(); const counts={}; ST_TABS.forEach(([k])=>counts[k]=all.filter(r=>stIn(r,k)).length);
   const fresh=all.filter(r=>r.isNew).length;
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Keywords</h2><div class="sub">Every word customers type is saved here automatically. Make a keyword a topic, or add it to a topic.</div></div>
-      </div><div class="quiet"><b>${all.length}</b> keywords saved · <b>${counts.unassigned}</b> not assigned yet · newest first</div></div>
+      ${S.ai&&S.ai.describe?'<button class="btn" data-act="describeKw" type="button" title="Claude writes a short note and suggests a type for words that have none">Describe new words with AI</button>':''}</div><div class="quiet"><b>${all.length}</b> keywords saved · <b>${counts.unassigned}</b> not assigned yet · newest first${S.ai&&S.ai.describe?'':' · <span title="Add the Anthropic key to .env">AI descriptions are off</span>'}</div></div>
     <div class="card rkfilter"><div class="head"><div class="segs" role="group" aria-label="Show">${ST_TABS.map(([k,l])=>`<button type="button" data-sttab="${k}" aria-pressed="${S.stTab===k}">${l} <span class="n">${counts[k]}</span></button>`).join('')}</div>
       <div class="filt"><input type="search" id="stq" placeholder="Filter keywords" aria-label="Filter keywords" value="${esc(S.stQ)}">
       <select id="stl" aria-label="Language"><option value="all">All languages</option>${[['en','English'],['ms','Malay'],['zh','Chinese']].map(([v,l])=>`<option value="${v}" ${S.stLang===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -735,6 +735,8 @@ document.addEventListener('click',e=>{
     if(a==='saveSet'){ const s=SET(); const g=id=>document.getElementById(id); s.tone=g('s_tone').value; if(isAdmin()){ s.handoff_group=+g('s_hg').value; s.answer=+g('s_ans').value; s.clarify=+g('s_cl').value; document.querySelectorAll('[data-tool]').forEach(c=>s.tools[c.dataset.tool]=c.checked); }
       if(isAdmin()) s.abuse_close_after=Math.max(0,Math.min(10,+g('s_ab').value||0)); const l=S.mtab||'en'; s.kind[l]=g('s_kind').value; s.closing[l]=g('s_close').value; s.handoff[l]=g('s_hand').value; change('Changed settings for '+M().name); toast('Saved to draft'); vSET(); }
     if(a==='runTests') runTests();
+    if(a==='describeKw'){ el.disabled=true; el.textContent='Asking Claude…';
+      api('/api/admin/keywords/describe',{merchant:S.merchant}).then(async r=>{ await loadKeywords(); toast(r.tried?('Described '+r.done+' of '+r.tried+' words'):'Every word already has a description'); vSTORE(); }).catch(e=>{ toast(e.message); vSTORE(); }); }
     if(a==='rkApply') applySet();
     if(a==='simReload'){ loadSim(); toast('Chat reloaded with your latest draft'); }
     if(a==='impSample'){ S.imp=S.imp||{mode:'update',status:'draft'}; S.imp.text=sampleCSV(); S.imp.name='sample_'+S.merchant.toLowerCase()+'.csv'; S.imp.out=''; vIMP(); }
@@ -758,7 +760,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.matches&&e
 
 (async function boot(){
   try{
-    const srv=await api('/api/admin/state'); ME=srv.user; DRAFT_KEY+='_'+ME.username; D.merchants=srv.merchants; S=makeState(srv); S.role=ME.role; if(ME.merchant) S.merchant=ME.merchant;
+    const srv=await api('/api/admin/state'); ME=srv.user; DRAFT_KEY+='_'+ME.username; D.merchants=srv.merchants; S=makeState(srv); S.role=ME.role; S.ai=srv.ai; if(ME.merchant) S.merchant=ME.merchant;
     { const hv=location.hash.slice(1); if(VIEW_KEYS.includes(hv)) S.view=hv;
       if(isAdmin()){ try{ const m=localStorage.getItem('aibot_panel_merchant_'+ME.username); if(m&&D.merchants.some(x=>x.code===m)) S.merchant=m; }catch(e){} } }
     const restored=restoreDraft(); await loadMerchantData(); render();

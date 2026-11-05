@@ -50,7 +50,7 @@ export interface Guard { kind: 'injection' | 'other-merchant' | 'sensitive'; hit
 
 export interface AnalyzeResult {
   raw: string; lang: Lang; normalized: string; hits: [string, string][];
-  abuseHit: string[]; guard: Guard | null; ks: KeywordScan; via: 'similarity' | 'keywords';
+  abuseHit: string[]; guard: Guard | null; ks: KeywordScan; via: 'similarity' | 'keywords' | 'ai';
   cands: Candidate[]; top: Candidate; second: Candidate;
   decision: Decision; why: string; conf: number; options: Option[]; topic: string | null;
   small: string | null; smallFallback: boolean;

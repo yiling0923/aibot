@@ -11,5 +11,11 @@ export const config = {
   /** Test helpers (fake customer tokens). Must be off in production. */
   devTools: (process.env.DEV_TOOLS ?? 'on') !== 'off',
   anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',
+  /** Claude picks the entry and describes new keywords. A small fast model is plenty for this. */
+  claudeModel: process.env.CLAUDE_MODEL || 'claude-haiku-5-5',
+  /** The ChatGPT model that writes replies. Leave empty to keep the standard wording. */
+  openaiModel: process.env.OPENAI_MODEL ?? '',
+  /** Safety limit on AI calls per hour (cost control). */
+  aiMaxCallsPerHour: Number(process.env.AI_MAX_CALLS_PER_HOUR ?? 600),
   openaiKey: process.env.OPENAI_API_KEY ?? '',
 };

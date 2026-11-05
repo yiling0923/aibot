@@ -1,0 +1,29 @@
+/** What the bot needs from the AI services. Everything returns null when the AI is off, slow, fails, or gives an unusable answer,
+ *  and the bot then carries on exactly as it does without AI. */
+export interface PickInput {
+  merchantName: string; text: string; lang: string;
+  entries: { key: string; topic: string; aspect: string | null; examples: string[] }[];
+}
+export interface Pick { intent: string; confidence: number }
+
+export interface WriteInput { merchantName: string; tone: 'friendly' | 'formal'; lang: string; customerText: string; facts: string }
+
+export const WORD_TYPES = ['filler', 'slang', 'topic', 'question', 'rude', 'greeting', 'negation', 'other'] as const;
+export type WordType = (typeof WORD_TYPES)[number];
+export interface DescribeInput { word: string; sample: string; merchantName: string; topics: string[] }
+export interface WordNote { note: string; type: WordType }
+
+export interface AiService {
+  /** Claude can match a message to a knowledge base entry. */
+  canPick: boolean;
+  /** ChatGPT can write the reply. */
+  canWrite: boolean;
+  /** Claude can describe a new keyword. */
+  canDescribe: boolean;
+  pickEntry(input: PickInput): Promise<Pick | null>;
+  writeReply(input: WriteInput): Promise<string | null>;
+  describeWord(input: DescribeInput): Promise<WordNote | null>;
+}
+
+/** Claude's match must be at least this sure before the bot answers with it. */
+export const PICK_MIN_CONFIDENCE = 0.75;

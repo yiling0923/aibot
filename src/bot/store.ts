@@ -59,6 +59,13 @@ export class Store {
     } catch (e) { console.error('store.logTurn failed', e); }
   }
 
+  /** Saves Claude's description and suggested type for a keyword, unless someone already wrote one. */
+  async setNote(merchant: string, word: string, note: string, type: string) {
+    try {
+      await this.pool.query('UPDATE keyword_store k JOIN merchants m ON m.id = k.merchant_id SET k.note = ?, k.guess = ? WHERE m.code = ? AND k.word = ? AND k.note IS NULL', [note.slice(0, 200), type, merchant, word]);
+    } catch (e) { console.error('store.setNote failed', e); }
+  }
+
   async keywordCount(merchant: string) {
     const mid = await this.merchantId(merchant); if (mid == null) return { words: 0, unmatched: 0 };
     const [a] = await this.pool.query<RowDataPacket[]>('SELECT COUNT(*) AS n FROM keyword_store WHERE merchant_id = ?', [mid]);

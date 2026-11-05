@@ -10,7 +10,7 @@ Everything here runs on your own computer. Nothing is connected to LiveChat yet 
 | 0. Project setup | done |
 | 1. Database (schema, migrations, fake template data) | done |
 | 2. Bot engine in TypeScript, **all 149 acceptance cases pass** | done |
-| 3. AI layer (Claude picks, ChatGPT writes) | next |
+| 3. AI layer (Claude picks, ChatGPT writes) | built, switches on when the keys are added |
 | 4. Chat test page + automatic keyword saving | done |
 | 5. Control panel | done |
 | 6. Account lookup and login token | |
@@ -66,6 +66,19 @@ curl -X POST localhost:3000/api/analyze -H 'content-type: application/json' \
 ```
 
 `npm run db:reset` wipes the database and loads the fake data again.
+
+## AI (optional)
+
+Put the keys in `.env` (see `.env.example`) and restart. Without keys nothing changes: the bot answers from its own rules.
+
+* **Claude** (`ANTHROPIC_API_KEY`): when no keyword matches a message, Claude is asked which knowledge base entry it is about.
+  Its pick is checked against the real entries and ignored below 75% confidence, so the bot then asks again or hands off as before.
+  Claude also writes a short note and suggests a type for every new keyword (the Keywords screen, and the **Describe new words with AI** button for older ones).
+* **ChatGPT** (`OPENAI_API_KEY` and `OPENAI_MODEL`): phrases the knowledge base answer as a natural reply in the customer's language and the merchant's tone.
+  A checker compares the reply with the answer: every number must be kept, and no new number, link or menu path may appear.
+  If the checker refuses it, or the call fails, the standard wording is used.
+* **What is sent:** the customer's message and the merchant's knowledge base text. Account data (balance, transactions, points) is never sent.
+* **Cost control:** small models, short calls, a timeout, and `AI_MAX_CALLS_PER_HOUR`.
 
 ## Tests
 
