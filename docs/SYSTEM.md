@@ -198,6 +198,15 @@ All fixed texts (greetings, buttons, refusal, limits, account answers) exist in 
 
 ## 6. The AI layer (optional)
 
+**Important: the bot never invents an answer.** Every answer a customer sees comes from an entry that a person wrote and published in the knowledge base. The AI does not search for or write new facts:
+
+- **Claude only chooses.** When the message is not clear, it picks the closest entry from the entries that already exist, or says it is not sure. It writes nothing.
+- **ChatGPT only rewords.** It takes the written answer and says it in the merchant's tone (friendly or formal). Numbers, steps and amounts must stay the same. A checker compares every reworded reply with the original, and if a fact changed the original wording is used instead.
+- **No entry, no answer.** If nothing matches, the bot asks once more and then hands the chat to a person.
+- **So each merchant needs its answers set up first** (deposit, withdraw, limits, forgot password, promotions...). It is not necessary to list every way a customer can write a question: a topic word plus at least 3 example questions is enough, and short forms such as `depo` or `dep` are recognised.
+- The "Suggest with AI" button in the entry editor is a **placeholder** for now: it only adds simple variations of the first example. It does not call an AI.
+- Writing draft answers automatically from a merchant's documents is **not built** and not planned for now.
+
 The AI is **off until keys are added** to the `.env` file. With no keys the bot works exactly as described above. Each AI step also falls back safely if the service is slow, down or returns something unusable.
 
 | Step | Service | What it does | Safety |
@@ -896,6 +905,7 @@ Every miss was then fixed and kept as a test. A fair expectation for messages th
 | **Hardening** | Login has a lockout, but the chat API has no speed limit yet. No automatic backups. |
 | **Two admins at once** | Each publish saves a new version of the merchants that changed, so if two admins edit the same merchant at the same time, the later publish wins. |
 | **Unused tables** | `feedback`, `unmatched_messages`, and the columns `business_hours`, `valid_from` and `valid_to` exist but no screen uses them. |
+| **"Suggest with AI" button** | A placeholder: it only adds simple variations of the first example question. It does not call an AI. |
 | **Languages in the panel** | The control panel is in English only. |
 
 ---
