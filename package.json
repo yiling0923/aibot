@@ -5,8 +5,8 @@
   "type": "module",
   "description": "Multi-merchant LiveChat AI bot: engine, API and database (runs on localhost)",
   "scripts": {
-    "dev": "vite build && tsx watch src/server/index.ts",
-    "start": "vite build && tsx src/server/index.ts",
+    "dev": "npm run build && tsx watch src/server/index.ts",
+    "start": "npm run build && tsx src/server/index.ts",
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "test": "vitest run",
     "db:migrate": "tsx src/db/migrate.ts",
@@ -14,7 +14,7 @@
     "db:reset": "tsx src/db/migrate.ts --reset && tsx src/db/seed.ts",
     "user:add": "tsx src/auth/addUser.ts",
     "eval:report": "tsx scripts/evalReport.ts",
-    "build": "vite build",
+    "build": "node scripts/cleanWeb.mjs && vite build",
     "dev:web": "vite"
   },
   "engines": {
