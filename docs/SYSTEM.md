@@ -281,7 +281,7 @@ Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_T
 - **Languages** are stored per row (`en`, `ms`, `zh`), not as separate columns, so a language can be added without changing the tables.
 - **Flexible parts use JSON columns** (example questions, fixed messages, settings), so they can grow without new columns.
 - **Versions are full snapshots.** Publishing writes the whole knowledge as one JSON document into `kb_versions`, which makes roll back simple and safe.
-- **Numbered migrations** (`001` to `005` in `db/migrations`) create and change the tables. A table `schema_migrations` records which ones have run, so running them again is safe.
+- **Numbered migrations** (`001` to `006` in `db/migrations`) create and change the tables. A table `schema_migrations` records which ones have run, so running them again is safe.
 - Text is stored as **utf8mb4** so Chinese, Malay and emoji work.
 
 ![Database map](img/database.svg)
@@ -297,6 +297,21 @@ Every table in the picture is linked to **`merchants`** through `merchant_id` (d
 - **Chats** are logged in `chat_sessions`, `chat_messages` and `bot_decisions`.
 - **`eval_cases`** are the sample customer messages with the result the bot should give. They are the automatic tests.
 - **`kb_versions`** holds every published version. **`admin_users`** holds the logins.
+
+**Browsing one merchant in phpMyAdmin.** Migration `006` adds read-only **views** (they hold no data of their own). Each starts with `merchant_code` and `merchant_name`, so open a view and filter that column to see one merchant's records:
+
+| View | Shows |
+|---|---|
+| `v_merchants` | One row per merchant with its counts (entries, keywords, unmatched messages, chats) |
+| `v_answers` | Answers and example questions, one row per entry and language |
+| `v_keywords` | Words customers typed, with hits |
+| `v_unmatched` | Messages the bot did not understand |
+| `v_settings` | Tone, thresholds, limits, account tools and fixed messages |
+| `v_words` | Short forms, block lists and greetings (shared ones show "(all merchants)") |
+| `v_chats` | Chats with their messages |
+| `v_logins` | Logins and the merchant each is locked to |
+
+Change data in the control panel, not in these views.
 
 ### The tables
 

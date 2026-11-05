@@ -10,10 +10,10 @@ const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db
  *  MySQL cannot undo table changes, so if a file fails halfway run `npm run db:reset` and fix the file. */
 export async function migrate(pool: Pool = getPool(), opts: { reset?: boolean } = {}) {
   if (opts.reset) {
-    const [tables] = await pool.query<RowDataPacket[]>('SELECT table_name AS t FROM information_schema.tables WHERE table_schema = DATABASE()');
+    const [tables] = await pool.query<RowDataPacket[]>('SELECT table_name AS t, table_type AS ty FROM information_schema.tables WHERE table_schema = DATABASE()');
     if (tables.length) {
       await pool.query('SET FOREIGN_KEY_CHECKS = 0');
-      for (const r of tables) await pool.query(`DROP TABLE IF EXISTS \`${r.t}\``);
+      for (const r of tables) await pool.query(`DROP ${r.ty === 'VIEW' ? 'VIEW' : 'TABLE'} IF EXISTS \`${r.t}\``);   // views are dropped as views
       await pool.query('SET FOREIGN_KEY_CHECKS = 1');
     }
   }

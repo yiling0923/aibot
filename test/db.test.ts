@@ -31,6 +31,16 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
     expect(r.map((x) => x.name)).toContain('001_init.sql');
   });
 
+  it('has read-only views that start with the merchant, for browsing in phpMyAdmin', async () => {
+    const q = async (sql: string) => (await pool!.query<RowDataPacket[]>(sql))[0];
+    const codes = (await q('SELECT merchant_code FROM v_merchants ORDER BY merchant_code')).map((r) => r.merchant_code);
+    expect(codes).toEqual(seedJson.merchants.map((m: { code: string }) => m.code).sort());
+    const mine = await q(`SELECT DISTINCT merchant_code FROM v_answers WHERE merchant_code = '${codes[0]}'`);
+    expect(mine).toHaveLength(1);                                                  // filtering one merchant shows only its records
+    expect(Number((await q('SELECT COUNT(DISTINCT entry_id) AS n FROM v_answers'))[0].n)).toBe(seedJson.kb_entries.length);
+    for (const v of ['v_keywords', 'v_unmatched', 'v_settings', 'v_words', 'v_chats', 'v_logins']) await q(`SELECT * FROM ${v} LIMIT 1`);
+  });
+
   it('seeds the three fake merchants and all acceptance cases', async () => {
     const c = async (t: string) => Number((await pool!.query<RowDataPacket[]>(`SELECT count(*) AS n FROM ${t}`))[0][0].n);
     expect(await c('merchants')).toBe(seedJson.merchants.length);

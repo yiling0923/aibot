@@ -121,3 +121,9 @@ test/          acceptance cases + database tests
 6. Buttons when the question is not clear, then similarity to example questions, then a human.
 
 Each decision comes with a plain-language reason (`why`), which the control panel will show.
+
+## Looking at one merchant in phpMyAdmin
+
+Open `livechat_bot` and use the views that start with `v_` (`v_merchants`, `v_answers`, `v_keywords`, `v_unmatched`, `v_settings`, `v_words`, `v_chats`, `v_logins`).
+Each shows the merchant first: open one and filter the `merchant_code` column. They are read-only, so make changes in the control panel.
+Run `npm run db:migrate` once after pulling to create them.
