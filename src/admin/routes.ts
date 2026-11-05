@@ -121,7 +121,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);
     const rows = await q(pool, `SELECT k.word, k.language, k.hits, k.status, k.source, k.note, k.guess, k.first_seen, k.last_seen FROM keyword_store k JOIN merchants m ON m.id = k.merchant_id
       WHERE m.code = ? ORDER BY k.hits DESC, k.word`, [req.query.merchant]);
-    return rows.map((r) => ({ w: r.word, lg: r.language, n: Number(r.hits), ignored: r.status === 'ignored', from: r.source === 'test' ? 'Test chat' : 'Live chat', h: r.note ?? '', guess: r.guess ?? null, isNew: r.source === 'test', first: ago(r.first_seen), last: ago(r.last_seen) }));
+    return rows.map((r) => ({ w: r.word, lg: r.language, n: Number(r.hits), ignored: r.status === 'ignored', from: r.source === 'test' ? 'Test chat' : 'Live chat', h: r.note ?? '', guess: r.guess ?? null, isNew: r.source === 'test', first: ago(r.first_seen), last: ago(r.last_seen), lastTs: r.last_seen.getTime() }));
   });
 
   /** Recent customer messages that contain a word (the "Recent chats with this word" list). */

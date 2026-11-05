@@ -73,7 +73,7 @@ function rankRows(offArg) {
 }
 function dateLabel() { const d = RKC[S.rankWeek]; return d ? d.from + ' – ' + d.to : ''; }
 const unassigned = () => storeRows().filter((r) => !r.ignored && r.st.t === 'Not set yet');
-const storeRows = () => KW.map((k) => ({ w: k.w, n: k.n, c: 0, lg: k.lg, t: classify(k.w), h: k.h, isNew: k.isNew, st: kwStatus(k.w), first: k.first, last: k.last, ignored: S.rankExcluded.has(k.w), from: k.from }));
+const storeRows = () => KW.map((k) => ({ w: k.w, n: k.n, c: 0, lg: k.lg, t: classify(k.w), h: k.h, isNew: k.isNew, st: kwStatus(k.w), first: k.first, last: k.last, lastTs: k.lastTs, ignored: S.rankExcluded.has(k.w), from: k.from }));
 
 /* ---------- tests, publish, history ---------- */
 async function fetchTests() {
@@ -590,7 +590,7 @@ function vSTORE(){
   const all=storeRows(); const counts={}; ST_TABS.forEach(([k])=>counts[k]=all.filter(r=>stIn(r,k)).length);
   const fresh=all.filter(r=>r.isNew).length;
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Keywords</h2><div class="sub">Every word customers type is saved here automatically. Make a keyword a topic, or add it to a topic.</div></div>
-      </div><div class="quiet"><b>${all.length}</b> keywords saved · <b>${counts.unassigned}</b> not assigned yet</div></div>
+      </div><div class="quiet"><b>${all.length}</b> keywords saved · <b>${counts.unassigned}</b> not assigned yet · newest first</div></div>
     <div class="card rkfilter"><div class="head"><div class="segs" role="group" aria-label="Show">${ST_TABS.map(([k,l])=>`<button type="button" data-sttab="${k}" aria-pressed="${S.stTab===k}">${l} <span class="n">${counts[k]}</span></button>`).join('')}</div>
       <div class="filt"><input type="search" id="stq" placeholder="Filter keywords" aria-label="Filter keywords" value="${esc(S.stQ)}">
       <select id="stl" aria-label="Language"><option value="all">All languages</option>${[['en','English'],['ms','Malay'],['zh','Chinese']].map(([v,l])=>`<option value="${v}" ${S.stLang===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -598,7 +598,7 @@ function vSTORE(){
     <div class="card scroll"><div id="stbulk"></div><div id="sttable"></div></div>`;
   const draw=()=>{
     const q=S.stQ.trim().toLowerCase();
-    const list=all.filter(r=>stIn(r,S.stTab)&&(!q||r.w.toLowerCase().includes(q)||r.h.toLowerCase().includes(q))&&(S.stLang==='all'||r.lg===S.stLang)).sort((a,b)=>b.n-a.n||a.w.localeCompare(b.w));
+    const list=all.filter(r=>stIn(r,S.stTab)&&(!q||r.w.toLowerCase().includes(q)||r.h.toLowerCase().includes(q))&&(S.stLang==='all'||r.lg===S.stLang)).sort((a,b)=>(b.lastTs||0)-(a.lastTs||0)||b.n-a.n||a.w.localeCompare(b.w));
     window.__stshown=list; const sel=S.newSel, allSel=list.length&&list.every(r=>sel.has(r.w)); const lock=!isAdmin();
     $('#sttable').innerHTML=`<table style="min-width:960px"><thead><tr><th style="width:34px"><input type="checkbox" data-nkall="1" ${allSel?'checked':''} aria-label="Select all shown"></th><th>Keyword</th><th class="num">Heard</th><th>Language</th><th>Status</th><th></th></tr></thead><tbody>
     ${list.map(r=>{ const fresh=r.isNew||r.live; const todo=!r.ignored&&r.st.t==='Not set yet'; const stt=r.ignored?{c:'',t:'Ignored'}:r.st;
