@@ -35,9 +35,27 @@ npm run dev                       # starts the bot on http://localhost:3000
 Open **http://localhost:3000** for the test chat page: pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
 Every word you type is saved to the keyword store, and messages the bot did not understand are saved for review.
 
-Open **http://localhost:3000/admin** for the control panel. Edit entries, topics, keywords and settings, try them in the Test chat tab,
+Open **http://localhost:3000** and sign in. Demo logins (loaded by `npm run db:seed`):
+
+| Username | Password | Can do |
+|---|---|---|
+| `admin` | `admin123` | everything, all merchants |
+| `luckypay`, `swiftwallet`, `megaplay` | `demo123` | only their own merchant: the merchant is fixed, there is no picker |
+
+Merchant staff can change their own entries, short forms, tone and fixed messages. The server refuses everything else
+(other merchants, shared word lists, limits, tools, roll back), even if a request is sent by hand.
+Add or change a login (the merchant must already exist):
+
+```bash
+npm run user:add -- <username> <password> staff <MERCHANT_CODE>
+npm run user:add -- <username> <password> admin
+```
+
+Before real use, change the demo passwords and set `SESSION_SECRET` in `.env` to a long random value.
+
+The control panel is at **http://localhost:3000/admin**. Edit entries, topics, keywords and settings, try them in the Test chat tab,
 run the tests, and press **Publish**: the bot uses the new version straight away. Every publish is saved in History and can be rolled back.
-Your edits stay a draft in the browser until you publish. "Signed in as" only changes what the screens show; real logins come in phase 7.
+Your edits stay a draft in the browser until you publish.
 
 Or try the API directly:
 

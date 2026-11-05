@@ -250,3 +250,9 @@ body{padding:0}
 details.fold>summary{cursor:pointer;font-weight:600;color:var(--accent);padding:6px 0;list-style:none}
 details.fold>summary::-webkit-details-marker{display:none}
 details.fold[open]>summary{margin-bottom:8px}
+
+/* who is signed in; staff have a fixed merchant instead of a picker */
+.whoami{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.whoami b{display:block;font-size:14px}
+.whoami small{display:block;color:var(--muted);font-size:12px}
+.merch-fixed{font-weight:700;font-size:15px;padding:8px 10px;border-radius:8px;background:var(--surface2)}

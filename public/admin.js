@@ -1,13 +1,15 @@
 /* Control panel. The screens are the approved mockup; the data now comes from /api/admin (your database).
    Changes stay a draft in this browser until Publish, which saves them for the bot. */
 let D = { merchants: [], tests: [] };
+let ME = { username: '', role: 'admin', merchant: null };   // the signed-in person, from the server
 let S = null;
 const api = async (path, body) => {
   const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
+  if (r.status === 401) { location.replace('/login.html'); throw new Error('Please sign in.'); }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
   return r.json();
 };
-const DRAFT_KEY = 'aibot_panel_draft_v1';
+let DRAFT_KEY = 'aibot_panel_draft_v1';   // one saved draft per person: the user name is added after sign in
 function agoISO(iso) {
   if (!iso) return '';
   const s = Math.max(0, (Date.now() - new Date(iso).getTime()) / 1000);
@@ -84,7 +86,7 @@ async function prefetch() {
   if (S.view === 'test' && (S.testsStale || !D.tests.length)) await fetchTests();
 }
 async function reloadAll() {
-  const keep = { merchant: S.merchant, view: S.view, role: S.role, adv: S.adv };
+  const keep = { merchant: S.merchant, view: S.view, role: ME.role, adv: S.adv };
   S = makeState(await api('/api/admin/state')); Object.assign(S, keep); await loadMerchantData(); render();
 }
 
@@ -110,7 +112,9 @@ const NAV_ICON={kb:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" 
 /* The menu, in four groups. */
 const NAV_GROUPS=[['Answers',[['kb','Knowledge base'],['imp','Import']]],['Words',[['kw','Topics'],['store','Keywords'],['rank','Keyword ranking']]],['Check',[['chat','Test chat'],['test','Tests']]],['Setup',[['set','Merchant settings'],['hist','History']]]];
 function renderChrome(){
-  $('#merchant').innerHTML=D.merchants.filter(m=>isAdmin()||m.code==='MERCH_A').map(m=>`<option value="${m.code}" ${m.code===S.merchant?'selected':''}>${esc(m.name)}</option>`).join('');
+  $('#merchant').innerHTML=D.merchants.map(m=>`<option value="${m.code}" ${m.code===S.merchant?'selected':''}>${esc(m.name)}</option>`).join('');
+  $('#merchant').hidden=!isAdmin(); $('#merchFixed').hidden=isAdmin(); $('#merchFixed').textContent=M()?M().name:'';
+  $('#whoName').textContent=ME.username; $('#whoRole').textContent=isAdmin()?'Admin · all merchants':'Staff · '+(M()?M().name:'');
   $('#ver').innerHTML='<span class="vchip"><i></i>Live v'+S.ver+'</span>'+(S.changes.length?'<span class="vchip warn">Draft · '+S.changes.length+' change'+(S.changes.length>1?'s':'')+'</span><button class="btn sm ghost" data-act="discardDraft" type="button">Discard</button>':'');
   $('#publish').disabled=!S.changes.length; $('#publish').innerHTML='Publish'+(S.changes.length?' <span class="badge">'+S.changes.length+'</span>':'');
   $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
@@ -313,7 +317,7 @@ async function loadSim(){
   const f=document.getElementById('sim'); const info=document.getElementById('sim_info');
   try{
     const r=await api('/api/admin/draft',{snapshot:snapshotOf(S),includeDrafts:inc});
-    f.src='/chat.html?draft='+r.draftId+'&merchant='+encodeURIComponent(S.merchant)+(isAdmin()?'':'&only=MERCH_A');
+    f.src='/chat.html?draft='+r.draftId+'&merchant='+encodeURIComponent(S.merchant)+(isAdmin()?'':'&only='+encodeURIComponent(S.merchant));
     const n=S.kb.filter(e=>e.merchant===S.merchant).length, d=S.kb.filter(e=>e.merchant===S.merchant&&e.status!=='live').length;
     info.innerHTML='Using <b>'+esc(M().name)+'</b>: '+(inc?n:n-d)+' entries'+(inc?' ('+d+' draft included)':' (live only, '+d+' draft left out)')+'. Last loaded just now.';
   }catch(e){ info.textContent='Could not start the test chat: '+e.message; }
@@ -639,7 +643,7 @@ async function runTests(){ S.testsRun=false; D.tests=[]; vTEST(); const p=$('#pr
 /* ---------- History ---------- */
 function vHIST(){
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>History</h2><div class="sub">Every published version, who changed it, and when. Roll back if a change goes wrong.</div></div></div>
-    <div style="margin-top:6px">${S.history.map((h,i)=>`<div class="q"><div><div class="t"><span class="mono">${esc(h[0])}</span> · ${esc(h[2])}</div><div class="sub">${esc(h[1])} · ${esc(h[3])}</div></div><div class="acts">${i===0?'<span class="pill ok">live</span>':`<button class="btn sm" data-roll="${esc(h[0])}" type="button">Roll back to this</button>`}</div></div>`).join('')}</div></div>`;
+    <div style="margin-top:6px">${S.history.map((h,i)=>`<div class="q"><div><div class="t"><span class="mono">${esc(h[0])}</span> · ${esc(h[2])}</div><div class="sub">${esc(h[1])} · ${esc(h[3])}</div></div><div class="acts">${i===0?'<span class="pill ok">live</span>':!isAdmin()?'':`<button class="btn sm" data-roll="${esc(h[0])}" type="button">Roll back to this</button>`}</div></div>`).join('')}</div></div>`;
 }
 
 /* ---------- Publish ---------- */
@@ -740,7 +744,7 @@ document.addEventListener('input',e=>{ const t=e.target;
   if(t.id==='s_ans'){ t.closest('.full').querySelector('.fld span').textContent='Answer when the match is at least '+(+t.value).toFixed(2); }
   if(t.id==='s_cl'){ t.closest('.full').querySelector('.fld span').textContent='Ask with buttons when the match is at least '+(+t.value).toFixed(2); } });
 $('#merchant').onchange=async e=>{S.merchant=e.target.value; S.newSel.clear(); S.rankSel.clear(); await loadMerchantData(); render();};
-$('#role').onchange=async e=>{S.role=e.target.value; if(S.role==='staff'&&S.merchant!=='MERCH_A'){ S.merchant='MERCH_A'; await loadMerchantData(); } render();};
+$('#signout').onclick=async()=>{ try{ await api('/api/auth/logout',{}); }catch(e){} location.replace('/login.html'); };
 $('#publish').onclick=openPublish;
 $('#adv').onchange=e=>{ S.adv=e.target.checked; if(!S.adv&&S.kwTab==='aspect') S.kwTab='short'; render(); };
 document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.matches&&e.target.matches('.addrow input')){ e.preventDefault(); const b=e.target.closest('.addrow').querySelector('.btn.pri'); if(b) b.click(); return; }
@@ -748,7 +752,7 @@ document.addEventListener('keydown',e=>{ if(e.key==='Enter'&&e.target.matches&&e
 
 (async function boot(){
   try{
-    const srv=await api('/api/admin/state'); D.merchants=srv.merchants; S=makeState(srv);
+    const srv=await api('/api/admin/state'); ME=srv.user; DRAFT_KEY+='_'+ME.username; D.merchants=srv.merchants; S=makeState(srv); S.role=ME.role; if(ME.merchant) S.merchant=ME.merchant;
     const restored=restoreDraft(); await loadMerchantData(); render();
     if(restored) toast('Restored your unpublished changes');
   }catch(e){ document.getElementById('main').innerHTML='<div class="card"><h2>Cannot reach the bot server</h2><div class="sub">'+esc(e.message)+'. Start it with <span class="mono">npm run dev</span> and refresh this page.</div></div>'; }

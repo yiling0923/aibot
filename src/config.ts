@@ -6,6 +6,8 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? 'mysql://bot:bot@localhost:3306/livechat_bot',
   /** Secret shared with the merchant website; it signs the customer token. */
   tokenSecret: process.env.CUSTOMER_TOKEN_SECRET ?? 'demo-secret',
+  /** Signs the login cookie of the control panel. Set your own long random value for real use. */
+  sessionSecret: process.env.SESSION_SECRET ?? 'dev-session-secret-change-me',
   /** Test helpers (fake customer tokens). Must be off in production. */
   devTools: (process.env.DEV_TOOLS ?? 'on') !== 'off',
   anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',

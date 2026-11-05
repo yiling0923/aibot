@@ -11,7 +11,8 @@
     "test": "vitest run",
     "db:migrate": "tsx src/db/migrate.ts",
     "db:seed": "tsx src/db/seed.ts",
-    "db:reset": "tsx src/db/migrate.ts --reset && tsx src/db/seed.ts"
+    "db:reset": "tsx src/db/migrate.ts --reset && tsx src/db/seed.ts",
+    "user:add": "tsx src/auth/addUser.ts"
   },
   "engines": {
     "node": ">=20"

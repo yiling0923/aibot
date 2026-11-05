@@ -3,11 +3,21 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import { getPool, closePool, type Pool } from './pool';
+import { hashPassword } from '../auth/passwords';
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data');
 const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(dataDir, f), 'utf8'));
 
-/** Fake traffic so the Keyword ranking and Needs review screens have something to show on a fresh install. */
+/** Demo logins: one admin (all merchants) and one staff user per merchant (locked to that merchant). Change these before real use. */
+export const DEMO_ADMIN = { username: 'admin', password: 'admin123' };
+export const DEMO_STAFF_PASSWORD = 'demo123';
+async function seedUsers(c: PoolConnection, mid: Record<string, number>, merchants: { code: string; name: string }[]) {
+  await c.query('INSERT INTO admin_users(username, password_hash, role, merchant_id) VALUES(?,?,?,NULL)', [DEMO_ADMIN.username, hashPassword(DEMO_ADMIN.password), 'admin']);
+  for (const m of merchants)
+    await c.query('INSERT INTO admin_users(username, password_hash, role, merchant_id) VALUES(?,?,?,?)', [m.name.toLowerCase().replace(/[^a-z0-9]/g, ''), hashPassword(DEMO_STAFF_PASSWORD), 'staff', mid[m.code]]);
+}
+
+/** Fake traffic so the Keyword ranking screen has something to show on a fresh install. */
 async function seedPanelSamples(c: PoolConnection, mid: Record<string, number>) {
   const panel = readJson('fake_panel.json') as {
     keywords: { w: string; n: number; c: number; lg: string; h: string; t: string }[];
@@ -51,7 +61,7 @@ export async function seed(pool: Pool = getPool()) {
   try {
     // TRUNCATE ends any transaction in MySQL, so clear the tables first (ids restart at 1), then load everything in one transaction.
     await c.query('SET FOREIGN_KEY_CHECKS = 0');
-    for (const t of ['keyword_daily', 'kb_versions', 'keyword_store', 'unmatched_messages', 'feedback', 'bot_decisions', 'chat_messages', 'chat_sessions', 'eval_cases', 'kb_translations', 'kb_entries', 'kb_categories',
+    for (const t of ['admin_users', 'keyword_daily', 'kb_versions', 'keyword_store', 'unmatched_messages', 'feedback', 'bot_decisions', 'chat_messages', 'chat_sessions', 'eval_cases', 'kb_translations', 'kb_entries', 'kb_categories',
       'aliases', 'aspects', 'smalltalk_phrases', 'guard_phrases', 'filler_words', 'merchant_tools', 'merchant_limits', 'merchant_settings', 'merchants'])
       await c.query(`TRUNCATE TABLE ${t}`);
     await c.query('SET FOREIGN_KEY_CHECKS = 1');
@@ -101,6 +111,7 @@ export async function seed(pool: Pool = getPool()) {
         [mid[ec.merchant], ec.message, ec.language, ec.expected_decision, kb, ec.expected_intent ?? null]);
     }
     await seedPanelSamples(c, mid);
+    await seedUsers(c, mid, s.merchants);
     await c.commit();
     return { merchants: s.merchants.length, entries: s.kb_entries.length, evalCases: s.eval_cases.length };
   } catch (e) { await c.rollback(); throw e; } finally { c.release(); }

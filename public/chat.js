@@ -21,6 +21,7 @@ let merchants = [], customers = [], cur = null, identKey = 'tom', sessionId = nu
 
 async function api(path, body) {
   const r = await fetch(path, body ? { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) } : undefined);
+  if (r.status === 401) { location.replace('/login.html'); throw new Error('Please sign in.'); }
   if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || r.statusText);
   return r.json();
 }
