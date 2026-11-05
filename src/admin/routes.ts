@@ -9,6 +9,7 @@ import '../auth/types';
 import { effectiveSnapshot, scopeSnapshot } from './scope';
 import type { SessionUser } from '../auth/session';
 import type { AiService } from '../ai/types';
+import { checkTranslation } from '../ai/validator';
 import { Store } from '../bot/store';
 import { knowledgeFromSnapshot, readMerchants, readSnapshot, writeSnapshot, type MerchantMeta, type Snapshot } from './snapshot';
 import { Tenants, tbl } from '../db/tenants';
@@ -66,7 +67,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const v = await versionState(pool, user, merchants.map((m) => m.code));
     const history = v.history.map((h) => ({ kind: h.kind, merchant: h.merchant, version: h.version, actor: h.actor, summary: h.summary, ago: ago(h.created_at) }));
     return { versions: v.versions, sharedVer: v.sharedVer, stamp: v.stamp, merchants, snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
-      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe } };
+      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe, translate: ctx.ai.canTranslate } };
   });
 
   app.post<{ Body: { snapshot: Snapshot; includeDrafts?: boolean } }>(`${A}/tests`, async (req) => {
@@ -161,6 +162,26 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
       if (d) { await store.setNote(merchant, r.word, d.note, d.type); done++; }
     }
     return { done, tried: rows.length };
+  });
+
+  /** Translates an entry's answer (and its example questions) into another language, as a draft for a person to check.
+   *  The numbers, links and menu paths of the answer must come back unchanged, otherwise the translation is refused. */
+  app.post<{ Body: { merchant: string; from?: string; to: string; answer: string; examples?: string[] } }>(`${A}/translate`, async (req, reply) => {
+    const b = req.body ?? ({} as never);
+    if (!mayUse(req, b.merchant)) return forbidden(reply);
+    const langs = ['en', 'ms', 'zh'] as const; type L = (typeof langs)[number];
+    const from = (b.from ?? 'en') as L, to = b.to as L;
+    if (!langs.includes(from) || !langs.includes(to) || from === to) return reply.code(400).send({ error: 'Choose two different languages (en, ms or zh).' });
+    const answer = String(b.answer ?? '').trim();
+    if (!answer) return reply.code(400).send({ error: 'Write the answer first, then translate it.' });
+    if (!ctx.ai.canTranslate) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });
+    const examples = (Array.isArray(b.examples) ? b.examples : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20);
+    const name = (await tenants.get(b.merchant))?.name ?? b.merchant;
+    const t = await ctx.ai.translate({ merchantName: name, from, to, answer: answer.slice(0, 4000), examples });
+    if (!t) return reply.code(502).send({ error: 'The translation could not be made. Try again in a moment.' });
+    const check = checkTranslation(t.answer, answer);
+    if (!check.ok) return reply.code(422).send({ error: `The translation was refused because ${check.reason}. Try again, or write it yourself.` });
+    return { answer: t.answer, examples: t.examples };
   });
 
   /** Recent customer messages that contain a word (the "Recent chats with this word" list). */

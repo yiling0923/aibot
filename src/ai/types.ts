@@ -13,6 +13,10 @@ export type WordType = (typeof WORD_TYPES)[number];
 export interface DescribeInput { word: string; sample: string; merchantName: string; topics: string[] }
 export interface WordNote { note: string; type: WordType }
 
+export type TranslateLang = 'en' | 'ms' | 'zh';
+export interface TranslateInput { merchantName: string; from: TranslateLang; to: TranslateLang; answer: string; examples: string[] }
+export interface Translation { answer: string; examples: string[] }
+
 export interface AiService {
   /** Claude can match a message to a knowledge base entry. */
   canPick: boolean;
@@ -20,9 +24,12 @@ export interface AiService {
   canWrite: boolean;
   /** Claude can describe a new keyword. */
   canDescribe: boolean;
+  /** Claude can translate an answer and its example questions into another language (always checked by a person afterwards). */
+  canTranslate: boolean;
   pickEntry(input: PickInput): Promise<Pick | null>;
   writeReply(input: WriteInput): Promise<string | null>;
   describeWord(input: DescribeInput): Promise<WordNote | null>;
+  translate(input: TranslateInput): Promise<Translation | null>;
 }
 
 /** Claude's match must be at least this sure before the bot answers with it. */

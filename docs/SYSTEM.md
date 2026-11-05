@@ -88,7 +88,7 @@ Dashed boxes in the picture are not connected yet or are optional.
 | **Settings** | `dotenv` | Reads the `.env` file. |
 | **AI** | `@anthropic-ai/sdk` (Claude) and `openai` (ChatGPT), official libraries | Answers from Claude are checked with **zod** (a schema checker) before use. |
 | **Passwords and signatures** | Node's built-in `crypto` | scrypt for password hashing, HMAC-SHA256 for signed cookies and tokens. |
-| **Tests** | **Vitest 5**, run with `tsx` (front end tests use **jsdom** and **Testing Library**) | 2,017 automatic tests. |
+| **Tests** | **Vitest 5**, run with `tsx` (front end tests use **jsdom** and **Testing Library**) | 2,023 automatic tests. |
 | **Front end** | **React 19 + TypeScript + Vite 8**, with **React Router 7** | A real single-page app. Vite builds it into `web/dist`, and the bot server serves that folder. The front end shares its data types with the back end (`src/admin/snapshotTypes.ts`), so a mismatch is caught when the code is checked. |
 | **Front end look** | CSS variables, Google Fonts (Instrument Sans, JetBrains Mono), inline SVG icons | Light and dark mode follow the computer's setting. Works on phones. |
 
@@ -202,7 +202,8 @@ All fixed texts (greetings, buttons, refusal, limits, account answers) exist in 
 - **ChatGPT only rewords.** It takes the written answer and says it in the merchant's tone (friendly or formal). Numbers, steps and amounts must stay the same. A checker compares every reworded reply with the original, and if a fact changed the original wording is used instead.
 - **No entry, no answer.** If nothing matches, the bot asks once more and then hands the chat to a person.
 - **So each merchant needs its answers set up first** (deposit, withdraw, limits, forgot password, promotions...). It is not necessary to list every way a customer can write a question: a topic word plus at least 3 example questions is enough, and short forms such as `depo` or `dep` are recognised.
-- The "Suggest with AI" button in the entry editor is a **placeholder** for now: it only adds simple variations of the first example. It does not call an AI.
+- **Translating is a separate, safe helper.** In the entry editor, **Translate to Malay and Chinese** (or **Translate from English** on the MS and ZH tabs) writes a draft translation of the English answer and example questions. It does not invent anything new, and a person checks it before saving. It works as soon as the Anthropic key is in `.env`; without a key the button is greyed out.
+- The "Suggest with AI" button next to the example questions is a **placeholder** for now: it only adds simple variations of the first example. It does not call an AI.
 - Writing draft answers automatically from a merchant's documents is **not built** and not planned for now.
 
 The AI is **off until keys are added** to the `.env` file. With no keys the bot works exactly as described above. Each AI step also falls back safely if the service is slow, down or returns something unusable.
@@ -211,6 +212,7 @@ The AI is **off until keys are added** to the `.env` file. With no keys the bot 
 |---|---|---|---|
 | **Find the entry** | Claude (default model `claude-haiku-5-5`) | Only when no keyword matched: asks which knowledge base entry the message is about | The answer must be a real entry and at least **75% sure**. Otherwise ignored. |
 | **Phrase the reply** | ChatGPT (model set in `.env`) | Rewrites the knowledge base answer as a natural reply in the customer's language and tone | A **checker** compares the rewrite with the original: every number must stay, and no new number, link or menu path may appear. If it fails, the standard wording is used. |
+| **Translate an answer** | Claude | In the entry editor: translates the English answer and example questions into Malay or Chinese, as a **draft** that a person checks and saves | Every number, link and menu path (`Wallet > Deposit`) must come back exactly as written, otherwise the translation is refused. Nothing is saved or published automatically. |
 | **Describe new keywords** | Claude | Writes a short note and suggests a type for each new word (filler, short form, topic, question, rude, greeting...) | Staff make the final decision. Notes written by hand are never replaced. |
 
 **Protection**
@@ -220,7 +222,7 @@ The AI is **off until keys are added** to the `.env` file. With no keys the bot 
 - A **timeout** (8 seconds, one retry) and a limit of **600 AI calls per hour** (changeable) protect cost and speed.
 - Claude's answers are checked with a schema (zod), and a made-up entry name is ignored.
 
-Status: built and tested with a **fake network** (21 tests). It has not been tried with real keys yet.
+Status: built and tested with a **fake network**. It has not been tried with real keys yet.
 
 ---
 
@@ -728,7 +730,9 @@ Other design rules:
 
 ![Login](img/login.png)
 
-**Knowledge base**: a table of entries with topic, language dots (EN, MS, ZH), the English answer and status. Click a row to edit.
+**Knowledge base**: a table of entries with topic, language dots (EN, MS, ZH), the English answer and status. Click a row to edit. In the editor, the **Translate** button fills the Malay and Chinese answers and examples from the English ones (needs the AI key).
+
+![Entry editor](img/panel-translate.png)
 
 **Import**: four numbered steps (merchant, add the file, check, import).
 
@@ -799,6 +803,7 @@ All calls need a valid login cookie unless marked open. Data is sent as JSON.
 | `POST /api/admin/draft` | Build a temporary bot from a draft (Test chat) |
 | `GET /api/admin/keywords`, `/keywords/samples`, `/ranking` | Keyword list, example messages, weekly ranking |
 | `POST /api/admin/keywords/ignore`, `/keywords/describe` | Ignore a word, describe words with AI |
+| `POST /api/admin/translate` | Translate an answer and its examples into another language (needs the AI) |
 | `GET /api/admin/people` (admin) | Merchants and logins |
 | `POST /api/admin/merchants`, `/users`, `/users/password`, `/users/delete` (admin) | Add a merchant, add a login, reset a password, remove a login |
 
@@ -877,7 +882,7 @@ Useful commands: `npm run eval:report` (lists sample messages the bot gets wrong
 
 ## 15. Testing and quality
 
-- **2,017 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
+- **2,023 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
 - Tests also cover the database, the control panel API, login and the merchant lock (with forged requests), merchants and logins, the AI layer (on a fake network), and the reply builder.
 - `npm run eval:report` runs all sample messages and prints every one that gives a different result than expected.
 
@@ -905,6 +910,7 @@ Every miss was then fixed and kept as a test. A fair expectation for messages th
 | **Hardening** | Login has a lockout, but the chat API has no speed limit yet. No automatic backups. |
 | **Two admins at once** | Each publish saves a new version of the merchants that changed, so if two admins edit the same merchant at the same time, the later publish wins. |
 | **Unused tables** | `feedback`, `unmatched_messages`, and the columns `business_hours`, `valid_from` and `valid_to` exist but no screen uses them. |
+| **Translate button** | Built and tested on a fake network. It needs the Anthropic key, and the quality of the Malay and Chinese wording is untested with the real AI. |
 | **"Suggest with AI" button** | A placeholder: it only adds simple variations of the first example question. It does not call an AI. |
 | **Production start** | The back end runs through `tsx` (TypeScript is run directly). That is fine on your own computer; for a server it should be compiled to JavaScript first. Not done. |
 | **Many merchants** | Every merchant has its own database, so backups, upgrades and monitoring must handle many databases. `npm run db:migrate` updates all of them. No automatic backups yet. |

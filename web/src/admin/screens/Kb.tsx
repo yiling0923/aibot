@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { ASPECT_LABEL, LANGS, LN, clone, langState, slug, topicList, isZh, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
@@ -53,6 +54,28 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   const t = trOf(ed, ed.tab);
   const setTr = (patch: Partial<Tr>, lang = ed.tab) => setEd({ ...ed, translations: { ...ed.translations, [lang]: { ...trOf(ed, lang), ...patch } } });
   const sug = ed.sug[ed.tab] || [];
+  const [busy, setBusy] = useState(false);
+
+  /** Asks the AI to translate the English answer and examples into other languages. The result is only a draft in the editor: nothing is saved until "Save to draft". */
+  const translateTo = async (langs: string[]) => {
+    const en = trOf(ed, 'en');
+    if (!en.answer_text.trim()) return p.toast('Write the English answer first, then translate it.');
+    setBusy(true);
+    let next = { ...ed.translations } as Record<string, Tr>; const done: string[] = [], failed: string[] = [];
+    for (const l of langs) {
+      const cur = trOf({ ...ed, translations: next as Entry['translations'] }, l);
+      if (cur.answer_text.trim() && !confirm(`Replace the current ${LN[l]} answer with a new translation?`)) continue;
+      try {
+        const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: l, answer: en.answer_text, examples: en.question_examples });
+        const have = new Set(cur.question_examples.map((x) => x.toLowerCase()));
+        next = { ...next, [l]: { answer_text: r.answer, question_examples: [...cur.question_examples, ...r.examples.filter((x) => !have.has(x.toLowerCase()))] } };
+        done.push(LN[l]);
+      } catch (e) { failed.push(`${LN[l]}: ${(e as Error).message}`); }
+    }
+    setEd({ ...ed, translations: next as Entry['translations'] }); setBusy(false);
+    if (failed.length) p.toast(failed[0]);
+    else if (done.length) p.toast(`Translated to ${done.join(' and ')}. Please check the wording, then save.`);
+  };
 
   const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...t, question_examples: [...t.question_examples, v] } } }); };
   const suggest = () => {
@@ -105,6 +128,12 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <div className="note">The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.</div>
       <div className="tabs" role="tablist">{LANGS.map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
       <label className="fld"><span>Answer in {LN[ed.tab]} (facts only; the bot adds the tone)</span><textarea lang={ed.tab} value={t.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
+      <div className="tools" style={{ marginTop: -4 }}>
+        {ed.tab === 'en'
+          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['ms', 'zh'])}>{busy ? 'Translating…' : 'Translate to Malay and Chinese'}</button>
+          : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo([ed.tab])}>{busy ? 'Translating…' : `Translate from English to ${LN[ed.tab]}`}</button>}
+        <span className="sub">{p.ai.translate ? 'The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.' : 'Translating needs the AI. Add the Anthropic key to .env.'}</span>
+      </div>
       <div><h3>Example questions ({t.question_examples.length}) <span className="sub">at least 3, include slang</span></h3>
         <div className="chips">{t.question_examples.map((x, i) => <span className="chip" key={i}>{x}<button type="button" aria-label="Remove" onClick={() => setTr({ question_examples: t.question_examples.filter((_, j) => j !== i) })}>×</button></span>)}{!t.question_examples.length && <span className="sub">None yet</span>}</div>
         <div className="addrow"><input type="text" placeholder="Add an example, then press Enter" style={{ flex: 1, minWidth: 180 }} value={ed.newEx} onChange={(e) => set({ newEx: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEx(); } }} /><button className="btn sm" type="button" onClick={addEx}>Add</button><button className="btn sm" type="button" onClick={suggest}>Suggest with AI</button></div></div>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dbNameFor, tbl } from '../src/db/tenants';
-import { createAi, checkReply, type AiService, type PickInput } from '../src/ai';
+import { createAi, checkReply, checkTranslation, type AiService, type PickInput, type TranslateInput } from '../src/ai';
 import { Bot, newSession } from '../src/bot/responder';
 import { knowledgeFromSeed } from '../src/engine';
 import { seedJson, accountsJson } from './helpers';
@@ -46,7 +46,8 @@ const pickInput: PickInput = { merchantName: 'LuckyPay', text: 'apa tu', lang: '
 describe('Claude and ChatGPT calls', () => {
   it('everything is off without keys', async () => {
     const ai = createAi({});
-    expect([ai.canPick, ai.canWrite, ai.canDescribe]).toEqual([false, false, false]);
+    expect([ai.canPick, ai.canWrite, ai.canDescribe, ai.canTranslate]).toEqual([false, false, false, false]);
+    expect(await ai.translate({ merchantName: 'x', from: 'en', to: 'ms', answer: 'Hi', examples: [] })).toBeNull();
     expect(await ai.pickEntry(pickInput)).toBeNull();
     expect(await ai.writeReply({ merchantName: 'x', tone: 'friendly', lang: 'en', customerText: 'hi', facts: 'f' })).toBeNull();
     expect(createAi({ openaiKey: 'k' }).canWrite).toBe(false);                            // ChatGPT also needs a model name
@@ -110,7 +111,7 @@ describe('Claude and ChatGPT calls', () => {
 function fakeAi(p: Partial<AiService> & { picks?: { intent: string; confidence: number } | null; written?: string | null }) {
   const log = { pick: 0, write: 0, writeFacts: [] as string[] };
   const ai: AiService = {
-    canPick: p.canPick ?? true, canWrite: p.canWrite ?? true, canDescribe: false,
+    canPick: p.canPick ?? true, canWrite: p.canWrite ?? true, canDescribe: false, canTranslate: false, translate: async () => null,
     pickEntry: async () => { log.pick++; return p.picks ?? null; },
     writeReply: async (i) => { log.write++; log.writeFacts.push(i.facts); return p.written ?? null; },
     describeWord: async () => null,
@@ -191,12 +192,13 @@ if (dbUrl) { pool = createPool(dbUrl, 4); try { await pool.query('select 1'); re
 describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', () => {
   const described: string[] = [];
   const ai: AiService = {
-    canPick: true, canWrite: false, canDescribe: true,
+    canPick: true, canWrite: false, canDescribe: true, canTranslate: true,
+    translate: async (i) => (i.answer.includes('Wallet') ? { answer: i.to === 'zh' ? '请到 Wallet > Deposit，选择付款方式，按步骤操作。最低 MYR 10。' : 'Pergi ke Wallet > Deposit, pilih kaedah bayaran. Minimum MYR 10.', examples: i.examples.map((x) => `[${i.to}] ${x}`) } : { answer: 'Minimum MYR 99', examples: [] }),
     pickEntry: async (i) => (i.text === 'apa tu' ? { intent: 'deposit_how', confidence: 0.9 } : null),
     writeReply: async () => null,
     describeWord: async (i) => { described.push(i.word); return { note: `note for ${i.word}`, type: 'slang' }; },
   };
-  const off: AiService = { canPick: false, canWrite: false, canDescribe: false, pickEntry: async () => null, writeReply: async () => null, describeWord: async () => null };
+  const off: AiService = { canPick: false, canWrite: false, canDescribe: false, canTranslate: false, translate: async () => null, pickEntry: async () => null, writeReply: async () => null, describeWord: async () => null };
   let app: Awaited<ReturnType<typeof buildApp>>, appOff: Awaited<ReturnType<typeof buildApp>>, cookie = '', cookieOff = '';
 
   const signIn = async (a: typeof app) => {
@@ -210,8 +212,8 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     await migrate(pool!, { reset: true }); await seed(pool!);
     app = await buildApp({ pool: pool!, logger: false, ai }); appOff = await buildApp({ pool: pool!, logger: false, ai: off });
     cookie = await signIn(app); cookieOff = await signIn(appOff);
-    expect(((await get(app, cookie, '/api/admin/state')).json()).ai).toEqual({ pick: true, write: false, describe: true });
-    expect(((await get(appOff, cookieOff, '/api/admin/state')).json()).ai).toEqual({ pick: false, write: false, describe: false });
+    expect(((await get(app, cookie, '/api/admin/state')).json()).ai).toEqual({ pick: true, write: false, describe: true, translate: true });
+    expect(((await get(appOff, cookieOff, '/api/admin/state')).json()).ai).toEqual({ pick: false, write: false, describe: false, translate: false });
   });
 
   it('Claude rescues a message through the chat endpoint', async () => {
@@ -234,6 +236,17 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     expect(rows.find((k: { w: string }) => k.w === 'lh').h).toBe('"lah", a particle');       // a note someone wrote is never replaced
   });
 
+  it('translates an answer for the entry editor, refuses a changed number, and says so when AI is off', async () => {
+    const ok = await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', from: 'en', to: 'ms', answer: 'Go to Wallet > Deposit. Minimum MYR 10.', examples: ['depo how'] });
+    expect(ok.statusCode).toBe(200); expect(ok.json()).toEqual({ answer: 'Pergi ke Wallet > Deposit, pilih kaedah bayaran. Minimum MYR 10.', examples: ['[ms] depo how'] });
+    expect((await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', to: 'zh', answer: 'Go to Wallet > Deposit. Minimum MYR 10.' })).json().answer).toContain('MYR 10');
+    const bad = await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', to: 'ms', answer: 'Please wait 5 minutes.' });     // the fake returns "MYR 99", a number that is not in the original
+    expect(bad.statusCode).toBe(422); expect(bad.json().error).toContain('refused');
+    expect((await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', to: 'ms', answer: '  ' })).statusCode).toBe(400);
+    expect((await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', to: 'en', answer: 'x' })).statusCode).toBe(400);
+    expect((await post(appOff, cookieOff, '/api/admin/translate', { merchant: 'MERCH_A', to: 'ms', answer: 'Go to Wallet.' })).statusCode).toBe(409);
+  });
+
   it('the "Describe new words" button fills the words that have no note, and says so when AI is off', async () => {
     await pool!.query(`UPDATE ${tbl(dbNameFor('livechat_bot_test', 'MERCH_A'), 'keyword_store')} SET note = NULL WHERE word IN ('dh','nk')`);
     const r = await post(app, cookie, '/api/admin/keywords/describe', { merchant: 'MERCH_A' });
@@ -248,5 +261,37 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     expect((await post(app, staff, '/api/admin/keywords/describe', { merchant: 'MERCH_B' })).statusCode).toBe(403);
     expect((await post(app, staff, '/api/admin/keywords/describe', { merchant: 'MERCH_A' })).statusCode).toBe(200);
     await app.close(); await appOff.close(); await pool?.end();
+  });
+});
+
+/* ---------- translating an answer ---------- */
+describe('translation checker', () => {
+  const en = 'To deposit, go to Wallet > Deposit and choose a payment method. The minimum is MYR 10 and it takes 5 minutes. See https://pay.example.com/help.';
+  it('accepts a faithful translation', () => {
+    expect(checkTranslation('Untuk deposit, pergi ke Wallet > Deposit dan pilih kaedah bayaran. Minimum ialah MYR 10 dan ambil masa 5 minit. Lihat https://pay.example.com/help.', en).ok).toBe(true);
+    expect(checkTranslation('充值请到 Wallet > Deposit 选择付款方式。最低 MYR 10，需要 5 分钟。详见 https://pay.example.com/help。', en).ok).toBe(true);
+  });
+  it('refuses a changed or missing number, an added link, a changed menu path or an empty text', () => {
+    expect(checkTranslation('Minimum MYR 100, 5 minit, Wallet > Deposit https://pay.example.com/help', en)).toMatchObject({ ok: false, reason: expect.stringContaining('100') });
+    expect(checkTranslation('Minimum MYR 10, Wallet > Deposit https://pay.example.com/help', en)).toMatchObject({ ok: false, reason: expect.stringContaining('left out the number 5') });
+    expect(checkTranslation('MYR 10, 5 minit, Wallet > Deposit https://pay.example.com/help https://evil.test/x', en).ok).toBe(false);
+    expect(checkTranslation('MYR 10, 5 minit, Dompet > Deposit https://pay.example.com/help', en)).toMatchObject({ ok: false, reason: expect.stringContaining('menu path') });
+    expect(checkTranslation('   ', en).ok).toBe(false);
+  });
+});
+
+describe('Claude translation on a fake network', () => {
+  const input: TranslateInput = { merchantName: 'LuckyPay', from: 'en', to: 'ms', answer: 'Go to Wallet > Deposit. The minimum is MYR 10.', examples: ['depo how', 'how to deposit'] };
+  it('returns the translated answer and examples, and sends the original text as data', async () => {
+    const net = fakeNet(() => json(claudeReply('{"answer":"Pergi ke Wallet > Deposit. Minimum ialah MYR 10.","examples":["depo macam mana","cara deposit"]}')));
+    const ai = createAi({ anthropicKey: 'k', fetch: net.fetchImpl });
+    expect(ai.canTranslate).toBe(true);
+    expect(await ai.translate(input)).toEqual({ answer: 'Pergi ke Wallet > Deposit. Minimum ialah MYR 10.', examples: ['depo macam mana', 'cara deposit'] });
+    const sent = JSON.stringify(net.calls[0].body);
+    expect(sent).toContain('<answer>Go to Wallet > Deposit.'); expect(sent).toContain('Bahasa Melayu');
+  });
+  it('gives null for an empty answer or a failing service', async () => {
+    expect(await createAi({ anthropicKey: 'k', fetch: fakeNet(() => json(claudeReply('{"answer":"  ","examples":[]}'))).fetchImpl }).translate(input)).toBeNull();
+    expect(await createAi({ anthropicKey: 'bad', fetch: fakeNet(() => json({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }, 401)).fetchImpl }).translate(input)).toBeNull();
   });
 });

@@ -7,16 +7,16 @@ import Admin from './Admin';
 
 const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay' }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
-  history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false },
+  history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
   snapshot: {
     kb: [], aliases: { deposit: { en: ['deposit'], ms: [], zh: [] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
     settings: {},
   },
 });
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
-const open = (role: 'admin' | 'staff') => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/state') ? state(role) : [])));
-  return render(<MemoryRouter initialEntries={['/admin/kw']}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
+const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
+  vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] } : [])));
+  return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
 beforeEach(() => localStorage.clear());
@@ -55,5 +55,19 @@ describe('Control panel', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
     expect(await screen.findByText(/already a short form of "deposit"/)).toBeTruthy();
     expect((screen.getByRole('button', { name: /^Publish/ }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('translates the English answer into Malay and Chinese as a draft in the editor, and is switched off without AI', async () => {
+    open('admin', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    const answer = document.querySelector('.pane textarea') as HTMLTextAreaElement;
+    await userEvent.type(answer, 'Go to Wallet > Deposit.');
+    await userEvent.click(screen.getByRole('button', { name: 'Translate to Malay and Chinese' }));
+    expect(await screen.findByText(/Translated to MS and ZH/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('tab', { name: /^MS/ }));
+    expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');
+    expect(screen.getByText('depo macam mana')).toBeTruthy();
+    cleanup(); open('admin', '/admin/kb', false);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    expect((screen.getByRole('button', { name: 'Translate to Malay and Chinese' }) as HTMLButtonElement).disabled).toBe(true);
   });
 });

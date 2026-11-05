@@ -1,11 +1,11 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import { claudeDescribe, claudePick, makeAnthropic } from './claude';
+import { claudeDescribe, claudePick, claudeTranslate, makeAnthropic } from './claude';
 import { makeOpenAI, openaiWrite } from './openai';
-import type { AiService, DescribeInput, PickInput, WriteInput } from './types';
+import type { AiService, DescribeInput, PickInput, TranslateInput, WriteInput } from './types';
 
 export * from './types';
-export { checkReply } from './validator';
+export { checkReply, checkTranslation } from './validator';
 
 export interface AiOptions {
   anthropicKey?: string; claudeModel?: string; openaiKey?: string; openaiModel?: string;
@@ -43,9 +43,10 @@ export function createAi(o: AiOptions): AiService {
   };
 
   return {
-    canPick: !!claude, canWrite: !!gpt, canDescribe: !!claude,
+    canPick: !!claude, canWrite: !!gpt, canDescribe: !!claude, canTranslate: !!claude,
     pickEntry: (i: PickInput) => (claude ? run('claude pick', () => claudePick(claude, claudeModel, i)) : Promise.resolve(null)),
     describeWord: (i: DescribeInput) => (claude ? run('claude describe', () => claudeDescribe(claude, claudeModel, i)) : Promise.resolve(null)),
+    translate: (i: TranslateInput) => (claude ? run('claude translate', () => claudeTranslate(claude, claudeModel, i)) : Promise.resolve(null)),
     writeReply: (i: WriteInput) => (gpt ? run('chatgpt write', () => openaiWrite(gpt, o.openaiModel!, i)) : Promise.resolve(null)),
   };
 }

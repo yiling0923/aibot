@@ -131,3 +131,9 @@ The migrate step moves the data of an older single-database installation into me
 
 To see the databases grouped in phpMyAdmin, add this line to `config.inc.php`:
 `$cfg['NavigationTreeDbSeparator'] = '_m_';`
+
+## Translating answers
+
+In the entry editor, **Translate to Malay and Chinese** writes a draft translation of the English answer and example questions (on the MS and ZH tabs: **Translate from English**).
+It needs the Anthropic key in `.env` (`ANTHROPIC_API_KEY`); without it the button is greyed out. The numbers, links and menu paths such as `Wallet > Deposit` must come back exactly as written, otherwise the translation is refused.
+It is only a draft: check it, then **Save to draft** and publish as usual.
