@@ -90,7 +90,10 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot): Promise<void> {
     const mid = new Map(merchants.map((m) => [m.code as string, Number(m.id)]));
 
     // words shared by all merchants: rewritten in the order the panel shows them
-    await c.query('DELETE FROM aliases'); await c.query('DELETE FROM aspects'); await c.query('DELETE FROM smalltalk_phrases WHERE merchant_id IS NULL');
+    // Only merchants this snapshot knows about are rewritten: a merchant added later keeps its entries and short forms.
+    const known = Object.keys(snap.settings).map((code) => mid.get(code)).filter((id): id is number => id != null);
+    await (known.length ? c.query('DELETE FROM aliases WHERE merchant_id IS NULL OR merchant_id IN (?)', [known]) : c.query('DELETE FROM aliases WHERE merchant_id IS NULL'));
+    await c.query('DELETE FROM aspects'); await c.query('DELETE FROM smalltalk_phrases WHERE merchant_id IS NULL');
     await c.query('DELETE FROM guard_phrases WHERE merchant_id IS NULL'); await c.query('DELETE FROM filler_words');
     const bulk = async (table: string, cols: string, tuples: unknown[][]) => {
       for (let i = 0; i < tuples.length; i += 500) await c.query(`INSERT INTO ${table}(${cols}) VALUES ?`, [tuples.slice(i, i + 500)]);
@@ -138,7 +141,7 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot): Promise<void> {
       }
     }
     for (const r of await rows(c, 'SELECT id, merchant_id, intent_key FROM kb_entries'))
-      if (!keep.has(`${r.merchant_id}|${r.intent_key}`)) await c.query('DELETE FROM kb_entries WHERE id=?', [r.id]);
+      if (known.includes(Number(r.merchant_id)) && !keep.has(`${r.merchant_id}|${r.intent_key}`)) await c.query('DELETE FROM kb_entries WHERE id=?', [r.id]);
     await c.commit();
   } catch (e) { await c.rollback(); throw e; } finally { c.release(); }
 }

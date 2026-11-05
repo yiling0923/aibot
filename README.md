@@ -44,7 +44,9 @@ Open **http://localhost:3000** and sign in. Demo logins (loaded by `npm run db:s
 
 Merchant staff can change their own entries, short forms, tone and fixed messages. The server refuses everything else
 (other merchants, shared word lists, limits, tools, roll back), even if a request is sent by hand.
-Add or change a login (the merchant must already exist):
+An admin adds merchants and logins in the panel under **Setup > Merchants & logins**: a new merchant starts with an empty knowledge base,
+and its first staff login can be created in the same step. Everyone can change their own password with **Change my password**.
+The same can be done from the command line (the merchant must already exist):
 
 ```bash
 npm run user:add -- <username> <password> staff <MERCHANT_CODE>

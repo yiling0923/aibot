@@ -83,11 +83,12 @@ async function fetchTests() {
 async function prefetch() {
   if (S.view === 'rank') { await loadRanking(); }
   if (S.view === 'rank' || S.view === 'store') await loadKeywords();
+  if (S.view === 'users' && isAdmin()) await loadPeople();
   if (S.view === 'test' && (S.testsStale || !D.tests.length)) await fetchTests();
 }
 async function reloadAll() {
   const keep = { merchant: S.merchant, view: S.view, role: ME.role, adv: S.adv };
-  { const st = await api('/api/admin/state'); S = makeState(st); S.ai = st.ai; } Object.assign(S, keep); await loadMerchantData(); render();
+  { const st = await api('/api/admin/state'); D.merchants = st.merchants; S = makeState(st); S.ai = st.ai; } Object.assign(S, keep); await loadMerchantData(); render();
 }
 
 /* ---------- screens (from the approved mockup) ---------- */
@@ -108,19 +109,19 @@ function toast(t){ const el=$('#toast'); el.textContent=t; el.hidden=false; clea
 const LABEL={deposit:'Deposit',withdraw:'Withdrawal',password:'Password',verify:'Verification',customer_service:'Customer service',promotion:'Promotion',bank_account:'Bank account'};
 
 /* ---------- chrome ---------- */
-const NAV_ICON={kb:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M9 8h6"/></svg>',imp:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',kw:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20 4 12V4h8z"/><circle cx="8.5" cy="8.5" r="1"/></svg>',store:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',rank:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>',chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',test:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg>',rev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',set:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',hist:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'};
+const NAV_ICON={users:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c.6-3.5 3.2-5.5 6.5-5.5s5.9 2 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2 .7 3.2 2.6 3.5 5.3"/></svg>',kb:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z"/><path d="M4 21V5"/><path d="M9 8h6"/></svg>',imp:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>',kw:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 12 12 20 4 12V4h8z"/><circle cx="8.5" cy="8.5" r="1"/></svg>',store:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>',rank:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 20V10M12 20V4M18 20v-7"/></svg>',chat:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/></svg>',test:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4 10-10"/></svg>',rev:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',set:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.9l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.9.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>',hist:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3 2"/></svg>'};
 /* The menu, in four groups. */
-const NAV_GROUPS=[['Answers',[['kb','Knowledge base'],['imp','Import']]],['Words',[['kw','Topics'],['store','Keywords'],['rank','Keyword ranking']]],['Check',[['chat','Test chat'],['test','Tests']]],['Setup',[['set','Merchant settings'],['hist','History']]]];
+const NAV_GROUPS=[['Answers',[['kb','Knowledge base'],['imp','Import']]],['Words',[['kw','Topics'],['store','Keywords'],['rank','Keyword ranking']]],['Check',[['chat','Test chat'],['test','Tests']]],['Setup',[['set','Merchant settings'],['users','Merchants & logins'],['hist','History']]]];
 function renderChrome(){
   $('#merchant').innerHTML=D.merchants.map(m=>`<option value="${m.code}" ${m.code===S.merchant?'selected':''}>${esc(m.name)}</option>`).join('');
   $('#merchant').hidden=!isAdmin(); $('#merchFixed').hidden=isAdmin(); $('#merchFixed').textContent=M()?M().name:'';
   $('#whoName').textContent=ME.username; $('#whoRole').textContent=isAdmin()?'Admin · all merchants':'Staff · '+(M()?M().name:'');
   $('#ver').innerHTML='<span class="vchip"><i></i>Live v'+S.ver+'</span>'+(S.changes.length?'<span class="vchip warn">Draft · '+S.changes.length+' change'+(S.changes.length>1?'s':'')+'</span><button class="btn sm ghost" data-act="discardDraft" type="button">Discard</button>':'');
   $('#publish').disabled=!S.changes.length; $('#publish').innerHTML='Publish'+(S.changes.length?' <span class="badge">'+S.changes.length+'</span>':'');
-  $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
+  $('#nav').innerHTML=NAV_GROUPS.map(([g,items])=>`<div class="grp"><div class="gl">${g}</div>${items.filter(([k])=>k!=='users'||isAdmin()).map(([k,l])=>`<button type="button" data-view="${k}" ${k===S.view?'aria-current="page"':''}>${NAV_ICON[k]}<span>${l}</span>${k==='store'&&unassigned().length?`<span class="cnt">${unassigned().length}</span>`:''}</button>`).join('')}</div>`).join('');
 }
-const VIEW_KEYS=['kb','imp','chat','kw','store','rank','set','test','hist'];
-async function render(){ if(location.hash!=='#'+S.view) location.hash=S.view; try{ if(isAdmin()) localStorage.setItem('aibot_panel_merchant_'+ME.username,S.merchant); }catch(e){} renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,test:vTEST,hist:vHIST})[S.view](); }
+const VIEW_KEYS=['kb','imp','chat','kw','store','rank','set','users','test','hist'];
+async function render(){ if(location.hash!=='#'+S.view) location.hash=S.view; try{ if(isAdmin()) localStorage.setItem('aibot_panel_merchant_'+ME.username,S.merchant); }catch(e){} renderChrome(); try{ await prefetch(); }catch(e){ toast('Could not load: '+e.message); } renderChrome(); ({kb:vKB,imp:vIMP,chat:vCHAT,kw:vKW,store:vSTORE,rank:vRANK,set:vSET,test:vTEST,hist:vHIST,users:vUSERS})[S.view](); }
 
 /* ---------- Knowledge base ---------- */
 function langState(e,l){ const t=e.translations[l]||{}; const a=(t.answer_text||'').trim(), n=(t.question_examples||[]).length; return a&&n>=3?'on':(a||n)?'part':''; }
@@ -676,6 +677,64 @@ async function rollBack(v){
   try{ const r=await api('/api/admin/rollback',{version:+v.slice(1),actor:isAdmin()?'admin':'staff'}); clearDraft(); toast('Rolled back. Now live as v'+r.ver); await reloadAll(); }
   catch(e){ toast('Rollback failed: '+e.message); }
 }
+
+
+/* ---------- Merchants and logins (admin) ---------- */
+let PEOPLE = null;
+async function loadPeople() { PEOPLE = await api('/api/admin/people'); }
+function vUSERS() {
+  if (!isAdmin()) { $('#main').innerHTML = '<div class="card"><h2>Merchants &amp; logins</h2><div class="sub">Only an admin can use this screen.</div></div>'; return; }
+  const P = PEOPLE || { merchants: [], users: [] };
+  $('#main').innerHTML = `<div class="card"><div class="head"><div><h2>Merchants</h2><div class="sub">Each merchant has its own knowledge base, words and settings. A new merchant starts empty.</div></div><button class="btn pri" data-pa="newMerchant" type="button">Add merchant</button></div>
+    <table style="margin-top:10px"><thead><tr><th>Merchant</th><th>Code</th><th>Tone</th><th class="num">Entries</th><th>Logins</th></tr></thead><tbody>${P.merchants.map((m) => `<tr><td><b>${esc(m.name)}</b></td><td class="mono">${esc(m.code)}</td><td>${esc(m.tone)}</td><td class="num">${m.entries}</td><td>${m.logins.length ? m.logins.map(esc).join(', ') : '<span class="sub">none</span>'}</td></tr>`).join('')}</tbody></table></div>
+    <div class="card"><div class="head"><div><h2>Logins</h2><div class="sub">Staff are locked to one merchant. Admins see every merchant.</div></div><button class="btn pri" data-pa="newUser" type="button">Add login</button></div>
+    <table style="margin-top:10px"><thead><tr><th>Username</th><th>Role</th><th>Merchant</th><th></th></tr></thead><tbody>${P.users.map((u) => `<tr><td><b>${esc(u.username)}</b>${u.username === ME.username ? ' <span class="pill info">you</span>' : ''}</td><td>${u.role === 'admin' ? 'Admin' : 'Staff'}</td><td>${u.merchant ? esc(u.merchant) : '<span class="sub">all merchants</span>'}</td>
+      <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-pa="resetPw" data-u="${esc(u.username)}" type="button">Reset password</button> ${u.username === ME.username ? '' : `<button class="btn sm ghost" data-pa="delUser" data-u="${esc(u.username)}" type="button">Remove</button>`}</td></tr>`).join('')}</tbody></table></div>`;
+}
+function paModal(title, body, action, label) {
+  $('#layer').innerHTML = `<div class="ov c" data-close="1"><div class="pane modal" role="dialog" aria-label="${esc(title)}"><h2>${esc(title)}</h2>${body}
+    <div class="note" id="pm_err" hidden style="background:var(--badbg);color:var(--bad)"></div>
+    <div class="head"><button class="btn" data-act="closeEd" type="button">Cancel</button><button class="btn pri" data-pa="${action}" type="button">${esc(label)}</button></div></div></div>`;
+  const first = $('#layer input'); if (first) first.focus();
+}
+const pv = (id) => (($('#' + id) || {}).value || '').trim();
+async function paSend(path, body, done, after) {
+  const btn = document.querySelector('#layer .btn.pri'); if (btn) btn.disabled = true;
+  try { await api(path, body); $('#layer').innerHTML = ''; toast(done); if (after) await after(); }
+  catch (e) { const box = $('#pm_err'); if (box) { box.textContent = e.message; box.hidden = false; } if (btn) btn.disabled = false; }
+}
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-pa]'); if (!el) return;
+  const a = el.dataset.pa, u = el.dataset.u;
+  const merchantOpts = () => ((PEOPLE && PEOPLE.merchants) || []).map((m) => `<option value="${esc(m.code)}">${esc(m.name)} (${esc(m.code)})</option>`).join('');
+  if (a === 'newMerchant') paModal('Add merchant', `<div class="sub">The knowledge base starts empty. Add entries in the Knowledge base or Import screens after choosing this merchant.</div><div class="form">
+      <label class="fld"><span>Name</span><input id="pm_name" placeholder="e.g. W88"></label>
+      <label class="fld"><span>Code (letters and digits, optional)</span><input id="pm_code" placeholder="made from the name"></label>
+      <label class="fld"><span>Main language</span><select id="pm_lang"><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="zh">中文</option></select></label>
+      <label class="fld"><span>Tone</span><select id="pm_tone"><option value="friendly">Friendly</option><option value="formal">Formal</option></select></label>
+      <label class="fld"><span>Human group for handoff (optional)</span><input id="pm_hg" type="number"></label>
+      <label class="fld"><span>LiveChat group (optional)</span><input id="pm_lg" type="number"></label>
+      <label class="fld"><span>First staff login (optional)</span><input id="pm_user" autocomplete="off" placeholder="username"></label>
+      <label class="fld"><span>Password for it</span><input id="pm_pass" type="password" autocomplete="new-password" placeholder="at least 6 characters"></label></div>`, 'saveMerchant', 'Add merchant');
+  else if (a === 'saveMerchant') {
+    const name = pv('pm_name'); const code = pv('pm_code') || name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
+    const login = pv('pm_user') || pv('pm_pass') ? { username: pv('pm_user'), password: ($('#pm_pass') || {}).value || '' } : undefined;
+    paSend('/api/admin/merchants', { name, code, language: pv('pm_lang'), tone: pv('pm_tone'), handoffGroup: pv('pm_hg') || null, livechatGroup: pv('pm_lg') || null, login }, 'Added ' + name, async () => { await loadPeople(); await reloadAll(); });
+  }
+  else if (a === 'newUser') paModal('Add login', `<div class="form">
+      <label class="fld"><span>Username</span><input id="pu_name" autocomplete="off"></label>
+      <label class="fld"><span>Password</span><input id="pu_pass" type="password" autocomplete="new-password" placeholder="at least 6 characters"></label>
+      <label class="fld"><span>Role</span><select id="pu_role"><option value="staff">Staff: one merchant</option><option value="admin">Admin: all merchants</option></select></label>
+      <label class="fld" id="pu_mb"><span>Merchant</span><select id="pu_m">${merchantOpts()}</select></label></div>`, 'saveUser', 'Add login');
+  else if (a === 'saveUser') paSend('/api/admin/users', { username: pv('pu_name'), password: ($('#pu_pass') || {}).value || '', role: pv('pu_role'), merchant: pv('pu_m') }, 'Login added', async () => { await loadPeople(); vUSERS(); });
+  else if (a === 'resetPw') paModal('Reset password for ' + u, `<div class="form"><label class="fld full"><span>New password</span><input id="pr_pass" type="password" autocomplete="new-password" placeholder="at least 6 characters"></label></div>`, 'savePw', 'Reset password'), $('#layer').dataset.u = u;
+  else if (a === 'savePw') paSend('/api/admin/users/password', { username: $('#layer').dataset.u, password: ($('#pr_pass') || {}).value || '' }, 'Password changed');
+  else if (a === 'delUser') { if (confirm('Remove the login "' + u + '"?')) api('/api/admin/users/delete', { username: u }).then(async () => { toast('Login removed'); await loadPeople(); vUSERS(); }).catch((err) => toast(err.message)); }
+  else if (a === 'myPw') paModal('Change my password', `<div class="form"><label class="fld full"><span>Current password</span><input id="pc_cur" type="password" autocomplete="current-password"></label>
+      <label class="fld full"><span>New password</span><input id="pc_new" type="password" autocomplete="new-password" placeholder="at least 6 characters"></label></div>`, 'saveMyPw', 'Change password');
+  else if (a === 'saveMyPw') paSend('/api/auth/password', { current: ($('#pc_cur') || {}).value || '', password: ($('#pc_new') || {}).value || '' }, 'Password changed');
+});
+document.addEventListener('change', (e) => { if (e.target.id === 'pu_role') $('#pu_mb').hidden = e.target.value === 'admin'; });
 
 /* ---------- events ---------- */
 document.addEventListener('click',e=>{

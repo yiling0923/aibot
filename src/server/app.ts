@@ -12,6 +12,7 @@ import { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
 import { adminRoutes, ensureVersion } from '../admin/routes';
 import { createAi, type AiService } from '../ai';
+import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
 import { COOKIE, clearCookie, makeSession, parseCookies, readSession, sessionCookie, type SessionUser } from '../auth/session';
 import '../auth/types';
@@ -45,6 +46,7 @@ export async function buildApp(opts: AppOptions = {}) {
   /** The bot a chat talks to: the published one, or a draft copy when the control panel's Test chat opened it. */
   const botFor = async (s: Session) => (s.draft && drafts.get(s.draft)) || (await getBot());
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
+  peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
   await ensureVersion(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
   /* ---------- sign in ---------- */
