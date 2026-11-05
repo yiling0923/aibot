@@ -31,8 +31,11 @@ npm install
 npm run db:migrate                # creates the tables
 npm run db:seed                   # loads the 6 fake merchants (LuckyPay, SwiftWallet, MegaPlay, BetKing, CashPoint, GameHub)
 npm test                          # runs the tests
-npm run dev                       # starts the bot on http://localhost:3000
+npm run dev                       # builds the front end, then starts the bot on http://localhost:3000
 ```
+
+The front end (React + TypeScript + Vite) lives in `web/`. `npm run build` builds it into `web/dist`, which the bot serves.
+While you work on the screens, run `npm run dev:web` in a second terminal for instant reloads on http://localhost:5173 (it passes API calls to the bot on port 3000).
 
 Open **http://localhost:3000** for the test chat page: pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
 Every word you type is saved to the keyword store, and messages the bot did not understand are saved for review.
@@ -89,7 +92,8 @@ Put the keys in `.env` (see `.env.example`) and restart. Without keys nothing ch
 * `npm test` runs the engine tests (no database needed): the 149 acceptance messages plus extra checks.
 * The database tests run too when `TEST_DATABASE_URL` is set (it is in `.env.example`, and `db/setup.sql` creates it). They wipe that database every time,
   so it must be the separate `livechat_bot_test` database, never your real data.
-* `npm run typecheck` checks the TypeScript.
+* `npm run typecheck` checks the TypeScript (back end and front end).
+* Front end tests are in `web/src` (React Testing Library). They run with `npm test` too.
 * `npm run eval:report` runs all ~1,900 sample customer messages (English, Malay, Chinese, slang and short forms) through the engine and lists every one that gets a different result than expected.
   Add a message by adding an entry to `eval_cases` in `data/kb_seed.json`.
 

@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
@@ -27,7 +28,10 @@ function whyOf(tr: Record<string, unknown>): string {
 }
 
 const PUBLIC_API = new Set(['/api/auth/login', '/health']);
-const SIGNED_IN_PAGES = new Set(['/', '/admin', '/admin.html', '/chat.html']);
+/** Where the built front end is (npm run build). */
+const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+/** Pages that need a login. The login page and the built files (/assets) stay open. */
+const isSignedInPage = (route: string) => route === '/' || route === '/admin' || route.startsWith('/admin/') || route === '/chat';
 
 export interface AppOptions { pool?: Pool; logger?: boolean; ai?: AiService }
 
@@ -36,7 +40,7 @@ export async function buildApp(opts: AppOptions = {}) {
   const app = Fastify({ logger: opts.logger ?? true });
   // Claude and ChatGPT are optional: with no keys set, every AI step is off and the bot answers from its own rules.
   const ai = opts.ai ?? createAi({ anthropicKey: config.anthropicKey, claudeModel: config.claudeModel, openaiKey: config.openaiKey, openaiModel: config.openaiModel, maxCallsPerHour: config.aiMaxCallsPerHour });
-  await app.register(fastifyStatic, { root: path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../public') });
+  if (fs.existsSync(WEB)) await app.register(fastifyStatic, { root: WEB });
 
   let bot: Bot | null = null;
   const store = new Store(pool);
@@ -56,7 +60,7 @@ export async function buildApp(opts: AppOptions = {}) {
     const user = readSession(parseCookies(req.headers.cookie)[COOKIE]);
     req.user = user ?? undefined;
     if (route.startsWith('/api/')) { if (!user && !PUBLIC_API.has(route)) return reply.code(401).send({ error: 'Please sign in.' }); return; }
-    if (!user && SIGNED_IN_PAGES.has(route)) return reply.redirect('/login.html');
+    if (!user && isSignedInPage(route)) return reply.redirect('/login');
   });
 
   const failures = new Map<string, { n: number; until: number }>();   // too many wrong passwords: wait a minute
@@ -76,8 +80,21 @@ export async function buildApp(opts: AppOptions = {}) {
   app.post('/api/auth/logout', async (_req, reply) => { reply.header('set-cookie', clearCookie()); return { ok: true }; });
   app.get('/api/auth/me', async (req) => ({ user: req.user }));
 
-  app.get('/', async (_req, reply) => reply.redirect('/admin.html'));
-  app.get('/admin', async (_req, reply) => reply.redirect('/admin.html'));
+  app.get('/', async (_req, reply) => reply.redirect('/admin'));
+  // the old page addresses still work
+  const query = (url: string) => (url.includes('?') ? url.slice(url.indexOf('?')) : '');
+  app.get('/admin.html', async (req, reply) => reply.redirect('/admin' + query(req.url)));
+  app.get('/chat.html', async (req, reply) => reply.redirect('/chat' + query(req.url)));
+  app.get('/login.html', async (req, reply) => reply.redirect('/login' + query(req.url)));
+
+  // Every other page address belongs to the front end (a single-page app), so it gets index.html and the app shows the right page.
+  app.setNotFoundHandler(async (req, reply) => {
+    if (req.method === 'GET' && !req.url.startsWith('/api/')) {
+      if (!fs.existsSync(path.join(WEB, 'index.html'))) return reply.code(503).type('text/plain').send('The front end is not built yet. Run: npm run build');
+      return reply.type('text/html').sendFile('index.html');
+    }
+    return reply.code(404).send({ error: 'Not found' });
+  });
 
   app.get('/health', async () => {
     let db = 'down';

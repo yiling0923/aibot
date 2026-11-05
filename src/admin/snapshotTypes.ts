@@ -1,0 +1,19 @@
+// The shapes the control panel and the server share. Pure types, no imports of server code, so the front end can use them too.
+import type { Lang } from '../engine/types';
+
+export type Words = Record<string, Record<string, string[]>>;
+export interface SnapEntry {
+  id: number; merchant: string; category: string; intent_key: string; topic: string; aspect: string | null; topic_optional: boolean;
+  status: 'live' | 'draft'; updated?: string;
+  translations: Partial<Record<Lang, { question_examples: string[]; answer_text: string }>>;
+}
+export interface SnapSettings {
+  tone: 'friendly' | 'formal'; handoff_group: number | null; answer: number; clarify: number; abuse_close_after: number;
+  kind: Record<string, string>; closing: Record<string, string>; handoff: Record<string, string>; tools: Record<string, boolean>;
+}
+/** Everything the control panel edits. The panel works on a copy of this and sends it back on Publish. */
+export interface Snapshot {
+  kb: SnapEntry[]; aliases: Words; mAliases: Record<string, { language: string; variant: string; canonical: string }[]>;
+  aspects: Words; smalltalk: Words; guard: Words; fillers: Record<string, string[]>; settings: Record<string, SnapSettings>;
+}
+export interface MerchantMeta { code: string; name: string; default_language: Lang; livechat_group_id: number | null }

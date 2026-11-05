@@ -58,10 +58,14 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     expect((await get('/api/admin/state')).statusCode).toBe(401);
     expect((await post('/api/chat/start', { merchant: 'MERCH_A' })).statusCode).toBe(401);
     expect((await post('/api/analyze', { merchant: 'MERCH_A', text: 'hi' })).statusCode).toBe(401);
-    const page = await get('/admin.html');
-    expect(page.statusCode).toBe(302); expect(page.headers.location).toBe('/login.html');
+    for (const route of ['/admin', '/admin/kb', '/chat']) {                        // signed out: sent to the login page
+      const page = await get(route);
+      expect(page.statusCode).toBe(302); expect(page.headers.location).toBe('/login');
+    }
+    expect((await get('/admin.html')).headers.location).toBe('/admin');          // the old page addresses still work
+    expect((await get('/login.html?x=1')).headers.location).toBe('/login?x=1');
     expect((await get('/health')).statusCode).toBe(200);                           // the health check stays open
-    expect((await get('/login.html')).statusCode).toBe(200);
+    expect((await get('/login')).statusCode).not.toBe(302);                        // the login page itself is open (200 once the front end is built)
     expect((await get('/api/admin/state', 'aibot_session=tampered.value')).statusCode).toBe(401);
   });
 
