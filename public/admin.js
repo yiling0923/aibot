@@ -477,6 +477,10 @@ function vRANK(){
   $('#main').innerHTML=`<div class="card"><div class="head"><div><h2>Keyword ranking</h2><div class="sub">The words customers wrote most in ${esc(M().name)} chats. Find fillers, short forms and rude words, and tell the bot what each one is.</div></div>
       <div class="tools"><button class="btn sm" data-rkweek="-1" type="button" ${S.rankWeek<=-4?'disabled':''} aria-label="Previous week">‹</button><span class="stat" style="padding:5px 12px"><b style="font-size:13px">Date</b>${dateLabel()}</span><button class="btn sm" data-rkweek="1" type="button" ${S.rankWeek>=0?'disabled':''} aria-label="Next week">›</button></div></div></div>
     <div class="quiet" style="margin:-4px 2px 0"><b>${total.toLocaleString()}</b> words written this week · <b>${vis.length}</b> different keywords · <b>${counts.unset}</b> need a decision</div>
+    ${top.length?`<div class="sub" style="margin:2px 2px -4px">Count: how many times customers wrote it (repeats count). Share: its part of all keywords. Change: compared with the 7 days before. Click a keyword to see its chats.</div>
+    <div class="podium">${top.map((r,i)=>`<div class="pod p${i+1}"><div class="pod-head">${medal(i+1)}<div class="pod-main"><span class="kwlink pod-nm" data-rkopen="${esc(r.w)}">${esc(r.w)}</span><div class="sub">${r.n} time${r.n===1?'':'s'} · ${r.share.toFixed(2)}%</div></div>${chgPill(r.c)}</div>
+      <div class="pod-trend">${spark(r.series,260,38)}</div>
+      <div class="pod-foot"><span class="pods">${r.isNew?'<span class="pill info">New</span>':''}<span class="pill ${r.st.c}">${esc(r.st.t)}</span></span><span class="tools"><button class="btn sm pri" data-rkset="${esc(r.w)}" type="button">Set…</button><button class="btn sm ghost" data-rkex="${esc(r.w)}" type="button">Exclude</button></span></div></div>`).join('')}</div>`:''}
     <div class="card rkfilter"><div class="head"><div class="segs" role="group" aria-label="Show">${RK_TABS.map(([k,l])=>`<button type="button" data-rktab="${k}" aria-pressed="${S.rankTab===k}">${l} <span class="n">${counts[k]}</span></button>`).join('')}</div>
       <div class="filt"><input type="search" id="rkq" placeholder="Filter keywords" aria-label="Filter keywords" value="${esc(S.rankQ)}" style="min-width:180px">
       <select id="rkl" aria-label="Language"><option value="all">All languages</option>${[['en','English'],['ms','Malay'],['zh','Chinese']].map(([v,l])=>`<option value="${v}" ${S.rankLang===v?'selected':''}>${l}</option>`).join('')}</select>
@@ -485,6 +489,7 @@ function vRANK(){
   const drawT=()=>{
     const q=S.rankQ.trim().toLowerCase();
     let list=vis.filter(r=>inTab(r,S.rankTab)&&(!q||r.w.toLowerCase().includes(q)||r.h.toLowerCase().includes(q))&&(S.rankLang==='all'||r.lg===S.rankLang));
+    if(S.rankTab==='all'&&!q&&S.rankLang==='all') list=list.filter(r=>r.pos>3);
     const k=S.rankSort.k, d=S.rankSort.d; const key={rank:r=>-r.n,n:r=>r.n,share:r=>r.share,c:r=>r.c,type:r=>r.t,st:r=>r.st.t,w:r=>r.w}[k];
     list=list.slice().sort((a,b)=>{ const x=key(a),y=key(b); const rv=(x>y?1:x<y?-1:0); return k==='rank'?rv*d:rv*(-d); });
     const maxShare=Math.max(...list.map(r=>r.share),1); const sel=S.rankSel; const allSel=list.length&&list.every(r=>sel.has(r.w));

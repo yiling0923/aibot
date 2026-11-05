@@ -256,3 +256,19 @@ details.fold[open]>summary{margin-bottom:8px}
 .whoami b{display:block;font-size:14px}
 .whoami small{display:block;color:var(--muted);font-size:12px}
 .merch-fixed{font-weight:700;font-size:15px;padding:8px 10px;border-radius:8px;background:var(--surface2)}
+
+/* top 3 keywords: medal cards */
+.podium{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+@media (max-width:900px){.podium{grid-template-columns:minmax(0,1fr)}}
+.pod{border-radius:14px;padding:16px 18px;display:flex;flex-direction:column;gap:10px;min-width:0;border:1px solid var(--line);border-top-width:4px}
+.pod.p1{background:var(--gold);border-color:var(--goldl);border-top-color:#f0a81c}
+.pod.p2{background:var(--silver);border-color:var(--silverl);border-top-color:#97a3b0}
+.pod.p3{background:var(--bronze);border-color:var(--bronzel);border-top-color:#d27c2c}
+.pod-head{display:flex;align-items:center;gap:12px}
+.pod-head>svg{flex:none}
+.pod-main{flex:1;min-width:0}
+.pod-nm{font-size:20px;font-weight:700;display:block;overflow-wrap:anywhere;line-height:1.2}
+.pod-trend{display:flex;justify-content:center}
+.pod-trend svg{width:100%;max-width:260px;height:auto}
+.pod-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.pods{display:flex;gap:6px;flex-wrap:wrap}
