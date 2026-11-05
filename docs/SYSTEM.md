@@ -24,6 +24,8 @@ How the system works, what it is built with, how the database is designed, and h
 14. How to run it
 15. Testing and quality
 16. What is not finished
+17. What you asked for, and where it is
+18. Installing on Windows (XAMPP) and fixing common problems
 
 ---
 
@@ -851,12 +853,12 @@ aibot/
 ## 14. How to run it
 
 1. Install **Node.js 20 or newer** and **MySQL 8** (or XAMPP).
-2. Create the databases once: `mysql -u root -p < db/setup.sql` (XAMPP: `C:\xampp\mysql\bin\mysql.exe -u root < db/setup.sql`).
+2. Create the databases and the `bot` user once, as the MySQL admin: `mysql -u root -p < db/setup.sql` (see section 18 for Windows and PowerShell). Run it again after an update that adds permissions: it is safe to repeat.
 3. Copy `.env.example` to `.env`.
 4. `npm install`
 5. `npm run db:migrate` (creates the tables) and `npm run db:seed` (loads the 6 fake merchants, 68 entries and demo logins).
 6. `npm test` runs the automatic tests.
-7. `npm run dev` starts the bot. Open **http://localhost:3000** and sign in.
+7. `npm run dev` builds the front end and starts the bot. Open **http://localhost:3000** and sign in.
 
 Demo logins: `admin` / `admin123` (everything), and `luckypay`, `swiftwallet`, `megaplay`, `betking`, `cashpoint`, `gamehub` / `demo123` (own merchant only). Change these before real use.
 
@@ -892,6 +894,53 @@ Every miss was then fixed and kept as a test. A fair expectation for messages th
 | **Chat memory** | Chat state is kept in the server's memory, so a restart ends running chats. The chat log is saved in the database. |
 | **HTTPS** | Not built in. For real use, run it behind HTTPS (the cookie must then be marked secure). |
 | **Hardening** | Login has a lockout, but the chat API has no speed limit yet. No automatic backups. |
-| **Two admins at once** | Each publish saves a whole version, so if two admins publish at the same time, the later one wins. |
+| **Two admins at once** | Each publish saves a new version of the merchants that changed, so if two admins edit the same merchant at the same time, the later publish wins. |
 | **Unused tables** | `feedback`, `unmatched_messages`, and the columns `business_hours`, `valid_from` and `valid_to` exist but no screen uses them. |
 | **Languages in the panel** | The control panel is in English only. |
+
+---
+
+## 17. What you asked for, and where it is
+
+| What you asked for | State | Where |
+|---|---|---|
+| A bot for an existing LiveChat account serving many merchants, in Malay, Chinese and English | Built and tested on a test page | Sections 4 and 5 |
+| Each merchant has its own knowledge base | Done. Each merchant has its **own database**, `livechat_bot_m_<code>` | Section 9 |
+| Merchants first, everything else under the merchant | Done: the main database lists merchants, and every merchant database holds its knowledge base, keywords, chats, settings, tests and versions | Section 9 |
+| Each merchant publishes and rolls back on its own | Done: each merchant has its own version numbers and History | Sections 7 and 9 |
+| The bot finds the answer; Claude may help choose, ChatGPT may help phrase | Built; needs your AI keys to be tried for real | Section 6 |
+| Ask again once when unsure, then hand over to a person | Done | Section 4 |
+| Reply kindly first to rude customers; never show secrets | Done | Sections 4 and 8 |
+| Staff are locked to their own merchant (no "sign in as", no changing merchant) | Done, checked on the server too | Section 8 |
+| A real build, not plain HTML | Done: React + TypeScript + Vite | Section 3 |
+| Control panel with draft, test, publish, history and roll back | Done | Section 7 |
+| Keyword store: every typed word is saved; ranking with the top 3 shown | Done | Section 10 |
+| Test chat that saves keywords and shows the bot's steps | Done | Section 10 |
+| "Needs review" screen removed; content full width; English interface | Done | Section 10 |
+| Add a merchant and its first staff login from the panel | Done | Section 7 |
+| LiveChat connection | **Not built**, as you asked to do it later | Section 16 |
+| Real AI keys | **Waiting for your keys** (put them in `.env`, never in chat) | Sections 6 and 13 |
+| A document of the system, with the database and layout | This document | |
+
+---
+
+## 18. Installing on Windows (XAMPP) and fixing common problems
+
+These are the problems met while installing on a Windows computer with XAMPP, and the fix for each.
+
+**Which MySQL?** A computer can have more than one MySQL. XAMPP's runs on the port in `C:\xampp\mysql\bin\my.ini` (here **3310**), and another MySQL can run on 3306. The port in `DATABASE_URL` (in `.env`) must be the one phpMyAdmin looks at. Set it in phpMyAdmin's `config.inc.php` with `$cfg['Servers'][$i]['port'] = '3310';`.
+
+**Importing `db/setup.sql`.**
+- PowerShell does not accept `<`. Use: `C:\xampp\mysql\bin\mysql.exe -u root -p -P 3310 -h 127.0.0.1 -e "source db/setup.sql"` from inside the project folder.
+- If XAMPP's `mysql.exe` says `caching_sha2_password could not be loaded`, you are talking to a MySQL 8 server. Use phpMyAdmin instead: log in as root, open **SQL**, paste the file.
+- phpMyAdmin: log in with `bot` / `bot` for the data. The red `pma` messages are harmless (comment out `controluser` and `controlpass` to hide them).
+
+**Forgot the MySQL root password, or the `bot` user needs a new permission.** Stop MySQL in XAMPP, then in an Administrator PowerShell start `C:\xampp\mysql\bin\mysqld.exe --defaults-file=C:\xampp\mysql\bin\my.ini --skip-grant-tables --console`. In a second window: `mysql.exe -u root -P 3310 -h 127.0.0.1`, then `FLUSH PRIVILEGES;`, ``GRANT ALL PRIVILEGES ON `livechat\_bot\_%`.* TO 'bot'@'localhost';``, `FLUSH PRIVILEGES;`. Then shut down **cleanly** with `mysqladmin.exe -u root -P 3310 -h 127.0.0.1 shutdown` and start MySQL from XAMPP. Do not kill the window.
+
+**MySQL will not start: "Aria recovery failed".** This is caused by closing MySQL forcibly. Your data is in InnoDB and is not lost. Stop all `mysqld.exe` in Task Manager, copy `C:\xampp\mysql\data` somewhere as a backup, delete `aria_log.*` and `aria_log_control` in that folder, and start MySQL again. If it still fails, run `aria_chk.exe -r C:\xampp\mysql\data\mysql\*.MAI`.
+
+**"The database user may not create the database livechat_bot_m_...".** The `bot` user lacks the permission above. Grant it as root, then run `npm run db:migrate` again. The page shows "Internal Server Error" until the migrate has finished.
+
+**Build error `EPERM` or "Access is denied" in `web\dist`.** The folder was probably created by another Windows user (for example in an Administrator window). Delete it once from an Administrator PowerShell (`Remove-Item -Recurse -Force C:\xampp\htdocs\aibot-app\web\dist`), then run `npm run dev` from a normal PowerShell, inside the project folder. The build no longer stops if an old file is locked.
+
+**`npm run dev` says package.json not found.** You are in the wrong folder. Run `cd C:\xampp\htdocs\aibot-app` first.
