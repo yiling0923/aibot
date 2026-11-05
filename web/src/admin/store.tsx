@@ -1,11 +1,11 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
-import { agoISO, classify, clone, kwStatus, snapshotOf, type AiFlags, type Draft, type KwRow, type MerchantRowAdmin, type Me, type Snapshot, type Status, type TestResult } from './model';
+import { agoISO, classify, type HistoryItem, clone, kwStatus, snapshotOf, type AiFlags, type Draft, type KwRow, type MerchantRowAdmin, type Me, type Snapshot, type Status, type TestResult } from './model';
 
-interface ServerState { ver: number; merchants: MerchantRowAdmin[]; snapshot: Snapshot; history: string[][]; user: Me; ai: AiFlags }
+interface ServerState { versions: Record<string, number>; sharedVer: number | null; stamp: number; merchants: MerchantRowAdmin[]; snapshot: Snapshot; history: HistoryItem[]; user: Me; ai: AiFlags }
 
 export interface Panel {
-  me: Me; isAdmin: boolean; ver: number; merchants: MerchantRowAdmin[]; ai: AiFlags; history: string[][];
+  me: Me; isAdmin: boolean; ver: number; sharedVer: number | null; merchants: MerchantRowAdmin[]; ai: AiFlags; history: HistoryItem[];
   merchant: string; M: MerchantRowAdmin; setMerchant: (code: string) => void;
   adv: boolean; setAdv: (on: boolean) => void;
   draft: Draft; changes: string[];
@@ -40,7 +40,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
   const draftKey = useRef('aibot_panel_draft_v1');
   const restored = useRef(false);
 
-  const save = (d: Draft, c: string[], ver: number) => { try { localStorage.setItem(draftKey.current, JSON.stringify({ ver, changes: c, snapshot: snapshotOf(d) })); } catch { /* the panel works without it */ } };
+  const save = (d: Draft, c: string[], stamp: number) => { try { localStorage.setItem(draftKey.current, JSON.stringify({ ver: stamp, changes: c, snapshot: snapshotOf(d) })); } catch { /* the panel works without it */ } };
   const clearSaved = () => { try { localStorage.removeItem(draftKey.current); } catch { /* ignore */ } };
 
   const loadKeywordsFor = useCallback(async (code: string) => {
@@ -58,7 +58,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
     if (!keep) {
       try {
         const saved = JSON.parse(localStorage.getItem(draftKey.current) || 'null');
-        if (saved && saved.ver === st.ver && saved.changes.length) {
+        if (saved && saved.ver === st.stamp && saved.changes.length) {
           d = { ...saved.snapshot, kb: saved.snapshot.kb.map((e: Draft['kb'][number]) => ({ ...e, updated: 'edited', dirty: true })) }; c = saved.changes; restored.current = true;
         } else if (saved) clearSaved();
       } catch { /* ignore a broken saved draft */ }
@@ -73,7 +73,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
     if (!draft || !srv) return;
     const next = clone(draft); const notes: string[] = [];
     fn(next, (t) => notes.push(t));
-    const nc = [...changes, ...notes]; setDraft(next); setChanges(nc); setTestsRun(false); save(next, nc, srv.ver);
+    const nc = [...changes, ...notes]; setDraft(next); setChanges(nc); setTestsRun(false); save(next, nc, srv.stamp);
   }, [draft, changes, srv]);
 
   const setMerchant = (code: string) => {
@@ -96,7 +96,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
     if (!srv || !draft) return null;
     const M = srv.merchants.find((m) => m.code === merchant) || srv.merchants[0] || { code: merchant, name: merchant };
     return {
-      me: srv.user, isAdmin: srv.user.role === 'admin', ver: srv.ver, merchants: srv.merchants, ai: srv.ai, history: srv.history,
+      me: srv.user, isAdmin: srv.user.role === 'admin', ver: srv.versions[merchant] ?? 0, sharedVer: srv.sharedVer, merchants: srv.merchants, ai: srv.ai, history: srv.history,
       merchant, M, setMerchant, adv, setAdv, draft, changes, edit,
       discard: () => { if (confirm('Throw away all unpublished changes?')) { clearSaved(); load({ merchant }).catch((e: Error) => onToast(e.message)); } },
       kw, kwMap, ignored, reloadKeywords: () => loadKeywordsFor(merchant), ignoreWord, unignoreWord,

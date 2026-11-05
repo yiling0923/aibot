@@ -11,6 +11,7 @@ import type { SessionUser } from '../auth/session';
 import type { AiService } from '../ai/types';
 import { Store } from '../bot/store';
 import { knowledgeFromSnapshot, readMerchants, readSnapshot, writeSnapshot, type MerchantMeta, type Snapshot } from './snapshot';
+import { ensureVersions, merchantSig, merchantSlice, recordVersion, sharedSig, sharedSlice, versionState, withMerchantSlice, withSharedSlice, type MerchantSlice, type SharedSlice } from './versions';
 
 export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: Map<string, Bot>; ai: AiService }
 
@@ -20,15 +21,6 @@ const ago = (d: Date) => {
   const s = Math.max(0, (Date.now() - d.getTime()) / 1000);
   return s < 90 ? 'just now' : s < 3600 ? `${Math.round(s / 60)} min ago` : s < 86400 ? `${Math.round(s / 3600)} hours ago` : `${Math.round(s / 86400)} days ago`;
 };
-
-export async function ensureVersion(pool: Pool) {
-  const [r] = await q(pool, 'SELECT COALESCE(MAX(version), 0) AS v FROM kb_versions');
-  if (Number(r.v) === 0) {
-    await pool.query('INSERT INTO kb_versions(version, actor, summary, snapshot) VALUES(1, ?, ?, ?)', ['system', 'Template data loaded', JSON.stringify(await readSnapshot(pool))]);
-    return 1;
-  }
-  return Number(r.v);
-}
 
 /** Runs every sample message of every merchant through the engine built from this knowledge. */
 export async function runTests(pool: Pool, engine: Engine) {
@@ -63,10 +55,11 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
 
   app.get(`${A}/state`, async (req) => {
     const user = req.user!;
-    const ver = await ensureVersion(pool);
-    const history = (await q(pool, 'SELECT version, actor, summary, created_at FROM kb_versions ORDER BY version DESC LIMIT 50'))
-      .map((h) => [`v${h.version}`, h.actor, h.summary, ago(h.created_at)]);
-    return { ver, merchants: await merchantsFor(pool, user), snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
+    await ensureVersions(pool);
+    const merchants = await merchantsFor(pool, user);
+    const v = await versionState(pool, user, merchants.map((m) => m.code));
+    const history = v.history.map((h) => ({ id: h.id, kind: h.kind, merchant: h.merchant, version: h.version, actor: h.actor, summary: h.summary, ago: ago(h.created_at) }));
+    return { versions: v.versions, sharedVer: v.sharedVer, stamp: v.stamp, merchants, snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
       user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe } };
   });
 
@@ -78,31 +71,50 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     return { results, pass: results.filter((r) => r.ok).length, total: results.length };
   });
 
+  /** Publishes the draft. Only the merchants whose data really changed get a new version (each has its own history),
+   *  and the shared word lists get one only if they changed. */
   app.post<{ Body: { snapshot: Snapshot; changes: string[] } }>(`${A}/publish`, async (req, reply) => {
     const user = req.user!;
     const { snapshot, changes = [] } = req.body ?? ({} as never);
     if (!snapshot?.kb) return reply.code(400).send({ error: 'snapshot is required' });
-    const snap = effectiveSnapshot(user, await readSnapshot(pool), snapshot);
+    const current = await readSnapshot(pool);
+    const snap = effectiveSnapshot(user, current, snapshot);
     const all = await runTests(pool, await engineFor(pool, snap, false, await readMerchants(pool)));
     const tests = user.role === 'admin' ? all : all.filter((r) => r.merchant === user.merchant);
-    await writeSnapshot(pool, snap);
-    const ver = (await ensureVersion(pool)) + 1;
-    const summary = `${changes.length} change${changes.length === 1 ? '' : 's'} published: ${changes.slice(0, 2).join('; ')}${changes.length > 2 ? '…' : ''}`.slice(0, 500);
-    await pool.query('INSERT INTO kb_versions(version, actor, summary, snapshot) VALUES(?,?,?,?)', [ver, user.username, summary, JSON.stringify(await readSnapshot(pool))]);
+    const changed = Object.keys(snap.settings).filter((c) => merchantSig(merchantSlice(snap, c)) !== merchantSig(merchantSlice(current, c)));
+    const sharedChanged = sharedSig(sharedSlice(snap)) !== sharedSig(sharedSlice(current));
+    await ensureVersions(pool);                                           // so there is always an earlier version to go back to
+    await writeSnapshot(pool, snap, { merchants: changed, shared: sharedChanged });
+    const after = await readSnapshot(pool);
+    const summary = `${changes.length} change${changes.length === 1 ? '' : 's'} published: ${changes.slice(0, 2).join('; ')}${changes.length > 2 ? '…' : ''}`;
+    const published: { scope: 'merchant' | 'shared'; code?: string; ver: number }[] = [];
+    for (const code of changed) published.push({ scope: 'merchant', code, ver: await recordVersion(pool, { kind: 'merchant', code }, user.username, summary, merchantSlice(after, code)) });
+    if (sharedChanged) published.push({ scope: 'shared', ver: await recordVersion(pool, { kind: 'shared' }, user.username, summary, sharedSlice(after)) });
     await ctx.reloadBot();
-    return { ver, pass: tests.filter((t) => t.ok).length, total: tests.length };
+    return { published, pass: tests.filter((t) => t.ok).length, total: tests.length };
   });
 
-  /** Rolling back replaces every merchant's knowledge, so only an admin may do it. */
-  app.post<{ Body: { version: number } }>(`${A}/rollback`, async (req, reply) => {
-    if (req.user!.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can roll back.' });
-    const [row] = await q(pool, 'SELECT snapshot FROM kb_versions WHERE version = ?', [req.body.version]);
+  /** Rolls one merchant (or the shared word lists) back to a saved version. Other merchants are not touched.
+   *  Staff may roll back their own merchant; the shared lists are for admins. */
+  app.post<{ Body: { id: number } }>(`${A}/rollback`, async (req, reply) => {
+    const user = req.user!;
+    const [row] = await q(pool, 'SELECT v.id, v.kind, v.version, v.snapshot, m.code AS merchant FROM kb_versions v LEFT JOIN merchants m ON m.id = v.merchant_id WHERE v.id = ?', [req.body?.id]);
     if (!row) return reply.code(404).send({ error: 'unknown version' });
-    await writeSnapshot(pool, JSON.parse(row.snapshot));
-    const ver = (await ensureVersion(pool)) + 1;
-    await pool.query('INSERT INTO kb_versions(version, actor, summary, snapshot) VALUES(?,?,?,?)', [ver, req.user!.username, `Rolled back to v${req.body.version}`, row.snapshot]);
+    if (row.kind === 'legacy') return reply.code(400).send({ error: 'This version was saved before versions were kept per merchant, so it cannot be rolled back to.' });
+    if (row.kind === 'shared' ? user.role !== 'admin' : !mayUse(req, row.merchant)) return reply.code(403).send({ error: row.kind === 'shared' ? 'Only an admin can roll back the shared word lists.' : 'You can only roll back your own merchant.' });
+    const current = await readSnapshot(pool);
+    const slice = JSON.parse(row.snapshot);
+    const summary = `Rolled back to v${row.version}`;
+    let ver: number;
+    if (row.kind === 'merchant') {
+      await writeSnapshot(pool, withMerchantSlice(current, row.merchant, slice as MerchantSlice), { merchants: [row.merchant], shared: false });
+      ver = await recordVersion(pool, { kind: 'merchant', code: row.merchant }, user.username, summary, slice);
+    } else {
+      await writeSnapshot(pool, withSharedSlice(current, slice as SharedSlice), { merchants: [], shared: true });
+      ver = await recordVersion(pool, { kind: 'shared' }, user.username, summary, slice);
+    }
     await ctx.reloadBot();
-    return { ver };
+    return { ver, scope: row.kind, merchant: row.merchant };
   });
 
   /** A copy of the bot built from the panel's draft, so the Test chat tab can try changes before they are published.

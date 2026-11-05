@@ -53,9 +53,9 @@ export class Store {
       await this.pool.query('INSERT INTO chat_sessions(merchant_id, livechat_chat_id, customer_ref, language, status) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE language = VALUES(language)',
         [mid, p.sessionKey, p.customerRef, p.lang, 'open']);
       const [s] = await this.pool.query<RowDataPacket[]>('SELECT id FROM chat_sessions WHERE livechat_chat_id = ?', [p.sessionKey]);
-      const [m] = await this.pool.query<ResultSetHeader>('INSERT INTO chat_messages(session_id, role, text) VALUES(?,?,?)', [s[0].id, 'customer', p.text]);
-      await this.pool.query('INSERT INTO bot_decisions(message_id, decision, matched_kb_id, confidence, reply_text, why) VALUES(?,?,?,?,?,?)',
-        [m.insertId, p.decision, p.matchedKbId, p.confidence, p.reply, (p.why ?? '').slice(0, 500)]);
+      const [m] = await this.pool.query<ResultSetHeader>('INSERT INTO chat_messages(merchant_id, session_id, role, text) VALUES(?,?,?,?)', [mid, s[0].id, 'customer', p.text]);
+      await this.pool.query('INSERT INTO bot_decisions(merchant_id, message_id, decision, matched_kb_id, confidence, reply_text, why) VALUES(?,?,?,?,?,?,?)',
+        [mid, m.insertId, p.decision, p.matchedKbId, p.confidence, p.reply, (p.why ?? '').slice(0, 500)]);
     } catch (e) { console.error('store.logTurn failed', e); }
   }
 

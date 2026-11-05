@@ -5,6 +5,7 @@ import { hashPassword } from '../auth/passwords';
 import { checkLogin, upsertUser } from '../auth/users';
 import type { Bot } from '../bot/responder';
 import { readSnapshot } from './snapshot';
+import { merchantSlice, recordVersion } from './versions';
 import '../auth/types';
 
 export interface PeopleCtx { pool: Pool; reloadBot: () => Promise<Bot> }
@@ -68,8 +69,7 @@ export function peopleRoutes(app: FastifyInstance, ctx: PeopleCtx) {
       try { await upsertUser(pool, { username: b.login.username, password: b.login.password, role: 'staff', merchant: code }); }
       catch (e) { return fail(reply, 400, `The merchant ${code} was added, but the login was not: ${(e as Error).message}`); }
     }
-    const [ver] = await q(pool, 'SELECT COALESCE(MAX(version), 0) AS v FROM kb_versions');
-    await pool.query('INSERT INTO kb_versions(version, actor, summary, snapshot) VALUES(?,?,?,?)', [Number(ver.v) + 1, req.user!.username, `Added merchant ${name} (${code})`, JSON.stringify(await readSnapshot(pool))]);
+    await recordVersion(pool, { kind: 'merchant', code }, req.user!.username, `Added merchant ${name} (${code})`, merchantSlice(await readSnapshot(pool), code));
     await ctx.reloadBot();
     return { code, name };
   });

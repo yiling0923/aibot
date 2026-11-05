@@ -115,8 +115,11 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
   const publish = async () => {
     setBusy(true);
     try {
-      const r = await api<{ ver: number }>('/api/admin/publish', { snapshot: snapshotOf(p.draft), changes: p.changes, actor: p.isAdmin ? 'admin' : 'staff' });
-      onClose(); p.toast('Published as v' + r.ver); await p.reloadAll();
+      const r = await api<{ published: { scope: string; code?: string; ver: number }[] }>('/api/admin/publish', { snapshot: snapshotOf(p.draft), changes: p.changes });
+      const name = (c?: string) => p.merchants.find((m) => m.code === c)?.name ?? c;
+      onClose();
+      p.toast(r.published.length ? 'Published: ' + r.published.map((x) => (x.scope === 'shared' ? 'shared words' : name(x.code)) + ' v' + x.ver).join(', ') : 'Nothing was different, so nothing was published');
+      await p.reloadAll();
     } catch (e) { setBusy(false); p.toast('Publish failed: ' + (e as Error).message); }
   };
   if (!res) return <Modal small label="Publish" onClose={onClose}><h2>Checking your changes…</h2><div className="note">Running the sample customer messages on your draft.</div></Modal>;
@@ -125,8 +128,8 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
     <Modal small label="Publish" onClose={onClose}>
       <h2>Publish {n} change{n > 1 ? 's' : ''}?</h2>
       <ul className="plain">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed, see the Tests screen. You can still publish.` : '.'} The bot starts using the new version straight away. You can roll back from History.</div>
-      <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish v' + (p.ver + 1)}</button></div>
+      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed, see the Tests screen. You can still publish.` : '.'} The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.</div>
+      <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish'}</button></div>
     </Modal>
   );
 }

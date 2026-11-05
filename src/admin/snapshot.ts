@@ -68,7 +68,13 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
 }
 
 /** Replaces the knowledge base with the snapshot, in one transaction. Entries keep their ids so history and tests still point at them. */
-export async function writeSnapshot(pool: Pool, snap: Snapshot): Promise<void> {
+export interface WriteScope {
+  /** Only these merchants are rewritten (codes). Leave out for every merchant in the snapshot. */
+  merchants?: string[];
+  /** Rewrite the word lists shared by all merchants. Default true. */
+  shared?: boolean;
+}
+export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScope = {}): Promise<void> {
   const c = await pool.getConnection();
   try {
     await c.beginTransaction();
@@ -77,25 +83,31 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot): Promise<void> {
 
     // words shared by all merchants: rewritten in the order the panel shows them
     // Only merchants this snapshot knows about are rewritten: a merchant added later keeps its entries and short forms.
-    const known = Object.keys(snap.settings).map((code) => mid.get(code)).filter((id): id is number => id != null);
-    await (known.length ? c.query('DELETE FROM aliases WHERE merchant_id IS NULL OR merchant_id IN (?)', [known]) : c.query('DELETE FROM aliases WHERE merchant_id IS NULL'));
-    await c.query('DELETE FROM aspects'); await c.query('DELETE FROM smalltalk_phrases WHERE merchant_id IS NULL');
-    await c.query('DELETE FROM guard_phrases WHERE merchant_id IS NULL'); await c.query('DELETE FROM filler_words');
+    const shared = scope.shared !== false;
+    const known = Object.keys(snap.settings).filter((code) => !scope.merchants || scope.merchants.includes(code)).map((code) => mid.get(code)).filter((id): id is number => id != null);
+    const codes = new Set(Object.keys(snap.settings).filter((code) => !scope.merchants || scope.merchants.includes(code)));
+    if (known.length) await c.query('DELETE FROM aliases WHERE merchant_id IN (?)', [known]);
+    if (shared) {
+      await c.query('DELETE FROM aliases WHERE merchant_id IS NULL'); await c.query('DELETE FROM aspects'); await c.query('DELETE FROM smalltalk_phrases WHERE merchant_id IS NULL');
+      await c.query('DELETE FROM guard_phrases WHERE merchant_id IS NULL'); await c.query('DELETE FROM filler_words');
+    }
     const bulk = async (table: string, cols: string, tuples: unknown[][]) => {
       for (let i = 0; i < tuples.length; i += 500) await c.query(`INSERT INTO ${table}(${cols}) VALUES ?`, [tuples.slice(i, i + 500)]);
     };
     const flat = (w: Words, pre: unknown[] = []) => Object.entries(w).flatMap(([k, byLang]) => Object.entries(byLang).flatMap(([lang, list]) => list.map((x) => [...pre, k, lang, x])));
-    await bulk('aliases', 'merchant_id,canonical,language,variant', flat(snap.aliases, [null]));
-    await bulk('aspects', 'kind,language,keyword', flat(snap.aspects));
-    await bulk('smalltalk_phrases', 'merchant_id,kind,language,phrase', flat(snap.smalltalk, [null]));
-    await bulk('guard_phrases', 'merchant_id,kind,language,phrase', flat(snap.guard, [null]));
-    await bulk('filler_words', 'language,word', Object.entries(snap.fillers).flatMap(([lang, list]) => list.map((w) => [lang, w])));
-    for (const [code, list] of Object.entries(snap.mAliases)) if (mid.has(code))
+    if (shared) {
+      await bulk('aliases', 'merchant_id,canonical,language,variant', flat(snap.aliases, [null]));
+      await bulk('aspects', 'kind,language,keyword', flat(snap.aspects));
+      await bulk('smalltalk_phrases', 'merchant_id,kind,language,phrase', flat(snap.smalltalk, [null]));
+      await bulk('guard_phrases', 'merchant_id,kind,language,phrase', flat(snap.guard, [null]));
+      await bulk('filler_words', 'language,word', Object.entries(snap.fillers).flatMap(([lang, list]) => list.map((w) => [lang, w])));
+    }
+    for (const [code, list] of Object.entries(snap.mAliases)) if (mid.has(code) && codes.has(code))
       await bulk('aliases', 'merchant_id,language,variant,canonical', list.map((a) => [mid.get(code), a.language, a.variant, a.canonical]));
 
     // settings and tools
     for (const [code, s] of Object.entries(snap.settings)) {
-      const id = mid.get(code); if (!id) continue;
+      const id = mid.get(code); if (!id || !codes.has(code)) continue;
       await c.query('UPDATE merchants SET handoff_group_id = ? WHERE id = ?', [s.handoff_group, id]);
       await c.query(`UPDATE merchant_settings SET tone=?, answer_threshold=?, clarify_threshold=?, abuse_close_after=?, kind_reply=?, closing_msg=?, handoff_msg=? WHERE merchant_id=?`,
         [s.tone, s.answer, s.clarify, s.abuse_close_after, JSON.stringify(s.kind), JSON.stringify(s.closing), JSON.stringify(s.handoff), id]);
@@ -106,7 +118,7 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot): Promise<void> {
     // knowledge base entries: update the ones that exist, add new ones, delete removed ones
     const keep = new Set<string>();
     for (const e of snap.kb) {
-      const m = mid.get(e.merchant); if (!m) continue;
+      const m = mid.get(e.merchant); if (!m || !codes.has(e.merchant)) continue;
       keep.add(`${m}|${e.intent_key}`);
       let cat = (await rows(c, 'SELECT id FROM kb_categories WHERE merchant_id=? AND name=?', [m, e.category || 'General']))[0]?.id;
       if (!cat) cat = (await c.query<ResultSetHeader>('INSERT INTO kb_categories(merchant_id,name) VALUES(?,?)', [m, e.category || 'General']))[0].insertId;
@@ -123,7 +135,7 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot): Promise<void> {
       await c.query('DELETE FROM kb_translations WHERE kb_id=?', [id]);
       for (const [lang, t] of Object.entries(e.translations)) {
         if (!t || (!(t.answer_text || '').trim() && !(t.question_examples || []).length)) continue;
-        await c.query('INSERT INTO kb_translations(kb_id,language,question_examples,answer_text) VALUES(?,?,?,?)', [id, lang, JSON.stringify(t.question_examples || []), t.answer_text || '']);
+        await c.query('INSERT INTO kb_translations(merchant_id,kb_id,language,question_examples,answer_text) VALUES(?,?,?,?,?)', [m, id, lang, JSON.stringify(t.question_examples || []), t.answer_text || '']);
       }
     }
     for (const r of await rows(c, 'SELECT id, merchant_id, intent_key FROM kb_entries'))

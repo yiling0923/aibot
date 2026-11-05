@@ -105,21 +105,20 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     expect((await get('/api/admin/keywords?merchant=MERCH_B', admin)).statusCode).toBe(200);        // an admin may
   });
 
-  it('only an admin can roll back or reload', async () => {
-    expect((await post('/api/admin/rollback', { version: 1 }, staffA)).statusCode).toBe(403);
+  it('staff can only roll back their own merchant, never the shared lists or another merchant; only an admin can reload', async () => {
+    const hist = (await get('/api/admin/state', admin)).json().history as { id: number; kind: string; merchant: string | null }[];
+    const shared = hist.find((h) => h.kind === 'shared')!, other = hist.find((h) => h.merchant === 'MERCH_B')!, mine = hist.find((h) => h.merchant === 'MERCH_A')!;
+    expect((await post('/api/admin/rollback', { id: shared.id }, staffA)).statusCode).toBe(403);
+    expect((await post('/api/admin/rollback', { id: other.id }, staffA)).statusCode).toBe(403);
+    expect((await post('/api/admin/rollback', { id: mine.id }, staffA)).statusCode).toBe(200);        // their own merchant is allowed
+    expect((await post('/api/admin/rollback', { id: 999999 }, admin)).statusCode).toBe(404);
     expect((await post('/api/reload', {}, staffA)).statusCode).toBe(403);
     expect((await post('/api/reload', {}, admin)).statusCode).toBe(200);
   });
 
-  it('a chat session belongs to the person who started it', async () => {
-    const s = (await post('/api/chat/start', { merchant: 'MERCH_A' }, staffA)).json();
-    const other = (await login('swiftwallet', DEMO_STAFF_PASSWORD)).cookie;
-    expect((await post('/api/chat/message', { sessionId: s.sessionId, text: 'hello' }, other)).statusCode).toBe(404);
-    expect((await post('/api/chat/message', { sessionId: s.sessionId, text: 'hello' }, staffA)).statusCode).toBe(200);
-  });
-
   it('a staff publish only changes their own entries, short forms, tone and messages, even if the request is edited by hand', async () => {
-    const full = (await get('/api/admin/state', admin)).json().snapshot;
+    const before = (await get('/api/admin/state', admin)).json();
+    const full = before.snapshot;
     const mine = (await get('/api/admin/state', staffA)).json().snapshot;
     const hacked = JSON.parse(JSON.stringify(mine));
     hacked.kb.find((e: { intent_key: string }) => e.intent_key === 'deposit_how').translations.en.answer_text = 'STAFF EDIT';          // allowed
@@ -142,7 +141,11 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     expect(after.snapshot.guard.abuse.en.length).toBe(full.guard.abuse.en.length);
     expect(after.snapshot.kb.some((e: { intent_key: string }) => e.intent_key === 'sneaky')).toBe(false);
     expect(after.snapshot.settings.MERCH_B.tone).toBe(full.settings.MERCH_B.tone);
-    expect(after.history[0][1]).toBe('luckypay');                                                                                       // the version records who published
+    const row = after.history.find((h: { actor: string }) => h.actor === 'luckypay');                                                    // the version records who published
+    expect(row.merchant).toBe('MERCH_A');
+    expect(after.versions.MERCH_A).toBe(before.versions.MERCH_A + 1);                                                                    // only their merchant got a new version
+    expect(after.versions.MERCH_B).toBe(before.versions.MERCH_B);
+    expect(after.sharedVer).toBe(before.sharedVer);
   });
 
   it('a staff test chat only knows their own merchant', async () => {

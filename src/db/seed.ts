@@ -44,8 +44,8 @@ async function seedPanelSamples(c: PoolConnection, mid: Record<string, number>) 
     const session = (await c.query<ResultSetHeader>("INSERT INTO chat_sessions(merchant_id,livechat_chat_id,language,status) VALUES(?,?,?,'closed')", [mid[code], `sample-${code}`, 'en']))[0].insertId;
     const ago = (label: string) => { const m = /^(Today|Yesterday)\s+(\d+):(\d+)/.exec(label); const d = new Date(); if (m) { if (m[1] === 'Yesterday') d.setDate(d.getDate() - 1); d.setHours(+m[2], +m[3], 0, 0); } else d.setDate(d.getDate() - (parseInt(label) || 2)); return d; };
     const add = async (text: string, decision: string, why: string, when: string) => {
-      const mm = (await c.query<ResultSetHeader>('INSERT INTO chat_messages(session_id,role,text) VALUES(?,?,?)', [session, 'customer', text]))[0].insertId;
-      await c.query('INSERT INTO bot_decisions(message_id,decision,why,created_at) VALUES(?,?,?,?)', [mm, decision, why, ago(when)]);
+      const mm = (await c.query<ResultSetHeader>('INSERT INTO chat_messages(merchant_id,session_id,role,text) VALUES(?,?,?,?)', [mid[code], session, 'customer', text]))[0].insertId;
+      await c.query('INSERT INTO bot_decisions(merchant_id,message_id,decision,why,created_at) VALUES(?,?,?,?,?)', [mid[code], mm, decision, why, ago(when)]);
     };
     for (const [text, , why, when] of panel.review.handoff[code] ?? []) await add(text, 'HANDOFF', why, when);
     for (const [text, why, when, outcome] of panel.review.abuse[code] ?? []) await add(text, 'ABUSE', `${why} || ${outcome}`, when);
@@ -101,8 +101,8 @@ export async function seed(pool: Pool = getPool()) {
         VALUES(?,?,?,?,?,?,?)`,
         [mid[e.merchant], cat[key], e.intent_key, e.intent_key.replace(/_/g, ' '), e.topic ?? '', e.aspect ?? null, !!e.topic_optional]);
       for (const [lang, t] of Object.entries<any>(e.translations))
-        await run('INSERT INTO kb_translations(kb_id,language,question_examples,answer_text) VALUES(?,?,?,?)',
-          [kb, lang, JSON.stringify(t.question_examples), t.answer_text]);
+        await run('INSERT INTO kb_translations(merchant_id,kb_id,language,question_examples,answer_text) VALUES(?,?,?,?,?)',
+          [mid[e.merchant], kb, lang, JSON.stringify(t.question_examples), t.answer_text]);
     }
     for (const ec of s.eval_cases) {
       const kb = ec.expected_intent

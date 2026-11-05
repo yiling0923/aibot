@@ -31,14 +31,18 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
     expect(r.map((x) => x.name)).toContain('001_init.sql');
   });
 
-  it('has read-only views that start with the merchant, for browsing in phpMyAdmin', async () => {
-    const q = async (sql: string) => (await pool!.query<RowDataPacket[]>(sql))[0];
-    const codes = (await q('SELECT merchant_code FROM v_merchants ORDER BY merchant_code')).map((r) => r.merchant_code);
-    expect(codes).toEqual(seedJson.merchants.map((m: { code: string }) => m.code).sort());
-    const mine = await q(`SELECT DISTINCT merchant_code FROM v_answers WHERE merchant_code = '${codes[0]}'`);
-    expect(mine).toHaveLength(1);                                                  // filtering one merchant shows only its records
-    expect(Number((await q('SELECT COUNT(DISTINCT entry_id) AS n FROM v_answers'))[0].n)).toBe(seedJson.kb_entries.length);
-    for (const v of ['v_keywords', 'v_unmatched', 'v_settings', 'v_words', 'v_chats', 'v_logins']) await q(`SELECT * FROM ${v} LIMIT 1`);
+  it('every row sits under a merchant, and the database refuses a row under the wrong merchant', async () => {
+    const q = async (sql: string, p: unknown[] = []) => (await pool!.query<RowDataPacket[]>(sql, p))[0];
+    for (const t of ['kb_translations', 'chat_messages', 'bot_decisions', 'feedback', 'kb_entries', 'keyword_store', 'chat_sessions'])
+      expect(Number((await q(`SELECT COUNT(*) AS n FROM ${t} WHERE merchant_id IS NULL`))[0].n)).toBe(0);
+    const [a, b] = (await q('SELECT id FROM merchants ORDER BY id')).map((r) => r.id);
+    const [entry] = await q('SELECT id FROM kb_entries WHERE merchant_id = ? LIMIT 1', [a]);
+    // an answer for merchant A's entry cannot be filed under merchant B
+    await expect(pool!.query('INSERT INTO kb_translations(merchant_id,kb_id,language,question_examples,answer_text) VALUES(?,?,?,?,?)', [b, entry.id, 'xx', '[]', 'wrong'])).rejects.toThrow();
+    // each merchant counts its own versions
+    await pool!.query("INSERT INTO kb_versions(kind,merchant_id,version,actor,summary,snapshot) VALUES('merchant',?,1,'t','a','{}'),('merchant',?,1,'t','b','{}')", [a, b]);
+    await expect(pool!.query("INSERT INTO kb_versions(kind,merchant_id,version,actor,summary,snapshot) VALUES('merchant',?,1,'t','dup','{}')", [a])).rejects.toThrow();
+    await pool!.query("DELETE FROM kb_versions WHERE actor = 't'");
   });
 
   it('seeds the three fake merchants and all acceptance cases', async () => {

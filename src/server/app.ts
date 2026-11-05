@@ -11,7 +11,8 @@ import { Bot, newSession, type Session, type Turn } from '../bot/responder';
 import { makeToken, checkToken } from '../bot/token';
 import { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
-import { adminRoutes, ensureVersion } from '../admin/routes';
+import { adminRoutes } from '../admin/routes';
+import { ensureVersions } from '../admin/versions';
 import { createAi, type AiService } from '../ai';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
@@ -51,7 +52,7 @@ export async function buildApp(opts: AppOptions = {}) {
   const botFor = async (s: Session) => (s.draft && drafts.get(s.draft)) || (await getBot());
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
-  await ensureVersion(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
+  await ensureVersions(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
   /* ---------- sign in ---------- */
   // Every page and API call needs a valid signed-in cookie, except the login itself and the health check.

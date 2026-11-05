@@ -122,8 +122,9 @@ test/          acceptance cases + database tests
 
 Each decision comes with a plain-language reason (`why`), which the control panel will show.
 
-## Looking at one merchant in phpMyAdmin
+## Merchants in the database
 
-Open `livechat_bot` and use the views that start with `v_` (`v_merchants`, `v_answers`, `v_keywords`, `v_unmatched`, `v_settings`, `v_words`, `v_chats`, `v_logins`).
-Each shows the merchant first: open one and filter the `merchant_code` column. They are read-only, so make changes in the control panel.
-Run `npm run db:migrate` once after pulling to create them.
+Everything belongs to a merchant: every table with merchant data has a `merchant_id`, and the database refuses a row filed under the wrong merchant.
+To look at one merchant in phpMyAdmin, open a table (for example `kb_entries`) and filter `merchant_id`, or start from the `merchants` table.
+Each merchant also has its own publish history (`kb_versions`), so every merchant publishes and rolls back on its own.
+After pulling, run `npm run db:migrate` once (it adds migration `006_merchant_scope`; no data is lost).

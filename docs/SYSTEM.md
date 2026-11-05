@@ -239,13 +239,13 @@ The control panel is a web page at `/admin`. Staff change the bot here without t
 1. Edits stay a **draft in the browser** (saved there, so a refresh does not lose them).
 2. **Test chat** uses a temporary copy of the bot built from the draft. The live bot is not touched.
 3. **Publish** runs all sample messages on the draft first and shows the result. Then it saves everything in **one database transaction**, writes a **new version** (a full copy of the knowledge) and reloads the live bot in memory.
-4. **Roll back** (admin only) restores an older version. It never deletes a merchant that was added after that version.
+4. **Roll back** restores an older version of **one merchant**. Other merchants are not touched. Staff can roll back their own merchant; the shared word lists can only be rolled back by an admin.
 
 **Roles**
 
 | Role | Sees | Can change |
 |---|---|---|
-| **Admin** | All merchants, all screens | Everything, plus merchants, logins and roll back |
+| **Admin** | All merchants, all screens | Everything, plus merchants, logins and the shared word lists |
 | **Staff** | Only their own merchant (the merchant is fixed, there is no picker) | Their own entries, short forms, tone and fixed messages |
 
 The server enforces this; hiding a button is not what protects the data (see section 8).
@@ -265,7 +265,7 @@ The server enforces this; hiding a button is not what protects the data (see sec
 | **Secrets** | The bot never shows passwords, OTP codes or full bank, card and ID numbers, even to a verified customer. |
 | **Database** | All queries use placeholders. |
 | **AI** | See section 6: untrusted-text rule, no account data sent, fact checker, call limit. |
-| **Roll back and reload** | Admin only. |
+| **Roll back** | Staff: their own merchant. Admin: any merchant and the shared word lists. Reload is admin only. |
 | **Version history** | Records who published each version. |
 
 Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_TOKEN_SECRET` to long random values, turn `DEV_TOOLS` off, and put the server behind HTTPS (see section 16).
@@ -280,7 +280,7 @@ Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_T
 - **Merchant data is cut off by `ON DELETE CASCADE`**: removing a merchant removes its rows.
 - **Languages** are stored per row (`en`, `ms`, `zh`), not as separate columns, so a language can be added without changing the tables.
 - **Flexible parts use JSON columns** (example questions, fixed messages, settings), so they can grow without new columns.
-- **Versions are full snapshots.** Publishing writes the whole knowledge as one JSON document into `kb_versions`, which makes roll back simple and safe.
+- **Versions are snapshots per merchant.** Publishing writes that merchant's knowledge as one JSON document into `kb_versions`, which makes roll back simple and safe.
 - **Numbered migrations** (`001` to `006` in `db/migrations`) create and change the tables. A table `schema_migrations` records which ones have run, so running them again is safe.
 - Text is stored as **utf8mb4** so Chinese, Malay and emoji work.
 
@@ -298,20 +298,11 @@ Every table in the picture is linked to **`merchants`** through `merchant_id` (d
 - **`eval_cases`** are the sample customer messages with the result the bot should give. They are the automatic tests.
 - **`kb_versions`** holds every published version. **`admin_users`** holds the logins.
 
-**Browsing one merchant in phpMyAdmin.** Migration `006` adds read-only **views** (they hold no data of their own). Each starts with `merchant_code` and `merchant_name`, so open a view and filter that column to see one merchant's records:
+**Everything sits under a merchant.** Every table that holds merchant data carries `merchant_id`, including the ones that used to reach a merchant only through another table (`kb_translations`, `chat_messages`, `bot_decisions`, `feedback`). A **composite foreign key** such as `(kb_id, merchant_id)` makes the database refuse an answer filed under a different merchant than its entry. Indexes start with `merchant_id`, so a merchant's data stays quick to read when there are many merchants.
 
-| View | Shows |
-|---|---|
-| `v_merchants` | One row per merchant with its counts (entries, keywords, unmatched messages, chats) |
-| `v_answers` | Answers and example questions, one row per entry and language |
-| `v_keywords` | Words customers typed, with hits |
-| `v_unmatched` | Messages the bot did not understand |
-| `v_settings` | Tone, thresholds, limits, account tools and fixed messages |
-| `v_words` | Short forms, block lists and greetings (shared ones show "(all merchants)") |
-| `v_chats` | Chats with their messages |
-| `v_logins` | Logins and the merchant each is locked to |
+**Versions are per merchant.** Publishing writes a new row in `kb_versions` for each merchant whose data really changed (kind `merchant`, with that merchant's entries, short forms and settings). Changes to the word lists shared by all merchants get their own history (kind `shared`). Each merchant counts its own versions (`v1`, `v2`, ...) and is rolled back on its own; other merchants are not touched. Old rows saved before this change are kept as kind `legacy` and are no longer used.
 
-Change data in the control panel, not in these views.
+To look at one merchant in phpMyAdmin, open a table and filter `merchant_id`, or open `merchants` first and follow the links.
 
 ### The tables
 
@@ -405,7 +396,7 @@ Indexes: `merchant_id`, `parent_id`.
 | `valid_to` | timestamp |  |
 | `updated_at` | timestamp | default `CURRENT_TIMESTAMP` |
 
-Indexes: `category_id`, `merchant_id, status`, `merchant_id, intent_key` (unique).
+Indexes: `category_id`, `id, merchant_id` (unique), `merchant_id, status`, `merchant_id, intent_key` (unique).
 
 
 **`kb_translations`**. For each entry and language: the example questions (JSON list) and the answer text.
@@ -413,12 +404,13 @@ Indexes: `category_id`, `merchant_id, status`, `merchant_id, intent_key` (unique
 | Column | Type | Notes |
 |---|---|---|
 | `id` | bigint | primary key; numbers itself |
+| `merchant_id` | bigint | links to `merchants.id`; required |
 | `kb_id` | bigint | links to `kb_entries.id`; required |
 | `language` | varchar(10) | required |
 | `question_examples` | json | required |
 | `answer_text` | text | required |
 
-Indexes: `kb_id, language` (unique).
+Indexes: `kb_id, merchant_id`, `merchant_id, language`, `kb_id, language` (unique).
 
 
 **`eval_cases`**. Sample customer messages and the result the bot should give (`expected_decision`, and for answers `expected_intent`). These are the automatic tests.
@@ -567,7 +559,7 @@ Indexes: `merchant_id, text` (unique).
 | `closed_reason` | varchar(100) |  |
 | `started_at` | timestamp | default `CURRENT_TIMESTAMP` |
 
-Indexes: `livechat_chat_id` (unique), `merchant_id`.
+Indexes: `id, merchant_id` (unique), `livechat_chat_id` (unique), `merchant_id`.
 
 
 **`chat_messages`**. What was written in a chat.
@@ -575,6 +567,7 @@ Indexes: `livechat_chat_id` (unique), `merchant_id`.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | bigint | primary key; numbers itself |
+| `merchant_id` | bigint | links to `chat_sessions.merchant_id`; required |
 | `session_id` | bigint | links to `chat_sessions.id`; required |
 | `livechat_event_id` | varchar(100) | unique |
 | `role` | varchar(20) |  |
@@ -582,7 +575,7 @@ Indexes: `livechat_chat_id` (unique), `merchant_id`.
 | `normalized_text` | text |  |
 | `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
 
-Indexes: `livechat_event_id` (unique), `session_id`.
+Indexes: `id, merchant_id` (unique), `merchant_id, created_at`, `session_id, merchant_id`, `livechat_event_id` (unique).
 
 
 **`bot_decisions`**. What the bot decided for a message (decision, matched entry, confidence, reason, reply text).
@@ -590,6 +583,7 @@ Indexes: `livechat_event_id` (unique), `session_id`.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | bigint | primary key; numbers itself |
+| `merchant_id` | bigint | links to `chat_messages.merchant_id`; required |
 | `message_id` | bigint | links to `chat_messages.id` |
 | `decision` | varchar(20) | required |
 | `matched_kb_id` | bigint | links to `kb_entries.id` |
@@ -603,7 +597,7 @@ Indexes: `livechat_event_id` (unique), `session_id`.
 | `reviewed` | varchar(100) |  |
 | `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
 
-Indexes: `matched_kb_id`, `message_id`.
+Indexes: `id, merchant_id` (unique), `merchant_id`, `message_id, merchant_id`, `matched_kb_id`.
 
 
 **`feedback`**. For marking a decision right or wrong. Not used by any screen yet.
@@ -611,30 +605,33 @@ Indexes: `matched_kb_id`, `message_id`.
 | Column | Type | Notes |
 |---|---|---|
 | `id` | bigint | primary key; numbers itself |
+| `merchant_id` | bigint | links to `merchants.id`; required |
 | `decision_id` | bigint | links to `bot_decisions.id` |
 | `agent_id` | varchar(100) |  |
 | `verdict` | varchar(20) |  |
 | `correct_kb_id` | bigint | links to `kb_entries.id` |
 | `note` | text |  |
 
-Indexes: `correct_kb_id`, `decision_id`.
+Indexes: `correct_kb_id`, `decision_id, merchant_id`, `merchant_id`.
 
 
 #### Control panel
 
 
-**`kb_versions`**. Every published version: number, who published, a short summary, and the **whole knowledge as one JSON document** so it can be rolled back to.
+**`kb_versions`**. Every published version of one merchant (or of the shared word lists): number, who published, a short summary, and the knowledge of that merchant as one JSON document so it can be rolled back to. Each merchant counts its own version numbers.
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | bigint | primary key; numbers itself |
-| `version` | int | unique; required |
+| `kind` | enum('merchant','shared','legacy') | default `merchant` |
+| `merchant_id` | bigint | links to `merchants.id` |
+| `version` | int | required |
 | `actor` | varchar(100) | required |
 | `summary` | varchar(500) | required |
 | `snapshot` | longtext | required |
 | `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
 
-Indexes: `version` (unique).
+Indexes: `merchant_id`, `kind, merchant_id, version` (unique).
 
 
 **`admin_users`**. Logins: username, password hash (scrypt), role (`admin` or `staff`), and for staff the merchant they belong to.
@@ -759,7 +756,7 @@ All calls need a valid login cookie unless marked open. Data is sent as JSON.
 | `POST /api/reload` | Reload the knowledge (admin) |
 | `GET /api/admin/state` | Everything the panel needs |
 | `POST /api/admin/tests` | Run the sample messages on a draft |
-| `POST /api/admin/publish`, `/api/admin/rollback` | Publish a version, roll back (admin) |
+| `POST /api/admin/publish`, `/api/admin/rollback` | Publish (a new version for each merchant that changed), roll back one merchant or the shared lists |
 | `POST /api/admin/draft` | Build a temporary bot from a draft (Test chat) |
 | `GET /api/admin/keywords`, `/keywords/samples`, `/ranking` | Keyword list, example messages, weekly ranking |
 | `POST /api/admin/keywords/ignore`, `/keywords/describe` | Ignore a word, describe words with AI |
