@@ -756,7 +756,7 @@ Other design rules:
 
 ![Not understood](img/panel-unmatched.png)
 
-**Keyword ranking**: the top 3 as gold, silver and bronze cards, then a table. The week can be changed with the arrows.
+**Keyword ranking**: the top 3 as gold, silver and bronze cards, then a table with trend and change. The week can be changed with the arrows. Click a keyword to see the chats it was in. This screen is for looking; to decide what a word is (topic, short form, filler, rude word), use the Keywords screen.
 
 ![Keyword ranking](img/panel-ranking.png)
 

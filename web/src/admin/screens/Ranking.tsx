@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import type { RankData } from '../model';
 import { ChgPill, Medal, Pill, Spark } from '../ui';
-import { KeywordDrawer, RANK_TYPES, SetKeywordModal } from './KeywordModals';
+import { KeywordDrawer, RANK_TYPES } from './KeywordModals';
 import { useAssign } from './assign';
 
 const TABS: [string, string][] = [['all', 'All'], ['new', 'New from chat'], ['unset', 'Needs a decision'], ['filler', 'Fillers'], ['slang', 'Abbreviations'], ['rude', 'Rude words'], ['meaning', 'Topics & other']];
@@ -15,7 +15,7 @@ export default function Ranking() {
   const [week, setWeek] = useState(0); const [cache, setCache] = useState<Record<string, RankData>>({});
   const [tab, setTab] = useState('all'); const [q, setQ] = useState(''); const [lang, setLang] = useState('all'); const [showEx, setShowEx] = useState(false);
   const [sort, setSort] = useState<{ k: string; d: number }>({ k: 'rank', d: 1 }); const [sel, setSel] = useState<Set<string>>(new Set());
-  const [setFor, setSetFor] = useState<string | null>(null); const [drawer, setDrawer] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<string | null>(null);
   const key = p.merchant + '|' + week; const data = cache[key];
 
   useEffect(() => { if (!cache[key]) api<RankData>(`/api/admin/ranking?merchant=${encodeURIComponent(p.merchant)}&week=${week}`).then((r) => setCache((c) => ({ ...c, [key]: r }))).catch((e: Error) => p.toast('Could not load: ' + e.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [key]);
@@ -47,11 +47,10 @@ export default function Ranking() {
     const res = assign(words, kind); if (res.err) return p.toast(res.err);
     setSel(new Set()); p.toast(kind === 'exclude' ? words.length + ' keywords ignored' : res.done.length + ' keyword' + (res.done.length === 1 ? '' : 's') + ' added to the draft' + (res.skipped.length ? ' (' + res.skipped.length + ' already set)' : ''));
   };
-  const exclude = (w: string) => { p.ignoreWord(w); p.toast('Excluded “' + w + '” from the ranking'); };
 
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Keyword ranking</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Find fillers, short forms and rude words, and tell the bot what each one is.</div></div>
+      <div className="card"><div className="head"><div><h2>Keyword ranking</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Click a keyword to see the chats it was in. To decide what a word is, use the Keywords screen.</div></div>
         <div className="tools"><button className="btn sm" type="button" disabled={week <= -4} aria-label="Previous week" onClick={() => setWeek(week - 1)}>‹</button><span className="stat" style={{ padding: '5px 12px' }}><b style={{ fontSize: 13 }}>Date</b>{label}</span><button className="btn sm" type="button" disabled={week >= 0} aria-label="Next week" onClick={() => setWeek(week + 1)}>›</button></div></div></div>
       <div className="quiet" style={{ margin: '-4px 2px 0' }}><b>{total.toLocaleString()}</b> words written this week · <b>{vis.length}</b> different keywords · <b>{counts.unset}</b> need a decision</div>
       {top.length > 0 && <>
@@ -59,7 +58,7 @@ export default function Ranking() {
         <div className="podium">{top.map((r, i) => (
           <div key={r.w} className={'pod p' + (i + 1)}><div className="pod-head"><Medal n={i + 1} /><div className="pod-main"><span className="kwlink pod-nm" onClick={() => setDrawer(r.w)}>{r.w}</span><div className="sub">{r.n} time{r.n === 1 ? '' : 's'} · {r.share.toFixed(2)}%</div></div><ChgPill c={r.c} /></div>
             <div className="pod-trend"><Spark v={r.series} w={260} h={38} /></div>
-            <div className="pod-foot"><span className="pods">{r.isNew ? <Pill c="info">New</Pill> : null}<Pill c={r.st.c}>{r.st.t}</Pill></span><span className="tools"><button className="btn sm pri" type="button" onClick={() => setSetFor(r.w)}>Set…</button><button className="btn sm ghost" type="button" onClick={() => exclude(r.w)}>Exclude</button></span></div></div>))}</div></>}
+            <div className="pod-foot"><span className="pods">{r.isNew ? <Pill c="info">New</Pill> : null}<Pill c={r.st.c}>{r.st.t}</Pill></span></div></div>))}</div></>}
       <div className="card rkfilter"><div className="head"><div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
         <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 180 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{[['en', 'English'], ['ms', 'Malay'], ['zh', 'Chinese']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
@@ -74,10 +73,9 @@ export default function Ranking() {
                 <td><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} /></td><td>{r.pos}</td>
                 <td>{r.isNew ? <><Pill c="info">New</Pill> </> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span><div className="sub">{r.h}{r.live && !r.isNew ? ' · +' + r.live + ' from Test chat' : ''}{r.isNew && (r.live || 0) > 1 ? ' · ' + r.live + ' times' : ''}</div></td>
                 <td><Pill c={ty[1]} title={TIPS[r.t]}>{ty[0]}</Pill></td><td><Spark v={r.series} w={110} h={28} /></td><td className="num">{r.n}</td><td><ChgPill c={r.c} /></td><td><Pill c={r.st.c}>{r.st.t}</Pill></td>
-                <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{ex ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button> : <><button className="btn sm" type="button" onClick={() => setSetFor(r.w)}>Set…</button> <button className="btn sm ghost" type="button" onClick={() => exclude(r.w)}>Exclude</button></>}</td></tr>); })}
+                <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{ex ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button> : null}</td></tr>); })}
           {!list.length && <tr><td colSpan={10} className="sub">No keyword matches.</td></tr>}</tbody></table></div>
-      {drawer && <KeywordDrawer word={drawer} count={vis.find((r) => r.w === drawer)?.n ?? p.kwMap[drawer]?.n ?? 0} share={vis.find((r) => r.w === drawer)?.share} onClose={() => setDrawer(null)} onSet={() => { setSetFor(drawer); setDrawer(null); }} />}
-      {setFor && <SetKeywordModal word={setFor} onClose={() => setSetFor(null)} />}
+      {drawer && <KeywordDrawer word={drawer} count={vis.find((r) => r.w === drawer)?.n ?? p.kwMap[drawer]?.n ?? 0} share={vis.find((r) => r.w === drawer)?.share} onClose={() => setDrawer(null)} />}
     </>
   );
 }

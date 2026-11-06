@@ -61,7 +61,7 @@ export function SetKeywordModal({ word, preset, onClose }: { word: string; prese
 }
 
 /** The side panel with real customer messages that used this word. */
-export function KeywordDrawer({ word, count, share, onClose, onSet }: { word: string; count: number; share?: number; onClose: () => void; onSet: () => void }) {
+export function KeywordDrawer({ word, count, share, onClose, onSet }: { word: string; count: number; share?: number; onClose: () => void; onSet?: () => void }) {
   const p = usePanel(); const [real, setReal] = useState<string[]>([]);
   useEffect(() => { api<string[]>('/api/admin/keywords/samples?merchant=' + encodeURIComponent(p.merchant) + '&word=' + encodeURIComponent(word)).then(setReal).catch(() => setReal([])); }, [word, p.merchant]);
   const ty = RANK_TYPES[p.typeOf(word)] || RANK_TYPES.other; const st = p.status(word); const h = p.kwMap[word]?.h || '';
@@ -72,7 +72,7 @@ export function KeywordDrawer({ word, count, share, onClose, onSet }: { word: st
       <div className="kv"><Pill c={ty[1]}>{ty[0]}</Pill><Pill c={st.c}>{st.t}</Pill><span className="sub">{count} times{share !== undefined ? ' · ' + share.toFixed(2) + '%' : ''}</span></div><div className="sub">{h}</div>
       <div><h3>Recent chats with this word (sample)</h3>
         {samples.map((s, i) => <div className="q" key={i}><div className="t">“{s}”</div><span className="sub">Customer {i + 1} · {['Today', 'Today', 'Yesterday', '2 days ago'][i % 4]}</span></div>)}</div>
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">Tell the bot what this word is.</span><button className="btn pri" type="button" onClick={onSet}>Set…</button></div>
+      {onSet && <div className="head" style={{ marginTop: 'auto' }}><span className="sub">Tell the bot what this word is.</span><button className="btn pri" type="button" onClick={onSet}>Set…</button></div>}
     </Modal>
   );
 }
