@@ -296,6 +296,7 @@ Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_T
 - **Versions are kept per merchant.** Publishing writes a new row in that merchant's own `versions` table only if its data really changed. The shared word lists have their own history (`shared_versions`). Each merchant counts its own `v1`, `v2`, ... and is rolled back on its own; other merchants are not touched.
 - **Entry ids never repeat across merchants.** New entries get their number from `kb_id_seq` in the main database, so the control panel can find an entry by its id.
 - **Numbered migrations** create and change the tables: `001` to `008` in `db/migrations` for the main database (`008` is a one-time step that moved the data of an older single-database installation into merchant databases), and the files in `db/merchant` for every merchant database. Each database has a `schema_migrations` table that records which ones have run, so running them again is safe.
+- **Merchant databases update themselves when the server starts.** If a new version adds a table or column to the merchant databases (the files in `db/merchant`), the server applies it on start, so a merchant database is never left behind. `npm run db:migrate` does the same, and also updates the main database.
 - **The database user needs one grant**, in `db/setup.sql`: the right to create and use databases that start with `livechat_bot_`. It is run once as the MySQL admin.
 - Text is stored as **utf8mb4** so Chinese, Malay and emoji work.
 

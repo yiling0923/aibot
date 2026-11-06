@@ -13,6 +13,7 @@ import { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
 import { adminRoutes } from '../admin/routes';
 import { ensureVersions } from '../admin/versions';
+import { Tenants } from '../db/tenants';
 import { createAi, type AiService } from '../ai';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
@@ -52,6 +53,7 @@ export async function buildApp(opts: AppOptions = {}) {
   const botFor = async (s: Session) => (s.draft && drafts.get(s.draft)) || (await getBot());
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
+  await new Tenants(pool).migrateAll().then((a) => { if (a.length) app.log.info(`updated merchant databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the merchant databases (run npm run db:migrate)'));
   await ensureVersions(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
   /* ---------- sign in ---------- */

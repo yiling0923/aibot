@@ -4,7 +4,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { createPool, type Pool } from '../src/db/pool';
 import { migrate } from '../src/db/migrate';
 import { seed } from '../src/db/seed';
-import { dbNameFor, tbl } from '../src/db/tenants';
+import { Tenants, dbNameFor, tbl } from '../src/db/tenants';
 import { loadKnowledge } from '../src/db/loadKnowledge';
 import { Engine, knowledgeFromSeed } from '../src/engine';
 import { seedJson, accountsJson, evalCases, judge } from './helpers';
@@ -48,6 +48,17 @@ d('database (needs TEST_DATABASE_URL, see README)', () => {
       const col = await pool!.query<RowDataPacket[]>("SELECT 1 FROM information_schema.columns WHERE table_schema = ? AND column_name = 'merchant_id'", [r.db_name]);
       expect(col[0]).toHaveLength(0);                                              // inside a merchant database the database itself is the merchant
     }
+  });
+
+  it('brings a merchant database that is behind up to date by itself (what happens when the server starts after an update)', async () => {
+    const db = dbOf('MERCH_B');
+    await pool!.query(`ALTER TABLE ${tbl(db, 'chat_sessions')} DROP COLUMN source`);
+    await pool!.query(`DELETE FROM ${tbl(db, 'schema_migrations')} WHERE name = '002_chat_source.sql'`);
+    const applied = await new Tenants(pool!).migrateAll();
+    expect(applied).toEqual([`${db}: 002_chat_source.sql`]);
+    expect(await new Tenants(pool!).migrateAll()).toEqual([]);                       // nothing left to do the second time
+    const col = (await pool!.query<RowDataPacket[]>("SELECT 1 FROM information_schema.columns WHERE table_schema = ? AND table_name = 'chat_sessions' AND column_name = 'source'", [db]))[0];
+    expect(col).toHaveLength(1);
   });
 
   it('entry ids never repeat across merchants, and each merchant keeps only its own entries', async () => {

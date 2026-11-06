@@ -50,8 +50,8 @@ export default function Ranking() {
 
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Keyword ranking</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Click a keyword to see the chats it was in. To decide what a word is, use the Keywords screen.</div></div>
-        <div className="tools"><button className="btn sm" type="button" disabled={week <= -4} aria-label="Previous week" onClick={() => setWeek(week - 1)}>‹</button><span className="stat" style={{ padding: '5px 12px' }}><b style={{ fontSize: 13 }}>Date</b>{label}</span><button className="btn sm" type="button" disabled={week >= 0} aria-label="Next week" onClick={() => setWeek(week + 1)}>›</button></div></div></div>
+      <div className="card"><div className="head"><div style={{ maxWidth: 560 }}><h2>Keyword ranking</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Click a keyword to see the chats it was in. To decide what a word is, use the Keywords screen.</div></div>
+        <div className="tools"><button className="btn" type="button" style={{ padding: '10px 16px', fontSize: 18 }} disabled={week <= -4} aria-label="Previous week" onClick={() => setWeek(week - 1)}>‹</button><span className="stat" style={{ padding: '10px 26px', minWidth: 230, alignItems: 'center', textAlign: 'center' }}><b style={{ fontSize: 13 }}>Date</b><span style={{ fontSize: 17, fontWeight: 700 }}>{label}</span></span><button className="btn" type="button" style={{ padding: '10px 16px', fontSize: 18 }} disabled={week >= 0} aria-label="Next week" onClick={() => setWeek(week + 1)}>›</button></div></div></div>
       <div className="quiet" style={{ margin: '-4px 2px 0' }}><b>{total.toLocaleString()}</b> words written this week · <b>{vis.length}</b> different keywords · <b>{counts.unset}</b> need a decision</div>
       {top.length > 0 && <>
         <div className="sub" style={{ margin: '2px 2px -4px' }}>Count: how many times customers wrote it (repeats count). Share: its part of all keywords. Change: compared with the 7 days before. Click a keyword to see its chats.</div>

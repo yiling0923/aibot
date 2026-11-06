@@ -48,6 +48,13 @@ export class Tenants {
     return db;
   }
 
+  /** Brings every existing merchant database up to date (new files in db/merchant). Used when the server starts, so an update never leaves a merchant behind. */
+  async migrateAll(): Promise<string[]> {
+    const have = new Set(await this.allMerchantDbs()); const applied: string[] = [];
+    for (const t of await this.list(true)) if (have.has(t.db)) for (const f of await migrateMerchantDb(this.pool, t.db)) applied.push(`${t.db}: ${f}`);
+    return applied;
+  }
+
   /** Every database that belongs to this installation's merchants (also leftovers of merchants that were removed). */
   async allMerchantDbs(): Promise<string[]> {
     const control = await this.controlDb();
