@@ -157,13 +157,11 @@ export default function Chat() {
           <h1>LiveChat AI bot, test chat</h1>
           <p>Pick a merchant and type like a customer. The panel on the right shows each step the bot takes. When the message is too short to tell, the bot shows buttons and the customer taps one. Choose who is chatting (as the merchant website would send it) to see account lookups. This runs on your own computer with the data in your database. Every word you type is saved to Keywords automatically.</p>
         </div>
-        <div className="seg" role="group" aria-label="Merchant">
-          {merchants.map((m) => (
-            <button key={m.code} type="button" aria-pressed={m.code === cur?.code} onClick={() => switchMerchant(m)}>
-              <b>{m.name}</b><small>{m.tone} tone · {m.defaultLanguage.toUpperCase()}</small>
-            </button>
-          ))}
-        </div>
+        <label className="mpick"><span>Merchant</span>
+          <select value={cur?.code ?? ''} onChange={(e) => { const m = merchants.find((x) => x.code === e.target.value); if (m) switchMerchant(m); }}>
+            {merchants.map((m) => <option key={m.code} value={m.code}>{m.name} · {m.tone} tone · {m.defaultLanguage.toUpperCase()}</option>)}
+          </select>
+        </label>
       </div>
 
       <div className="grid">
