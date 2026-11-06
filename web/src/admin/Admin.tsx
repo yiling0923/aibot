@@ -11,7 +11,6 @@ import Topics from './screens/Topics';
 import Keywords from './screens/Keywords';
 import Ranking from './screens/Ranking';
 import TestChat from './screens/TestChat';
-import Tests from './screens/Tests';
 import Settings from './screens/Settings';
 import People from './screens/People';
 import History from './screens/History';
@@ -21,7 +20,7 @@ import Unmatched from './screens/Unmatched';
 const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
-  ['Check', [['report', 'Report'], ['unm', 'Not understood'], ['chat', 'Test chat'], ['test', 'Tests']]],
+  ['Check', [['report', 'Report'], ['unm', 'Not understood'], ['chat', 'Test chat']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['hist', 'History']]],
 ];
 
@@ -92,7 +91,6 @@ function Shell() {
             <Route path="report" element={<Report />} />
             <Route path="unm" element={<Unmatched />} />
             <Route path="chat" element={<TestChat />} />
-            <Route path="test" element={<Tests />} />
             <Route path="set" element={<Settings />} />
             <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="hist" element={<History />} />
@@ -109,7 +107,7 @@ function Shell() {
 /** Runs the sample messages on the draft, shows the result, then publishes. */
 function PublishDialog({ onClose }: { onClose: () => void }) {
   const p = usePanel();
-  const [res, setRes] = useState<{ pass: number; total: number } | null>(null);
+  const [res, setRes] = useState<{ pass: number; total: number; results: { message: string; merchant: string; expected: string; got: string; ok: boolean }[] } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -133,7 +131,8 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
     <Modal small label="Publish" onClose={onClose}>
       <h2>Publish {n} change{n > 1 ? 's' : ''}?</h2>
       <ul className="plain">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed, see the Tests screen. You can still publish.` : '.'} The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.</div>
+      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed (listed below). You can still publish.` : '.'} The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.</div>
+      {fails > 0 && <ul className="plain" aria-label="Failed tests">{res.results.filter((t) => !t.ok).slice(0, 6).map((t, i) => <li key={i}><b>{p.merchants.find((m) => m.code === t.merchant)?.name ?? t.merchant}</b>: “{t.message}” should be {t.expected}, the bot gave {t.got}</li>)}{fails > 6 && <li className="sub">and {fails - 6} more</li>}</ul>}
       <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish'}</button></div>
     </Modal>
   );

@@ -17,7 +17,7 @@ export interface Panel {
   unmatched: UnmatchedRow[]; reloadUnmatched: () => Promise<void>; resolveUnmatched: (texts: string[], resolution: 'added' | 'ignored' | null) => Promise<void>;
   ignoreWord: (w: string) => void; unignoreWord: (w: string) => void;
   status: (w: string) => Status; typeOf: (w: string) => string;
-  tests: TestResult[]; testsRun: boolean; runTests: () => Promise<{ pass: number; total: number }>;
+  tests: TestResult[]; testsRun: boolean; runTests: () => Promise<{ pass: number; total: number; results: TestResult[] }>;
   reloadAll: () => Promise<void>;
   toast: (text: string) => void;
 }
@@ -95,7 +95,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
   const unignoreWord = (w: string) => { setIgnored((s) => { const n = new Set(s); n.delete(w); return n; }); api('/api/admin/keywords/ignore', { merchant, words: [w], ignored: false }).catch(() => onToast('Could not save that')); };
 
   const runTests = useCallback(async () => {
-    if (!draft) return { pass: 0, total: 0 };
+    if (!draft) return { pass: 0, total: 0, results: [] };
     const r = await api<{ results: TestResult[]; pass: number; total: number }>('/api/admin/tests', { snapshot: snapshotOf(draft), includeDrafts: false });
     setTests(r.results); setTestsRun(true); return r;
   }, [draft]);

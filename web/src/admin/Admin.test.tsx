@@ -20,7 +20,8 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
-    : url.startsWith('/api/admin/report') ? REPORT : [])));
+    : url.startsWith('/api/admin/report') ? REPORT
+    : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : [])));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
@@ -92,5 +93,17 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: 'Add to an answer' })).toBeTruthy(); expect(screen.getByRole('button', { name: 'New answer' })).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Ignore' }));
     await vi.waitFor(() => expect(calls.some((c) => c.includes('/api/admin/unmatched/resolve') && c.includes('ignored') && c.includes('tarik duit lambat'))).toBe(true));
+  });
+  it('has no Tests screen in the menu, but publishing still runs the tests and lists the ones that fail', async () => {
+    open('admin', '/admin/kw');
+    expect(await screen.findByText('Report')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Tests' })).toBeNull();
+    await userEvent.click(screen.getByText('＋ Add a topic or keyword'));
+    await userEvent.type(screen.getByPlaceholderText('e.g. depoo'), 'depoo');
+    await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+    await userEvent.click(screen.getByRole('button', { name: /^Publish/ }));
+    expect(await screen.findByText(/1 of 2 passed/)).toBeTruthy();
+    expect(screen.getByText(/should be ANSWER, the bot gave HANDOFF/)).toBeTruthy();
+    expect(screen.queryByText(/should be CHOICE/)).toBeNull();                       // only the failed ones are listed
   });
 });
