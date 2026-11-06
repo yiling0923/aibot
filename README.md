@@ -48,7 +48,7 @@ Every word you type is saved to that merchant's keyword store, and messages the 
 Merchant staff can change their own entries, short forms, tone and fixed messages. The server refuses everything else
 (other merchants, shared word lists, limits, tools, rolling back the shared lists), even if a request is sent by hand.
 An admin adds merchants and logins in the panel under **Setup > Merchants & logins**: a new merchant starts with an empty knowledge base,
-and its first staff login can be created in the same step. Everyone can change their own password with **Change my password**.
+and its first staff login can be created in the same step. An admin resets a login's password with the key icon in the logins list.
 The same can be done from the command line (the merchant must already exist):
 
 ```bash

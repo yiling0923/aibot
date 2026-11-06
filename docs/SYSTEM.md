@@ -714,7 +714,7 @@ The panel has **three areas**:
    - the logo and name,
    - the **merchant**: a picker for admins, a fixed name for staff,
    - the **menu in four groups**: *Answers*, *Words*, *Check* and *Setup*, each item with a small icon and a count badge where something needs attention,
-   - at the bottom: who is signed in, **Sign out**, **Change my password**, and the **Advanced options** switch.
+   - at the bottom: who is signed in, **Sign out**, and the **Advanced options** switch. (Passwords are changed by an admin, with the key icon in the logins list.)
 2. **Top bar**: the live version of the open merchant (`Live v1`; every merchant counts its own versions), a draft chip with **Discard** when there are unpublished changes, and the **Publish** button.
 3. **Content area**: uses the **full width**. Each screen is made of white cards on a light grey background, with one clear heading per card.
 
@@ -797,7 +797,7 @@ All calls need a valid login cookie unless marked open. Data is sent as JSON.
 |---|---|
 | `GET /health` (open) | Is the server and database up |
 | `POST /api/auth/login` (open) | Sign in |
-| `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password` | Sign out, who am I, change own password |
+| `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password` | Sign out, who am I, change own password (no screen uses the last one now; an admin resets passwords from the logins list) |
 | `GET /api/merchants` | Merchants the person may use |
 | `GET /api/dev/customers` | Fake customers with signed tokens (test only) |
 | `POST /api/chat/start`, `/api/chat/message`, `/api/chat/pick` | Start a chat, send a message, tap a button |

@@ -41,7 +41,7 @@ function Shell() {
   const p = usePanel();
   const nav = useNavigate();
   const view = useLocation().pathname.split('/')[2] || 'kb';
-  const [dialog, setDialog] = useState<'publish' | 'password' | null>(null);
+  const [dialog, setDialog] = useState<'publish' | null>(null);
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
   const openUnmatched = p.unmatched.filter((r) => !r.resolved).length;
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
@@ -69,7 +69,6 @@ function Shell() {
         </nav>
         <div className="side-foot">
           <div className="whoami"><div><b>{p.me.username}</b><small>{p.isAdmin ? 'Admin · all merchants' : 'Staff · ' + p.M.name}</small></div><button className="btn sm" type="button" onClick={signOut}>Sign out</button></div>
-          <button className="btn sm ghost" type="button" onClick={() => setDialog('password')}>Change my password</button>
           <label className="switch" title="Show options most staff do not need, such as question types"><input type="checkbox" checked={p.adv} onChange={(e) => p.setAdv(e.target.checked)} /><span className="track"><span className="thumb" /></span><span className="swl">Advanced options</span></label>
         </div>
       </aside>
@@ -99,7 +98,6 @@ function Shell() {
         </main>
       </div>
       {dialog === 'publish' && <PublishDialog onClose={() => setDialog(null)} />}
-      {dialog === 'password' && <PasswordDialog onClose={() => setDialog(null)} />}
     </div>
   );
 }
@@ -134,27 +132,6 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
       <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed (listed below). You can still publish.` : '.'} The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.</div>
       {fails > 0 && <ul className="plain" aria-label="Failed tests">{res.results.filter((t) => !t.ok).slice(0, 6).map((t, i) => <li key={i}><b>{p.merchants.find((m) => m.code === t.merchant)?.name ?? t.merchant}</b>: “{t.message}” should be {t.expected}, the bot gave {t.got}</li>)}{fails > 6 && <li className="sub">and {fails - 6} more</li>}</ul>}
       <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish'}</button></div>
-    </Modal>
-  );
-}
-
-function PasswordDialog({ onClose }: { onClose: () => void }) {
-  const p = usePanel();
-  const [cur, setCur] = useState(''); const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [busy, setBusy] = useState(false);
-  const save = async () => {
-    setBusy(true); setErr('');
-    try { await api('/api/auth/password', { current: cur, password: pw }); onClose(); p.toast('Password changed'); }
-    catch (e) { setErr((e as Error).message); setBusy(false); }
-  };
-  return (
-    <Modal small label="Change my password" onClose={onClose}>
-      <h2>Change my password</h2>
-      <div className="form">
-        <label className="fld full"><span>Current password</span><input type="password" autoComplete="current-password" autoFocus value={cur} onChange={(e) => setCur(e.target.value)} /></label>
-        <label className="fld full"><span>New password</span><input type="password" autoComplete="new-password" placeholder="at least 6 characters" value={pw} onChange={(e) => setPw(e.target.value)} /></label>
-      </div>
-      {err && <div className="note" style={{ background: 'var(--badbg)', color: 'var(--bad)' }}>{err}</div>}
-      <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={save}>Change password</button></div>
     </Modal>
   );
 }
