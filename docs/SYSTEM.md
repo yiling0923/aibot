@@ -788,7 +788,7 @@ The Test chat tab shows the real chat page inside the panel, running on the draf
 ![Chat page](img/chat-page.png)
 
 - **Top row**: one button per merchant. Each merchant has its own accent colour.
-- **Left column**: *Website sends with the chat* (choose a fake customer: Tom, Mary, "Tom, ID edited", or not logged in, and see whether the signature is valid), the **chat window** (greeting, messages, buttons), and *Try these messages* (ready-made examples).
+- **Left column**: *Website sends with the chat* (choose a fake customer: Tom, Mary, "Tom, ID edited", or not logged in, and see whether the signature is valid), the **chat window** (greeting, messages, buttons), and a **New chat** button with a line saying how many words and unclear messages were saved.
 - **Right column**: **What the bot did with the last message**, step by step: guard rules, normalising, keywords found, the decision as data, the reason, and the reply. If Claude or ChatGPT was used, that step is shown too.
 
 ---
