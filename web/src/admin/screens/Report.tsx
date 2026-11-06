@@ -8,6 +8,17 @@ interface Report {
   daily: { day: string; total: number; helped: number; notUnderstood: number; handedOver: number }[];
   topAnswers: { intent: string; n: number }[]; topMissing: { text: string; hits: number }[];
 }
+/** One big number with a coloured edge and, for shares, a thin bar. */
+function Tile({ label, value, note, color, share }: { label: string; value: string; note: string; color: string; share?: number }) {
+  return (
+    <div style={{ background: 'var(--surface)', border: '1px solid var(--line)', borderLeft: `5px solid ${color}`, borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ fontSize: 12, fontWeight: 700, letterSpacing: '.06em', textTransform: 'uppercase', color: 'var(--muted)' }}>{label}</div>
+      <div style={{ fontSize: 34, fontWeight: 700, lineHeight: 1.1, color }}>{value}</div>
+      <div className="sub">{note}</div>
+      {share !== undefined && <div style={{ background: 'var(--surface2)', borderRadius: 6, height: 6, marginTop: 4 }}><div style={{ width: Math.max(2, share * 100) + '%', height: 6, borderRadius: 6, background: color }} /></div>}
+    </div>
+  );
+}
 const pct = (n: number, t: number) => (t ? Math.round((n / t) * 100) : 0) + '%';
 
 /** How the bot is doing for this merchant: what it handled, what it did not understand, what went to a person. */
@@ -30,12 +41,12 @@ export default function Report() {
           <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={withTest} onChange={(e) => setWithTest(e.target.checked)} /> Include test chat{r && r.tests ? ` (${r.tests})` : ''}</label></div></div>
         {err && <div className="note" style={{ background: 'var(--badbg)' }}>{err}</div>}</div>
       {r && <>
-        <div className="stats">
-          <div className="stat"><b>{r.total}</b>messages</div>
-          <div className="stat"><b style={{ color: 'var(--ok)' }}>{pct(r.helped, r.total)}</b>answered by the bot ({r.helped})</div>
-          <div className="stat"><b style={{ color: 'var(--warn)' }}>{pct(r.notUnderstood, r.total)}</b>not understood ({r.notUnderstood})</div>
-          <div className="stat"><b style={{ color: 'var(--bad)' }}>{pct(r.handedOver, r.total)}</b>handed to a person ({r.handedOver})</div>
-          {r.rude > 0 && <div className="stat"><b>{r.rude}</b>rude messages</div>}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
+          <Tile label="Messages" value={String(r.total)} note={`in the last ${r.days} days`} color="var(--accent)" />
+          <Tile label="Answered by bot" value={pct(r.helped, r.total)} note={`${r.helped} messages`} color="var(--ok)" share={r.total ? r.helped / r.total : 0} />
+          <Tile label="Not understood" value={pct(r.notUnderstood, r.total)} note={`${r.notUnderstood} messages`} color="var(--warn)" share={r.total ? r.notUnderstood / r.total : 0} />
+          <Tile label="Handed to a person" value={pct(r.handedOver, r.total)} note={`${r.handedOver} messages`} color="var(--bad)" share={r.total ? r.handedOver / r.total : 0} />
+          {r.rude > 0 && <Tile label="Rude messages" value={String(r.rude)} note="answered kindly first" color="var(--muted)" />}
         </div>
         {!r.total ? <div className="card"><div className="sub">No messages in this period yet. {withTest ? '' : 'Try "Include test chat" to see messages typed in the Test chat.'}</div></div> : <>
           <div className="card"><h3>Messages per day</h3>
