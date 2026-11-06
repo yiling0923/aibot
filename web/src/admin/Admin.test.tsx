@@ -20,6 +20,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
+    : url.startsWith('/api/admin/people') ? { merchants: [], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
     : url.startsWith('/api/admin/report') ? REPORT
     : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : [])));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
@@ -105,5 +106,13 @@ describe('Control panel', () => {
     expect(await screen.findByText(/1 of 2 passed/)).toBeTruthy();
     expect(screen.getByText(/should be ANSWER, the bot gave HANDOFF/)).toBeTruthy();
     expect(screen.queryByText(/should be CHOICE/)).toBeNull();                       // only the failed ones are listed
+  });
+  it('shows the login actions as icon buttons with the words available on hover', async () => {
+    open('admin', '/admin/users');
+    const reset = await screen.findAllByRole('button', { name: 'Reset password' });
+    expect(reset).toHaveLength(2);                                                       // one per login
+    expect(reset[0].textContent).toBe('');                                               // an icon, no words on the button
+    expect(reset[0].getAttribute('data-tip')).toBe('Reset password');                    // the words shown on hover
+    expect(screen.getAllByRole('button', { name: 'Remove login' })).toHaveLength(1);     // you cannot remove yourself
   });
 });

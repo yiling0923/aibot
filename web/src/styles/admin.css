@@ -275,3 +275,11 @@ details.fold[open]>summary{margin-bottom:8px}
 
 /* an element marked hidden must really be hidden, even where a rule above sets its display */
 [hidden]{display:none !important}
+
+/* icon buttons: the words appear on hover or keyboard focus */
+.ibtn{position:relative;display:inline-grid;place-items:center;width:34px;height:34px;padding:0;border:1px solid var(--line);border-radius:9px;background:var(--surface);color:var(--muted);cursor:pointer;vertical-align:middle}
+.ibtn:hover,.ibtn:focus-visible{border-color:var(--accent);color:var(--accent)}
+.ibtn.danger:hover,.ibtn.danger:focus-visible{border-color:var(--bad);color:var(--bad)}
+.ibtn::after{content:attr(data-tip);position:absolute;bottom:calc(100% + 7px);right:0;background:var(--fg);color:var(--bg);padding:4px 9px;border-radius:7px;font-size:12px;font-weight:600;white-space:nowrap;pointer-events:none;opacity:0;transform:translateY(3px);transition:opacity .12s,transform .12s;z-index:20}
+.ibtn:hover::after,.ibtn:focus-visible::after{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.ibtn::after{transition:none}}

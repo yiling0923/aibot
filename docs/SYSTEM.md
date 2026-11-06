@@ -765,7 +765,7 @@ Other design rules:
 
 ![Merchant settings](img/panel-settings.png)
 
-**Merchants and logins** (admin only)
+**Merchants and logins** (admin only): the merchants with their logins, and the list of logins. Each login has two small icon buttons: a key (reset password) and a bin (remove the login). The words show when the mouse is over an icon.
 
 ![Merchants and logins](img/panel-merchants.png)
 

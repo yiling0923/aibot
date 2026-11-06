@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { Modal } from '../ui';
+import { IconBtn, Modal } from '../ui';
 
 interface PeopleData { merchants: { code: string; name: string; tone: string; entries: number; logins: string[] }[]; users: { username: string; role: string; merchant: string | null }[] }
 type Dlg = { kind: 'merchant' } | { kind: 'user' } | { kind: 'reset'; user: string } | null;
@@ -24,7 +24,7 @@ export default function People() {
         <table style={{ marginTop: 10 }}><thead><tr><th>Username</th><th>Role</th><th>Merchant</th><th></th></tr></thead><tbody>
           {P.users.map((u) => (
             <tr key={u.username}><td><b>{u.username}</b>{u.username === p.me.username ? <> <span className="pill info">you</span></> : null}</td><td>{u.role === 'admin' ? 'Admin' : 'Staff'}</td><td>{u.merchant ? u.merchant : <span className="sub">all merchants</span>}</td>
-              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><button className="btn sm" type="button" onClick={() => setDlg({ kind: 'reset', user: u.username })}>Reset password</button> {u.username === p.me.username ? null : <button className="btn sm ghost" type="button" onClick={() => remove(u.username)}>Remove</button>}</td></tr>))}</tbody></table></div>
+              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><IconBtn tip="Reset password" onClick={() => setDlg({ kind: 'reset', user: u.username })}><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2 21 2" /><path d="M17 6l3 3" /><path d="M14 9l2 2" /></IconBtn>{u.username === p.me.username ? null : <> <IconBtn tip="Remove login" danger onClick={() => remove(u.username)}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></IconBtn></>}</td></tr>))}</tbody></table></div>
       {dlg?.kind === 'merchant' && <MerchantDialog onClose={() => setDlg(null)} onDone={async () => { await load(); await p.reloadAll(); }} />}
       {dlg?.kind === 'user' && <UserDialog merchants={P.merchants} onClose={() => setDlg(null)} onDone={load} />}
       {dlg?.kind === 'reset' && <ResetDialog user={dlg.user} onClose={() => setDlg(null)} />}
