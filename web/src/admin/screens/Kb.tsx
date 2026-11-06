@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { ASPECT_LABEL, LANGS, LN, clone, langState, slug, topicList, isZh, type Entry } from '../model';
@@ -13,15 +14,23 @@ export default function Kb() {
   const p = usePanel();
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all');
   const [ed, setEd] = useState<Ed | null>(null);
+  const loc = useLocation(); const nav = useNavigate(); const resolveAfter = useRef<string | null>(null);
   const all = p.draft.kb.filter((e) => e.merchant === p.merchant);
   const list = all.filter((e) => (status === 'all' || e.status === status) && (!q || (e.intent_key + ' ' + LANGS.map((l) => trOf(e, l).answer_text).join(' ')).toLowerCase().includes(q.toLowerCase())));
   const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => LANGS.some((l) => langState(e, l) !== 'on')).length;
 
-  const open = (e: Entry | null) => {
+  const open = (e: Entry | null, prefill?: { lang: string; text: string }) => {
     const src = e ? clone(e) : blank(p.merchant);
     LANGS.forEach((l) => { (src.translations as Record<string, Tr>)[l] = trOf(src, l); });
-    setEd({ ...src, useAspect: !!src.aspect, tab: 'en', sug: {}, newTopic: '', newTopicW: '', newEx: '' });
+    if (prefill) (src.translations as Record<string, Tr>)[prefill.lang].question_examples.push(prefill.text);
+    setEd({ ...src, useAspect: !!src.aspect, tab: prefill?.lang ?? 'en', sug: {}, newTopic: '', newTopicW: '', newEx: '' });
   };
+  // coming from "Not understood" with "New answer": the editor opens with that message as the first example
+  useEffect(() => {
+    const pre = (loc.state as { prefill?: { lang: string; text: string } } | null)?.prefill;
+    if (pre) { resolveAfter.current = pre.text; open(null, pre); nav(loc.pathname, { replace: true, state: null }); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -43,12 +52,12 @@ export default function Kb() {
         ))}
         {!list.length && <tr><td colSpan={5} className="sub">No entries match.</td></tr>}
       </tbody></table></div>
-      {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
+      {ed && <Editor ed={ed} setEd={setEd} onClose={() => { setEd(null); resolveAfter.current = null; }} onSaved={() => { const t = resolveAfter.current; resolveAfter.current = null; if (t) void p.resolveUnmatched([t], 'added').catch(() => undefined); }} />}
     </>
   );
 }
 
-function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClose: () => void }) {
+function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => void; onClose: () => void; onSaved?: () => void }) {
   const p = usePanel();
   const set = (patch: Partial<Ed>) => setEd({ ...ed, ...patch });
   const t = trOf(ed, ed.tab);
@@ -103,7 +112,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
       else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
     });
-    onClose(); p.toast('Saved to draft');
+    onSaved?.(); onClose(); p.toast('Saved to draft');
   };
   const del = () => {
     p.edit((d, note) => { d.kb = d.kb.filter((e) => e.id !== ed.id); note('Deleted entry "' + ed.intent_key + '" (' + p.M.name + ')'); });

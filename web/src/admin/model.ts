@@ -11,6 +11,7 @@ export interface Draft extends Omit<Snapshot, 'kb'> { kb: Entry[] }
 export interface MerchantRowAdmin { code: string; name: string; tone?: string; default_language?: string }
 export interface Me { username: string; role: 'admin' | 'staff'; merchant: string | null }
 export interface HistoryItem { kind: 'merchant' | 'shared'; merchant: string | null; version: number; actor: string; summary: string; ago: string }
+export interface UnmatchedRow { text: string; language: string | null; hits: number; resolved: boolean; resolution: 'added' | 'ignored' | null; first: string; last: string }
 export interface AiFlags { pick: boolean; write: boolean; describe: boolean; translate: boolean }
 
 export interface KwRow { w: string; n: number; lg: string; h: string; isNew?: boolean; ignored?: boolean; first?: string; last?: string; lastTs?: number; from?: string; guess?: string; live?: number }

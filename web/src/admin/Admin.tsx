@@ -15,11 +15,13 @@ import Tests from './screens/Tests';
 import Settings from './screens/Settings';
 import People from './screens/People';
 import History from './screens/History';
+import Report from './screens/Report';
+import Unmatched from './screens/Unmatched';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
-  ['Check', [['chat', 'Test chat'], ['test', 'Tests']]],
+  ['Check', [['report', 'Report'], ['unm', 'Not understood'], ['chat', 'Test chat'], ['test', 'Tests']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['hist', 'History']]],
 ];
 
@@ -42,6 +44,7 @@ function Shell() {
   const view = useLocation().pathname.split('/')[2] || 'kb';
   const [dialog, setDialog] = useState<'publish' | 'password' | null>(null);
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
+  const openUnmatched = p.unmatched.filter((r) => !r.resolved).length;
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
   const n = p.changes.length;
 
@@ -59,7 +62,7 @@ function Shell() {
             <div className="grp" key={g}><div className="gl">{g}</div>
               {items.filter(([k]) => k !== 'users' || p.isAdmin).map(([k, l]) => (
                 <button key={k} type="button" aria-current={k === view ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
-                  <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
+                  <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}{k === 'unm' && openUnmatched ? <span className="cnt">{openUnmatched}</span> : null}
                 </button>
               ))}
             </div>
@@ -86,6 +89,8 @@ function Shell() {
             <Route path="kw" element={<Topics />} />
             <Route path="store" element={<Keywords />} />
             <Route path="rank" element={<Ranking />} />
+            <Route path="report" element={<Report />} />
+            <Route path="unm" element={<Unmatched />} />
             <Route path="chat" element={<TestChat />} />
             <Route path="test" element={<Tests />} />
             <Route path="set" element={<Settings />} />

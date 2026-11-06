@@ -146,6 +146,39 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     expect(after.sharedVer).toBe(before.sharedVer);
   });
 
+  it('lists the messages the bot did not understand, lets staff deal with them, and keeps other merchants out', async () => {
+    const list = (await get('/api/admin/unmatched?merchant=MERCH_A', staffA)).json() as { text: string; resolved: boolean; hits: number }[];
+    expect(list.length).toBeGreaterThan(0); expect(list.every((r) => !r.resolved)).toBe(true);
+    expect(list.map((r) => r.hits)).toEqual([...list.map((r) => r.hits)].sort((a, b) => b - a));            // most frequent first
+    expect((await get('/api/admin/unmatched?merchant=MERCH_B', staffA)).statusCode).toBe(403);               // another merchant
+    expect((await post('/api/admin/unmatched/resolve', { merchant: 'MERCH_B', texts: ['x'], resolution: 'ignored' }, staffA)).statusCode).toBe(403);
+    expect((await post('/api/admin/unmatched/resolve', { merchant: 'MERCH_A', texts: [list[0].text], resolution: 'nonsense' }, staffA)).statusCode).toBe(400);
+    expect((await post('/api/admin/unmatched/resolve', { merchant: 'MERCH_A', texts: [list[0].text], resolution: 'ignored' }, staffA)).json().changed).toBe(1);
+    const after = (await get('/api/admin/unmatched?merchant=MERCH_A', staffA)).json() as { text: string; resolved: boolean; resolution: string | null }[];
+    expect(after.find((r) => r.text === list[0].text)).toMatchObject({ resolved: true, resolution: 'ignored' });
+    expect(after[after.length - 1].text).toBe(list[0].text);                                                 // dealt-with ones go to the end
+    await post('/api/admin/unmatched/resolve', { merchant: 'MERCH_A', texts: [list[0].text], resolution: null }, staffA);   // open it again
+    expect(((await get('/api/admin/unmatched?merchant=MERCH_A', staffA)).json() as { resolved: boolean }[]).every((r) => !r.resolved)).toBe(true);
+  });
+
+  it('reports what the bot did, can leave the test chat out, and keeps other merchants out', async () => {
+    const rep = async (qs: string, who = staffA) => (await get('/api/admin/report?merchant=MERCH_A&' + qs, who)).json();
+    const r0 = await rep('days=7'), r30 = await rep('days=30');
+    expect(r0.total).toBeGreaterThan(0); expect(r0.daily).toHaveLength(7); expect(r30.daily).toHaveLength(30); expect(r30.total).toBeGreaterThan(r0.total);
+    expect(r0.helped + r0.notUnderstood + r0.handedOver + r0.rude).toBeLessThanOrEqual(r0.total);
+    expect(r0.daily.reduce((a: number, d: { total: number }) => a + d.total, 0)).toBe(r0.total);
+    expect(r0.topAnswers.length).toBeGreaterThan(0); expect(r0.topAnswers[0].n).toBeGreaterThanOrEqual(r0.topAnswers[r0.topAnswers.length - 1].n);
+    expect(r0.tests).toBe(0);
+    // a chat typed in the Test chat is counted as a test and can be left out
+    const s = (await post('/api/chat/start', { merchant: 'MERCH_A' }, staffA)).json();
+    await post('/api/chat/message', { sessionId: s.sessionId, text: 'depo how' }, staffA);
+    await new Promise((r) => setTimeout(r, 300));
+    const withTest = await rep('days=7'), liveOnly = await rep('days=7&test=0');
+    expect(withTest.total).toBe(r0.total + 1); expect(withTest.tests).toBe(1);
+    expect(liveOnly.total).toBe(r0.total);
+    expect((await get('/api/admin/report?merchant=MERCH_B&days=7', staffA)).statusCode).toBe(403);
+  });
+
   it('a staff test chat only knows their own merchant', async () => {
     const mine = (await get('/api/admin/state', staffA)).json().snapshot;
     const d = (await post('/api/admin/draft', { snapshot: mine, includeDrafts: false }, staffA)).json();

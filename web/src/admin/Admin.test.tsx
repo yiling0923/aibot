@@ -13,9 +13,14 @@ const state = (role: 'admin' | 'staff') => ({
     settings: {},
   },
 });
+const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
+const REPORT = { days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }] };
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] } : [])));
+  vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
+    : url.startsWith('/api/admin/unmatched') ? UNMATCHED
+    : url.startsWith('/api/admin/report') ? REPORT : [])));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
@@ -69,5 +74,23 @@ describe('Control panel', () => {
     cleanup(); open('admin', '/admin/kb', false);
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
     expect((screen.getByRole('button', { name: 'Translate to Malay and Chinese' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('shows the report with the share of messages answered, not understood and handed over', async () => {
+    open('admin', '/admin/report');
+    expect(await screen.findByText('70%')).toBeTruthy();                          // answered by the bot
+    expect(screen.getByText('10%')).toBeTruthy(); expect(screen.getByText('15%')).toBeTruthy();
+    expect(screen.getByText('deposit_how')).toBeTruthy();
+    expect(screen.getByText(/Include test chat \(3\)/)).toBeTruthy();
+  });
+  it('lists the messages the bot did not understand and lets staff add one to an answer or ignore it', async () => {
+    const calls: string[] = [];
+    open('admin', '/admin/unm');
+    const orig = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
+    vi.stubGlobal('fetch', vi.fn((u: string, i?: RequestInit) => { if (i?.method === 'POST') calls.push(u + ' ' + i.body); return orig(u, i); }));
+    expect(await screen.findByText('tarik duit lambat')).toBeTruthy();
+    expect(screen.queryByText('abc xyz')).toBeNull();                              // dealt-with ones are on the other tab
+    expect(screen.getByRole('button', { name: 'Add to an answer' })).toBeTruthy(); expect(screen.getByRole('button', { name: 'New answer' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Ignore' }));
+    await vi.waitFor(() => expect(calls.some((c) => c.includes('/api/admin/unmatched/resolve') && c.includes('ignored') && c.includes('tarik duit lambat'))).toBe(true));
   });
 });

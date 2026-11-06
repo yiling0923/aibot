@@ -184,6 +184,53 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     return { answer: t.answer, examples: t.examples };
   });
 
+  /* ---------- messages the bot did not understand ---------- */
+  /** The messages the bot could not answer, most frequent first. Open ones come before the ones that were dealt with. */
+  app.get<{ Querystring: { merchant: string } }>(`${A}/unmatched`, async (req, reply) => {
+    if (!mayUse(req, req.query.merchant)) return forbidden(reply);
+    const U = await mt(req.query.merchant, 'unmatched_messages'); if (!U) return [];
+    const rows = await q(pool, `SELECT text, language, hits, resolved, resolution, first_seen, last_seen FROM ${U} ORDER BY resolved, hits DESC, last_seen DESC LIMIT 500`);
+    return rows.map((r) => ({ text: r.text, language: r.language, hits: Number(r.hits), resolved: !!r.resolved, resolution: r.resolution ?? null, first: ago(r.first_seen), last: ago(r.last_seen) }));
+  });
+
+  /** Marks messages as dealt with (resolution "added" or "ignored"), or opens them again (resolution null). */
+  app.post<{ Body: { merchant: string; texts: string[]; resolution: 'added' | 'ignored' | null } }>(`${A}/unmatched/resolve`, async (req, reply) => {
+    const { merchant, texts, resolution } = req.body ?? ({} as never);
+    if (!mayUse(req, merchant)) return forbidden(reply);
+    if (!Array.isArray(texts) || !texts.length) return { ok: true, changed: 0 };
+    if (resolution !== null && resolution !== 'added' && resolution !== 'ignored') return reply.code(400).send({ error: 'resolution must be added, ignored or null.' });
+    const U = await mt(merchant, 'unmatched_messages'); if (!U) return { ok: true, changed: 0 };
+    const [r] = await pool.query<import('mysql2/promise').ResultSetHeader>(`UPDATE ${U} SET resolved = ?, resolution = ? WHERE text IN (?)`, [resolution !== null, resolution, texts.map((x) => String(x).slice(0, 500))]);
+    return { ok: true, changed: r.affectedRows };
+  });
+
+  /* ---------- report: how the bot is doing ---------- */
+  const HELPED = new Set(['ANSWER', 'CHOICE', 'CLARIFY', 'SMALLTALK', 'ACCOUNT', 'AMOUNT', 'REFUSE']);
+  /** What the bot did over the last 7 or 30 days: how many messages it handled, did not understand or handed to a person. */
+  app.get<{ Querystring: { merchant: string; days?: string; test?: string } }>(`${A}/report`, async (req, reply) => {
+    if (!mayUse(req, req.query.merchant)) return forbidden(reply);
+    const days = Number(req.query.days) === 30 ? 30 : 7; const includeTest = req.query.test !== '0';
+    const D = await mt(req.query.merchant, 'bot_decisions'), M = await mt(req.query.merchant, 'chat_messages'), S = await mt(req.query.merchant, 'chat_sessions'), E = await mt(req.query.merchant, 'kb_entries'), U = await mt(req.query.merchant, 'unmatched_messages');
+    const empty = { days, total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0 };
+    if (!D || !M || !S || !E || !U) return empty;
+    const where = `d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
+    const base = `FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE ${where}`;
+    const rows = await q(pool, `SELECT DATE_FORMAT(d.created_at, '%Y-%m-%d') AS day, d.decision, COUNT(*) AS n ${base} GROUP BY day, d.decision`, [days - 1]);
+    const byDecision: Record<string, number> = {}; const perDay = new Map<string, { total: number; helped: number; notUnderstood: number; handedOver: number }>();
+    for (const r of rows) {
+      const n = Number(r.n); byDecision[r.decision] = (byDecision[r.decision] ?? 0) + n;
+      const d = perDay.get(r.day) ?? { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }; d.total += n;
+      if (HELPED.has(r.decision)) d.helped += n; if (r.decision === 'REASK') d.notUnderstood += n; if (r.decision === 'HANDOFF') d.handedOver += n; perDay.set(r.day, d);
+    }
+    const sum = (f: (k: string) => boolean) => Object.entries(byDecision).filter(([k]) => f(k)).reduce((a, [, v]) => a + v, 0);
+    const daily = []; for (let i = days - 1; i >= 0; i--) { const dt = new Date(Date.now() - i * 86400000), key = dt.toISOString().slice(0, 10); daily.push({ day: key, ...(perDay.get(key) ?? { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }) }); }
+    const top = await q(pool, `SELECT e.intent_key AS intent, COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id JOIN ${E} e ON e.id = d.matched_kb_id WHERE ${where} AND d.decision = 'ANSWER' GROUP BY e.intent_key ORDER BY n DESC, e.intent_key LIMIT 8`, [days - 1]);
+    const missing = await q(pool, `SELECT text, hits FROM ${U} WHERE resolved = false ORDER BY hits DESC, last_seen DESC LIMIT 5`);
+    const [t] = await q(pool, `SELECT COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND s.source = 'test' AND d.decision <> 'HANDED'`, [days - 1]);
+    return { days, total: sum(() => true), helped: sum((k) => HELPED.has(k)), notUnderstood: byDecision.REASK ?? 0, handedOver: byDecision.HANDOFF ?? 0, rude: byDecision.ABUSE ?? 0, byDecision, daily,
+      topAnswers: top.map((r) => ({ intent: r.intent, n: Number(r.n) })), topMissing: missing.map((r) => ({ text: r.text, hits: Number(r.hits) })), tests: Number(t.n) };
+  });
+
   /** Recent customer messages that contain a word (the "Recent chats with this word" list). */
   app.get<{ Querystring: { merchant: string; word: string } }>(`${A}/keywords/samples`, async (req, reply) => {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);

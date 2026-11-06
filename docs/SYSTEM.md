@@ -88,7 +88,7 @@ Dashed boxes in the picture are not connected yet or are optional.
 | **Settings** | `dotenv` | Reads the `.env` file. |
 | **AI** | `@anthropic-ai/sdk` (Claude) and `openai` (ChatGPT), official libraries | Answers from Claude are checked with **zod** (a schema checker) before use. |
 | **Passwords and signatures** | Node's built-in `crypto` | scrypt for password hashing, HMAC-SHA256 for signed cookies and tokens. |
-| **Tests** | **Vitest 5**, run with `tsx` (front end tests use **jsdom** and **Testing Library**) | 2,023 automatic tests. |
+| **Tests** | **Vitest 5**, run with `tsx` (front end tests use **jsdom** and **Testing Library**) | 2,027 automatic tests. |
 | **Front end** | **React 19 + TypeScript + Vite 8**, with **React Router 7** | A real single-page app. Vite builds it into `web/dist`, and the bot server serves that folder. The front end shares its data types with the back end (`src/admin/snapshotTypes.ts`), so a mismatch is caught when the code is checked. |
 | **Front end look** | CSS variables, Google Fonts (Instrument Sans, JetBrains Mono), inline SVG icons | Light and dark mode follow the computer's setting. Works on phones. |
 
@@ -239,7 +239,9 @@ The control panel is a web page at `/admin`. Staff change the bot here without t
 | **Words** | Topics | Topic keywords and short forms, question words, greetings, fillers and block lists (rude words, safety lists, asking for a person) |
 | | Keywords | Every word customers typed, saved automatically, newest first. Make a word a topic, add it to a topic, or ignore it. A short AI note appears when AI is on. |
 | | Keyword ranking | The words customers wrote most in a week: top 3 as medal cards, then a table with trend and change |
-| **Check** | Test chat | Chat with the bot using your **unpublished** changes. Shows every step the bot took. |
+| **Check** | Report | How the bot is doing for this merchant over the last 7 or 30 days: the share of messages answered by the bot, not understood and handed to a person, messages per day, the answers used most, and what was not understood most |
+| | Not understood | The messages the bot could not answer, most frequent first. For each one: add it as an example to an existing answer, make a new answer from it (the editor opens with the message filled in), or ignore it |
+| | Test chat | Chat with the bot using your **unpublished** changes. Shows every step the bot took. |
 | | Tests | Runs the sample customer messages and shows what passed or failed |
 | **Setup** | Merchant settings | Tone, handoff group, answer limits, account tools, how many rude messages before closing, fixed messages |
 | | Merchants and logins (admin) | Add a merchant (starts empty), add or remove logins, reset passwords |
@@ -586,7 +588,7 @@ Indexes: `word` (unique).
 | `hits` | int | default `0` |
 
 
-**`unmatched_messages`**. Messages the bot did not understand, counted when repeated.
+**`unmatched_messages`**. Messages the bot did not understand, counted when repeated. The Not understood screen works from this list (open, added to an answer, or ignored).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -606,7 +608,7 @@ Indexes: `text` (unique).
 #### Chat log
 
 
-**`chat_sessions`**. One row per chat: language, status.
+**`chat_sessions`**. One row per chat: language, status, and where it came from (`test` for the control panel's Test chat, `live` for a real customer).
 
 | Column | Type | Notes |
 |---|---|---|
@@ -615,6 +617,7 @@ Indexes: `text` (unique).
 | `customer_ref` | varchar(200) |  |
 | `language` | varchar(10) |  |
 | `status` | varchar(20) |  |
+| `source` | varchar(10) | default `live` |
 | `clarify_count` | int | default `0` |
 | `closed_reason` | varchar(100) |  |
 | `started_at` | timestamp | default `CURRENT_TIMESTAMP` |
@@ -746,6 +749,14 @@ Other design rules:
 
 ![Keywords](img/panel-keywords.png)
 
+**Report**: four numbers at the top (messages, answered by the bot, not understood, handed to a person, each as a percentage), a bar chart of messages per day, the answers used most, and the messages not understood most. Choose the last 7 or 30 days, and whether the test chat is counted (messages typed in the Test chat are marked as test, so real customers can be looked at alone once LiveChat is connected).
+
+![Report](img/panel-report.png)
+
+**Not understood**: a to-do list. Each row is a message the bot could not answer, with how many times it was written. **Add to an answer** adds it as an example question of the answer you choose (as a draft change); **New answer** opens the entry editor with the message already filled in; **Ignore** puts it away. Dealt-with messages move to a second tab and can be opened again. The count shows in the menu.
+
+![Not understood](img/panel-unmatched.png)
+
 **Keyword ranking**: the top 3 as gold, silver and bronze cards, then a table. The week can be changed with the arrows.
 
 ![Keyword ranking](img/panel-ranking.png)
@@ -802,6 +813,8 @@ All calls need a valid login cookie unless marked open. Data is sent as JSON.
 | `POST /api/admin/publish`, `/api/admin/rollback` | Publish (a new version for each merchant that changed), roll back one merchant or the shared lists |
 | `POST /api/admin/draft` | Build a temporary bot from a draft (Test chat) |
 | `GET /api/admin/keywords`, `/keywords/samples`, `/ranking` | Keyword list, example messages, weekly ranking |
+| `GET /api/admin/report` | The report: counts by decision, per day, answers used most (last 7 or 30 days, with or without the test chat) |
+| `GET /api/admin/unmatched`, `POST /api/admin/unmatched/resolve` | Messages the bot did not understand; mark them as added, ignored, or open again |
 | `POST /api/admin/keywords/ignore`, `/keywords/describe` | Ignore a word, describe words with AI |
 | `POST /api/admin/translate` | Translate an answer and its examples into another language (needs the AI) |
 | `GET /api/admin/people` (admin) | Merchants and logins |
@@ -882,7 +895,7 @@ Useful commands: `npm run eval:report` (lists sample messages the bot gets wrong
 
 ## 15. Testing and quality
 
-- **2,023 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
+- **2,027 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
 - Tests also cover the database, the control panel API, login and the merchant lock (with forged requests), merchants and logins, the AI layer (on a fake network), and the reply builder.
 - `npm run eval:report` runs all sample messages and prints every one that gives a different result than expected.
 
@@ -904,12 +917,12 @@ Every miss was then fixed and kept as a test. A fair expectation for messages th
 | **LiveChat connection** | Not built. Today the bot runs on a test page only. It needs the LiveChat developer details and a public web address. |
 | **AI with real keys** | Built and tested only on a fake network. Real wording quality and speed are untested. |
 | **Merchant API** | Account data is fake JSON. Each merchant's real API still has to be connected. |
-| **Demo data** | The merchants, entries, accounts and the keyword history in the ranking are fake sample data. |
+| **Demo data** | The merchants, entries, accounts, the keyword history in the ranking and the two weeks of traffic in the Report are fake sample data. |
 | **Chat memory** | Chat state is kept in the server's memory, so a restart ends running chats. The chat log is saved in the database. |
 | **HTTPS** | Not built in. For real use, run it behind HTTPS (the cookie must then be marked secure). |
 | **Hardening** | Login has a lockout, but the chat API has no speed limit yet. No automatic backups. |
 | **Two admins at once** | Each publish saves a new version of the merchants that changed, so if two admins edit the same merchant at the same time, the later publish wins. |
-| **Unused tables** | `feedback`, `unmatched_messages`, and the columns `business_hours`, `valid_from` and `valid_to` exist but no screen uses them. |
+| **Unused tables** | `feedback`, and the columns `business_hours`, `valid_from` and `valid_to` exist but no screen uses them. |
 | **Translate button** | Built and tested on a fake network. It needs the Anthropic key, and the quality of the Malay and Chinese wording is untested with the real AI. |
 | **"Suggest with AI" button** | A placeholder: it only adds simple variations of the first example question. It does not call an AI. |
 | **Production start** | The back end runs through `tsx` (TypeScript is run directly). That is fine on your own computer; for a server it should be compiled to JavaScript first. Not done. |

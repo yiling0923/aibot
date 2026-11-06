@@ -137,3 +137,12 @@ To see the databases grouped in phpMyAdmin, add this line to `config.inc.php`:
 In the entry editor, **Translate to Malay and Chinese** writes a draft translation of the English answer and example questions (on the MS and ZH tabs: **Translate from English**).
 It needs the Anthropic key in `.env` (`ANTHROPIC_API_KEY`); without it the button is greyed out. The numbers, links and menu paths such as `Wallet > Deposit` must come back exactly as written, otherwise the translation is refused.
 It is only a draft: check it, then **Save to draft** and publish as usual.
+
+## Report and Not understood
+
+Two screens under **Check** help to improve the bot:
+
+* **Report** shows, for the open merchant and the last 7 or 30 days, how many messages the bot answered, did not understand or handed to a person, messages per day, and the answers used most. Messages typed in the Test chat are marked as test and can be left out.
+* **Not understood** lists the messages the bot could not answer, most frequent first. Add one to an existing answer as an example question, make a new answer from it, or ignore it. Everything is a draft change until you publish.
+
+After pulling, run `npm run db:migrate` once (it adds one column, `chat_sessions.source`, to every merchant database).

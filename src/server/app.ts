@@ -157,7 +157,7 @@ export async function buildApp(opts: AppOptions = {}) {
     if (t.log && !silent) {
       saved = await store.hear(s.merchant, t.log.text, t.log.lang as Lang, t.log.notUnderstood);
       if (ai.canDescribe && saved.fresh.length) void describeNew(b, s.merchant, saved.fresh, t.log.text);
-      void store.logTurn({ merchant: s.merchant, sessionKey: s.id, customerRef: null, text: t.log.text, lang: t.log.lang as Lang, decision: t.log.decision,
+      void store.logTurn({ merchant: s.merchant, sessionKey: s.id, customerRef: null, text: t.log.text, lang: t.log.lang as Lang, decision: t.log.decision, source: 'test',      // every chat started here is a test chat; a real LiveChat connection will log 'live'
         confidence: Number(t.trace.conf ?? 0), reply: t.messages.map((m) => m.text).join('\n'), matchedKbId: (t.trace.decision === 'ANSWER' ? (t.trace.top as { id: number }).id : null), why: whyOf(t.trace) });
     }
     return { closed: s.closed, handed: s.handed, turn: t, saved };

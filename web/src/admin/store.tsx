@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { api } from '../lib/api';
-import { agoISO, classify, type HistoryItem, clone, kwStatus, snapshotOf, type AiFlags, type Draft, type KwRow, type MerchantRowAdmin, type Me, type Snapshot, type Status, type TestResult } from './model';
+import { agoISO, classify, type UnmatchedRow, type HistoryItem, clone, kwStatus, snapshotOf, type AiFlags, type Draft, type KwRow, type MerchantRowAdmin, type Me, type Snapshot, type Status, type TestResult } from './model';
 
 interface ServerState { versions: Record<string, number>; sharedVer: number | null; stamp: number; merchants: MerchantRowAdmin[]; snapshot: Snapshot; history: HistoryItem[]; user: Me; ai: AiFlags }
 
@@ -13,6 +13,8 @@ export interface Panel {
   edit: (fn: (d: Draft, note: (text: string) => void) => void) => void;
   discard: () => void;
   kw: KwRow[]; kwMap: Record<string, KwRow>; ignored: Set<string>; reloadKeywords: () => Promise<void>;
+  /** Messages the bot did not understand (this merchant), and a way to mark some as dealt with or open them again. */
+  unmatched: UnmatchedRow[]; reloadUnmatched: () => Promise<void>; resolveUnmatched: (texts: string[], resolution: 'added' | 'ignored' | null) => Promise<void>;
   ignoreWord: (w: string) => void; unignoreWord: (w: string) => void;
   status: (w: string) => Status; typeOf: (w: string) => string;
   tests: TestResult[]; testsRun: boolean; runTests: () => Promise<{ pass: number; total: number }>;
@@ -35,6 +37,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
   const [adv, setAdv] = useState(false);
   const [kw, setKw] = useState<KwRow[]>([]);
   const [ignored, setIgnored] = useState<Set<string>>(new Set());
+  const [unmatched, setUnmatched] = useState<UnmatchedRow[]>([]);
   const [tests, setTests] = useState<TestResult[]>([]);
   const [testsRun, setTestsRun] = useState(false);
   const draftKey = useRef('aibot_panel_draft_v1');
@@ -46,6 +49,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
   const loadKeywordsFor = useCallback(async (code: string) => {
     const rows = await api<KwRow[]>('/api/admin/keywords?merchant=' + encodeURIComponent(code));
     setKw(rows); setIgnored(new Set(rows.filter((k) => k.ignored).map((k) => k.w)));
+    setUnmatched(await api<UnmatchedRow[]>('/api/admin/unmatched?merchant=' + encodeURIComponent(code)).catch(() => []));
   }, []);
 
   const load = useCallback(async (keep?: { merchant?: string }) => {
@@ -77,11 +81,16 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
   }, [draft, changes, srv]);
 
   const setMerchant = (code: string) => {
-    setMerchantState(code); setKw([]);
+    setMerchantState(code); setKw([]); setUnmatched([]);
     try { if (srv?.user.role === 'admin') localStorage.setItem('aibot_panel_merchant_' + srv.user.username, code); } catch { /* ignore */ }
     loadKeywordsFor(code).catch(() => onToast('Could not load keywords'));
   };
 
+  const reloadUnmatched = async () => { setUnmatched(await api<UnmatchedRow[]>('/api/admin/unmatched?merchant=' + encodeURIComponent(merchant)).catch(() => [])); };
+  const resolveUnmatched = async (texts: string[], resolution: 'added' | 'ignored' | null) => {
+    await api('/api/admin/unmatched/resolve', { merchant, texts, resolution });
+    await reloadUnmatched();
+  };
   const ignoreWord = (w: string) => { setIgnored((s) => new Set(s).add(w)); api('/api/admin/keywords/ignore', { merchant, words: [w], ignored: true }).catch(() => onToast('Could not save that')); };
   const unignoreWord = (w: string) => { setIgnored((s) => { const n = new Set(s); n.delete(w); return n; }); api('/api/admin/keywords/ignore', { merchant, words: [w], ignored: false }).catch(() => onToast('Could not save that')); };
 
@@ -99,12 +108,12 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
       me: srv.user, isAdmin: srv.user.role === 'admin', ver: srv.versions[merchant] ?? 0, sharedVer: srv.sharedVer, merchants: srv.merchants, ai: srv.ai, history: srv.history,
       merchant, M, setMerchant, adv, setAdv, draft, changes, edit,
       discard: () => { if (confirm('Throw away all unpublished changes?')) { clearSaved(); load({ merchant }).catch((e: Error) => onToast(e.message)); } },
-      kw, kwMap, ignored, reloadKeywords: () => loadKeywordsFor(merchant), ignoreWord, unignoreWord,
+      kw, kwMap, ignored, reloadKeywords: () => loadKeywordsFor(merchant), ignoreWord, unignoreWord, unmatched, reloadUnmatched, resolveUnmatched,
       status: (w) => kwStatus(draft, merchant, w), typeOf: (w) => classify(draft, merchant, kwMap, w),
       tests, testsRun, runTests, reloadAll: async () => { clearSaved(); await load({ merchant }); }, toast: onToast,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [srv, draft, changes, merchant, adv, kw, kwMap, ignored, tests, testsRun, edit, runTests]);
+  }, [srv, draft, changes, merchant, adv, kw, kwMap, ignored, unmatched, tests, testsRun, edit, runTests]);
 
   if (error) return <div className="app"><div className="card"><h2>Cannot reach the bot server</h2><div className="sub">{error}. Start it with <span className="mono">npm run dev</span> and refresh this page.</div></div></div>;
   if (!value) return null;

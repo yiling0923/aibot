@@ -49,6 +49,20 @@ async function seedPanelSamples(c: PoolConnection, dbs: Record<string, string>) 
       const mm = (await c.query<ResultSetHeader>(`INSERT INTO ${D('chat_messages')}(session_id,role,text) VALUES(?,?,?)`, [session, 'customer', text]))[0].insertId;
       await c.query(`INSERT INTO ${D('bot_decisions')}(message_id,decision,why,created_at) VALUES(?,?,?,?)`, [mm, decision, why, ago(when)]);
     };
+    // a fortnight of fake traffic, so the Report screen has something to show on a fresh install
+    const kbIds = (await c.query<RowDataPacket[]>(`SELECT id FROM ${D('kb_entries')} ORDER BY id`))[0].map((r) => Number(r.id));
+    const mix: [string, number][] = [['ANSWER', 46], ['CHOICE', 9], ['SMALLTALK', 8], ['ACCOUNT', 7], ['AMOUNT', 4], ['REASK', 9], ['HANDOFF', 11], ['ABUSE', 2], ['REFUSE', 1], ['CLARIFY', 3]];
+    const pickDecision = (n: number) => { let t = n % 100; for (const [d, w] of mix) { if (t < w) return d; t -= w; } return 'ANSWER'; };
+    for (let day = 0; day < 14; day++) {
+      const count = 14 + (hash(code + day) % 14);
+      for (let i = 0; i < count; i++) {
+        const decision = pickDecision(hash(code + day + 'd' + i));
+        const matched = decision === 'ANSWER' && kbIds.length ? kbIds[(hash(code + 'k' + i + day) % Math.min(kbIds.length, 6))] : null;
+        const mm = (await c.query<ResultSetHeader>(`INSERT INTO ${D('chat_messages')}(session_id,role,text) VALUES(?,?,?)`, [session, 'customer', `sample message ${day}-${i}`]))[0].insertId;
+        const at = new Date(Date.now() - day * 86400000 - (hash(code + day + i) % 40000) * 1000);
+        await c.query(`INSERT INTO ${D('bot_decisions')}(message_id,decision,matched_kb_id,why,created_at) VALUES(?,?,?,?,?)`, [mm, decision, matched, 'sample', at]);
+      }
+    }
     for (const [text, , why, when] of panel.review.handoff[code] ?? []) await add(text, 'HANDOFF', why, when);
     for (const [text, why, when, outcome] of panel.review.abuse[code] ?? []) await add(text, 'ABUSE', `${why} || ${outcome}`, when);
   }

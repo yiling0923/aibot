@@ -48,11 +48,11 @@ export class Store {
   }
 
   /** Writes the conversation log (used for review and, later, for LiveChat). */
-  async logTurn(p: { merchant: string; sessionKey: string; customerRef: string | null; text: string; lang: Lang; decision: string; confidence: number; reply: string; matchedKbId: number | null; why?: string }) {
+  async logTurn(p: { merchant: string; sessionKey: string; customerRef: string | null; text: string; lang: Lang; decision: string; confidence: number; reply: string; matchedKbId: number | null; why?: string; source?: 'live' | 'test' }) {
     try {
       const S = await this.t(p.merchant, 'chat_sessions'); if (!S) return;
       const M = (await this.t(p.merchant, 'chat_messages'))!, D = (await this.t(p.merchant, 'bot_decisions'))!;
-      await this.pool.query(`INSERT INTO ${S}(livechat_chat_id, customer_ref, language, status) VALUES(?,?,?,?) ON DUPLICATE KEY UPDATE language = VALUES(language)`, [p.sessionKey, p.customerRef, p.lang, 'open']);
+      await this.pool.query(`INSERT INTO ${S}(livechat_chat_id, customer_ref, language, status, source) VALUES(?,?,?,?,?) ON DUPLICATE KEY UPDATE language = VALUES(language)`, [p.sessionKey, p.customerRef, p.lang, 'open', p.source ?? 'live']);
       const [s] = await this.pool.query<RowDataPacket[]>(`SELECT id FROM ${S} WHERE livechat_chat_id = ?`, [p.sessionKey]);
       const [m] = await this.pool.query<ResultSetHeader>(`INSERT INTO ${M}(session_id, role, text) VALUES(?,?,?)`, [s[0].id, 'customer', p.text]);
       await this.pool.query(`INSERT INTO ${D}(message_id, decision, matched_kb_id, confidence, reply_text, why) VALUES(?,?,?,?,?,?)`,
