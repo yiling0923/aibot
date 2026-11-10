@@ -15,7 +15,10 @@ const writable = (dir) => {
 const tryRemove = (p) => { try { fs.rmSync(p, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 }); return true; } catch { return false; } };
 
 tryRemove(dist);
-if (writable(dist) && writable(path.join(dist, 'assets'))) {
+// Something may be left that cannot be deleted (a file Windows will not let this person touch). The new build would then fail on
+// the file with the same name, so a folder that is not empty after clearing is not usable.
+const leftOver = () => { try { return fs.existsSync(dist) && fs.readdirSync(dist).length > 0; } catch { return true; } };
+if (!leftOver() && writable(dist) && writable(path.join(dist, 'assets'))) {
   tryRemove(marker);                                                                      // the normal folder works again
   for (const f of fs.readdirSync(web)) if (/^dist-\d+$/.test(f)) tryRemove(path.join(web, f));   // leftovers of an earlier fallback
 } else {
