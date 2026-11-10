@@ -20,10 +20,8 @@ How the system works, what it is built with, how the database is designed, and h
 10. Screens and layout
 11. API addresses
 12. Folders and files
-13. Settings (.env)
-14. How to run it
-15. Testing and quality
-16. What is not finished
+13. How to run it
+14. What is not finished
 
 ---
 
@@ -99,10 +97,7 @@ Dashed boxes in the picture are not connected yet or are optional.
 - **MySQL** was chosen because the existing tools (XAMPP) already include it.
 - **The engine has no AI and no network**, so it is fast, free to run, predictable, and can be tested with thousands of sample messages.
 
-**Size of the code**
-
-| Area | Lines |
-|---|---|
+---|---|
 | Bot engine | about 380 |
 | Reply builder and texts | about 370 |
 | AI layer | about 190 |
@@ -280,7 +275,7 @@ The server enforces this; hiding a button is not what protects the data (see sec
 | **Roll back** | Staff: their own merchant. Admin: any merchant and the shared word lists. Reload is admin only. |
 | **Version history** | Records who published each version. |
 
-Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_TOKEN_SECRET` to long random values, turn `DEV_TOOLS` off, and put the server behind HTTPS (see section 16).
+Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_TOKEN_SECRET` to long random values, turn `DEV_TOOLS` off, and put the server behind HTTPS (see section 14).
 
 ---
 
@@ -856,28 +851,11 @@ aibot/
 
 ---
 
-## 13. Settings (.env)
-
-| Setting | Meaning |
-|---|---|
-| `DATABASE_URL` | Where the main database is, for example `mysql://bot:bot@localhost:3306/livechat_bot`. Use the port of your own MySQL (here 3310). The merchant databases are found on the same server. |
-| `PORT` | Port of the web server (3000) |
-| `TEST_DATABASE_URL` | A separate database for tests (and the merchant databases that start with `livechat_bot_test_m_`). They are wiped on every test run. |
-| `SESSION_SECRET` | Signs the login cookie. Use a long random value. |
-| `CUSTOMER_TOKEN_SECRET` | Shared with the merchant website; signs the customer token. |
-| `DEV_TOOLS` | `on` shows the fake-customer buttons; set `off` for real use |
-| `ANTHROPIC_API_KEY`, `CLAUDE_MODEL` | Claude (key, and model, default `claude-haiku-5-5`) |
-| `OPENAI_API_KEY`, `OPENAI_MODEL` | ChatGPT (key, and the model name; empty keeps ChatGPT off) |
-| `AI_MAX_CALLS_PER_HOUR` | Cost limit for AI calls (600) |
-| `LIVECHAT_*` | For the future LiveChat connection (not used yet) |
-
----
-
-## 14. How to run it
+## 13. How to run it
 
 1. Install **Node.js 20 or newer** and **MySQL 8** (or XAMPP).
 2. Create the databases and the `bot` user once, as the MySQL admin: `mysql -u root -p < db/setup.sql` (in Windows PowerShell, which does not accept `<`, use `mysql -u root -p -e "source db/setup.sql"` from the project folder). Run it again after an update that adds permissions: it is safe to repeat.
-3. Copy `.env.example` to `.env`.
+3. Copy `.env.example` to `.env`. This file holds the settings: the database address, the secrets that sign logins and customer tokens, and the AI keys. Each setting is explained in `.env.example`.
 4. `npm install`
 5. `npm run db:migrate` (creates the tables) and `npm run db:seed` (loads the 6 fake merchants, 68 entries and demo logins).
 6. `npm test` runs the automatic tests.
@@ -889,24 +867,7 @@ Useful commands: `npm run eval:report` (lists sample messages the bot gets wrong
 
 ---
 
-## 15. Testing and quality
-
-- **2,027 automatic tests**, including **1,922 sample customer messages** in English, Malay and Chinese (slang, short forms and typos) across six merchants, each with the expected result.
-- Tests also cover the database, the control panel API, login and the merchant lock (with forged requests), merchants and logins, the AI layer (on a fake network), and the reply builder.
-- `npm run eval:report` runs all sample messages and prints every one that gives a different result than expected.
-
-**How accurate is the bot?** The sample messages were used to tune the bot, so passing them proves little by itself. To get an honest number, two fresh batches of messages written *after* tuning were run once, before any fix:
-
-| Fresh batch | First-try result |
-|---|---|
-| 49 realistic, messy messages | **82%** |
-| 35 new messages, after the first round of fixes | **91%** |
-
-Every miss was then fixed and kept as a test. A fair expectation for messages the bot has never seen is **about 85 to 90%**. Real customer messages from the live chat are the best way to raise it further.
-
----
-
-## 16. What is not finished
+## 14. What is not finished
 
 | Item | State |
 |---|---|
