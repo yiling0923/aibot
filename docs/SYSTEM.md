@@ -18,10 +18,7 @@ How the system works, what it is built with, how the database is designed, and h
 8. Login and security
 9. Database design
 10. Screens and layout
-11. API addresses
-12. Folders and files
-13. How to run it
-14. What is not finished
+11. What is not finished
 
 ---
 
@@ -275,7 +272,7 @@ The server enforces this; hiding a button is not what protects the data (see sec
 | **Roll back** | Staff: their own merchant. Admin: any merchant and the shared word lists. Reload is admin only. |
 | **Version history** | Records who published each version. |
 
-Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_TOKEN_SECRET` to long random values, turn `DEV_TOOLS` off, and put the server behind HTTPS (see section 14).
+Before real use: change the demo passwords, set `SESSION_SECRET` and `CUSTOMER_TOKEN_SECRET` to long random values, turn `DEV_TOOLS` off, and put the server behind HTTPS (see section 11).
 
 ---
 
@@ -784,90 +781,7 @@ The Test chat tab shows the real chat page inside the panel, running on the draf
 
 ---
 
-## 11. API addresses
-
-All calls need a valid login cookie unless marked open. Data is sent as JSON.
-
-| Address | What it does |
-|---|---|
-| `GET /health` (open) | Is the server and database up |
-| `POST /api/auth/login` (open) | Sign in |
-| `POST /api/auth/logout`, `GET /api/auth/me`, `POST /api/auth/password` | Sign out, who am I, change own password (no screen uses the last one now; an admin resets passwords from the logins list) |
-| `GET /api/merchants` | Merchants the person may use |
-| `GET /api/dev/customers` | Fake customers with signed tokens (test only) |
-| `POST /api/chat/start`, `/api/chat/message`, `/api/chat/pick` | Start a chat, send a message, tap a button |
-| `POST /api/analyze` | Shows what the engine decides for a message |
-| `GET /api/keywords/summary` | How many words and unclear messages were saved |
-| `POST /api/reload` | Reload the knowledge (admin) |
-| `GET /api/admin/state` | Everything the panel needs |
-| `POST /api/admin/tests` | Run the sample messages on a draft |
-| `POST /api/admin/publish`, `/api/admin/rollback` | Publish (a new version for each merchant that changed), roll back one merchant or the shared lists |
-| `POST /api/admin/draft` | Build a temporary bot from a draft (Test chat) |
-| `GET /api/admin/keywords`, `/keywords/samples`, `/ranking` | Keyword list, example messages, weekly ranking |
-| `GET /api/admin/report` | The report: counts by decision, per day, answers used most (last 7 or 30 days, with or without the test chat) |
-| `GET /api/admin/unmatched`, `POST /api/admin/unmatched/resolve` | Messages the bot did not understand; mark them as added, ignored, or open again |
-| `POST /api/admin/keywords/ignore`, `/keywords/describe` | Ignore a word, describe words with AI |
-| `POST /api/admin/translate` | Translate an answer and its examples into another language (needs the AI) |
-| `GET /api/admin/people` (admin) | Merchants and logins |
-| `POST /api/admin/merchants`, `/users`, `/users/password`, `/users/delete` (admin) | Add a merchant, add a login, reset a password, remove a login |
-
----
-
-## 12. Folders and files
-
-```
-aibot/
-  web/                the front end (React + TypeScript), built by Vite into web/dist
-    index.html          the one page that loads the app
-    src/main.tsx        the routes: /login, /chat, /admin/...
-    src/pages/          Login.tsx, Chat.tsx, Brain.tsx (what the bot did panel)
-    src/admin/          Admin.tsx (menu, top bar, publish), store.tsx (draft and loaded data),
-                        model.ts (word rules, import checker), screens/ (one file per screen)
-    src/lib/api.ts      calls to the bot server
-    src/styles/         admin.css, chat.css, login.css
-  vite.config.ts        build settings (dev server on port 5173, passes /api to the bot)
-  src/
-    server/             app.ts (all routes and the sign-in check), index.ts (starts it)
-    engine/             engine.ts (the decision rules), types, seed adapter
-    bot/                responder.ts (reply builder), texts.ts (3 languages x 2 tones),
-                        token.ts (customer token), merchantApi.ts (fake account data), store.ts
-    ai/                 claude.ts, openai.ts, validator.ts (fact checker), index.ts
-    admin/              routes.ts, snapshot.ts (read and write the knowledge of every merchant),
-                        versions.ts (each merchant's own publish history), scope.ts (what staff may see
-                        and change), people.ts (merchants and logins)
-    auth/               passwords.ts, session.ts, users.ts, addUser.ts
-    db/                 pool, migrate, seed, loadKnowledge, tenants.ts (finds each merchant's database),
-                        steps/ (one-time data moves between database layouts)
-    config.ts           reads .env
-  db/migrations/        001 to 008 for the main database (008 moves old data into merchant databases)
-  db/merchant/          the tables every merchant database gets
-  db/setup.sql          creates the databases and the bot user (run once as the MySQL admin)
-  data/                 fake merchants, entries, accounts and sample messages (JSON)
-  scripts/              evalReport.ts (lists wrong sample messages), cleanWeb.mjs (clears the old front end build; if web/dist cannot be written on Windows it chooses a new folder)
-  test/                 automatic tests
-  docs/                 this document
-  design/               the original mockups
-```
-
----
-
-## 13. How to run it
-
-1. Install **Node.js 20 or newer** and **MySQL 8** (or XAMPP).
-2. Create the databases and the `bot` user once, as the MySQL admin: `mysql -u root -p < db/setup.sql` (in Windows PowerShell, which does not accept `<`, use `mysql -u root -p -e "source db/setup.sql"` from the project folder). Run it again after an update that adds permissions: it is safe to repeat.
-3. Copy `.env.example` to `.env`. This file holds the settings: the database address, the secrets that sign logins and customer tokens, and the AI keys. Each setting is explained in `.env.example`.
-4. `npm install`
-5. `npm run db:migrate` (creates the tables) and `npm run db:seed` (loads the 6 fake merchants, 68 entries and demo logins).
-6. `npm test` runs the automatic tests.
-7. `npm run dev` builds the front end and starts the bot. Open **http://localhost:3000** and sign in.
-
-Demo logins: `admin` / `admin123` (everything), and `luckypay`, `swiftwallet`, `megaplay`, `betking`, `cashpoint`, `gamehub` / `demo123` (own merchant only). Change these before real use.
-
-Useful commands: `npm run eval:report` (lists sample messages the bot gets wrong), `npm run user:add -- <name> <password> staff <MERCHANT_CODE>` (add a login), `npm run db:reset` (wipes and reloads the fake data).
-
----
-
-## 14. What is not finished
+## 11. What is not finished
 
 | Item | State |
 |---|---|
