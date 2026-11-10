@@ -31,7 +31,9 @@ function whyOf(tr: Record<string, unknown>): string {
 
 const PUBLIC_API = new Set(['/api/auth/login', '/health']);
 /** Where the built front end is (npm run build). */
-const WEB = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web/dist');
+/** The built front end: web/dist, or the folder named in web/.outdir when the build could not use web/dist (see scripts/cleanWeb.mjs). */
+const webDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../web');
+const WEB = path.join(webDir, (() => { try { const n = fs.readFileSync(path.join(webDir, '.outdir'), 'utf8').trim(); return /^dist(-\d+)?$/.test(n) ? n : 'dist'; } catch { return 'dist'; } })());
 /** Pages that need a login. The login page and the built files (/assets) stay open. */
 const isSignedInPage = (route: string) => route === '/' || route === '/admin' || route.startsWith('/admin/') || route === '/chat';
 

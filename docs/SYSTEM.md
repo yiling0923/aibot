@@ -848,7 +848,7 @@ aibot/
   db/merchant/          the tables every merchant database gets
   db/setup.sql          creates the databases and the bot user (run once as the MySQL admin)
   data/                 fake merchants, entries, accounts and sample messages (JSON)
-  scripts/              evalReport.ts (lists wrong sample messages), cleanWeb.mjs (clears the old front end build)
+  scripts/              evalReport.ts (lists wrong sample messages), cleanWeb.mjs (clears the old front end build; if web/dist cannot be written on Windows it chooses a new folder)
   test/                 automatic tests
   docs/                 this document
   design/               the original mockups

@@ -35,6 +35,7 @@ npm run dev                       # builds the front end, then starts the bot on
 ```
 
 The front end (React + TypeScript + Vite) lives in `web/`. `npm run build` builds it into `web/dist`, which the bot serves.
+If Windows does not allow writing to `web/dist` (for example it was once built from an Administrator window), the build picks a new folder by itself (`web/dist-<number>`, remembered in `web/.outdir`) and the server uses it. Nothing to fix by hand. Run `npm run dev` from a normal PowerShell opened in the project folder.
 While you work on the screens, run `npm run dev:web` in a second terminal for instant reloads on http://localhost:5173 (it passes API calls to the bot on port 3000).
 
 Open **http://localhost:3000** and sign in. The control panel is at `/admin`; the test chat page is `/chat` (and the **Test chat** screen inside the panel): pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
