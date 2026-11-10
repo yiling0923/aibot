@@ -11,6 +11,9 @@ const chosen = (() => { try { const n = fs.readFileSync(fileURLToPath(new URL('.
 export default defineConfig({
   root: 'web',
   plugins: [react()],
+  // A different number in every build, so the built files get new names each time (a file name that a Windows virus scanner or
+  // folder lock once blocked can then never be hit again).
+  define: { __BUILD_ID__: JSON.stringify(String(Date.now())) },
   build: { outDir: chosen, emptyOutDir: false, sourcemap: false },
   server: { port: 5173, proxy: { '/api': 'http://localhost:3000', '/health': 'http://localhost:3000' } },
 });

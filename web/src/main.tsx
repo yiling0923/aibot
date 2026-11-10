@@ -7,6 +7,9 @@ const Login = lazy(() => import('./pages/Login'));
 const Chat = lazy(() => import('./pages/Chat'));
 const Admin = lazy(() => import('./admin/Admin'));
 
+declare const __BUILD_ID__: string;
+document.documentElement.dataset.build = typeof __BUILD_ID__ === 'string' ? __BUILD_ID__ : 'dev';
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <BrowserRouter>
