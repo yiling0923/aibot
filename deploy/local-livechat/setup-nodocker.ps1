@@ -22,6 +22,7 @@ param(
   [string]$Merchant = 'MERCH_A',
   [string]$BotUrl = 'http://localhost:3000',
   [string]$MySqlZip = '',
+  [string]$MySqlDir = '',   # an already unzipped MySQL 8 folder (the one that holds bin\mysqld.exe)
   [string]$GoZip = '',
   [switch]$Stop
 )
@@ -35,7 +36,8 @@ New-Item -ItemType Directory -Force $ToolsDir, $bin, $logs | Out-Null
 
 function Stop-Mine {
   foreach ($n in 'lc-api', 'lc-worker') { Get-Process $n -ErrorAction SilentlyContinue | Stop-Process -Force }
-  $mysqlAdmin = Get-ChildItem $ToolsDir -Recurse -Filter mysqladmin.exe -ErrorAction SilentlyContinue | Select-Object -First 1
+  $roots = @($ToolsDir); if ($MySqlDir) { $roots += $MySqlDir }
+  $mysqlAdmin = $roots | ForEach-Object { Get-ChildItem $_ -Recurse -Filter mysqladmin.exe -ErrorAction SilentlyContinue } | Select-Object -First 1
   if ($mysqlAdmin) { & $mysqlAdmin.FullName -uroot -h127.0.0.1 -P $MySqlPort shutdown 2>$null }
 }
 if ($Stop) { Stop-Mine; Write-Host 'LiveChat and its MySQL are stopped.'; return }
@@ -78,8 +80,13 @@ if (-not $goExe) {
 Write-Host "   using $goExe"
 
 Write-Host '3/7 MySQL 8 (own copy, port ' $MySqlPort ')...'
-$mysqlRoot = Join-Path $ToolsDir "mysql-$MySqlVersion-winx64"
-Get-Zip @("https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-$MySqlVersion-winx64.zip", "https://downloads.mysql.com/archives/get/p/23/file/mysql-$MySqlVersion-winx64.zip") $ToolsDir "mysql-$MySqlVersion-winx64\bin\mysqld.exe" $MySqlZip
+if ($MySqlDir) {
+  if (-not (Test-Path (Join-Path $MySqlDir 'bin\mysqld.exe'))) { throw "No bin\mysqld.exe in $MySqlDir. Point -MySqlDir at the folder that contains the bin folder." }
+  $mysqlRoot = (Resolve-Path $MySqlDir).Path
+} else {
+  $mysqlRoot = Join-Path $ToolsDir "mysql-$MySqlVersion-winx64"
+  Get-Zip @("https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-$MySqlVersion-winx64.zip", "https://downloads.mysql.com/archives/get/p/23/file/mysql-$MySqlVersion-winx64.zip") $ToolsDir "mysql-$MySqlVersion-winx64\bin\mysqld.exe" $MySqlZip
+}
 $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $mysqlRoot 'bin\mysql.exe'; $mysqladmin = Join-Path $mysqlRoot 'bin\mysqladmin.exe'
 $data = Join-Path $ToolsDir 'mysql-data'
 $ini = Join-Path $ToolsDir 'my.ini'
