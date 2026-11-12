@@ -38,6 +38,16 @@ describe.skipIf(!reachable)('the merchant page (needs TEST_DATABASE_URL)', () =>
   });
   afterAll(async () => { await app?.close(); await pool?.end(); });
 
+  it('updates the database by itself when the server starts, so a new version never meets a missing table', async () => {
+    for (const t of ['ai_usage', 'ai_prices', 'billing_settings']) await pool!.query(`DROP TABLE ${t}`);        // everything migration 011 makes
+    await pool!.query("DELETE FROM schema_migrations WHERE name = '011_ai_usage.sql'");
+    await pool!.query('DROP TABLE merchant_ai_keys'); await pool!.query("DELETE FROM schema_migrations WHERE name = '010_merchant_ai_keys.sql'");
+    const again = await buildApp({ pool: pool!, logger: false });
+    expect((await rows("SELECT table_name FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('ai_usage','merchant_ai_keys')")).length).toBe(2);
+    expect((await again.inject({ method: 'GET', url: '/api/admin/merchants/MERCH_A/connection', headers: { cookie: admin } })).statusCode).toBe(200);
+    await again.close();
+  });
+
   it('is for admins only, and unknown merchants are not found', async () => {
     expect((await as(staff, 'GET', '/api/admin/merchants/MERCH_A/connection')).statusCode).toBe(403);
     expect((await as(staff, 'POST', '/api/admin/merchants/MERCH_A/ai-key', { provider: 'anthropic', key: 'sk-ant-abcdefghijkl' })).statusCode).toBe(403);

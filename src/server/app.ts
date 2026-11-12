@@ -15,6 +15,7 @@ import { adminRoutes } from '../admin/routes';
 import { ensureVersions } from '../admin/versions';
 import { connectorRoutes } from '../connector/routes';
 import { Tenants } from '../db/tenants';
+import { migrate } from '../db/migrate';
 import { createRoutedAi, type AiService } from '../ai';
 import { MerchantAiKeys } from '../ai/merchantKeys';
 import { UsageRecorder } from '../ai/usage';
@@ -47,6 +48,8 @@ export interface AppOptions { pool?: Pool; logger?: boolean; ai?: AiService }
 export async function buildApp(opts: AppOptions = {}) {
   const pool = opts.pool ?? createPool();
   const app = Fastify({ logger: opts.logger ?? true });
+  // Bring the databases up to date first, so a new version never meets a missing table (the same as `npm run db:migrate`).
+  await migrate(pool).then((a) => { if (a.length) app.log.info(`updated the databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the databases (run npm run db:migrate)'));
   // Claude and ChatGPT are optional: with no keys set, every AI step is off and the bot answers from its own rules.
   // A merchant that saved its own key on the merchant page uses that key; every other merchant uses the shared one from .env.
   const aiKeys = new MerchantAiKeys(pool); await aiKeys.refresh();
