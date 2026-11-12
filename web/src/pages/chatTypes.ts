@@ -28,7 +28,7 @@ export type Trace = MessageTrace | PickTrace | SkippedTrace;
 
 export interface Button { kind: string; key: string; label: string; amt?: number }
 export interface Turn {
-  messages: { kind: string; text: string }[]; buttons: Button[] | null; locked: boolean; status: string | null; trace: Trace;
+  messages: { kind: string; text: string }[]; buttons: Button[] | null; hint?: string | null; locked: boolean; status: string | null; trace: Trace;
 }
 export interface TurnResponse { closed: boolean; handed: boolean; turn: Turn | null; saved?: { fresh: string[]; unmatched: boolean } }
 export interface StartResponse {

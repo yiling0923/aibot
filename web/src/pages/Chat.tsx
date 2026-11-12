@@ -69,6 +69,7 @@ export default function Chat() {
         ...it.filter((i) => i.t !== 'typing'),
         ...t.messages.map((m): Item => ({ t: 'msg', kind: m.kind, text: m.text })),
         ...(t.buttons ? [{ t: 'opts', buttons: t.buttons, lang } as Item] : []),
+        ...(t.hint ? [{ t: 'msg', kind: 'bot', text: t.hint } as Item] : []),
       ]);
       if (t.status) setStatus(t.status);
       if (t.locked) setLocked(true);

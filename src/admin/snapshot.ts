@@ -63,6 +63,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     snap.settings[t.code] = {
       tone: st.tone, handoff_group: handoff.get(t.code) ?? null, answer: Number(st.answer_threshold), clarify: Number(st.clarify_threshold), abuse_close_after: st.abuse_close_after,
       kind: { en: '', ms: '', zh: '', ...asJson<Record<string, string>>(st.kind_reply, {}) }, closing: asJson(st.closing_msg, {}), handoff: asJson(st.handoff_msg, {}),
+      max_choices: Number(st.max_choices ?? 3), more_help_on: !!(st.more_help_on ?? 1), more_help: { en: '', ms: '', zh: '', ...asJson<Record<string, string>>(st.more_help_msg, {}) },
       tools: Object.fromEntries(TOOLS.map((k) => [k, k.endsWith('_status') ? true : on.has(k)])),
     };
   }
@@ -105,8 +106,8 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScop
       await c.query('UPDATE merchants SET handoff_group_id = ? WHERE id = ?', [s.handoff_group, t.id]);
       await c.query(`DELETE FROM ${D('aliases')}`);
       await bulk(D('aliases'), 'language,variant,canonical', (snap.mAliases[t.code] ?? []).map((a) => [a.language, a.variant, a.canonical]));
-      await c.query(`UPDATE ${D('settings')} SET tone=?, answer_threshold=?, clarify_threshold=?, abuse_close_after=?, kind_reply=?, closing_msg=?, handoff_msg=? WHERE id = 1`,
-        [s.tone, s.answer, s.clarify, s.abuse_close_after, JSON.stringify(s.kind), JSON.stringify(s.closing), JSON.stringify(s.handoff)]);
+      await c.query(`UPDATE ${D('settings')} SET tone=?, answer_threshold=?, clarify_threshold=?, abuse_close_after=?, kind_reply=?, closing_msg=?, handoff_msg=?, max_choices=?, more_help_on=?, more_help_msg=? WHERE id = 1`,
+        [s.tone, s.answer, s.clarify, s.abuse_close_after, JSON.stringify(s.kind), JSON.stringify(s.closing), JSON.stringify(s.handoff), Math.max(1, Math.min(3, Math.round(Number(s.max_choices) || 3))), s.more_help_on ? 1 : 0, JSON.stringify(s.more_help ?? {})]);
       for (const [tool, enabled] of Object.entries(s.tools))
         await c.query(`INSERT INTO ${D('tools')}(tool,enabled) VALUES(?,?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled)`, [tool, enabled]);
 
@@ -145,7 +146,7 @@ export function knowledgeFromSnapshot(snap: Snapshot, merchants: MerchantMeta[],
     const s = snap.settings[m.code];
     return {
       code: m.code, name: m.name, tone: s.tone, defaultLanguage: m.default_language, livechatGroupId: m.livechat_group_id, handoffGroupId: s.handoff_group,
-      closing: s.closing, handoff: s.handoff, abuseCloseAfter: s.abuse_close_after, answerThreshold: s.answer, clarifyThreshold: s.clarify, kindReply: s.kind,
+      closing: s.closing, handoff: s.handoff, maxChoices: s.max_choices, moreHelpOn: s.more_help_on, moreHelp: s.more_help, abuseCloseAfter: s.abuse_close_after, answerThreshold: s.answer, clarifyThreshold: s.clarify, kindReply: s.kind,
       aliases: snap.mAliases[m.code] ?? [], tools: Object.entries(s.tools).filter(([, on]) => on).map(([k]) => k).sort(), limits: limits[m.code] ?? {},
     };
   });

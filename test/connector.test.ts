@@ -102,6 +102,8 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     const first = (await call(keyA, { question: 'dep' })).json();
     expect(first.decision).toBe('clarify'); expect(first.choices.length).toBeGreaterThanOrEqual(3);
     expect(first.answer).toMatch(/1\. .+\n2\. .+\n3\. /);
+    expect(first.choices.filter((c: { value: string }) => !c.value.startsWith('agent')).length).toBeLessThanOrEqual(3);   // at most 3 choices, the agent is extra
+    expect(first.answer.endsWith('If you need other help, you can contact an agent.')).toBe(true);                       // the line comes after the list
     const second = (await call(keyA, { question: '2', session_id: first.session_id })).json();
     expect(second.decision).toBe('answer'); expect(second.answer).toContain('5 minutes');            // "Deposit time"
     const again = (await call(keyA, { question: 'dep' })).json();

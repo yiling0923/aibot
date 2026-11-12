@@ -70,6 +70,7 @@ Press **Test AI Chat**. A reply with numbered choices means the link works.
 
 - Sends back `answer`, `confidence`, `should_escalate`, `should_close`, `close_message`, `session_id`.
 - LiveChat has no buttons, so choices are written into the answer as a numbered list. The next message may be `2`, "the second one", or words from the choice.
+- At most **3 choices** are offered at once (the merchant may lower it; "Talk to an agent" is added on top and not counted). A line such as "If you need other help, you can contact an agent." is written after the list. Each merchant can switch it off or reword it per language in the panel under Settings.
 - Chat memory lives in the merchant's own database, so a restart loses nothing.
 - The same request sent twice within 10 minutes gets the same answer and the chat moves only once.
 - If the bot needs more than `ASK_TIMEOUT_MS` (default 8 seconds) or fails, it answers with the hand-off text and `should_escalate: true`; the customer is never left in silence.
@@ -84,4 +85,4 @@ Press **Test AI Chat**. A reply with numbered choices means the link works.
 
 ## Still to do on the bot side
 
-Maximum 3 choices plus an "if you need more help you can contact an agent" sentence, Vietnamese / Thai / Filipino, hand-off number sync, topic flow view, per-merchant settings and keys page, usage and billing page.
+Vietnamese / Thai / Filipino, hand-off number sync, topic flow view, per-merchant settings and keys page, usage and billing page.

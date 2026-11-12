@@ -36,7 +36,8 @@ export function effectiveSnapshot(user: SessionUser, current: Snapshot, incoming
   const inc = incoming.settings?.[m], cur = out.settings[m];
   if (inc && cur) {
     if (inc.tone === 'friendly' || inc.tone === 'formal') cur.tone = inc.tone;
-    for (const k of ['kind', 'closing', 'handoff'] as const) if (inc[k] && typeof inc[k] === 'object') cur[k] = { ...cur[k], ...clone(inc[k]) };
+    if (typeof inc.more_help_on === 'boolean') cur.more_help_on = inc.more_help_on;   // staff may switch the extra line on or off and reword it; the number of choices is admin only
+    for (const k of ['kind', 'closing', 'handoff', 'more_help'] as const) if (inc[k] && typeof inc[k] === 'object') cur[k] = { ...cur[k], ...clone(inc[k]) };
   }
   return out;
 }

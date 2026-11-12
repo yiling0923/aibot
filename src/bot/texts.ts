@@ -29,6 +29,11 @@ export const fmtAmt=n=>'RM'+Number(n).toLocaleString('en-US');
 export const TOPIC_LABEL={turnover:{en:'turnover',ms:'turnover',zh:'流水'},transfer:{en:'transfers',ms:'pindahan',zh:'转账'},refund:{en:'refunds',ms:'bayaran balik',zh:'退款'},register:{en:'registration',ms:'pendaftaran',zh:'注册'},deposit:{en:'deposits',ms:'deposit',zh:'存款'},withdraw:{en:'withdrawals',ms:'pengeluaran',zh:'提款'},password:{en:'your password',ms:'kata laluan',zh:'密码'},verify:{en:'verification',ms:'pengesahan akaun',zh:'账号验证'},customer_service:{en:'customer service',ms:'khidmat pelanggan',zh:'客服'},promotion:{en:'promotions',ms:'promosi',zh:'优惠'},bank_account:{en:'your bank account',ms:'akaun bank',zh:'银行账户'}};
 export const CHOICE_TXT={en:t=>`Sure! What would you like to know about ${t}?`,ms:t=>`Baik! Apa yang anda ingin tahu tentang ${t}?`,zh:t=>`好的！您想了解${t}的哪方面？`};
 export const PICK_TXT={en:'Which one do you need help with?',ms:'Yang mana satu yang anda perlukan?',zh:'请问您需要哪方面的帮助？'};
+export const MORE_HELP = {
+  en: 'If you need other help, you can contact an agent.',
+  ms: 'Jika anda perlukan bantuan lain, anda boleh hubungi ejen.',
+  zh: '如需其他帮助，可以联系人工客服。',
+} as const;
 export const AGENT={en:'Talk to an agent',ms:'Cakap dengan ejen',zh:'转人工客服'};
 export const SMALL_REPLY={
  friendly:{greeting:{en:'Hi there! 😊 How can I help you today?',ms:'Hai! 😊 Apa yang boleh saya bantu hari ini?',zh:'您好！😊 请问有什么可以帮您？'},

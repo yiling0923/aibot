@@ -62,10 +62,12 @@ describe.skipIf(!reachable)('control panel data (needs TEST_DATABASE_URL)', () =
   it('settings, tools, keywords and fillers are saved', async () => {
     const next = await readSnapshot(pool!);
     next.settings.MERCH_A.tone = 'formal'; next.settings.MERCH_A.abuse_close_after = 1; next.settings.MERCH_A.tools.points = false; next.settings.MERCH_A.handoff_group = 555;
+    next.settings.MERCH_A.max_choices = 2; next.settings.MERCH_A.more_help_on = false; next.settings.MERCH_A.more_help.ms = 'Perlukan bantuan lain? Hubungi ejen.';
     next.aliases.deposit.en!.push('topupz'); next.fillers.en = [...(next.fillers.en ?? []), 'hehehe']; next.mAliases.MERCH_A.push({ language: 'en', variant: 'cashin', canonical: 'deposit' });
     await writeSnapshot(pool!, next);
     const k = await loadKnowledge(pool!); const a = k.merchants.find((m) => m.code === 'MERCH_A')!;
     expect(a.tone).toBe('formal'); expect(a.abuseCloseAfter).toBe(1); expect(a.tools).not.toContain('points'); expect(a.handoffGroupId).toBe(555);
+    expect(a.maxChoices).toBe(2); expect(a.moreHelpOn).toBe(false); expect(a.moreHelp.ms).toBe('Perlukan bantuan lain? Hubungi ejen.');
     expect(k.globalAliases.deposit.en).toContain('topupz'); expect(k.fillers.en).toContain('hehehe');
     expect(new Engine(k).analyze('cashin how', 'MERCH_A').top.intent).toBe('deposit_how');
   });

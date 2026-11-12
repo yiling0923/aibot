@@ -37,7 +37,7 @@ export const merchantSig = (sl: MerchantSlice) => sig({
   kb: sl.kb.map((e) => ({ k: e.intent_key, c: e.category, t: e.topic, a: e.aspect || null, o: !!e.topic_optional, s: e.status,
     tr: Object.fromEntries(Object.entries(e.translations).filter(([, t]) => t && ((t.answer_text || '').trim() || (t.question_examples || []).length))) })).sort((a, b) => (a.k < b.k ? -1 : 1)),
   m: sl.mAliases.map((a) => `${a.language}|${a.variant}|${a.canonical}`).sort(),
-  s: { ...sl.settings, kind: texts(sl.settings?.kind), closing: texts(sl.settings?.closing), handoff: texts(sl.settings?.handoff) },
+  s: { ...sl.settings, kind: texts(sl.settings?.kind), closing: texts(sl.settings?.closing), handoff: texts(sl.settings?.handoff), more_help: texts(sl.settings?.more_help) },
 });
 export const sharedSig = (sl: SharedSlice) => sig({ a: words(sl.aliases), s: words(sl.aspects), t: words(sl.smalltalk), g: words(sl.guard), f: words(sl.fillers) });
 

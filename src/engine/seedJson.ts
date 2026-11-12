@@ -6,7 +6,7 @@ export function knowledgeFromSeed(seed: any, accounts: any): Knowledge {
   const merchants: MerchantCfg[] = seed.merchants.map((m: any) => ({
     code: m.code, name: m.name, tone: m.tone, defaultLanguage: m.default_language,
     livechatGroupId: m.livechat_group_id, handoffGroupId: m.handoff_group_id,
-    closing: m.settings.closing, handoff: m.settings.handoff, abuseCloseAfter: 3, answerThreshold: 0.72, clarifyThreshold: 0.45, kindReply: {},
+    closing: m.settings.closing, handoff: m.settings.handoff, maxChoices: 3, moreHelpOn: true, moreHelp: {}, abuseCloseAfter: 3, answerThreshold: 0.72, clarifyThreshold: 0.45, kindReply: {},
     aliases: (m.aliases as [string, string, string][]).map(([language, variant, canonical]) => ({ language, variant, canonical })),
     tools: ['deposit_status', 'withdraw_status', ...(tools[m.code] ?? [])],   // the two status tools are always on
     limits: Object.fromEntries(Object.entries(seed.limits?.[m.code] ?? {})) as MerchantCfg['limits'],

@@ -10,6 +10,7 @@ export interface SnapEntry {
 export interface SnapSettings {
   tone: 'friendly' | 'formal'; handoff_group: number | null; answer: number; clarify: number; abuse_close_after: number;
   kind: Record<string, string>; closing: Record<string, string>; handoff: Record<string, string>; tools: Record<string, boolean>;
+  max_choices: number; more_help_on: boolean; more_help: Record<string, string>;
 }
 /** Everything the control panel edits. The panel works on a copy of this and sends it back on Publish. */
 export interface Snapshot {

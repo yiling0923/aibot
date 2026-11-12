@@ -127,7 +127,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     const lang = (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? state.lang) as Lang | null; state.lang = lang;
     let answer = turn.messages.filter((m) => m.kind === 'bot').map((m) => m.text).join('\n\n');
     let choices: Choice[] = [];
-    if (turn.buttons?.length) { state.choices = turn.buttons; const r = renderChoices(turn.buttons); answer = (answer ? answer + '\n\n' : '') + r.text; choices = r.choices; }
+    if (turn.buttons?.length) { state.choices = turn.buttons; const r = renderChoices(turn.buttons); answer = (answer ? answer + '\n\n' : '') + r.text + (turn.hint ? '\n\n' + turn.hint : ''); choices = r.choices; }
     const ks = (turn.trace.ks ?? {}) as { T?: string[]; A?: string[] };
     const decision = decisionOf(turn, s, choices.length > 0);
     const res: AskResponse = {

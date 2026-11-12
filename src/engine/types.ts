@@ -21,6 +21,7 @@ export interface MerchantCfg {
   code: string; name: string; tone: 'friendly' | 'formal'; defaultLanguage: Lang;
   livechatGroupId: number | null; handoffGroupId: number | null;
   closing: Partial<Record<Lang, string>>; handoff: Partial<Record<Lang, string>>;
+  maxChoices: number; moreHelpOn: boolean; moreHelp: Partial<Record<Lang, string>>;   // choices shown at once (1-3), and the line after them
   abuseCloseAfter: number; answerThreshold: number; clarifyThreshold: number; kindReply: Partial<Record<Lang, string>>;
   aliases: { language: string; variant: string; canonical: string }[];   // merchant-only keywords
   tools: string[];                                                      // enabled account tools

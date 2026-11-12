@@ -28,6 +28,8 @@ export interface AccountInfo { chk: TokenCheck; verified: boolean; kind: string;
 export interface Turn {
   messages: BotMsg[]; buttons: Button[] | null; locked: boolean; status: string | null;
   trace: Record<string, unknown>;
+  /** A line to show after the choices ("if you need other help, contact an agent"). Null when it is off or there are no choices. */
+  hint?: string | null;
   /** For the keyword store and the review list. */
   log: { text: string; lang: Lang; decision: string; notUnderstood: boolean } | null;
 }
@@ -132,6 +134,29 @@ export class Bot {
 
   /* ---------- a typed message ---------- */
   async message(s: Session, rawText: string): Promise<Turn | null> {
+    const turn = await this.messageCore(s, rawText);
+    return turn && this.finish(s, turn, (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? this.cfg(s).defaultLanguage) as Lang);
+  }
+
+  /** At most the merchant's number of choices (3 or fewer; "Talk to an agent" is extra and not counted), then the line after them. */
+  private finish(s: Session, turn: Turn, lang: Lang): Turn {
+    if (!turn.buttons?.length) return turn;
+    const c = this.cfg(s), max = Math.max(1, Math.min(3, Math.round(c.maxChoices || 3)));
+    const agent = turn.buttons.filter((b) => b.kind === 'agent'), opts = turn.buttons.filter((b) => b.kind !== 'agent');
+    let kept = opts;
+    if (opts.length > max) {                                  // an account check ("where is my deposit") keeps its place; the rest are cut from the end
+      const special = opts.filter((b) => b.kind === 'status' || (b.kind === 'amt' && b.key === 'check')), rest = opts.filter((b) => !special.includes(b));
+      const keepSpecial = special.slice(0, max), room = max - keepSpecial.length;
+      const set = new Set([...rest.slice(0, room), ...keepSpecial]);
+      kept = opts.filter((b) => set.has(b));
+    }
+    turn.buttons = [...kept, ...agent];
+    turn.hint = c.moreHelpOn && kept.length ? (c.moreHelp[lang]?.trim() || T.MORE_HELP[lang]) : null;
+    if (kept.length < opts.length) turn.trace = { ...turn.trace, choicesCut: { shown: kept.length, had: opts.length, max } };
+    return turn;
+  }
+
+  private async messageCore(s: Session, rawText: string): Promise<Turn | null> {
     const text = rawText.trim(); if (!text || s.closed) return null;
     const c = this.cfg(s);
     if (s.handed) return {
@@ -251,6 +276,11 @@ export class Bot {
 
   /* ---------- a tapped button (fixed value, so no guessing and no search) ---------- */
   pick(s: Session, p: { kind: string; key: string; amt?: number; label: string; lang: Lang }): Turn | null {
+    const turn = this.pickCore(s, p);
+    return turn && this.finish(s, turn, p.lang);
+  }
+
+  private pickCore(s: Session, p: { kind: string; key: string; amt?: number; label: string; lang: Lang }): Turn | null {
     if (s.closed || s.handed) return null;
     const { kind, key, lang, label } = p; const c = this.cfg(s);
     s.pending = null; s.clarifyCount = 0;

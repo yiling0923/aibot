@@ -121,6 +121,7 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     const hacked = JSON.parse(JSON.stringify(mine));
     hacked.kb.find((e: { intent_key: string }) => e.intent_key === 'deposit_how').translations.en.answer_text = 'STAFF EDIT';          // allowed
     hacked.settings.MERCH_A.tone = 'formal'; hacked.settings.MERCH_A.kind.en = 'Custom kind reply';                                    // allowed
+    hacked.settings.MERCH_A.more_help_on = false; hacked.settings.MERCH_A.more_help.en = 'Need more? Ask an agent.'; hacked.settings.MERCH_A.max_choices = 1;   // the line is allowed, the number of choices is admin only
     hacked.settings.MERCH_A.abuse_close_after = 1; hacked.settings.MERCH_A.handoff_group = 999; hacked.settings.MERCH_A.tools.points = false;   // admin only
     hacked.aliases.deposit.en.push('globalhack'); hacked.guard.abuse.en = [];                                                           // shared lists: admin only
     hacked.kb.push({ id: 7777, merchant: 'MERCH_B', category: 'x', intent_key: 'sneaky', topic: 'deposit', aspect: null, topic_optional: false, status: 'live', translations: { en: { question_examples: ['x'], answer_text: 'x' } } });   // another merchant
@@ -132,6 +133,7 @@ describe.skipIf(!reachable)('sign in and merchant lock (needs TEST_DATABASE_URL)
     const a = after.snapshot.settings.MERCH_A;
     expect(after.snapshot.kb.find((e: { merchant: string; intent_key: string }) => e.merchant === 'MERCH_A' && e.intent_key === 'deposit_how').translations.en.answer_text).toBe('STAFF EDIT');
     expect(a.tone).toBe('formal'); expect(a.kind.en).toBe('Custom kind reply');
+    expect(a.more_help_on).toBe(false); expect(a.more_help.en).toBe('Need more? Ask an agent.'); expect(a.max_choices).toBe(full.settings.MERCH_A.max_choices);
     expect(a.abuse_close_after).toBe(full.settings.MERCH_A.abuse_close_after);
     expect(a.handoff_group).toBe(full.settings.MERCH_A.handoff_group);
     expect(a.tools.points).toBe(full.settings.MERCH_A.tools.points);

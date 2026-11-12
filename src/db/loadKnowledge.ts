@@ -37,7 +37,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
     if (!s) continue;
     const cfg: MerchantCfg = {
       code: t.code, name: m.name, tone: s.tone, defaultLanguage: m.default_language, livechatGroupId: m.livechat_group_id, handoffGroupId: m.handoff_group_id,
-      closing: asJson(s.closing_msg, {}), handoff: asJson(s.handoff_msg, {}), abuseCloseAfter: s.abuse_close_after, answerThreshold: Number(s.answer_threshold), clarifyThreshold: Number(s.clarify_threshold),
+      closing: asJson(s.closing_msg, {}), handoff: asJson(s.handoff_msg, {}), maxChoices: Math.max(1, Math.min(3, Number(s.max_choices ?? 3))), moreHelpOn: !!(s.more_help_on ?? 1), moreHelp: asJson(s.more_help_msg, {}), abuseCloseAfter: s.abuse_close_after, answerThreshold: Number(s.answer_threshold), clarifyThreshold: Number(s.clarify_threshold),
       kindReply: asJson(s.kind_reply, {}), aliases: own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical })), tools: tools.map((x) => x.tool), limits: {},
     };
     for (const l of limits) cfg.limits[l.kind as 'deposit' | 'withdraw'] = [l.lo, l.hi];
