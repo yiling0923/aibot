@@ -37,7 +37,8 @@ New-Item -ItemType Directory -Force $ToolsDir, $bin, $logs | Out-Null
 
 # Programs such as mysqld, go and npm print progress on stderr. PowerShell would treat that as a fatal error, so run them through this.
 function Run { param([scriptblock]$Do) $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & $Do } finally { $ErrorActionPreference = $old } }
-function Ping-MySql { Run { & $mysqladmin -uroot -h127.0.0.1 -P $MySqlPort ping *> $null }; return ($LASTEXITCODE -eq 0) }
+function Ping-MySql { $script:pingOut = (Run { & $mysqladmin -uroot -h127.0.0.1 -P $MySqlPort --protocol=tcp ping 2>&1 | Out-String }); return ($LASTEXITCODE -eq 0) }
+function Port-Open { return [bool](Get-NetTCPConnection -LocalPort $MySqlPort -State Listen -ErrorAction SilentlyContinue) }
 
 function Stop-Mine {
   foreach ($n in 'lc-api', 'lc-worker') { Get-Process $n -ErrorAction SilentlyContinue | Stop-Process -Force }
@@ -112,13 +113,16 @@ if (-not (Test-Path (Join-Path $data 'mysql'))) {
 }
 $up = Ping-MySql
 if (-not $up) {
-  Start-Process -FilePath $mysqld -ArgumentList "--defaults-file=$ini", '--console' -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'mysql.log')
+  if (Port-Open) { Write-Host "   Something already listens on port $MySqlPort (probably MySQL from an earlier run); waiting for it instead of starting another one." }
+  elseif (Get-Process mysqld -ErrorAction SilentlyContinue | Where-Object { $_.Path -eq $mysqld }) { Write-Host '   A MySQL from an earlier run is still starting; waiting for it.' }
+  else { Start-Process -FilePath $mysqld -ArgumentList "--defaults-file=$ini", '--console' -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'mysql.log') }
   1..150 | ForEach-Object { if (-not $up) { Start-Sleep 2; $up = Ping-MySql } }
   if (-not $up) {
     Write-Host '--- MySQL did not start. Its own messages (last 40 lines) ---' -ForegroundColor Yellow
     $lf = Join-Path $logs 'mysql.log'
     if (Test-Path $lf) { Get-Content $lf -Tail 40 } else { Write-Host '(no log file)' }
     Write-Host ('--- mysqld running now: ' + [bool](Get-Process mysqld -ErrorAction SilentlyContinue) + ' | port ' + $MySqlPort + ' in use by: ' + ((Get-NetTCPConnection -LocalPort $MySqlPort -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess))) -ForegroundColor Yellow
+    Write-Host ('--- last answer of mysqladmin ping: ' + $script:pingOut) -ForegroundColor Yellow
     throw "MySQL did not start. Copy the lines above and send them."
   }
 }
