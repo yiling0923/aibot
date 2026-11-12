@@ -34,11 +34,16 @@ $botDir = Resolve-Path (Join-Path $PSScriptRoot '..\..')
 $bin = Join-Path $ToolsDir 'bin'; $logs = Join-Path $ToolsDir 'logs'
 New-Item -ItemType Directory -Force $ToolsDir, $bin, $logs | Out-Null
 
+
+# Programs such as mysqld, go and npm print progress on stderr. PowerShell would treat that as a fatal error, so run them through this.
+function Run { param([scriptblock]$Do) $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & $Do } finally { $ErrorActionPreference = $old } }
+function Ping-MySql { Run { & $mysqladmin -uroot -h127.0.0.1 -P $MySqlPort ping *> $null }; return ($LASTEXITCODE -eq 0) }
+
 function Stop-Mine {
   foreach ($n in 'lc-api', 'lc-worker') { Get-Process $n -ErrorAction SilentlyContinue | Stop-Process -Force }
   $roots = @($ToolsDir); if ($MySqlDir) { $roots += $MySqlDir }
   $mysqlAdmin = $roots | ForEach-Object { Get-ChildItem $_ -Recurse -Filter mysqladmin.exe -ErrorAction SilentlyContinue } | Select-Object -First 1
-  if ($mysqlAdmin) { & $mysqlAdmin.FullName -uroot -h127.0.0.1 -P $MySqlPort shutdown 2>$null }
+  if ($mysqlAdmin) { Run { & $mysqlAdmin.FullName -uroot -h127.0.0.1 -P $MySqlPort shutdown *> $null } }
 }
 if ($Stop) { Stop-Mine; Write-Host 'LiveChat and its MySQL are stopped.'; return }
 
@@ -102,16 +107,16 @@ mysqlx=0
 "@ | Set-Content -Encoding ascii $ini
 if (-not (Test-Path (Join-Path $data 'mysql'))) {
   Write-Host '   first start: creating the data folder (about a minute)'
-  & $mysqld "--defaults-file=$ini" --initialize-insecure --console
+  Run { & $mysqld "--defaults-file=$ini" --initialize-insecure --console }
   if ($LASTEXITCODE -ne 0) { throw 'MySQL could not initialise. If Windows says VCRUNTIME140.dll is missing, install the "Microsoft Visual C++ Redistributable 2015-2022 (x64)" and run again.' }
 }
-$up = $false; try { & $mysqladmin -uroot -h127.0.0.1 -P $MySqlPort ping 2>$null | Out-Null; $up = ($LASTEXITCODE -eq 0) } catch { }
+$up = Ping-MySql
 if (-not $up) {
   Start-Process -FilePath $mysqld -ArgumentList "--defaults-file=$ini", '--console' -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'mysql.log')
-  1..60 | ForEach-Object { if (-not $up) { Start-Sleep 2; & $mysqladmin -uroot -h127.0.0.1 -P $MySqlPort ping 2>$null | Out-Null; $up = ($LASTEXITCODE -eq 0) } }
+  1..60 | ForEach-Object { if (-not $up) { Start-Sleep 2; $up = Ping-MySql } }
   if (-not $up) { throw "MySQL did not start. See $logs\mysql.log" }
 }
-& $mysql -uroot -h127.0.0.1 -P $MySqlPort -e "CREATE DATABASE IF NOT EXISTS livechat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'livechat'@'%' IDENTIFIED BY 'livechat'; GRANT ALL ON livechat.* TO 'livechat'@'%';"
+Run { & $mysql -uroot -h127.0.0.1 -P $MySqlPort -e "CREATE DATABASE IF NOT EXISTS livechat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'livechat'@'%' IDENTIFIED BY 'livechat'; GRANT ALL ON livechat.* TO 'livechat'@'%';" }
 if ($LASTEXITCODE -ne 0) { throw 'Could not create the LiveChat database.' }
 
 Write-Host '4/7 Building LiveChat (first time takes a few minutes)...'
@@ -119,8 +124,8 @@ $apiExe = Join-Path $bin 'lc-api.exe'; $workerExe = Join-Path $bin 'lc-worker.ex
 Stop-Process -Name lc-api, lc-worker -Force -ErrorAction SilentlyContinue
 Push-Location $LiveChatDir
 try {
-  & $goExe build -o $apiExe ./cmd/api;       if ($LASTEXITCODE -ne 0) { throw 'Building the LiveChat API failed (see the messages above).' }
-  & $goExe build -o $workerExe ./cmd/worker; if ($LASTEXITCODE -ne 0) { throw 'Building the LiveChat worker failed (see the messages above).' }
+  Run { & $goExe build -o $apiExe ./cmd/api };       if ($LASTEXITCODE -ne 0) { throw 'Building the LiveChat API failed (see the messages above).' }
+  Run { & $goExe build -o $workerExe ./cmd/worker }; if ($LASTEXITCODE -ne 0) { throw 'Building the LiveChat worker failed (see the messages above).' }
 } finally { Pop-Location }
 
 Write-Host '5/7 Starting LiveChat...'
@@ -139,12 +144,12 @@ if (-not $ready) { throw "LiveChat did not start. See $logs\api.log and api.out.
 Start-Process -FilePath $workerExe -WorkingDirectory $LiveChatDir -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'worker.log') -RedirectStandardOutput (Join-Path $logs 'worker.out.log')
 
 Write-Host '6/7 Adding merchant A and its admin...'
-Get-Content (Join-Path $PSScriptRoot 'seed.sql') -Raw | & $mysql -uroot -h127.0.0.1 -P $MySqlPort livechat
+Run { Get-Content (Join-Path $PSScriptRoot 'seed.sql') -Raw | & $mysql -uroot -h127.0.0.1 -P $MySqlPort livechat }
 if ($LASTEXITCODE -ne 0) { throw 'Could not add the merchant.' }
 
 Write-Host "7/7 Issuing the bot key for $Merchant and setting it in LiveChat..."
 Push-Location $botDir
-try { $out = npm run --silent key:create -- $Merchant 2>&1 | Out-String } finally { Pop-Location }
+try { Run { $script:out = npm run --silent key:create -- $Merchant 2>&1 | Out-String } } finally { Pop-Location }
 if ($out -notmatch '(aib_[A-Za-z0-9_-]+)') { throw "Could not read the bot key. Output was: $out" }
 $key = $Matches[1]
 $login = @{ email = 'admin@a.test'; password = 'Test1234!' } | ConvertTo-Json
