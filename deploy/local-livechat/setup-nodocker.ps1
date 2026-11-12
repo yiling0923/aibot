@@ -21,6 +21,8 @@ param(
   [int]$MySqlPort = 3307,
   [string]$Merchant = 'MERCH_A',
   [string]$BotUrl = 'http://localhost:3000',
+  [string]$MySqlZip = '',
+  [string]$GoZip = '',
   [switch]$Stop
 )
 $ErrorActionPreference = 'Stop'
@@ -38,11 +40,23 @@ function Stop-Mine {
 }
 if ($Stop) { Stop-Mine; Write-Host 'LiveChat and its MySQL are stopped.'; return }
 
-function Get-Zip($url, $dest, $marker) {
+function Get-Zip($urls, $dest, $marker, $localZip) {
   if (Test-Path (Join-Path $dest $marker)) { return }
-  $zip = Join-Path $ToolsDir ([IO.Path]::GetFileName($url))
-  Write-Host "   downloading $url"
-  Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing
+  $zip = Join-Path $ToolsDir 'download.zip'
+  if ($localZip) { Copy-Item $localZip $zip -Force }
+  else {
+    $ok = $false
+    foreach ($url in $urls) {
+      Write-Host "   downloading $url"
+      try {
+        Invoke-WebRequest -Uri $url -OutFile $zip -UseBasicParsing -UserAgent 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
+        $head = [IO.File]::ReadAllBytes($zip)[0..1]   # a real zip starts with "PK"; an error page does not
+        if ((Get-Item $zip).Length -gt 20MB -and $head[0] -eq 0x50 -and $head[1] -eq 0x4B) { $ok = $true; break }
+        Write-Host '   that address did not give a zip file, trying the next one'
+      } catch { Write-Host "   failed: $($_.Exception.Message.Split([char]10)[0])" }
+    }
+    if (-not $ok) { throw "Could not download it. Download the zip yourself in a browser and run again with the file path, for example -MySqlZip D:\\Downloads\\mysql-8.4.6-winx64.zip (Go: -GoZip ...). MySQL: https://dev.mysql.com/downloads/mysql/ (choose 8.4 LTS, Windows x86 64-bit ZIP Archive, then 'No thanks, just start my download')." }
+  }
   Expand-Archive -Path $zip -DestinationPath $dest -Force
   Remove-Item $zip
 }
@@ -58,14 +72,14 @@ try { Invoke-RestMethod http://localhost:3000/health | Out-Null } catch { throw 
 Write-Host '2/7 Go...'
 $goExe = (Get-Command go -ErrorAction SilentlyContinue).Source
 if (-not $goExe) {
-  Get-Zip "https://go.dev/dl/go$GoVersion.windows-amd64.zip" $ToolsDir 'go\bin\go.exe'
+  Get-Zip @("https://go.dev/dl/go$GoVersion.windows-amd64.zip") $ToolsDir 'go\bin\go.exe' $GoZip
   $goExe = Join-Path $ToolsDir 'go\bin\go.exe'
 }
 Write-Host "   using $goExe"
 
 Write-Host '3/7 MySQL 8 (own copy, port ' $MySqlPort ')...'
 $mysqlRoot = Join-Path $ToolsDir "mysql-$MySqlVersion-winx64"
-Get-Zip "https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-$MySqlVersion-winx64.zip" $ToolsDir "mysql-$MySqlVersion-winx64\bin\mysqld.exe"
+Get-Zip @("https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-$MySqlVersion-winx64.zip", "https://downloads.mysql.com/archives/get/p/23/file/mysql-$MySqlVersion-winx64.zip") $ToolsDir "mysql-$MySqlVersion-winx64\bin\mysqld.exe" $MySqlZip
 $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $mysqlRoot 'bin\mysql.exe'; $mysqladmin = Join-Path $mysqlRoot 'bin\mysqladmin.exe'
 $data = Join-Path $ToolsDir 'mysql-data'
 $ini = Join-Path $ToolsDir 'my.ini'
