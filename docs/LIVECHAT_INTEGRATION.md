@@ -28,6 +28,16 @@ The script starts LiveChat, adds one merchant and admin (`admin@a.test` / `Test1
 
 Stop everything: `docker compose down` in the LiveChat folder (add `-v` to delete its data).
 
+### If Docker Desktop will not run (for example Windows inside a virtual machine)
+
+LiveChat does not need Docker or Redis, only Go and MySQL 8. This script downloads both into `C:\lc-local` (MySQL on its own port 3307, so XAMPP is untouched), builds and starts LiveChat, adds the merchant, issues the key and runs "Test AI Chat". The bot stays on `http://localhost:3000`:
+
+```bash
+powershell -ExecutionPolicy Bypass -File deploy\local-livechat\setup-nodocker.ps1 -LiveChatDir C:\livechat-develop
+```
+
+Stop it with the same command plus `-Stop`. Delete `C:\lc-local` to remove everything. The LiveChat screens (inbox, settings pages) are not built in this mode; everything is done through its API, and `chat.ps1` plays the visitor.
+
 ## 2. Create the first admin and a merchant in the bot
 
 ```bash
