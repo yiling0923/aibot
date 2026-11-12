@@ -76,6 +76,26 @@ export async function migrateMerchantDb(pool: Pool, db: string): Promise<string[
       await c.query(fs.readFileSync(path.join(dir, file), 'utf8'));
       await c.query('INSERT INTO schema_migrations(name) VALUES (?)', [file]); applied.push(file);
     }
+    for (const r of await repairs(c, db)) applied.push(r);
   } finally { await c.query(`USE ${ident(back)}`); c.release(); }   // give the connection back pointing at the main database again
   return applied;
+}
+
+/** Columns that later files added. If a merchant database says it ran the file but the column is not there (a half-finished update, a restored backup),
+ *  the column is added again. Safe to repeat: it only acts on a column that is missing. */
+const REQUIRED: { table: string; column: string; add: string; after?: string }[] = [
+  { table: 'chat_sessions', column: 'source', add: "ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'live' AFTER status" },
+  { table: 'settings', column: 'max_choices', add: 'ADD COLUMN max_choices INT NOT NULL DEFAULT 3' },
+  { table: 'settings', column: 'more_help_on', add: 'ADD COLUMN more_help_on TINYINT(1) NOT NULL DEFAULT 1' },
+  { table: 'settings', column: 'more_help_msg', add: 'ADD COLUMN more_help_msg JSON NULL' },
+];
+async function repairs(c: import('mysql2/promise').PoolConnection, db: string): Promise<string[]> {
+  const fixed: string[] = [];
+  for (const r of REQUIRED) {
+    const [has] = await c.query<RowDataPacket[]>('SELECT 1 FROM information_schema.columns WHERE table_schema = ? AND table_name = ? AND column_name = ?', [db, r.table, r.column]);
+    const [tab] = await c.query<RowDataPacket[]>('SELECT 1 FROM information_schema.tables WHERE table_schema = ? AND table_name = ?', [db, r.table]);
+    if (has.length || !tab.length) continue;
+    await c.query(`ALTER TABLE ${ident(r.table)} ${r.add}`); fixed.push(`repaired ${r.table}.${r.column}`);
+  }
+  return fixed;
 }

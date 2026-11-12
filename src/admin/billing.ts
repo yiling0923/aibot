@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
 import '../auth/types';
-import { Tenants, tbl } from '../db/tenants';
+import { Tenants, migrateMerchantDb, tbl } from '../db/tenants';
 
 const q = async <T extends RowDataPacket = RowDataPacket>(pool: Pool, sql: string, p: unknown[] = []) => (await pool.query<T[]>(sql, p))[0];
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
@@ -16,6 +16,8 @@ export interface BillingRow {
   /** cost plus the markup: what to charge the merchant (USD). Calls on the merchant's own key are not included, the merchant pays the provider for those. */
   charge: number;
   ownKeyCalls: number; ownKeyTokens: number; unpricedCalls: number;
+  /** Set when this merchant's chats could not be counted (its database needs an update); the AI numbers are still right. */
+  problem?: string;
 }
 export interface BillingReport {
   from: string; to: string; markupPct: number;
@@ -48,10 +50,14 @@ export async function billingReport(pool: Pool, from: string, to: string): Promi
   const rows: BillingRow[] = [];
   for (const t of await new Tenants(pool).list()) {
     const r = byCode.get(t.code);
-    const [c] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND started_at >= ? AND started_at < DATE_ADD(?, INTERVAL 1 DAY)`, [from, to]);
+    let chats = 0, problem: string | undefined;
+    const count = async () => Number((await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND started_at >= ? AND started_at < DATE_ADD(?, INTERVAL 1 DAY)`, [from, to]))[0]?.n ?? 0);
+    try { chats = await count(); }
+    catch { try { await migrateMerchantDb(pool, t.db); chats = await count(); }                    // one merchant's database was behind: update it and count again
+      catch (e) { problem = `The chats of ${t.name} could not be counted: ${(e as Error).message}`; } }
     const sharedCost = Number(r?.shared_cost ?? 0), inp = Number(r?.inp ?? 0), outp = Number(r?.outp ?? 0);
-    rows.push({ code: t.code, name: t.name, chats: Number(c?.n ?? 0), calls: Number(r?.calls ?? 0), inputTokens: inp, outputTokens: outp, totalTokens: inp + outp,
-      cost: round(sharedCost), charge: round(sharedCost * (1 + markupPct / 100)), ownKeyCalls: Number(r?.own_calls ?? 0), ownKeyTokens: Number(r?.own_tokens ?? 0), unpricedCalls: Number(r?.unpriced ?? 0) });
+    rows.push({ code: t.code, name: t.name, chats, calls: Number(r?.calls ?? 0), inputTokens: inp, outputTokens: outp, totalTokens: inp + outp,
+      cost: round(sharedCost), charge: round(sharedCost * (1 + markupPct / 100)), ownKeyCalls: Number(r?.own_calls ?? 0), ownKeyTokens: Number(r?.own_tokens ?? 0), unpricedCalls: Number(r?.unpriced ?? 0), ...(problem ? { problem } : {}) });
   }
   const sum = (f: (r: BillingRow) => number) => rows.reduce((a, r) => a + f(r), 0);
   const totals = { chats: sum((r) => r.chats), calls: sum((r) => r.calls), inputTokens: sum((r) => r.inputTokens), outputTokens: sum((r) => r.outputTokens), totalTokens: sum((r) => r.totalTokens),

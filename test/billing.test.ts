@@ -126,4 +126,15 @@ describe.skipIf(!reachable)('usage and billing (needs TEST_DATABASE_URL)', () =>
     } finally { await pool!.query('RENAME TABLE billing_settings_off TO billing_settings'); }
     expect((await as(admin, 'GET', `/api/admin/billing?from=${day}&to=${day}`)).statusCode).toBe(200);
   });
+
+  it('repairs a merchant database that is missing a column, instead of failing the whole page', async () => {
+    await pool!.query('ALTER TABLE livechat_bot_test_m_merch_b.chat_sessions DROP COLUMN source');       // as if its update had not finished
+    const r: BillingReport = (await as(admin, 'GET', `/api/admin/billing?from=${day}&to=${day}`)).json();
+    expect(r.merchants.find((m) => m.code === 'MERCH_B')!.problem).toBeUndefined();
+    expect(r.merchants.find((m) => m.code === 'MERCH_B')!.chats).toBeGreaterThanOrEqual(0);
+    expect((await rows("SELECT 1 FROM information_schema.columns WHERE table_schema = 'livechat_bot_test_m_merch_b' AND table_name = 'chat_sessions' AND column_name = 'source'")).length).toBe(1);
+    const c = await as(admin, 'GET', '/api/admin/merchants/MERCH_B/connection');                         // the merchant page heals the same way
+    await pool!.query('ALTER TABLE livechat_bot_test_m_merch_b.chat_sessions DROP COLUMN source');
+    expect((await as(admin, 'GET', '/api/admin/merchants/MERCH_B/connection')).statusCode).toBe(200); expect(c.statusCode).toBe(200);
+  });
 });

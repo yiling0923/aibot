@@ -4,7 +4,7 @@ import type { Pool } from '../db/pool';
 import type { Bot } from '../bot/responder';
 import type { Store } from '../bot/store';
 import '../auth/types';
-import { Tenants, tbl } from '../db/tenants';
+import { Tenants, migrateMerchantDb, tbl } from '../db/tenants';
 import { ask } from '../connector/ask';
 import { listKeys } from '../connector/keys';
 import { MerchantAiKeys, PROVIDERS, type Provider } from '../ai/merchantKeys';
@@ -33,7 +33,8 @@ export function merchantPageRoutes(app: FastifyInstance, ctx: MerchantPageCtx) {
     const [m] = await q(pool, 'SELECT code, name, default_language FROM merchants WHERE code = ?', [t.code]);
     const [st] = await q(pool, `SELECT tone FROM ${tbl(t.db, 'settings')} WHERE id = 1`);
     const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
-    const [live] = await q(pool, `SELECT COUNT(*) AS n, MAX(started_at) AS last FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND started_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`);
+    const liveSql = `SELECT COUNT(*) AS n, MAX(started_at) AS last FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND started_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`;
+    const [live] = await q(pool, liveSql).catch(async () => { await migrateMerchantDb(pool, t.db); return q(pool, liveSql).catch(() => [{ n: 0, last: null }]); });   // a database that is behind is updated, then counted again
     const logins = (await q(pool, 'SELECT u.username FROM admin_users u JOIN merchants m ON m.id = u.merchant_id WHERE m.code = ? ORDER BY u.username', [t.code])).map((r) => r.username as string);
     const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol), host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost');
     const baseUrl = ctx.publicUrl || `${proto}://${host}`;

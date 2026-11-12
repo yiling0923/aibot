@@ -3,7 +3,7 @@ import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { Pill } from '../ui';
 
-interface Row { code: string; name: string; chats: number; calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost: number; charge: number; ownKeyCalls: number; ownKeyTokens: number; unpricedCalls: number }
+interface Row { code: string; name: string; chats: number; calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost: number; charge: number; ownKeyCalls: number; ownKeyTokens: number; unpricedCalls: number; problem?: string }
 interface Price { provider: 'anthropic' | 'openai'; model: string; inputPerMTok: number; outputPerMTok: number; updatedBy: string | null; updatedAt: string }
 interface Report {
   from: string; to: string; markupPct: number; merchants: Row[]; totals: Omit<Row, 'code' | 'name'>;
@@ -70,7 +70,7 @@ export default function Billing() {
                 <tr key={m.code}><td><b>{m.name}</b> <span className="mono sub">{m.code}</span></td>
                   <td className="num">{n0(m.chats)}</td><td className="num">{n0(m.calls)}</td><td className="num">{n0(m.inputTokens)}</td><td className="num">{n0(m.outputTokens)}</td><td className="num">{n0(m.totalTokens)}</td>
                   <td className="num">{usd(m.cost)}</td><td className="num"><b>{usd(m.charge)}</b></td>
-                  <td>{m.ownKeyCalls > 0 && <Pill c="info" title="These calls used the merchant's own AI key, so the merchant pays the AI provider for them. They are not in AI cost or To charge.">Own key: {calls(m.ownKeyCalls)}</Pill>}{m.unpricedCalls > 0 && <> <Pill c="warn">{calls(m.unpricedCalls)} not priced</Pill></>}</td></tr>
+                  <td>{m.ownKeyCalls > 0 && <Pill c="info" title="These calls used the merchant's own AI key, so the merchant pays the AI provider for them. They are not in AI cost or To charge.">Own key: {calls(m.ownKeyCalls)}</Pill>}{m.unpricedCalls > 0 && <> <Pill c="warn">{calls(m.unpricedCalls)} not priced</Pill></>}{m.problem && <> <Pill c="bad" title={m.problem}>Chats not counted</Pill></>}</td></tr>
               ))}
               <tr style={{ fontWeight: 700 }}><td>Total</td><td className="num">{n0(t.chats)}</td><td className="num">{n0(t.calls)}</td><td className="num">{n0(t.inputTokens)}</td><td className="num">{n0(t.outputTokens)}</td><td className="num">{n0(t.totalTokens)}</td><td className="num">{usd(t.cost)}</td><td className="num">{usd(t.charge)}</td><td /></tr>
             </tbody></table></div>
