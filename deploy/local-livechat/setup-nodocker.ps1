@@ -106,14 +106,14 @@ collation-server=utf8mb4_unicode_ci
 mysqlx=0
 "@ | Set-Content -Encoding ascii $ini
 if (-not (Test-Path (Join-Path $data 'mysql'))) {
-  Write-Host '   first start: creating the data folder (about a minute)'
+  Write-Host '   first start: creating the data folder (1-5 minutes on a slow machine, please wait)'
   Run { & $mysqld "--defaults-file=$ini" --initialize-insecure --console }
   if ($LASTEXITCODE -ne 0) { throw 'MySQL could not initialise. If Windows says VCRUNTIME140.dll is missing, install the "Microsoft Visual C++ Redistributable 2015-2022 (x64)" and run again.' }
 }
 $up = Ping-MySql
 if (-not $up) {
   Start-Process -FilePath $mysqld -ArgumentList "--defaults-file=$ini", '--console' -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'mysql.log')
-  1..60 | ForEach-Object { if (-not $up) { Start-Sleep 2; $up = Ping-MySql } }
+  1..150 | ForEach-Object { if (-not $up) { Start-Sleep 2; $up = Ping-MySql } }
   if (-not $up) {
     Write-Host '--- MySQL did not start. Its own messages (last 40 lines) ---' -ForegroundColor Yellow
     $lf = Join-Path $logs 'mysql.log'
@@ -145,7 +145,7 @@ $env:REDIS_HOST = '127.0.0.1'; $env:REDIS_PORT = '6379'; $env:LIVECHAT_REALTIME_
 New-Item -ItemType Directory -Force $env:LIVECHAT_UPLOAD_DIR | Out-Null
 Start-Process -FilePath $apiExe -WorkingDirectory $LiveChatDir -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'api.log') -RedirectStandardOutput (Join-Path $logs 'api.out.log')
 $ready = $false   # /login answers 200 once the API and its tables are up (/health says "degraded" without Redis, which is fine)
-1..60 | ForEach-Object { if (-not $ready) { try { Invoke-RestMethod http://localhost:8080/login | Out-Null; $ready = $true } catch { Start-Sleep 2 } } }
+1..150 | ForEach-Object { if (-not $ready) { try { Invoke-RestMethod http://localhost:8080/login | Out-Null; $ready = $true } catch { Start-Sleep 2 } } }
 if (-not $ready) { throw "LiveChat did not start. See $logs\api.log and api.out.log" }
 Start-Process -FilePath $workerExe -WorkingDirectory $LiveChatDir -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'worker.log') -RedirectStandardOutput (Join-Path $logs 'worker.out.log')
 
