@@ -13,6 +13,7 @@
     "db:seed": "tsx src/db/seed.ts",
     "db:reset": "tsx src/db/migrate.ts --reset && tsx src/db/seed.ts",
     "user:add": "tsx src/auth/addUser.ts",
+    "key:create": "tsx src/connector/createKey.ts",
     "eval:report": "tsx scripts/evalReport.ts",
     "build": "node scripts/cleanWeb.mjs && vite build",
     "dev:web": "vite"

@@ -13,6 +13,8 @@ const T: any = Texts;
 /** One chat. The server keeps this between messages; the website only sends the signed token once. */
 export interface Session {
   id: string; merchant: string; token: string | null;
+  /** Who the customer is, when the channel (LiveChat) says so. Used for account answers instead of the signed token. */
+  member?: { id: string; name: string; rank?: string } | null;
   draft: string | null; misses: number; abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
 }
 export const newSession = (id: string, merchant: string, token: string | null, draft: string | null = null): Session =>
@@ -37,6 +39,9 @@ const sp = (lang: Lang) => (lang === 'zh' ? '' : ' ');
 export class Bot {
   readonly engine: Engine;
   constructor(public readonly knowledge: Knowledge, private api: MerchantApi = fakeMerchantApi(), private ai?: AiService) { this.engine = new Engine(knowledge); }
+
+  /** Who the customer is: the member the channel sent, else the signed token, else nobody. */
+  private who(s: Session): TokenCheck { return s.member ? { state: 'valid', id: String(s.member.id), name: s.member.name } : checkToken(s.token); }
 
   /* ---------- small helpers ---------- */
   private cfg(s: Session) { return this.engine.merchant(s.merchant); }
@@ -66,7 +71,7 @@ export class Bot {
 
   /* ---------- account lookups (token checked, customer id never taken from the message) ---------- */
   private account(s: Session, kind: string, lang: Lang, kbAnswer: string): AccountInfo {
-    const c = this.cfg(s), tone = T.TONE[c.tone], chk = checkToken(s.token);
+    const c = this.cfg(s), tone = T.TONE[c.tone], chk = this.who(s);
     const res: AccountInfo = { chk, verified: chk.state === 'valid', kind, agent: false, text: '', rows: [] };
     if (chk.state !== 'valid') {
       res.text = tone.pre[lang] + (ACCT_TOPICS.includes(kind) ? '' : kbAnswer + sp(lang)) + T.NOTVER[lang]; res.agent = true; return res;
@@ -106,7 +111,7 @@ export class Bot {
   }
 
   private amountCheck(s: Session, amt: number, lang: Lang): AccountInfo {
-    const c = this.cfg(s), tone = T.TONE[c.tone], chk = checkToken(s.token);
+    const c = this.cfg(s), tone = T.TONE[c.tone], chk = this.who(s);
     const res: AccountInfo = { chk, verified: chk.state === 'valid', kind: 'check', agent: true, text: '', rows: [] };
     if (chk.state !== 'valid') { res.text = tone.pre[lang] + T.NOTVER[lang]; return res; }
     const list = this.api.getAccount(s.merchant, chk.id)?.transactions ?? [];
@@ -121,7 +126,7 @@ export class Bot {
 
   private choiceMenu(s: Session, topic: string, lang: Lang) {
     const opts: { kind: string; key: string }[] = this.engine.intentsOfTopic(s.merchant, topic).map((k) => ({ kind: 'intent', key: k }));
-    if (checkToken(s.token).state === 'valid' && (topic === 'deposit' || topic === 'withdraw')) opts.push({ kind: 'status', key: topic });
+    if (this.who(s).state === 'valid' && (topic === 'deposit' || topic === 'withdraw')) opts.push({ kind: 'status', key: topic });
     return { message: { kind: 'bot' as const, text: T.CHOICE_TXT[lang](T.tlab(topic, lang)) }, buttons: this.buttons(opts, lang) };
   }
 

@@ -147,3 +147,18 @@ Two screens under **Check** help to improve the bot:
 * **Not understood** lists the messages the bot could not answer, most frequent first. Add one to an existing answer as an example question, make a new answer from it, or ignore it. Everything is a draft change until you publish.
 
 After pulling, run `npm run db:migrate` once (it adds one column, `chat_sessions.source`, to every merchant database).
+
+## LiveChat connection
+
+The bot answers LiveChat's existing AI call, `POST {bot address}/api/v1/ai/ask` (see `docs`-free summary in the system document, section 11). LiveChat does not change.
+
+1. Make a key for the merchant: `npm run key:create -- MERCH_A` (shown once; add `--replace` to stop the old keys), or as an admin `POST /api/admin/merchants/MERCH_A/bot-key`.
+2. In LiveChat: Merchant Admin > Automation: set **AI Chat API base URL** to the bot's address (LiveChat's server must be able to reach it) and **AI Chat API key** to the key, then use **Test AI Chat**.
+3. Try it by hand:
+
+```bash
+curl -X POST http://localhost:3000/api/v1/ai/ask -H "Authorization: Bearer aib_..." -H "Content-Type: application/json" -d '{"question":"depo how","history":[]}'
+```
+
+`ASK_TIMEOUT_MS` (default 8000) is how long the bot may take before the chat is handed to a person.
+

@@ -18,7 +18,8 @@ How the system works, what it is built with, how the database is designed, and h
 8. Login and security
 9. Database design
 10. Screens and layout
-11. What is not finished
+11. The LiveChat connector
+12. What is not finished
 
 ---
 
@@ -309,7 +310,7 @@ Without it the databases are simply listed one after another (`livechat_bot`, `l
 
 ### The main database (`livechat_bot`)
 
-There are **10 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
+There are **11 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
 
 
 #### Merchants and logins
@@ -344,6 +345,23 @@ Indexes: `code` (unique), `db_name` (unique).
 | `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
 
 Indexes: `merchant_id`, `username` (unique).
+
+
+**`bot_api_keys`**. The key a merchant's LiveChat uses to call the bot. Only a hash of the key is stored (the key is shown once when it is made), plus its first characters, who made it, when it was last used, and when it was stopped. The key says which merchant is asking.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `merchant_id` | bigint | links to `merchants.id`; required |
+| `key_prefix` | varchar(12) | required |
+| `key_hash` | char(64) | unique; required |
+| `label` | varchar(100) |  |
+| `created_by` | varchar(100) |  |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+| `last_used_at` | timestamp |  |
+| `revoked_at` | timestamp |  |
+
+Indexes: `key_hash` (unique), `merchant_id`.
 
 
 #### Words shared by all merchants
@@ -437,7 +455,7 @@ Indexes: `version` (unique).
 
 Every merchant database has these tables and holds only that merchant's data. The tables are described once here; the tables shown are from the sample merchant `MERCH_A`.
 
-There are **17 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
+There are **19 tables**. For each column: the type, and what is special about it (primary key, required, default, link to another table, unique).
 
 
 #### Settings
@@ -667,6 +685,34 @@ Indexes: `matched_kb_id`, `message_id`.
 Indexes: `correct_kb_id`, `decision_id`.
 
 
+**`bot_sessions`**. The memory of each LiveChat conversation for the connector: how many times the bot asked again, rude messages, the choices on offer, whether the chat was handed to a person or closed. Kept in the database so a restart loses nothing.
+
+| Column | Type | Notes |
+|---|---|---|
+| `session_id` | varchar(64) | primary key |
+| `state` | longtext | required |
+| `language` | varchar(10) |  |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+| `updated_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `updated_at`.
+
+
+**`bot_requests`**. One row for each question the connector answered, with what was sent back and how long it took. A repeated request gets the same answer from here.
+
+| Column | Type | Notes |
+|---|---|---|
+| `id` | bigint | primary key; numbers itself |
+| `request_key` | char(64) | unique; required |
+| `session_id` | varchar(64) | required |
+| `decision` | varchar(20) | required |
+| `latency_ms` | int | default `0` |
+| `response` | longtext | required |
+| `created_at` | timestamp | default `CURRENT_TIMESTAMP` |
+
+Indexes: `created_at`, `request_key` (unique), `session_id`.
+
+
 #### Publish history
 
 
@@ -781,11 +827,33 @@ The Test chat tab shows the real chat page inside the panel, running on the draf
 
 ---
 
-## 11. What is not finished
+## 11. The LiveChat connector
+
+Your LiveChat already knows how to talk to an AI bot: it calls `POST {bot address}/api/v1/ai/ask` and writes the reply into the chat. The bot now answers that call, so **LiveChat itself does not change**.
+
+| | What LiveChat sends | What the bot sends back |
+|---|---|---|
+| **Fields** | `question`, `history` (earlier messages), `session_id` (not on the first call) | `answer`, `confidence`, `should_escalate`, `should_close`, `close_message`, `session_id` |
+| **Also sent back** | | `decision` (answer, clarify, handover, close, silent), `topic`, `keywords`, `choices` |
+
+- **One key per merchant.** LiveChat sends the merchant's bot key (`Authorization: Bearer ...`). The key tells the bot which merchant is asking, so each merchant is answered from its own knowledge base. An admin makes the key (the control panel or `npm run key:create -- MERCH_A`). It is shown once, only a hash is stored, and making a new key stops the old one at the same moment.
+- **Choices are text.** The LiveChat widget has no buttons, so the bot writes the choices into the answer as a numbered list. The customer can reply with a number ("2"), "the second one", or words from the choice, or just ask something new.
+- **Handing over.** When the bot hands the chat to a person it sends `should_escalate: true`. If a chat is closed for rude language it sends `should_close: true` and the closing message. After that, the bot stays silent in that chat.
+- **Memory is in the database.** What the bot remembers about a chat (how many times it asked again, rude messages, the choices on offer, handed over or closed) is saved in the merchant's own database, so a restart loses nothing.
+- **Repeated requests.** LiveChat sends no message id and tries again when it hears nothing. A repeated request gets the same answer, and the chat does not move twice.
+- **Never silent.** If the bot is slow (more than 8 seconds, adjustable) or fails, the chat is handed to a person.
+- **Who the customer is.** The question can carry the member (id, name, rank). With a member the bot can answer account questions; without one it says it cannot see the account and offers an agent. LiveChat does not send the member today, so account answers need LiveChat to add it.
+- **Saved as live traffic.** What the customer writes goes to the keywords and the Report as real (live) traffic, separate from the Test chat.
+
+**Status:** built and tested with the same kind of requests LiveChat makes, including its "Test AI Chat" call and a restart in the middle of a chat. **Not yet tested against your staging LiveChat.**
+
+---
+
+## 12. What is not finished
 
 | Item | State |
 |---|---|
-| **LiveChat connection** | Not built. Today the bot runs on a test page only. It needs the LiveChat developer details and a public web address. |
+| **LiveChat connection** | The bot side is built (section 11). Not yet tested against your staging LiveChat. The bot needs an address that LiveChat can reach (HTTPS), and LiveChat must send the member if account answers are wanted. |
 | **AI with real keys** | Built and tested only on a fake network. Real wording quality and speed are untested. |
 | **Merchant API** | Account data is fake JSON. Each merchant's real API still has to be connected. |
 | **Demo data** | The merchants, entries, accounts, the keyword history in the ranking and the two weeks of traffic in the Report are fake sample data. |

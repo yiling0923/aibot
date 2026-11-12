@@ -17,5 +17,7 @@ export const config = {
   openaiModel: process.env.OPENAI_MODEL ?? '',
   /** Safety limit on AI calls per hour (cost control). */
   aiMaxCallsPerHour: Number(process.env.AI_MAX_CALLS_PER_HOUR ?? 600),
+  /** How long the LiveChat connector may take before the chat is handed to a person. */
+  askTimeoutMs: Number(process.env.ASK_TIMEOUT_MS ?? 8000),
   openaiKey: process.env.OPENAI_API_KEY ?? '',
 };
