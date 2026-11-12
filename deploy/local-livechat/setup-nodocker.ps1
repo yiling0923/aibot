@@ -37,14 +37,14 @@ New-Item -ItemType Directory -Force $ToolsDir, $bin, $logs | Out-Null
 
 # Programs such as mysqld, go and npm print progress on stderr. PowerShell would treat that as a fatal error, so run them through this.
 function Run { param([scriptblock]$Do) $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; try { & $Do } finally { $ErrorActionPreference = $old } }
-function Ping-MySql { $script:pingOut = (Run { & $mysqladmin -uroot -h127.0.0.1 -P $MySqlPort --protocol=tcp ping 2>&1 | Out-String }); return ($LASTEXITCODE -eq 0) }
+function Ping-MySql { $script:pingOut = (Run { & $mysqladmin --user=root --host=127.0.0.1 "--port=$MySqlPort" --protocol=tcp ping 2>&1 | Out-String }); return ($LASTEXITCODE -eq 0) }
 function Port-Open { return [bool](Get-NetTCPConnection -LocalPort $MySqlPort -State Listen -ErrorAction SilentlyContinue) }
 
 function Stop-Mine {
   foreach ($n in 'lc-api', 'lc-worker') { Get-Process $n -ErrorAction SilentlyContinue | Stop-Process -Force }
   $roots = @($ToolsDir); if ($MySqlDir) { $roots += $MySqlDir }
   $mysqlAdmin = $roots | ForEach-Object { Get-ChildItem $_ -Recurse -Filter mysqladmin.exe -ErrorAction SilentlyContinue } | Select-Object -First 1
-  if ($mysqlAdmin) { Run { & $mysqlAdmin.FullName -uroot -h127.0.0.1 -P $MySqlPort shutdown *> $null } }
+  if ($mysqlAdmin) { Run { & $mysqlAdmin.FullName --user=root --host=127.0.0.1 "--port=$MySqlPort" shutdown *> $null } }
 }
 if ($Stop) { Stop-Mine; Write-Host 'LiveChat and its MySQL are stopped.'; return }
 
@@ -126,7 +126,7 @@ if (-not $up) {
     throw "MySQL did not start. Copy the lines above and send them."
   }
 }
-Run { & $mysql -uroot -h127.0.0.1 -P $MySqlPort -e "CREATE DATABASE IF NOT EXISTS livechat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'livechat'@'%' IDENTIFIED BY 'livechat'; GRANT ALL ON livechat.* TO 'livechat'@'%';" }
+Run { & $mysql --user=root --host=127.0.0.1 "--port=$MySqlPort" -e "CREATE DATABASE IF NOT EXISTS livechat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'livechat'@'%' IDENTIFIED BY 'livechat'; GRANT ALL ON livechat.* TO 'livechat'@'%';" }
 if ($LASTEXITCODE -ne 0) { throw 'Could not create the LiveChat database.' }
 
 Write-Host '4/7 Building LiveChat (first time takes a few minutes)...'
@@ -154,7 +154,7 @@ if (-not $ready) { throw "LiveChat did not start. See $logs\api.log and api.out.
 Start-Process -FilePath $workerExe -WorkingDirectory $LiveChatDir -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'worker.log') -RedirectStandardOutput (Join-Path $logs 'worker.out.log')
 
 Write-Host '6/7 Adding merchant A and its admin...'
-Run { Get-Content (Join-Path $PSScriptRoot 'seed.sql') -Raw | & $mysql -uroot -h127.0.0.1 -P $MySqlPort livechat }
+Run { Get-Content (Join-Path $PSScriptRoot 'seed.sql') -Raw | & $mysql --user=root --host=127.0.0.1 "--port=$MySqlPort" livechat }
 if ($LASTEXITCODE -ne 0) { throw 'Could not add the merchant.' }
 
 Write-Host "7/7 Issuing the bot key for $Merchant and setting it in LiveChat..."
