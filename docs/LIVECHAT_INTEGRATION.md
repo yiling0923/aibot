@@ -38,6 +38,14 @@ powershell -ExecutionPolicy Bypass -File deploy\local-livechat\setup-nodocker.ps
 
 Stop it with the same command plus `-Stop`. Delete `C:\lc-local` to remove everything. The LiveChat screens (inbox, settings pages) are not built in this mode; everything is done through its API, and `chat.ps1` plays the visitor.
 
+## Usage and billing
+
+The admin menu has **Usage & billing**. Every AI call (Claude or ChatGPT) writes one row with its tokens and its cost at the price of that moment. The page shows, per merchant and period: real chats, AI calls, tokens read and written, AI cost, and **To charge** (cost plus a markup percent you set). It also has a CSV download for invoicing, and an editable price table (US dollars per million tokens). Check the starting prices against the provider's current list.
+
+- Calls made with a merchant's **own** AI key are counted but not charged: that merchant pays the provider for them.
+- A model with no price yet is counted, and its cost shows as $0.00 with a warning until you set the price.
+- Only token counts are stored, never the customer's words.
+
 ## 2. Create the first admin and a merchant in the bot
 
 ```bash

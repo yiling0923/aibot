@@ -25,7 +25,10 @@ export function makeAnthropic(apiKey: string, fetchImpl?: typeof fetch) {
 }
 
 /** Asks Claude which entry a message is about. The answer is checked against the real entry list, never trusted as is. */
-export async function claudePick(client: Anthropic, model: string, input: PickInput): Promise<Pick | null> {
+/** Reports the tokens a call used, so the usage page can add them up. */
+export type UsageHook = (inputTokens: number, outputTokens: number) => void;
+
+export async function claudePick(client: Anthropic, model: string, input: PickInput, used?: UsageHook): Promise<Pick | null> {
   const list = input.entries
     .map((e) => `- ${e.key} | topic: ${e.topic}${e.aspect ? ` | about: ${e.aspect}` : ''} | examples: ${e.examples.slice(0, 3).join(' / ')}`)
     .join('\n');
@@ -34,6 +37,7 @@ export async function claudePick(client: Anthropic, model: string, input: PickIn
     messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nEntries:\n${list}\n\n<customer_message>${input.text}</customer_message>` }],
     output_config: { effort: 'low', format: zodOutputFormat(PickSchema) },
   });
+  used?.(res.usage?.input_tokens ?? 0, res.usage?.output_tokens ?? 0);
   const out = res.parsed_output;
   if (!out || !out.intent_key) return null;
   if (!input.entries.some((e) => e.key === out.intent_key)) return null;               // a made-up key is ignored
@@ -42,12 +46,13 @@ export async function claudePick(client: Anthropic, model: string, input: PickIn
 }
 
 /** Asks Claude what a new keyword means, as a short note and a suggested type. */
-export async function claudeDescribe(client: Anthropic, model: string, input: DescribeInput): Promise<WordNote | null> {
+export async function claudeDescribe(client: Anthropic, model: string, input: DescribeInput, used?: UsageHook): Promise<WordNote | null> {
   const res = await client.messages.parse({
     model, max_tokens: 1024, system: DESCRIBE_SYSTEM,
     messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTopics the bot knows: ${input.topics.join(', ')}\nWord: <word>${input.word}</word>\nSample message: <sample>${input.sample}</sample>` }],
     output_config: { effort: 'low', format: zodOutputFormat(NoteSchema) },
   });
+  used?.(res.usage?.input_tokens ?? 0, res.usage?.output_tokens ?? 0);
   const out = res.parsed_output;
   if (!out) return null;
   const note = out.note.replace(/\s+/g, ' ').trim().slice(0, 120);
@@ -63,12 +68,13 @@ examples: translate each example customer question into the target language the 
 Return the same number of examples, in the same order. If the list is empty return an empty list.`;
 
 /** Asks Claude to translate an answer and its example questions. A person checks the result before saving, and the caller checks the numbers. */
-export async function claudeTranslate(client: Anthropic, model: string, input: TranslateInput): Promise<Translation | null> {
+export async function claudeTranslate(client: Anthropic, model: string, input: TranslateInput, used?: UsageHook): Promise<Translation | null> {
   const res = await client.messages.parse({
     model, max_tokens: 2048, system: TRANSLATE_SYSTEM,
     messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTranslate from ${LANG_NAME[input.from]} into ${LANG_NAME[input.to]}.\n<answer>${input.answer}</answer>\n<examples>${JSON.stringify(input.examples)}</examples>` }],
     output_config: { effort: 'low', format: zodOutputFormat(TranslationSchema) },
   });
+  used?.(res.usage?.input_tokens ?? 0, res.usage?.output_tokens ?? 0);
   const out = res.parsed_output;
   if (!out) return null;
   const answer = out.answer.trim();

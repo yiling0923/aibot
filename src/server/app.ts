@@ -17,6 +17,8 @@ import { connectorRoutes } from '../connector/routes';
 import { Tenants } from '../db/tenants';
 import { createRoutedAi, type AiService } from '../ai';
 import { MerchantAiKeys } from '../ai/merchantKeys';
+import { UsageRecorder } from '../ai/usage';
+import { billingRoutes } from '../admin/billing';
 import { merchantPageRoutes } from '../admin/merchantPage';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
@@ -48,7 +50,8 @@ export async function buildApp(opts: AppOptions = {}) {
   // Claude and ChatGPT are optional: with no keys set, every AI step is off and the bot answers from its own rules.
   // A merchant that saved its own key on the merchant page uses that key; every other merchant uses the shared one from .env.
   const aiKeys = new MerchantAiKeys(pool); await aiKeys.refresh();
-  const ai = opts.ai ?? createRoutedAi({ anthropicKey: config.anthropicKey, claudeModel: config.claudeModel, openaiKey: config.openaiKey, openaiModel: config.openaiModel, maxCallsPerHour: config.aiMaxCallsPerHour }, aiKeys);
+  const usage = new UsageRecorder(pool);
+  const ai = opts.ai ?? createRoutedAi({ onUsage: (u) => void usage.record(u), anthropicKey: config.anthropicKey, claudeModel: config.claudeModel, openaiKey: config.openaiKey, openaiModel: config.openaiModel, maxCallsPerHour: config.aiMaxCallsPerHour }, aiKeys);
   if (fs.existsSync(WEB)) await app.register(fastifyStatic, { root: WEB });
 
   let bot: Bot | null = null;
@@ -61,6 +64,7 @@ export async function buildApp(opts: AppOptions = {}) {
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
   connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs });
+  billingRoutes(app, { pool, onPriceChange: () => usage.forgetPrices() });
   merchantPageRoutes(app, { pool, getBot, store, aiKeys, timeoutMs: config.askTimeoutMs, shared: { anthropic: !!config.anthropicKey, openai: !!config.openaiKey && !!config.openaiModel }, publicUrl: config.publicUrl });
   await new Tenants(pool).migrateAll().then((a) => { if (a.length) app.log.info(`updated merchant databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the merchant databases (run npm run db:migrate)'));
   await ensureVersions(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));

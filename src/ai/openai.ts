@@ -8,7 +8,7 @@ export function makeOpenAI(apiKey: string, fetchImpl?: typeof fetch) {
 }
 
 /** Asks ChatGPT to phrase the knowledge base answer as a short, natural reply. It is given only the answer text, never customer data. */
-export async function openaiWrite(client: OpenAI, model: string, input: WriteInput): Promise<string | null> {
+export async function openaiWrite(client: OpenAI, model: string, input: WriteInput, used?: (inputTokens: number, outputTokens: number) => void): Promise<string | null> {
   const tone = input.tone === 'formal' ? 'polite and formal' : 'warm, friendly and short, one emoji at most';
   const res = await client.chat.completions.create({
     model, max_completion_tokens: 1000,
@@ -21,6 +21,7 @@ Reply with the reply text only.` },
       { role: 'user', content: `FACTS:\n${input.facts}\n\n<customer_message>${input.customerText}</customer_message>` },
     ],
   });
+  used?.(res.usage?.prompt_tokens ?? 0, res.usage?.completion_tokens ?? 0);
   const text = res.choices[0]?.message?.content?.trim();
   return text || null;
 }

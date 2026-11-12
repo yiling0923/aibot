@@ -51,10 +51,13 @@ describe.skipIf(!reachable)('the merchant page (needs TEST_DATABASE_URL)', () =>
     expect(before.merchant.entries).toBeGreaterThan(0); expect(before.merchant.logins).toContain('luckypay');
     expect(before.livechat.baseUrl).toBe('http://bot.example.test:3000');                // the address of the open page
     expect(before.livechat.askUrl).toBe('http://bot.example.test:3000/api/v1/ai/ask');
-    expect(before.livechat.keys).toEqual([]);
+    expect(before.livechat.keys).toEqual([]); const chatsBefore = before.livechat.liveChats7d;       // the sample data counts as real chats
     const made = (await as(admin, 'POST', '/api/admin/merchants/MERCH_A/bot-key', {})).json();
+    await app.inject({ method: 'POST', url: '/api/v1/ai/ask', payload: { question: 'depo how' }, headers: { authorization: 'Bearer ' + made.key } });   // one real chat from LiveChat
+    await new Promise((r) => setTimeout(r, 300));                                         // the chat is saved in the background
     const after = (await as(admin, 'GET', '/api/admin/merchants/MERCH_A/connection')).json();
     expect(after.livechat.keys).toHaveLength(1); expect(after.livechat.keys[0].prefix).toBe(made.key.slice(0, 8));
+    expect(after.livechat.liveChats7d).toBe(chatsBefore + 1); expect(after.livechat.keys[0].lastUsedAt).not.toBeNull();
     expect(JSON.stringify(after)).not.toContain(made.key);                               // the key itself is never shown again
     await as(admin, 'POST', '/api/admin/merchants/MERCH_A/bot-key', {});                 // replace: the old one is stopped and not listed as active
     const again = (await as(admin, 'GET', '/api/admin/merchants/MERCH_A/connection')).json();

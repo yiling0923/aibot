@@ -33,7 +33,7 @@ export function merchantPageRoutes(app: FastifyInstance, ctx: MerchantPageCtx) {
     const [m] = await q(pool, 'SELECT code, name, default_language FROM merchants WHERE code = ?', [t.code]);
     const [st] = await q(pool, `SELECT tone FROM ${tbl(t.db, 'settings')} WHERE id = 1`);
     const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
-    const [live] = await q(pool, `SELECT COUNT(*) AS n, MAX(created_at) AS last FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND created_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`).catch(() => [{ n: 0, last: null }]);
+    const [live] = await q(pool, `SELECT COUNT(*) AS n, MAX(started_at) AS last FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND started_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`);
     const logins = (await q(pool, 'SELECT u.username FROM admin_users u JOIN merchants m ON m.id = u.merchant_id WHERE m.code = ? ORDER BY u.username', [t.code])).map((r) => r.username as string);
     const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol), host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost');
     const baseUrl = ctx.publicUrl || `${proto}://${host}`;
