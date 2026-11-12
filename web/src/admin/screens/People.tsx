@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { IconBtn, Modal } from '../ui';
@@ -7,7 +8,7 @@ interface PeopleData { merchants: { code: string; name: string; tone: string; en
 type Dlg = { kind: 'merchant' } | { kind: 'user' } | { kind: 'reset'; user: string } | null;
 
 export default function People() {
-  const p = usePanel();
+  const p = usePanel(); const nav = useNavigate();
   const [P, setP] = useState<PeopleData>({ merchants: [], users: [] }); const [dlg, setDlg] = useState<Dlg>(null);
   const load = useCallback(async () => setP(await api<PeopleData>('/api/admin/people')), []);
   useEffect(() => { load().catch((e: Error) => p.toast('Could not load: ' + e.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
@@ -17,9 +18,9 @@ export default function People() {
   };
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Merchants</h2><div className="sub">Each merchant has its own knowledge base, words and settings. A new merchant starts empty.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>Add merchant</button></div>
+      <div className="card"><div className="head"><div><h2>Merchants</h2><div className="sub">Each merchant has its own knowledge base, words and settings. A new merchant starts empty. Click a merchant's name to open its page: the LiveChat connection, the bot key and its own AI keys.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>Add merchant</button></div>
         <table style={{ marginTop: 10 }}><thead><tr><th>Merchant</th><th>Code</th><th>Tone</th><th className="num">Entries</th><th>Logins</th></tr></thead><tbody>
-          {P.merchants.map((m) => <tr key={m.code}><td><b>{m.name}</b></td><td className="mono">{m.code}</td><td>{m.tone}</td><td className="num">{m.entries}</td><td>{m.logins.length ? m.logins.join(', ') : <span className="sub">none</span>}</td></tr>)}</tbody></table></div>
+          {P.merchants.map((m) => <tr key={m.code}><td><b><a href={'/admin/merchants/' + m.code} onClick={(e) => { e.preventDefault(); nav('/admin/merchants/' + m.code); }}>{m.name}</a></b></td><td className="mono">{m.code}</td><td>{m.tone}</td><td className="num">{m.entries}</td><td>{m.logins.length ? m.logins.join(', ') : <span className="sub">none</span>}</td></tr>)}</tbody></table></div>
       <div className="card"><div className="head"><div><h2>Logins</h2><div className="sub">Staff are locked to one merchant. Admins see every merchant.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'user' })}>Add login</button></div>
         <table style={{ marginTop: 10 }}><thead><tr><th>Username</th><th>Role</th><th>Merchant</th><th></th></tr></thead><tbody>
           {P.users.map((u) => (

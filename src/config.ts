@@ -8,6 +8,10 @@ export const config = {
   tokenSecret: process.env.CUSTOMER_TOKEN_SECRET ?? 'demo-secret',
   /** Signs the login cookie of the control panel. Set your own long random value for real use. */
   sessionSecret: process.env.SESSION_SECRET ?? 'dev-session-secret-change-me',
+  /** Makes the AI keys saved in the panel unreadable in the database. Set your own long random value for real use (empty: the session secret is used). */
+  secretsKey: process.env.SECRETS_KEY ?? '',
+  /** The address LiveChat should use to reach this bot, shown on the merchant page (empty: the address of the page that is open). */
+  publicUrl: (process.env.PUBLIC_URL ?? '').replace(/\/+$/, ''),
   /** Test helpers (fake customer tokens). Must be off in production. */
   devTools: (process.env.DEV_TOOLS ?? 'on') !== 'off',
   anthropicKey: process.env.ANTHROPIC_API_KEY ?? '',

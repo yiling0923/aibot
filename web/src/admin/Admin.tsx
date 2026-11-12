@@ -13,6 +13,7 @@ import Ranking from './screens/Ranking';
 import TestChat from './screens/TestChat';
 import Settings from './screens/Settings';
 import People from './screens/People';
+import MerchantPage from './screens/MerchantPage';
 import History from './screens/History';
 import Report from './screens/Report';
 import Unmatched from './screens/Unmatched';
@@ -60,7 +61,7 @@ function Shell() {
           {NAV_GROUPS.map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
               {items.filter(([k]) => k !== 'users' || p.isAdmin).map(([k, l]) => (
-                <button key={k} type="button" aria-current={k === view ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
+                <button key={k} type="button" aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
                   <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}{k === 'unm' && openUnmatched ? <span className="cnt">{openUnmatched}</span> : null}
                 </button>
               ))}
@@ -92,6 +93,7 @@ function Shell() {
             <Route path="chat" element={<TestChat />} />
             <Route path="set" element={<Settings />} />
             <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />
+            <Route path="merchants/:code" element={p.isAdmin ? <MerchantPage /> : <div className="card"><h2>Merchant</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="hist" element={<History />} />
             <Route path="*" element={<Navigate to="/admin/kb" replace />} />
           </Routes>

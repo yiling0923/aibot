@@ -175,7 +175,7 @@ export class Bot {
     const unclear = r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard && !r.ks.T.length && !r.ks.A.length;
     if (unclear && this.ai?.canPick) {
       const pick = await this.ai.pickEntry({
-        merchantName: c.name, text: query, lang: r.lang,
+        merchant: s.merchant, merchantName: c.name, text: query, lang: r.lang,
         entries: this.engine.entriesOf(s.merchant).map((e) => ({ key: e.intentKey, topic: e.topic, aspect: e.aspect, examples: e.translations[r.lang]?.questionExamples ?? e.translations.en?.questionExamples ?? [] })),
       });
       const e = pick && pick.confidence >= PICK_MIN_CONFIDENCE ? this.engine.entry(s.merchant, pick.intent) : undefined;
@@ -258,7 +258,7 @@ export class Bot {
   private async composeReply(s: Session, customerText: string, facts: string, lang: Lang, turn: Turn): Promise<string> {
     const c = this.cfg(s);
     if (this.ai?.canWrite && facts) {
-      const w = await this.ai.writeReply({ merchantName: c.name, tone: c.tone, lang, customerText, facts });
+      const w = await this.ai.writeReply({ merchant: s.merchant, merchantName: c.name, tone: c.tone, lang, customerText, facts });
       if (w) {
         const v = checkReply(w, facts);
         if (v.ok) { turn.trace.ai = { ...((turn.trace.ai as object) ?? {}), written: true }; return w.trim(); }

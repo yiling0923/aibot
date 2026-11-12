@@ -2,6 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
 import { claudeDescribe, claudePick, claudeTranslate, makeAnthropic } from './claude';
 import { makeOpenAI, openaiWrite } from './openai';
+import type { MerchantAiKeys } from './merchantKeys';
 import type { AiService, DescribeInput, PickInput, TranslateInput, WriteInput } from './types';
 
 export * from './types';
@@ -48,5 +49,32 @@ export function createAi(o: AiOptions): AiService {
     describeWord: (i: DescribeInput) => (claude ? run('claude describe', () => claudeDescribe(claude, claudeModel, i)) : Promise.resolve(null)),
     translate: (i: TranslateInput) => (claude ? run('claude translate', () => claudeTranslate(claude, claudeModel, i)) : Promise.resolve(null)),
     writeReply: (i: WriteInput) => (gpt ? run('chatgpt write', () => openaiWrite(gpt, o.openaiModel!, i)) : Promise.resolve(null)),
+  };
+}
+
+/** The AI service with each merchant's own keys: a merchant that saved a Claude or ChatGPT key uses it, the others use the shared key from .env.
+ *  Callers say which merchant a call is for (the `merchant` field). Nothing changes for a merchant without its own key. */
+export function createRoutedAi(base: AiOptions, keys: MerchantAiKeys): AiService {
+  const shared = createAi(base);
+  const built = new Map<string, { sig: string; svc: AiService }>();
+  const forMerchant = async (merchant?: string): Promise<AiService> => {
+    if (!merchant) return shared;
+    const k = await keys.resolve(merchant);
+    if (!k.anthropic && !k.openai) return shared;
+    const sig = `${k.anthropic ?? ''}|${k.openai ?? ''}`, hit = built.get(merchant);
+    if (hit && hit.sig === sig) return hit.svc;
+    const svc = createAi({ ...base, anthropicKey: k.anthropic ?? base.anthropicKey, openaiKey: k.openai ?? base.openaiKey,
+      anthropic: k.anthropic ? undefined : base.anthropic, openai: k.openai ? undefined : base.openai });
+    built.set(merchant, { sig, svc }); return svc;
+  };
+  return {
+    get canPick() { return shared.canPick || keys.anyHas.anthropic; },
+    get canWrite() { return shared.canWrite || (keys.anyHas.openai && !!base.openaiModel); },
+    get canDescribe() { return shared.canDescribe || keys.anyHas.anthropic; },
+    get canTranslate() { return shared.canTranslate || keys.anyHas.anthropic; },
+    pickEntry: async (i: PickInput) => (await forMerchant(i.merchant)).pickEntry(i),
+    writeReply: async (i: WriteInput) => (await forMerchant(i.merchant)).writeReply(i),
+    describeWord: async (i: DescribeInput) => (await forMerchant(i.merchant)).describeWord(i),
+    translate: async (i: TranslateInput) => (await forMerchant(i.merchant)).translate(i),
   };
 }

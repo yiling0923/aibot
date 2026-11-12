@@ -15,7 +15,9 @@ import { adminRoutes } from '../admin/routes';
 import { ensureVersions } from '../admin/versions';
 import { connectorRoutes } from '../connector/routes';
 import { Tenants } from '../db/tenants';
-import { createAi, type AiService } from '../ai';
+import { createRoutedAi, type AiService } from '../ai';
+import { MerchantAiKeys } from '../ai/merchantKeys';
+import { merchantPageRoutes } from '../admin/merchantPage';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
 import { COOKIE, clearCookie, makeSession, parseCookies, readSession, sessionCookie, type SessionUser } from '../auth/session';
@@ -44,7 +46,9 @@ export async function buildApp(opts: AppOptions = {}) {
   const pool = opts.pool ?? createPool();
   const app = Fastify({ logger: opts.logger ?? true });
   // Claude and ChatGPT are optional: with no keys set, every AI step is off and the bot answers from its own rules.
-  const ai = opts.ai ?? createAi({ anthropicKey: config.anthropicKey, claudeModel: config.claudeModel, openaiKey: config.openaiKey, openaiModel: config.openaiModel, maxCallsPerHour: config.aiMaxCallsPerHour });
+  // A merchant that saved its own key on the merchant page uses that key; every other merchant uses the shared one from .env.
+  const aiKeys = new MerchantAiKeys(pool); await aiKeys.refresh();
+  const ai = opts.ai ?? createRoutedAi({ anthropicKey: config.anthropicKey, claudeModel: config.claudeModel, openaiKey: config.openaiKey, openaiModel: config.openaiModel, maxCallsPerHour: config.aiMaxCallsPerHour }, aiKeys);
   if (fs.existsSync(WEB)) await app.register(fastifyStatic, { root: WEB });
 
   let bot: Bot | null = null;
@@ -57,6 +61,7 @@ export async function buildApp(opts: AppOptions = {}) {
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
   connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs });
+  merchantPageRoutes(app, { pool, getBot, store, aiKeys, timeoutMs: config.askTimeoutMs, shared: { anthropic: !!config.anthropicKey, openai: !!config.openaiKey && !!config.openaiModel }, publicUrl: config.publicUrl });
   await new Tenants(pool).migrateAll().then((a) => { if (a.length) app.log.info(`updated merchant databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the merchant databases (run npm run db:migrate)'));
   await ensureVersions(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
@@ -134,7 +139,7 @@ export async function buildApp(opts: AppOptions = {}) {
   /** Claude writes a short note for each new keyword (a few per message), in the background so the customer never waits. */
   const describeNew = async (b: Bot, merchant: string, words: string[], sample: string) => {
     for (const word of words.slice(0, 5)) {
-      const d = await ai.describeWord({ word, sample, merchantName: b.engine.merchant(merchant).name, topics: Object.keys(b.knowledge.globalAliases) });
+      const d = await ai.describeWord({ merchant, word, sample, merchantName: b.engine.merchant(merchant).name, topics: Object.keys(b.knowledge.globalAliases) });
       if (d) await store.setNote(merchant, word, d.note, d.type);
     }
   };

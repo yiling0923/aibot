@@ -49,6 +49,10 @@ Open the panel at `http://<bot-host>:3000`.
 
 ## 3. Issue the bot key for a merchant
 
+**In the panel (admin):** open **Merchants & logins**, click the merchant's name, and use the **LiveChat connection** card. It shows the address to paste into LiveChat, makes the key (shown once, with a Copy button), and has **Replace key** and **Stop key**. **Test the link** sends "Can you help?" the way LiveChat does. The same page holds the merchant's own Claude and ChatGPT keys (encrypted; only the last 4 characters are shown). Set `PUBLIC_URL` in `.env` when LiveChat must reach the bot at an address other than the one you open the panel with, and `SECRETS_KEY` to a long random value (do not change it later).
+
+**From the command line:**
+
 ```bash
 docker compose exec ai-bot npm run key:create -- MERCH_CODE
 ```

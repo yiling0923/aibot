@@ -26,7 +26,7 @@ export interface AskResponse {
   topic: string | null; keywords: string[]; choices: Choice[];
 }
 interface State { session: Session; choices: Button[] | null; lang: Lang | null }
-export interface AskDeps { pool: Pool; bot: Bot; store: Store; timeoutMs?: number }
+export interface AskDeps { pool: Pool; bot: Bot; store: Store; timeoutMs?: number; /** 'test' for the panel's "Test the link" button: saved as a test chat, not as live traffic. Default 'live'. */ source?: 'live' | 'test' }
 
 const SESSION_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
@@ -137,9 +137,9 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     };
     if (!abandoned && turn.log) {
       const matched = turn.trace.decision === 'ANSWER' ? ((turn.trace.top as { id?: number } | undefined)?.id ?? null) : null;
-      await store.hear(merchant, turn.log.text, turn.log.lang, turn.log.notUnderstood, 'live');
+      await store.hear(merchant, turn.log.text, turn.log.lang, turn.log.notUnderstood, deps.source ?? 'live');
       void store.logTurn({ merchant, sessionKey: id, customerRef: member?.id ?? null, text: turn.log.text, lang: turn.log.lang, decision: turn.log.decision, confidence: res.confidence,
-        reply: answer, matchedKbId: matched, why: String(turn.trace.why ?? '').slice(0, 500), source: 'live' });
+        reply: answer, matchedKbId: matched, why: String(turn.trace.why ?? '').slice(0, 500), source: deps.source ?? 'live' });
     }
     return res;
   };

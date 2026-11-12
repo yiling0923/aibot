@@ -158,7 +158,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const store = new Store(pool); let done = 0;
     for (const r of rows) {
       const sample = (await q(pool, `SELECT text FROM ${M} WHERE text LIKE ? ORDER BY created_at DESC LIMIT 1`, [`%${String(r.word).replace(/[%_\\]/g, '\\$&')}%`]))[0]?.text ?? String(r.word);
-      const d = await ctx.ai.describeWord({ word: r.word, sample, merchantName, topics });
+      const d = await ctx.ai.describeWord({ merchant, word: r.word, sample, merchantName, topics });
       if (d) { await store.setNote(merchant, r.word, d.note, d.type); done++; }
     }
     return { done, tried: rows.length };
@@ -177,7 +177,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     if (!ctx.ai.canTranslate) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });
     const examples = (Array.isArray(b.examples) ? b.examples : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20);
     const name = (await tenants.get(b.merchant))?.name ?? b.merchant;
-    const t = await ctx.ai.translate({ merchantName: name, from, to, answer: answer.slice(0, 4000), examples });
+    const t = await ctx.ai.translate({ merchant: b.merchant, merchantName: name, from, to, answer: answer.slice(0, 4000), examples });
     if (!t) return reply.code(502).send({ error: 'The translation could not be made. Try again in a moment.' });
     const check = checkTranslation(t.answer, answer);
     if (!check.ok) return reply.code(422).send({ error: `The translation was refused because ${check.reason}. Try again, or write it yourself.` });
