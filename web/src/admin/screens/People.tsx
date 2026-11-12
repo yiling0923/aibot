@@ -59,7 +59,7 @@ function MerchantDialog({ onClose, onDone }: { onClose: () => void; onDone: () =
       <div className="form">
         <label className="fld"><span>Name</span><input placeholder="e.g. W88" autoFocus value={f.name} onChange={on('name')} /></label>
         <label className="fld"><span>Code (letters and digits, optional)</span><input placeholder="made from the name" value={f.code} onChange={on('code')} /></label>
-        <label className="fld"><span>Main language</span><select value={f.lang} onChange={on('lang')}><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="zh">中文</option></select></label>
+        <label className="fld"><span>Main language</span><select value={f.lang} onChange={on('lang')}><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="zh">中文</option><option value="vi">Tiếng Việt</option><option value="th">ไทย</option><option value="tl">Filipino</option></select></label>
         <label className="fld"><span>Tone</span><select value={f.tone} onChange={on('tone')}><option value="friendly">Friendly</option><option value="formal">Formal</option></select></label>
         <label className="fld"><span>Human group for handoff (optional)</span><input type="number" value={f.hg} onChange={on('hg')} /></label>
         <label className="fld"><span>LiveChat group (optional)</span><input type="number" value={f.lg} onChange={on('lg')} /></label>

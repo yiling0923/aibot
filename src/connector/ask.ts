@@ -5,6 +5,7 @@ import { Tenants, tbl } from '../db/tenants';
 import { newSession, type Bot, type Button, type Session, type Turn } from '../bot/responder';
 import type { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
+import { fold } from '../engine/engine';
 
 /**
  * The LiveChat connector. LiveChat calls POST /api/v1/ai/ask with a question; this turns it into a bot decision and back.
@@ -43,15 +44,16 @@ export function parseMember(raw: unknown): Member | null {
   return { id: sid, name: String(o.name ?? '').slice(0, 255), rank: o.rank != null ? String(o.rank).slice(0, 64) : o.member_rank != null ? String(o.member_rank).slice(0, 64) : undefined };
 }
 
-const NUMBER_WORDS: Record<string, number> = { first: 1, '1st': 1, one: 1, second: 2, '2nd': 2, two: 2, third: 3, '3rd': 3, three: 3, pertama: 1, kedua: 2, ketiga: 3, '第一': 1, '第二': 2, '第三': 3, '一': 1, '二': 2, '三': 3 };
-const clean = (s: string) => s.toLowerCase().replace(/[.,!?;:'"()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();
+const NUMBER_WORDS: Record<string, number> = { first: 1, '1st': 1, one: 1, second: 2, '2nd': 2, two: 2, third: 3, '3rd': 3, three: 3, pertama: 1, kedua: 2, ketiga: 3, '第一': 1, '第二': 2, '第三': 3, '一': 1, '二': 2, '三': 3,
+  mot: 1, hai: 2, ba: 3, nhat: 1, 'หนึ่ง': 1, 'สอง': 2, 'สาม': 3, una: 1, ikalawa: 2, pangalawa: 2, ikatlo: 3, pangatlo: 3 };
+const clean = (s: string) => fold(s.toLowerCase()).replace(/[.,!?;:'"()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();          // accents do not matter (Vietnamese)
 
 /** Which of the offered choices a reply means: "2", "the second one", or words from the choice itself. Null when it is a new question. */
 export function matchChoice(text: string, choices: Button[]): Button | null {
   const t = clean(text); if (!t) return null;
   const num = /^(?:no\.?\s*)?#?(\d{1,2})$/.exec(t);
   if (num) { const i = Number(num[1]); return i >= 1 && i <= choices.length ? choices[i - 1] : null; }
-  const ord = /^(?:the\s+|yang\s+|option\s+|pilihan\s+|选项\s*)?([a-z0-9一二三第]+?)(?:\s+one|\s+yang|\s*个|\s*项)?$/.exec(t);
+  const ord = /^(?:the\s+|yang\s+|option\s+|pilihan\s+|lua chon\s+|so\s+|cai\s+|ข้อ\s*|ตัวเลือก\s*|ang\s+|yung\s+|opsyon\s+|选项\s*)?([a-z0-9฀-๿一二三第]+?)(?:\s+one|\s+yang|\s+thu|\s*個|\s*个|\s*项)?$/.exec(t);
   if (ord && NUMBER_WORDS[ord[1]] && NUMBER_WORDS[ord[1]] <= choices.length) return choices[NUMBER_WORDS[ord[1]] - 1];
   const labels = choices.map((c) => ({ c, l: clean(c.label) }));
   const exact = labels.filter((x) => x.l === t); if (exact.length === 1) return exact[0].c;

@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import type { Acct, MessageTrace, PickTrace, Trace } from './chatTypes';
 
-const LANGN: Record<string, string> = { zh: '中文', ms: 'Bahasa Melayu', en: 'English' };
+const LANGN: Record<string, string> = { zh: '中文', ms: 'Bahasa Melayu', en: 'English', vi: 'Tiếng Việt', th: 'ไทย', tl: 'Filipino' };
 const DEC: Record<string, [string, string]> = {
   AMOUNT: ['info', 'Amount message'], ACCOUNT: ['info', 'Account lookup'], REFUSE: ['warn', 'Refuse for security'], SMALLTALK: ['info', 'Greeting'], ANSWER: ['ok', 'Answer'],
   CLARIFY: ['warn', 'Show 2 buttons'], CHOICE: ['info', 'Show choice buttons'], HANDOFF: ['warn', 'Hand off to human'], REASK: ['warn', 'Ask again first'], ABUSE: ['warn', 'Reply kindly'],

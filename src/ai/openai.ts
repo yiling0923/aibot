@@ -1,7 +1,7 @@
 import OpenAI from 'openai';
 import type { WriteInput } from './types';
 
-const LANGUAGE: Record<string, string> = { en: 'English', ms: 'Bahasa Melayu', zh: 'Chinese' };
+const LANGUAGE: Record<string, string> = { en: 'English', ms: 'Bahasa Melayu', zh: 'Chinese', vi: 'Vietnamese', th: 'Thai', tl: 'Filipino (Tagalog)' };
 
 export function makeOpenAI(apiKey: string, fetchImpl?: typeof fetch) {
   return new OpenAI({ apiKey, timeout: 8000, maxRetries: 1, ...(fetchImpl ? { fetch: fetchImpl } : {}) });

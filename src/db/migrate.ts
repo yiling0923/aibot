@@ -5,12 +5,13 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { getPool, closePool, type Pool } from './pool';
 import { Tenants, ident, migrateMerchantDb } from './tenants';
 import { splitIntoMerchantDatabases } from './steps/008_merchant_databases';
+import { addLanguages } from './steps/012_languages';
 import { allowWipe } from './guard';
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
 
 /** Steps written in code (they move data, which plain SQL cannot do). They run in name order together with the .sql files. */
-const STEPS: Record<string, (pool: Pool) => Promise<void>> = { '008_merchant_databases': splitIntoMerchantDatabases };
+const STEPS: Record<string, (pool: Pool) => Promise<void>> = { '008_merchant_databases': splitIntoMerchantDatabases, '012_languages': addLanguages };
 
 /** Brings the main database and every merchant database up to date.
  *  Main database: the files in db/migrations (and the code steps), each once, in name order.

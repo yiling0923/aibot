@@ -36,7 +36,7 @@ export interface Turn {
 
 const ACCT_TOPICS = ['balance', 'transactions', 'points'];
 const TOOLNAME: Record<string, string> = { balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
-const sp = (lang: Lang) => (lang === 'zh' ? '' : ' ');
+const sp = (lang: Lang) => (lang === 'zh' ? '' : ' ');   // Chinese has no space between sentences (Thai and Vietnamese do)
 
 export class Bot {
   readonly engine: Engine;

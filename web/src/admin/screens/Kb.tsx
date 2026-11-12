@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { ASPECT_LABEL, LANGS, LN, clone, langState, slug, topicList, isZh, type Entry } from '../model';
+import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, clone, langState, slug, topicList, guessLang, emptyWords, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 
 type Tr = { question_examples: string[]; answer_text: string };
@@ -17,7 +17,7 @@ export default function Kb() {
   const loc = useLocation(); const nav = useNavigate(); const resolveAfter = useRef<string | null>(null);
   const all = p.draft.kb.filter((e) => e.merchant === p.merchant);
   const list = all.filter((e) => (status === 'all' || e.status === status) && (!q || (e.intent_key + ' ' + LANGS.map((l) => trOf(e, l).answer_text).join(' ')).toLowerCase().includes(q.toLowerCase())));
-  const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => LANGS.some((l) => langState(e, l) !== 'on')).length;
+  const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => CORE_LANGS.some((l) => langState(e, l) !== 'on')).length;
 
   const open = (e: Entry | null, prefill?: { lang: string; text: string }) => {
     const src = e ? clone(e) : blank(p.merchant);
@@ -89,7 +89,7 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
   const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...t, question_examples: [...t.question_examples, v] } } }); };
   const suggest = () => {
     const base = t.question_examples[0] || (ed.intent_key || 'question').replace(/_/g, ' ');
-    const sfx = ({ en: ['pls', 'boss', 'ya'], ms: ['tolong', 'boss', 'lah'], zh: ['请问', '老板', '呀'] } as Record<string, string[]>)[ed.tab];
+    const sfx = ({ en: ['pls', 'boss', 'ya'], ms: ['tolong', 'boss', 'lah'], zh: ['请问', '老板', '呀'], vi: ['nhé', 'shop', 'giúp mình'], th: ['ค่ะ', 'ครับ', 'หน่อย'], tl: ['po', 'boss', 'naman'] } as Record<string, string[]>)[ed.tab];
     const out = ed.tab === 'zh' ? [sfx[0] + base, base + sfx[2], sfx[1] + base] : [base + ' ' + sfx[0], sfx[1] + ' ' + base, base + ' ' + sfx[2]];
     set({ sug: { ...ed.sug, [ed.tab]: out } });
   };
@@ -105,8 +105,8 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
     const clean: Entry = { ...rest, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
     p.edit((d, note) => {
       if (newTopic && !d.aliases[newTopic]) {
-        const byl: Record<string, string[]> = { en: [newTopic], ms: [], zh: [] };
-        newTopicW.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean).forEach((w) => { const l = isZh(w) ? 'zh' : 'en'; if (!byl[l].includes(w)) byl[l].push(w); });
+        const byl: Record<string, string[]> = { ...emptyWords(), en: [newTopic] };
+        newTopicW.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean).forEach((w) => { const l = guessLang(w); if (!byl[l].includes(w)) byl[l].push(w); });
         d.aliases[newTopic] = byl; note('Added topic "' + newTopic + '"');
       }
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
@@ -141,6 +141,7 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
         {ed.tab === 'en'
           ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['ms', 'zh'])}>{busy ? 'Translating…' : 'Translate to Malay and Chinese'}</button>
           : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo([ed.tab])}>{busy ? 'Translating…' : `Translate from English to ${LN[ed.tab]}`}</button>}
+        {ed.tab === 'en' && <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['vi', 'th', 'tl'])}>{busy ? 'Translating…' : 'Translate to Vietnamese, Thai and Filipino'}</button>}
         <span className="sub">{p.ai.translate ? 'The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.' : 'Translating needs the AI. Add the Anthropic key to .env.'}</span>
       </div>
       <div><h3>Example questions ({t.question_examples.length}) <span className="sub">at least 3, include slang</span></h3>

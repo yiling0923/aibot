@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePanel } from '../store';
-import { LANGS, LN, findDup, isZh, slug } from '../model';
+import { LANGS, LANG_NAMES, LN, findDup, guessLang, emptyWords, slug } from '../model';
 
 const TABS: [string, string][] = [['short', 'Topics'], ['aspect', 'Question words'], ['small', 'Greetings'], ['filler', 'Fillers'], ['block', 'Block lists']];
 const SMALL_NAMES: Record<string, string> = { morning: 'Morning greetings', greeting: 'Other greetings', callout: 'Calling for attention', thanks: 'Thanks', bye: 'Goodbye', ack: 'Short acknowledgements' };
@@ -28,7 +28,7 @@ export default function Topics() {
   const [shown, setShown] = useState(0);
   useEffect(() => { setShown(document.querySelectorAll('#kwlists .chip').length); });
 
-  useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }), 60); } });
+  useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 60); } });
 
   const done = (msg: string, chip: string, word?: string) => {
     if (word) setFresh((s) => new Set(s).add(word.toLowerCase()));
@@ -91,7 +91,7 @@ export default function Topics() {
         <details className="fold"><summary>＋ Add a topic or keyword</summary><div className="addbox"><AddBox tab={cur} dup={dup} done={done} /></div></details>
         {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 220 }} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ['en', 'English'], ['ms', 'Malay'], ['zh', 'Chinese']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <span className="sub">{shown} words shown</span></div>
         <div id="kwlists" ref={listRef}>{lists()}</div>
       </div></div>
@@ -119,8 +119,8 @@ function AddBox({ tab, dup, done }: { tab: string; dup: (v: string) => boolean; 
   const addTopic = () => {
     const n = slug(v('tp_n')); if (need(n, 'Type a name first')) return;
     if (d.aliases[n]) return p.toast('The topic "' + n + '" already exists');
-    const byl: Record<string, string[]> = { en: [n], ms: [], zh: [] };
-    v('tp_w').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean).forEach((w) => { const l = isZh(w) ? 'zh' : 'en'; if (!byl[l].includes(w)) byl[l].push(w); });
+    const byl: Record<string, string[]> = { ...emptyWords(), en: [n] };
+    v('tp_w').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean).forEach((w) => { const l = guessLang(w); if (!byl[l].includes(w)) byl[l].push(w); });
     p.edit((x, note) => { x.aliases[n] = byl; note('Added topic "' + n + '"'); }); done('Topic "' + n + '" created. You can now assign it to entries.', 'topic: ' + n); clear();
   };
   const addWord = (kind: 'filler' | 'aspect' | 'small' | 'guard') => {

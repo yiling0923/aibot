@@ -1,5 +1,5 @@
 import { usePanel } from '../store';
-import { isZh } from '../model';
+import { guessLang, emptyWords } from '../model';
 
 /** Puts many keywords into a list at once (rank and keyword screens). Returns what was done, or an error text. */
 export function useAssign() {
@@ -11,7 +11,7 @@ export function useAssign() {
     p.edit((d, note) => {
       words.forEach((w) => {
         if (p.status(w).t !== 'Not set yet') { skipped.push(w); return; }
-        const lg = p.kwMap[w]?.lg || (isZh(w) ? 'zh' : 'en'); const lw = w.toLowerCase();
+        const lg = p.kwMap[w]?.lg || guessLang(w); const lw = w.toLowerCase();
         if (kind === 'filler') (d.fillers[lg] = d.fillers[lg] || []).push(lw);
         if (kind === 'rude') (d.guard.abuse[lg] = d.guard.abuse[lg] || []).push(lw);
         if (kind === 'mild') (d.guard.abuse_soft[lg] = d.guard.abuse_soft[lg] || []).push(lw);

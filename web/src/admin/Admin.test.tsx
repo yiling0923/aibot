@@ -165,4 +165,16 @@ describe('Control panel', () => {
     expect(await screen.findByText('Only an admin can use this screen.')).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Usage & billing' })).toBeNull();                 // not in the menu either
   });
+
+  it('offers Vietnamese, Thai and Filipino next to English, Malay and Chinese', async () => {
+    open('admin', '/admin/kw');
+    const pick = ((await screen.findAllByLabelText('Language')) as HTMLSelectElement[]).find((x) => [...x.options].some((o) => o.textContent === 'All languages'))!;
+    expect([...pick.options].map((o) => o.textContent)).toEqual(['All languages', 'English', 'Malay', 'Chinese', 'Vietnamese', 'Thai', 'Filipino']);
+  });
+  it('lets a new merchant use Vietnamese, Thai or Filipino as its main language', async () => {
+    open('admin', '/admin/users');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add merchant' }));
+    const main = (await screen.findByLabelText('Main language')) as HTMLSelectElement;
+    expect([...main.options].map((o) => o.value)).toEqual(['en', 'ms', 'zh', 'vi', 'th', 'tl']);
+  });
 });

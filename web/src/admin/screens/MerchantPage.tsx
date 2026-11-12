@@ -14,7 +14,7 @@ interface Conn {
 interface LinkTest { ok: boolean; ms: number; hasKey: boolean; answer: string; decision: string; choices: { label: string }[] }
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never');
-const LANG: Record<string, string> = { en: 'English', ms: 'Malay', zh: 'Chinese' };
+const LANG: Record<string, string> = { en: 'English', ms: 'Malay', zh: 'Chinese', vi: 'Vietnamese', th: 'Thai', tl: 'Filipino' };
 
 /** One merchant: what LiveChat needs to reach its bot, its bot key, its own AI keys, and a button that tests the link. Admin only. */
 export default function MerchantPage() {

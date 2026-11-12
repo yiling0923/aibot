@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
+import { LANG_NAMES } from '../model';
 import { usePanel } from '../store';
 import { Pill } from '../ui';
 import { KeywordDrawer, SetKeywordModal } from './KeywordModals';
@@ -43,7 +44,7 @@ export default function Keywords() {
         <div className="quiet"><b>{all.length}</b> keywords saved · <b>{counts.unassigned}</b> not assigned yet · newest first{p.ai.describe ? '' : <> · <span title="Add the Anthropic key to .env">AI descriptions are off</span></>}</div></div>
       <div className="card rkfilter"><div className="head"><div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
         <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{[['en', 'English'], ['ms', 'Malay'], ['zh', 'Chinese']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <span className="sub">{list.length} keywords shown</span></div></div></div>
       <div className="card scroll">
         {sel.size > 0 && <div className="bulk"><b>{sel.size} selected</b><span className="tools"><select aria-label="Topic" value={topicNow} onChange={(e) => setTopic(e.target.value)}>{topics.map((k) => <option key={k}>{k}</option>)}</select>

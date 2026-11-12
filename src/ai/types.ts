@@ -14,7 +14,7 @@ export type WordType = (typeof WORD_TYPES)[number];
 export interface DescribeInput { merchant?: string; word: string; sample: string; merchantName: string; topics: string[] }
 export interface WordNote { note: string; type: WordType }
 
-export type TranslateLang = 'en' | 'ms' | 'zh';
+export type TranslateLang = 'en' | 'ms' | 'zh' | 'vi' | 'th' | 'tl';
 export interface TranslateInput { merchant?: string; merchantName: string; from: TranslateLang; to: TranslateLang; answer: string; examples: string[] }
 export interface Translation { answer: string; examples: string[] }
 

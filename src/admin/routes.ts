@@ -169,9 +169,9 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
   app.post<{ Body: { merchant: string; from?: string; to: string; answer: string; examples?: string[] } }>(`${A}/translate`, async (req, reply) => {
     const b = req.body ?? ({} as never);
     if (!mayUse(req, b.merchant)) return forbidden(reply);
-    const langs = ['en', 'ms', 'zh'] as const; type L = (typeof langs)[number];
+    const langs = ['en', 'ms', 'zh', 'vi', 'th', 'tl'] as const; type L = (typeof langs)[number];
     const from = (b.from ?? 'en') as L, to = b.to as L;
-    if (!langs.includes(from) || !langs.includes(to) || from === to) return reply.code(400).send({ error: 'Choose two different languages (en, ms or zh).' });
+    if (!langs.includes(from) || !langs.includes(to) || from === to) return reply.code(400).send({ error: 'Choose two different languages (en, ms, zh, vi, th or tl).' });
     const answer = String(b.answer ?? '').trim();
     if (!answer) return reply.code(400).send({ error: 'Write the answer first, then translate it.' });
     if (!ctx.ai.canTranslate) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });

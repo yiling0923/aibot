@@ -34,7 +34,7 @@ export class Store {
       const DAILY = (await this.t(merchant, 'keyword_daily'))!, U = (await this.t(merchant, 'unmatched_messages'))!;
       const words = tokensOf(text); const fresh: string[] = [];
       for (const w of words) {
-        const wl: Lang = /[一-鿿]/.test(w) ? 'zh' : lang;
+        const wl: Lang = /[一-鿿]/.test(w) ? 'zh' : /[฀-๿]/.test(w) ? 'th' : lang;
         const [r] = await this.pool.query<ResultSetHeader>(
           `INSERT INTO ${K}(word, language, source) VALUES(?,?,?) ON DUPLICATE KEY UPDATE hits = hits + 1, last_seen = CURRENT_TIMESTAMP`, [w, wl, source]);
         if (r.affectedRows === 1) fresh.push(w);          // 1 = inserted, 2 = updated an existing row

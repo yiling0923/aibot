@@ -3,6 +3,7 @@ import type { Pool } from '../db/pool';
 import { asJson } from '../db/pool';
 import { Tenants, ident, tbl } from '../db/tenants';
 import type { Knowledge, KbEntry, MerchantCfg, WordMap, Lang } from '../engine/types';
+import { LANGS } from '../engine/types';
 
 import type { Snapshot, SnapEntry, SnapSettings, Words, MerchantMeta } from './snapshotTypes';
 export type { Snapshot, SnapEntry, SnapSettings, Words, MerchantMeta } from './snapshotTypes';
@@ -21,6 +22,9 @@ export async function readMerchants(pool: Pool): Promise<MerchantMeta[]> {
 }
 
 /** Reads the whole editable knowledge base, drafts included: every merchant from its own database, the shared word lists from the main one. */
+/** An empty text for every language, so the panel always has a box to type in. */
+const blankTexts = (): Record<string, string> => Object.fromEntries(LANGS.map((l) => [l, '']));
+
 export async function readSnapshot(pool: Pool): Promise<Snapshot> {
   const tenants = await new Tenants(pool).list();
   const [merchants, aliases, aspects, small, guard, fillers] = await Promise.all([
@@ -62,8 +66,8 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     const on = new Set(tools.filter((x) => x.enabled).map((x) => x.tool));
     snap.settings[t.code] = {
       tone: st.tone, handoff_group: handoff.get(t.code) ?? null, answer: Number(st.answer_threshold), clarify: Number(st.clarify_threshold), abuse_close_after: st.abuse_close_after,
-      kind: { en: '', ms: '', zh: '', ...asJson<Record<string, string>>(st.kind_reply, {}) }, closing: asJson(st.closing_msg, {}), handoff: asJson(st.handoff_msg, {}),
-      max_choices: Number(st.max_choices ?? 3), more_help_on: !!(st.more_help_on ?? 1), more_help: { en: '', ms: '', zh: '', ...asJson<Record<string, string>>(st.more_help_msg, {}) },
+      kind: { ...blankTexts(), ...asJson<Record<string, string>>(st.kind_reply, {}) }, closing: asJson(st.closing_msg, {}), handoff: asJson(st.handoff_msg, {}),
+      max_choices: Number(st.max_choices ?? 3), more_help_on: !!(st.more_help_on ?? 1), more_help: { ...blankTexts(), ...asJson<Record<string, string>>(st.more_help_msg, {}) },
       tools: Object.fromEntries(TOOLS.map((k) => [k, k.endsWith('_status') ? true : on.has(k)])),
     };
   }

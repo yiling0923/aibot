@@ -10,6 +10,23 @@ import type {
  * ---------------------------------------------------------------------------------------------- */
 
 const CJK_RE = /[一-鿿]/;
+/** Scripts written without spaces between words (Chinese, Thai): their words are found as pieces of the text, not between spaces. */
+const NOSP_RE = /[฀-๿一-鿿]/;
+const THAI_RE = /[฀-๿]/;
+/** Vietnamese is written with many accents, and customers often leave them out. Both the message and every word list are folded to plain letters
+ *  (nạp tiền = nap tien), so one list entry matches both ways of typing. Other Latin-script languages have no accents here, so nothing changes. */
+export const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').normalize('NFC');
+const VI_ACCENT_RE = /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/i;
+const thaiSeg = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
+/** The words of a Thai text (Thai has no spaces). Falls back to pieces of 3 letters when the runtime has no word list. */
+const thaiWords = (t: string): string[] => {
+  const runs = t.match(/[฀-๿]+/g) ?? [];
+  if (!thaiSeg) return runs.flatMap((r) => r.match(/.{1,3}/g) ?? []);
+  return runs.flatMap((r) => [...thaiSeg.segment(r)].filter((x) => x.isWordLike).map((x) => x.segment));
+};
+/** The polite endings of Thai (ครับ ค่ะ คะ นะ ...) are whole words, never single letters. */
+const TH_PART = '(?:นะคะ|นะครับ|ครับ|ค่ะ|คะ|นะ|จ้ะ|จ๊ะ|ฮะ)';
+const TH_PARTICLES = new RegExp(TH_PART, 'g');
 const escRe = (p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GAP = 0.05;   // the best match must beat the second by this much (the answer / clarify limits are per merchant)
 // Kinds of question words. "problem" (rejected, failed, complaint) always goes to a human; "help" (what to do) is just noise.
@@ -17,18 +34,21 @@ const ASPECT_ORDER = ['time', 'limit', 'change', 'hours', 'how', 'problem', 'hel
 const ACCT_TOPICS = ['balance', 'transactions', 'points'];
 const TOOLNAME: Record<string, string> = { balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
 const SMALL_KINDS = ['morning', 'greeting', 'callout', 'thanks', 'bye', 'ack'];
-const CALL_PREFIX = ['boss', 'bos', 'bro', 'sis', 'sir', 'miss', 'kak', 'kakak', 'abang', 'bang', 'tuan', 'puan', 'oi', 'hoi', '老板'];
-const AMT_RE = /(?:(?:rm|myr)\s*)?(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)(?:\s*(?:rm|myr|ringgit|块|元))?|([一二三四五六七八九])\s*(百|千)/i;
+const CALL_PREFIX = ['boss', 'bos', 'bro', 'sis', 'sir', 'miss', 'kak', 'kakak', 'abang', 'bang', 'tuan', 'puan', 'oi', 'hoi', '老板', 'kuya', 'ate', 'maam', 'po', 'opo', 'anh oi', 'chi oi', 'em oi', 'แอดมิน', 'พี่'];
+const CUR = 'rm|myr|ringgit|块|元|vnd|dong|thb|baht|บาท|php|piso|₱';
+const AMT_RE = new RegExp('(?:(?:rm|myr|php|thb|vnd|₱)\\s*)?(\\d{1,3}(?:,\\d{3})+|\\d+(?:\\.\\d+)?)(?:\\s*(?:' + CUR + '|k(?![a-z])))?|([一二三四五六七八九])\\s*(百|千)', 'i');
 const CNUM: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9 };
-const AMT_WORDS = new Set(['cash', 'duit', 'wang', 'money', 'rm', 'myr', 'ringgit', 'pls', 'please', 'mau', 'ok']);
-const PAST_RE = /(deposited|withdrew|withdrawn|transferred|paid|sent|dah|sudah|tadi|semalam|yesterday|already|已经|昨天|刚才|刚刚)/i;
-const PERSONAL_RE = /(^|[^a-z])(my|mine|saya|aku|sy|belum|not|still|pending|yet|stuck|lambat|lewat|slow|delayed|late|dah|sudah|already)($|[^a-z])|我|还没|没到|没收到|未到|怎么还/i;
+const AMT_WORDS = new Set(['cash', 'duit', 'wang', 'money', 'rm', 'myr', 'ringgit', 'pls', 'please', 'mau', 'ok', 'tien', 'pera', 'salapi', 'php', 'piso', 'vnd', 'dong', 'thb', 'baht', 'po']);
+const PAST_RE = /(deposited|withdrew|withdrawn|transferred|paid|sent|dah|sudah|tadi|semalam|yesterday|already|已经|昨天|刚才|刚刚|hom qua|vua nap|vua rut|da nap|da rut|da chuyen|เมื่อวาน|เมื่อกี้|เพิ่งฝาก|เพิ่งถอน|ฝากแล้ว|ถอนแล้ว|โอนแล้ว|kahapon|kanina|nag-deposit na|nag-withdraw na|nagdeposit na|nagwithdraw na)/i;
+const PERSONAL_RE = /(^|[^a-z])(my|mine|saya|aku|sy|belum|not|still|pending|yet|stuck|lambat|lewat|slow|delayed|late|dah|sudah|already|cua toi|cua minh|chua|van|ko|akin|wala|hindi|pa rin|pa)($|[^a-z])|我|还没|没到|没收到|未到|怎么还|ของฉัน|ของผม|ของดิฉัน|ยังไม่/i;   // ownership, not just "I": in Vietnamese, Thai and Filipino "I / me" is also how a customer politely starts any question
 const MS_WORDS = new Set(('abang kakak bang orang okey faham selamat pagi petang malam terima kasih tq tqvm jumpa salam helo hai khabar sama macam mana nak berapa lama tak belum cara saya ada pukul buka lupa tarik duit sila boleh tukar salah nombor sahkan akaun lambat sangat masuk bonus promosi korang betul ni lah ke').split(' '));
+const VI_WORDS = new Set('khong nap rut tien lau nao lam sao cach toi minh xin chao khau quen khoan ngan chua roi duoc muon giup dich khuyen mai thuong ky nhe nha vay gio phut ngay hom nay oi alo cam on'.split(' '));
+const TL_WORDS = new Set("po opo paano magkano kailan gaano katagal ilang gusto ko mo ba naman salamat pwede puwede hindi wala bakit saan nasaan ang ng mga ako ikaw kayo namin natin pera hulog kuha pasok dumating sino ano anong yung nung lang din rin sige ayos kuya ate paki magandang umaga hapon gabi kumusta kamusta walang anuman tulong tulungan nakalimutan nakalimutang magdeposit magwithdraw mag nag tangina putangina gago tanga ulol bobo pota".split(' '));
 const BASE_FILLER = 'pls please plz tolong help nak nk mahu mau ingin want wanna gonna need would like can could may boleh to i im me my we saya sy aku kami ask tanya check about info any a the lah ke la ok yes ya';
 const BASE_SMALL_FILL = ['ok', 'okay', 'ya', 'la', 'lah', 'boss', 'bos', 'sir', 'miss', 'admin', 'cs', 'there', 'all', 'team', 'everyone', 'kak', 'abang', 'so', 'very', 'much', 'banyak', 'you', 'a', 'lot', 'for', 'the', 'info', 'help', 'your', 'ur', 'assistance', 'reply'];
 
 const flat = (m: Record<string, Record<string, string[]>> | undefined, key?: string): string[] =>
-  key ? Object.values(m?.[key] ?? {}).flat() : Object.values(m ?? {}).flatMap((x) => Object.values(x).flat());
+  (key ? Object.values(m?.[key] ?? {}).flat() : Object.values(m ?? {}).flatMap((x) => Object.values(x).flat())).map(fold);
 const compact = (s: string) => s.toLowerCase().replace(/[4@]/g, 'a').replace(/1/g, 'i').replace(/3/g, 'e').replace(/0/g, 'o').replace(/\$/g, 's').replace(/[^a-z]/g, '');
 const SIM_STOP = new Set('what is the a an to of do does i my me you your it its this that are can will be for and or if so at in on'.split(' '));
 const toks = (t: string): Set<string> => {
@@ -36,6 +56,7 @@ const toks = (t: string): Set<string> => {
   const words = t.match(/[a-z0-9_]+/g) || [];
   const keep = words.filter((w) => !SIM_STOP.has(w));
   (keep.length ? keep : words).forEach((w) => s.add(w));          // never remove every word
+  thaiWords(t).forEach((w) => s.add(w));
   (t.match(/[一-鿿]+/g) || []).forEach((r) => { if (r.length === 1) s.add(r); else for (let i = 0; i < r.length - 1; i++) s.add(r.slice(i, i + 2)); });
   return s;
 };
@@ -44,8 +65,9 @@ const reEsc = (p: string) => escRe(p) + (/[a-z]$/.test(p) ? '(?![a-z])' : '');
 
 export function extractAmount(raw: string): Amount | null {
   const m = raw.match(AMT_RE); if (!m) return null;
-  const n = m[1] ? parseFloat(m[1].replace(/,/g, '')) : CNUM[m[2]] * (m[3] === '百' ? 100 : 1000);
-  return { n, text: m[0], hasCur: /rm|myr|ringgit|块|元/i.test(m[0]) };
+  let n = m[1] ? parseFloat(m[1].replace(/,/g, '')) : CNUM[m[2]] * (m[3] === '百' ? 100 : 1000);
+  if (m[1] && /\dk$/i.test(m[0].trim())) n *= 1000;                      // 500k = 500,000 (the usual way to write it in Vietnamese chat)
+  return { n, text: m[0], hasCur: new RegExp(CUR + '|₱', 'i').test(m[0]) };
 }
 
 export class Engine {
@@ -66,7 +88,7 @@ export class Engine {
     this.topics = Object.keys(k.globalAliases);
     k.kbEntries.forEach((e) => { const l = (this.topicIntents[e.topic] ??= []); if (!l.includes(e.intentKey)) l.push(e.intentKey); });
 
-    this.DATA_FILLERS = Object.values(k.fillers ?? {}).flat().map((w) => w.toLowerCase());
+    this.DATA_FILLERS = Object.values(k.fillers ?? {}).flat().map((w) => fold(w.toLowerCase()));
     this.FILLER = new Set(BASE_FILLER.split(' ')); this.SMALL_FILL = new Set(BASE_SMALL_FILL);
     this.DATA_FILLERS.forEach((w) => { this.FILLER.add(w); this.SMALL_FILL.add(w); });
 
@@ -76,11 +98,11 @@ export class Engine {
     // every question word of every kind, longest first, so "what time" (opening hours) wins over "time", and "how much" over "how"
     const all: [string, string][] = ASPECT_ORDER.flatMap((a) => flat(k.aspects, a).map((w): [string, string] => [a, w.toLowerCase()]));
     all.sort((x, y) => y[1].length - x[1].length);
-    this.aspectWords = all.map(([a, w]): [string, RegExp] => [a, CJK_RE.test(w) ? new RegExp(escRe(w), 'g') : new RegExp('(?<![a-z0-9_])' + escRe(w) + '(?![a-z0-9_])', 'g')]);
+    this.aspectWords = all.map(([a, w]): [string, RegExp] => [a, NOSP_RE.test(w) ? new RegExp(escRe(w), 'g') : new RegExp('(?<![a-z0-9_])' + escRe(w) + '(?![a-z0-9_])', 'g')]);
     const sp = (kind: string) => flat(k.smalltalk, kind);
     this.allSmall = SMALL_KINDS.flatMap((kind) => sp(kind).map((p): [string, string] => [p, kind])).sort((a, b) => b[0].length - a[0].length);
     this.greetRe = new RegExp('^(?:\\s*(?:' + [...sp('greeting'), ...sp('morning'), ...CALL_PREFIX].sort((a, b) => b.length - a.length).map(reEsc).join('|') + ')[\\s,.!?，。！、:-]*)+', 'i');
-    this.tailRe = new RegExp('(?:^|[\\s,])(?:boss|bos|bro|sir|miss|kak|kakak|abang|bang|pls|please|plz|ya|lah|la|ok|老板)[\\s,.!?，。！]*$', 'i');
+    this.tailRe = new RegExp('(?:^|[\\s,])(?:boss|bos|bro|sir|miss|kak|kakak|abang|bang|pls|please|plz|ya|lah|la|ok|老板|po|opo|kuya|ate|nhe|nha|ha)[\\s,.!?，。！]*$', 'i');
   }
 
   hasMerchant(code: string) { return this.merchants.has(code); }
@@ -96,17 +118,17 @@ export class Engine {
   private aliasesFor(m: MerchantCfg): [string, string][] {
     const hit = this.aliasCache.get(m.code); if (hit) return hit;
     const out: [string, string][] = [];
-    for (const [canon, byLang] of Object.entries(this.k.globalAliases)) for (const vs of Object.values(byLang)) vs.forEach((v) => out.push([v.toLowerCase(), canon]));
-    m.aliases.forEach((a) => out.push([a.variant.toLowerCase(), a.canonical]));
+    for (const [canon, byLang] of Object.entries(this.k.globalAliases)) for (const vs of Object.values(byLang)) vs.forEach((v) => out.push([fold(v.toLowerCase()), canon]));
+    m.aliases.forEach((a) => out.push([fold(a.variant.toLowerCase()), a.canonical]));
     out.sort((a, b) => b[0].length - a[0].length);
     this.aliasCache.set(m.code, out); return out;
   }
   /** Turns short forms into the topic word: "depo" -> "deposit". */
   normalize(raw: string, m: MerchantCfg): { text: string; hits: [string, string][] } {
-    let t = ' ' + raw.toLowerCase() + ' '; const hits: [string, string][] = [];
+    let t = ' ' + fold(raw.toLowerCase()) + ' '; const hits: [string, string][] = [];
     for (const [v, c] of this.aliasesFor(m)) {
       if (v === c) continue;
-      if (CJK_RE.test(v)) { if (t.includes(v)) { t = t.split(v).join(' ' + c + ' '); hits.push([v, c]); } }
+      if (NOSP_RE.test(v)) { if (t.includes(v)) { t = t.split(v).join(' ' + c + ' '); hits.push([v, c]); } }
       else {
         const re = new RegExp('(^|[^a-z0-9_])' + escRe(v) + '(?=$|[^a-z0-9_])', 'g');
         if (re.test(t)) { re.lastIndex = 0; t = t.replace(re, '$1' + c); hits.push([v, c]); }
@@ -114,9 +136,16 @@ export class Engine {
     }
     return { text: t.replace(/\s+/g, ' ').trim(), hits };
   }
+  /** The language of a message, from its script and its words. Looks at the message as typed (accents and all), before it is folded. */
   detectLang(raw: string): Lang {
     if (CJK_RE.test(raw)) return 'zh';
-    return (raw.toLowerCase().match(/[a-z]+/g) || []).some((x) => MS_WORDS.has(x)) ? 'ms' : 'en';
+    if (THAI_RE.test(raw)) return 'th';
+    if (VI_ACCENT_RE.test(raw.normalize('NFC'))) return 'vi';
+    const words = fold(raw.toLowerCase()).match(/[a-z]+/g) || [];
+    const n = (set: Set<string>) => words.filter((x) => set.has(x)).length;
+    const hits: [Lang, number][] = [['ms', n(MS_WORDS)], ['tl', n(TL_WORDS)], ['vi', n(VI_WORDS)]];    // a tie keeps the earlier one: Malay, then Filipino, then Vietnamese
+    const best = hits.reduce((a, b) => (b[1] > a[1] ? b : a));
+    return best[1] > 0 ? best[0] : 'en';
   }
   private exampleTokens(m: MerchantCfg, e: KbEntry, lg: string, ex: string) {
     const key = m.code + '|' + e.intentKey + '|' + lg + '|' + ex;
@@ -130,16 +159,17 @@ export class Engine {
   /* ---------- greetings, thanks, fillers ---------- */
   private smallPhrases(kind: string) { return flat(this.k.smalltalk, kind); }
   private smalltalk(raw: string): string | null {
-    const s = raw.toLowerCase().replace(/[^a-z一-鿿\s]/g, ' ').replace(/[啊呀哦呢吧哈]/g, '').replace(/\s+/g, ' ').trim();
+    const s = raw.toLowerCase().replace(/[^a-z฀-๿一-鿿\s]/g, ' ').replace(/[啊呀哦呢吧哈]/g, '').replace(/\s+/g, ' ').trim();
     if (!s) return null;
     const variants = [s, s.split(' ').filter((w) => !this.SMALL_FILL.has(w)).join(' ')];
     for (const kind of SMALL_KINDS) if (this.smallPhrases(kind).some((p) => variants.includes(p))) return kind;
     let rest = ' ' + s + ' '; const found = new Set<string>();   // several phrases in one message: "ok noted thanks"
     for (const [p, kind] of this.allSmall) {
-      const re = CJK_RE.test(p) ? new RegExp(escRe(p), 'g') : new RegExp('(?<![a-z])' + escRe(p) + '(?![a-z])', 'g');
+      const re = NOSP_RE.test(p) ? new RegExp(escRe(p), 'g') : new RegExp('(?<![a-z])' + escRe(p) + '(?![a-z])', 'g');
       if (re.test(rest)) { found.add(kind); rest = rest.replace(re, ' '); }
     }
-    const left = rest.replace(/[你您了的]/g, '').split(/\s+/).filter((w) => w && !this.SMALL_FILL.has(w));
+    for (const f of this.SMALL_FILL) if (NOSP_RE.test(f)) rest = rest.split(f).join(' ');          // filler words of Thai and Chinese are pieces of the text
+    const left = rest.replace(/[你您了的]/g, '').replace(TH_PARTICLES, '').split(/\s+/).filter((w) => w && !this.SMALL_FILL.has(w));
     if (found.size && !left.length) for (const kind of ['bye', 'thanks', 'morning', 'greeting', 'callout', 'ack']) if (found.has(kind)) return kind;
     const fl = new Set([...this.DATA_FILLERS, ...this.SMALL_FILL]); const tk = s.split(' ').filter(Boolean);
     if (tk.length && tk.every((w) => fl.has(w))) return 'callout';     // only filler words (语助词): "lah", "tolong lah"
@@ -147,7 +177,8 @@ export class Engine {
   }
   stripGreeting(raw: string): string {
     let s = raw.replace(this.greetRe, '').trim(), prev: string;
-    do { prev = s; s = s.replace(this.tailRe, '').trim(); } while (s !== prev && s);
+    if (s !== raw.trim()) s = s.replace(new RegExp('^(?:' + TH_PART + '\\s*)+'), '').trim();           // the polite ending after a Thai greeting (only when a greeting was taken off)
+    do { prev = s; s = s.replace(this.tailRe, '').replace(new RegExp('(?:\\s*' + TH_PART + ')+\\s*$'), '').trim(); } while (s !== prev && s);
     return s || raw;
   }
 
@@ -156,7 +187,7 @@ export class Engine {
     let rest = ' ' + text + ' '; const found = new Set<string>();
     // A number with a unit (2 hours, 30 minit, 3天) is about time, when the sentence also names a topic (deposit 2 hours already).
     // "24 hours" is opening hours and is left for the word list, and an amount such as rm500 is not a number of days.
-    const duration = /(?<![\d/]|rm|myr)(?!24\s*(?:hours?|hrs?|jam|小时))\d+(?:\.\d+)?\s*(?:hours?(?![a-z])|hrs?(?![a-z])|minutes?(?![a-z])|mins?(?![a-z])|days?(?![a-z])|jam(?![a-z])|minit(?![a-z])|hari(?![a-z])|小时|分钟|天)/g;
+    const duration = /(?<![\d/]|rm|myr)(?!24\s*(?:hours?|hrs?|jam|gio|oras|ชั่วโมง|小时))\d+(?:\.\d+)?\s*(?:hours?(?![a-z])|hrs?(?![a-z])|minutes?(?![a-z])|mins?(?![a-z])|days?(?![a-z])|jam(?![a-z])|minit(?![a-z])|hari(?![a-z])|gio(?![a-z])|phut(?![a-z])|ngay(?![a-z])|oras(?![a-z])|minuto(?![a-z])|araw(?![a-z])|ชั่วโมง|นาที|วัน|小时|分钟|天)/g;
     if (hasTopic && duration.test(rest)) { found.add('time'); rest = rest.replace(duration, ' '); }
     for (const [a, re] of this.aspectWords) { re.lastIndex = 0; if (re.test(rest)) { found.add(a); re.lastIndex = 0; rest = rest.replace(re, ' '); } }
     return { found, rest };
@@ -183,7 +214,7 @@ export class Engine {
     const others = this.k.merchants.filter((x) => x.code !== m.code).flatMap((x) => [x.name.toLowerCase(), x.code.toLowerCase().replace(/[^a-z]/g, ''), 'merchant' + x.code.slice(-1).toLowerCase()]);
     const oh = others.filter((w) => cmp.includes(w));
     if (oh.length) return { kind: 'other-merchant', hit: oh, why: 'The customer asks about another merchant. This bot only answers for ' + m.name + ', so a human takes over.' };
-    const hasP = (p: string) => CJK_RE.test(p) ? lc.includes(p) : new RegExp('(?<![a-z])' + escRe(p) + '(?![a-z])').test(lc);
+    const hasP = (p: string) => NOSP_RE.test(p) ? lc.includes(p) : new RegExp('(?<![a-z])' + escRe(p) + '(?![a-z])').test(lc);
     const g = (kind: string) => flat(this.k.guard, kind);
     const sp = g('secret_phrase').filter(hasP), ob = g('secret_object').filter(hasP);
     if (sp.length || (g('reveal_verb').some(hasP) && ob.length && !g('reveal_except').some(hasP)))
@@ -195,17 +226,18 @@ export class Engine {
   }
 
   /* ---------- the decision ---------- */
-  analyze(raw: string, merchantCode: string, clarifyCount = 0, ctx: AnalyzeContext = {}): AnalyzeResult {
+  analyze(rawIn: string, merchantCode: string, clarifyCount = 0, ctx: AnalyzeContext = {}): AnalyzeResult {
     const m = this.merchants.get(merchantCode); if (!m) throw new Error('unknown merchant ' + merchantCode);
+    const raw = fold(rawIn);                                  // accents are left out of every comparison (the language is detected from the message as typed, below)
     const lc = raw.toLowerCase(); const cmp = compact(raw);
-    const hasWord = (w: string) => CJK_RE.test(w) ? lc.includes(w) : new RegExp('(^|[^a-z])' + escRe(w) + '($|[^a-z])').test(lc);
+    const hasWord = (w: string) => NOSP_RE.test(w) ? lc.includes(w) : new RegExp('(^|[^a-z])' + escRe(w) + '($|[^a-z])').test(lc);
     const strongHit = [...new Set([...this.abuseWords.filter(hasWord), ...this.abuseCompact.filter((w) => cmp.includes(w))])];
     const softHit = this.abuseSoft.filter(hasWord);
-    const cleaned = lc.replace(/[^a-z一-鿿]/g, '');
+    const cleaned = lc.replace(/[^a-z฀-๿一-鿿]/g, '');
     const softWhole = softHit.length > 0 && this.abuseSoft.some((w) => new RegExp('^(?:' + escRe(w) + ')+$').test(cleaned));
     const abuseHit = strongHit.length ? [...strongHit, ...softHit] : ((softWhole || new Set(softHit).size >= 2) ? softHit : []);
 
-    const lang = this.detectLang(raw);
+    const lang = this.detectLang(rawIn);
     const stripped = this.stripGreeting(raw); const n = this.normalize(stripped, m); const q = toks(n.text);
     const cands: Candidate[] = this.entriesOf(m.code).map((e) => {
       let best = 0, ex = '';
@@ -220,20 +252,21 @@ export class Engine {
     const Tav = ks.T.filter((t) => this.availIntents(m, t).length);
     const nonFill = (n.text.match(/[a-z0-9_]+/g) || []).filter((x) => !this.FILLER.has(x));
     const cjkLeft = (n.text.replace(/[我想要请问一下的吗啊呢]/g, '').match(/[一-鿿]/g) || []).length;
-    const shortMsg = nonFill.length + Math.ceil(cjkLeft / 2) <= 3;
+    const thN = (t: string) => thaiWords(t.replace(TH_PARTICLES, '')).length;
+    const shortMsg = nonFill.length + Math.ceil(cjkLeft / 2) + thN(n.text) <= 3;
     // A question word with nothing else (how long?) can show buttons. With other unknown words around it (bila cuti sekolah) it cannot.
     const leftTok = (ks.rest.match(/[a-z0-9_]+/g) || []).filter((x) => !this.FILLER.has(x)).length;
     const leftCJK = Math.ceil((ks.rest.replace(/[我想要请问一下的吗啊呢]/g, '').match(/[一-鿿]/g) || []).length / 2);
-    const aspectOnly = leftTok + leftCJK <= 1;
+    const aspectOnly = leftTok + leftCJK + thN(ks.rest) <= 1;
     const guard = abuseHit.length ? null : this.guardHit(raw, m);
     const amt = extractAmount(raw);
     const restRaw = amt ? raw.replace(AMT_RE, ' ').toLowerCase().replace(/[钱现金块元我要想请]/g, ' ') : '';
     const restTok = amt ? (this.normalize(restRaw, m).text.match(/[a-z0-9_]+/g) || []).filter((x) => !this.FILLER.has(x) && !AMT_WORDS.has(x)) : [];
-    const restCJK = amt ? (restRaw.match(/[一-鿿]/g) || []).length : 0;
+    const restCJK = amt ? (restRaw.match(/[一-鿿]/g) || []).length + thN(restRaw) : 0;
     const past = PAST_RE.test(lc);
 
     let small: string | null = (abuseHit.length || guard) ? null : this.smalltalk(raw); let smallFallback = false;
-    const remTok = (n.text.match(/[a-z0-9_]+|[一-鿿]/g) || []).length;
+    const remTok = (n.text.match(/[a-z0-9_]+|[一-鿿]/g) || []).length + thN(n.text);
     if (!small && !abuseHit.length && !guard && stripped !== raw && top.score < m.clarifyThreshold && remTok <= 3 && !ks.strong.length && !Tav.length && !acctKinds.length) { small = 'greeting'; smallFallback = true; }
 
     let decision: Decision, why: string, options: Option[] = [], topic: string | null = null, conf = top.score;
@@ -285,6 +318,6 @@ export class Engine {
 
     let account: AnalyzeResult['account'] = null;
     if (decision === 'ANSWER' && (top.intent === 'deposit_time' || top.intent === 'withdraw_time') && PERSONAL_RE.test(lc)) account = { kind: top.intent === 'deposit_time' ? 'deposit' : 'withdraw' };
-    return { raw, lang, normalized: n.text, hits: n.hits, abuseHit, guard, ks, via, cands, top, second, decision, why, conf, options, topic, small, smallFallback, account, amt, dir, ctxDir };
+    return { raw: rawIn, lang, normalized: n.text, hits: n.hits, abuseHit, guard, ks, via, cands, top, second, decision, why, conf, options, topic, small, smallFallback, account, amt, dir, ctxDir };
   }
 }

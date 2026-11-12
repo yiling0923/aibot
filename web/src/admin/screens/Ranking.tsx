@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
+import { LANG_NAMES } from '../model';
 import { usePanel } from '../store';
 import type { RankData } from '../model';
 import { ChgPill, Medal, Pill, Spark } from '../ui';
@@ -61,7 +62,7 @@ export default function Ranking() {
             <div className="pod-foot"><span className="pods">{r.isNew ? <Pill c="info">New</Pill> : null}<Pill c={r.st.c}>{r.st.t}</Pill></span></div></div>))}</div></>}
       <div className="card rkfilter"><div className="head"><div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
         <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 180 }} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{[['en', 'English'], ['ms', 'Malay'], ['zh', 'Chinese']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> Show excluded{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} keywords shown</span></div></div></div>
       <div className="card scroll">
         {sel.size > 0 && <div className="bulk"><b>{sel.size} selected</b><span className="tools">{[['filler', 'Mark as filler'], ['rude', 'Mark as rude word'], ['mild', 'Mark as mild rude word']].map(([k, l]) => <button key={k} className="btn sm" type="button" disabled={lock} onClick={() => bulk(k)}>{l}</button>)}<button className="btn sm" type="button" onClick={() => bulk('exclude')}>Exclude</button><button className="btn sm ghost" type="button" onClick={() => bulk('clear')}>Clear</button></span>{lock && <span className="lock">Only admins can change these lists.</span>}</div>}

@@ -1,5 +1,6 @@
-export type Lang = 'en' | 'ms' | 'zh';
-export const LANGS: Lang[] = ['en', 'ms', 'zh'];
+/** English, Malay, Chinese, Vietnamese, Thai and Filipino (tl, the code LiveChat uses too). */
+export type Lang = 'en' | 'ms' | 'zh' | 'vi' | 'th' | 'tl';
+export const LANGS: Lang[] = ['en', 'ms', 'zh', 'vi', 'th', 'tl'];
 
 /** Words grouped by key and language, for example aliases.deposit.en = ['dep','depo']. */
 export type WordMap = Record<string, Record<string, string[]>>;

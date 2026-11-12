@@ -1,9 +1,15 @@
 import type { Snapshot, SnapEntry, MerchantMeta } from '../../../src/admin/snapshotTypes';
 
 export type { Snapshot, SnapEntry, MerchantMeta };
-export const LANGS = ['en', 'ms', 'zh'] as const;
+export const LANGS = ['en', 'ms', 'zh', 'vi', 'th', 'tl'] as const;
 export type L = (typeof LANGS)[number];
-export const LN: Record<string, string> = { en: 'EN', ms: 'MS', zh: 'ZH' };
+export const LN: Record<string, string> = { en: 'EN', ms: 'MS', zh: 'ZH', vi: 'VI', th: 'TH', tl: 'TL' };
+/** The language names the pickers show. */
+export const LANG_NAMES: [string, string][] = [['en', 'English'], ['ms', 'Malay'], ['zh', 'Chinese'], ['vi', 'Vietnamese'], ['th', 'Thai'], ['tl', 'Filipino']];
+/** The three languages every entry should have. Vietnamese, Thai and Filipino are optional: an entry is not "missing" them, but is checked if it has them. */
+export const CORE_LANGS = ['en', 'ms', 'zh'] as const;
+/** An empty word list for every language (a new topic starts like this). */
+export const emptyWords = (): Record<string, string[]> => Object.fromEntries(LANGS.map((l) => [l, [] as string[]]));
 
 /** A knowledge base entry as the panel edits it: the server fields plus two display-only ones. */
 export type Entry = SnapEntry & { dirty?: boolean };
@@ -27,6 +33,8 @@ export const ASPECT_LABEL: Record<string, string> = {
 export const clone = <T,>(o: T): T => JSON.parse(JSON.stringify(o));
 export const slug = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
 export const isZh = (w: string) => /[一-鿿]/.test(w);
+/** The language a new word most likely belongs to, from its letters: Chinese, Thai or Vietnamese script, else English. */
+export const guessLang = (w: string): string => (isZh(w) ? 'zh' : /[฀-๿]/.test(w) ? 'th' : /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/i.test(w) ? 'vi' : 'en');
 
 export function agoISO(iso?: string): string {
   if (!iso) return '';
@@ -98,7 +106,7 @@ export const pushUnique = (obj: Record<string, string[]>, k: string, w: string) 
 /* ---------- import ---------- */
 const COLS: Record<string, string[]> = { intent_key: ['intent_key', 'entry', 'entry_name', 'name'], topic: ['topic', 'topic_word'], aspect: ['question_type', 'aspect', 'type'], language: ['language', 'lang'], examples: ['question_examples', 'examples', 'questions'], answer: ['answer_text', 'answer'], merchant: ['merchant'], optional: ['topic_optional', 'alone'], topicwords: ['topic_short_forms', 'short_forms'] };
 export const COL_NAMES = COLS;
-const LANGMAP: Record<string, string> = { en: 'en', english: 'en', ms: 'ms', bm: 'ms', malay: 'ms', 'bahasa melayu': 'ms', zh: 'zh', cn: 'zh', chinese: 'zh', 中文: 'zh' };
+const LANGMAP: Record<string, string> = { en: 'en', english: 'en', ms: 'ms', bm: 'ms', malay: 'ms', 'bahasa melayu': 'ms', zh: 'zh', cn: 'zh', chinese: 'zh', 中文: 'zh', vi: 'vi', vn: 'vi', vietnamese: 'vi', 'tiếng việt': 'vi', th: 'th', thai: 'th', ไทย: 'th', tl: 'tl', fil: 'tl', filipino: 'tl', tagalog: 'tl', ph: 'tl' };
 
 export function parseTable(src: string): string[][] {
   const text = src.replace(/^﻿/, ''); const first = text.split(/\r?\n/)[0] || ''; const d = first.includes('\t') ? '\t' : ',';
@@ -138,7 +146,7 @@ export function analyzeImport(text: string, d: Draft, merchant: string, merchant
     if (!g) { g = { key, raw, topic: '', aspect: '', optional: false, topicWords: [], langs: {}, issues: [], errors: [], dups: 0, exists: false }; groups.set(key || 'row' + ri, g); }
     if (!key) { g.errors.push('Row ' + (ri + 2) + ': entry name is empty'); return; }
     if (raw !== key) g.fixedName = raw;
-    if (!lg) { g.errors.push('Row ' + (ri + 2) + ': unknown language "' + get(r, 'language') + '" (use en, ms or zh)'); return; }
+    if (!lg) { g.errors.push('Row ' + (ri + 2) + ': unknown language "' + get(r, 'language') + '" (use en, ms, zh, vi, th or tl)'); return; }
     if (g.langs[lg]) g.dups++;
     g.langs[lg] = { answer: get(r, 'answer'), examples: [...new Set(get(r, 'examples').split(/\s*\|\s*|\n/).map((x) => x.trim()).filter(Boolean))] };
     if (!g.topic) g.topic = get(r, 'topic').toLowerCase();
@@ -153,7 +161,7 @@ export function analyzeImport(text: string, d: Draft, merchant: string, merchant
     if (!g.langs.en || !g.langs.en.answer) g.errors.push('The English answer is required');
     LANGS.forEach((l) => {
       const x = g.langs[l];
-      if (!x) { if (!(ex && (ex.translations[l] || { answer_text: '' }).answer_text)) g.issues.push(LN[l] + ' is missing'); return; }
+      if (!x) { if ((CORE_LANGS as readonly string[]).includes(l) && !(ex && (ex.translations[l] || { answer_text: '' }).answer_text)) g.issues.push(LN[l] + ' is missing'); return; }
       if (!x.answer) g.issues.push(LN[l] + ': answer is empty');
       if (x.examples.length < 3) g.issues.push(LN[l] + ': ' + x.examples.length + ' example question' + (x.examples.length === 1 ? '' : 's') + ' (3 or more is better)');
     });

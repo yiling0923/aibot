@@ -93,7 +93,7 @@ Put the keys in `.env` (see `.env.example`) and restart. Without keys nothing ch
   so it must be the separate `livechat_bot_test` database, never your real data.
 * `npm run typecheck` checks the TypeScript (back end and front end).
 * Front end tests are in `web/src` (React Testing Library). They run with `npm test` too.
-* `npm run eval:report` runs all ~1,900 sample customer messages (English, Malay, Chinese, slang and short forms) through the engine and lists every one that gets a different result than expected.
+* `npm run eval:report` runs all ~3,000 sample customer messages (English, Malay, Chinese, Vietnamese, Thai, Filipino, slang and short forms) through the engine and lists every one that gets a different result than expected.
   Add a message by adding an entry to `eval_cases` in `data/kb_seed.json`.
 
 The six fake merchants differ on purpose (tone, main language, limits, which entries and account tools they have), so a message can be answered by one merchant and handed to a human by another.
@@ -162,3 +162,18 @@ curl -X POST http://localhost:3000/api/v1/ai/ask -H "Authorization: Bearer aib_.
 
 `ASK_TIMEOUT_MS` (default 8000) is how long the bot may take before the chat is handed to a person.
 
+
+
+## Languages
+
+The bot understands and answers in **English (en), Malay (ms), Chinese (zh), Vietnamese (vi), Thai (th) and Filipino (tl)**. It reads the language from the message itself (script and words), so a customer may switch language mid-chat; the reply follows the last message. `tl` is the code LiveChat uses for Filipino.
+
+* **Replies.** Every fixed sentence of the bot (greetings, choices, account answers, refusals, kind replies to rude customers, "contact an agent") exists in all six languages and both tones: `src/bot/texts.ts` and `src/bot/texts_extra.ts`. A test fails if one is missing.
+* **Words.** Topic words, question words, greetings, rude words, secret / rule-change / "talk to a person" phrases and filler words for the new languages are in `data/kb_seed.json`, and appear under the same screens as the others (Topics, Keywords, Keyword ranking), with a language filter.
+* **Vietnamese accents.** Customers often type without accents (`nap tien` for `nạp tiền`). The bot ignores accents when it compares words, so one entry matches both. For the same reason the word lists avoid rude words that become everyday words without accents (for example `cặc` and `các`).
+* **Thai.** Thai has no spaces, so Thai words are found as pieces of the sentence, and the sentence is cut into words (with the Node `Intl.Segmenter`) for the similarity check. Polite endings (ค่ะ ครับ นะ) are ignored. Keep Thai entries long enough not to sit inside other words.
+* **Filipino.** Taglish works: English words customers really use (deposit, withdraw, agent) are listed next to the Filipino ones.
+* **Knowledge bases.** Vietnamese, Thai and Filipino are optional for an entry (it is not marked "missing" for them). An entry with no answer in the customer's language answers in English. In the entry editor, **Translate to Vietnamese, Thai and Filipino** writes a draft with the AI. Please have a native speaker check it before publishing.
+* **Existing databases** get the new word lists, the closing and hand-off messages, and the sample entries' translations automatically the first time the server starts (only where something is missing, and never over what you wrote).
+* **Add or change the sample words:** edit `tools/seed-languages/build.py` and run `python3 tools/seed-languages/build.py`, or edit the words in the panel.
+* **Not done yet:** amounts are still shown with `RM` and limits as written in each answer (a currency per merchant is a later step); the control panel itself is in English.

@@ -15,8 +15,8 @@ const q = async <T extends RowDataPacket = RowDataPacket>(pool: Pool, sql: strin
 const fail = (reply: FastifyReply, code: number, error: string) => reply.code(code).send({ error });
 const TOOLS = ['deposit_status', 'withdraw_status', 'balance', 'transactions', 'points'];
 const FALLBACK_MSG = {
-  closing: { en: 'This chat has been closed due to inappropriate language. Thank you for understanding.', ms: 'Sembang ini ditutup kerana bahasa yang tidak sesuai. Terima kasih.', zh: '由于不当用语，本次对话已结束。感谢您的理解。' },
-  handoff: { en: 'Let me connect you to our team who can help you better. Please wait a moment!', ms: 'Biar saya sambungkan anda kepada pasukan kami yang boleh membantu. Sila tunggu sebentar!', zh: '让我为您转接客服团队，请稍等片刻！' },
+  closing: { en: 'This chat has been closed due to inappropriate language. Thank you for understanding.', ms: 'Sembang ini ditutup kerana bahasa yang tidak sesuai. Terima kasih.', zh: '由于不当用语，本次对话已结束。感谢您的理解。', vi: 'Cuộc trò chuyện này đã được đóng vì có ngôn từ không phù hợp. Cảm ơn anh/chị đã thông cảm.', th: 'แชตนี้ถูกปิดเนื่องจากใช้ถ้อยคำไม่เหมาะสม ขอบคุณที่เข้าใจค่ะ', tl: 'Isinara na po ang chat na ito dahil sa hindi angkop na pananalita. Salamat po sa pag-unawa.' },
+  handoff: { en: 'Let me connect you to our team who can help you better. Please wait a moment!', ms: 'Biar saya sambungkan anda kepada pasukan kami yang boleh membantu. Sila tunggu sebentar!', zh: '让我为您转接客服团队，请稍等片刻！', vi: 'Để mình kết nối anh/chị với nhân viên có thể hỗ trợ tốt hơn. Vui lòng đợi một chút nhé!', th: 'ขอโอนสายให้เจ้าหน้าที่ที่ช่วยได้ดียิ่งขึ้นนะคะ รอสักครู่ค่ะ!', tl: 'Ikokonekta ko po kayo sa aming team na mas makakatulong sa inyo. Maghintay lang po sandali!' },
 };
 
 /** Merchants and logins. Only an admin may use these, except changing your own password. */
@@ -47,7 +47,7 @@ export function peopleRoutes(app: FastifyInstance, ctx: PeopleCtx) {
     const code = String(b.code ?? '').trim().toUpperCase(), name = String(b.name ?? '').trim();
     if (!/^[A-Z0-9_]{2,30}$/.test(code)) return fail(reply, 400, 'Code: 2-30 letters, digits or underscore, for example W88.');
     if (!name || name.length > 100) return fail(reply, 400, 'Give the merchant a name.');
-    const language = ['en', 'ms', 'zh'].includes(String(b.language)) ? String(b.language) : 'en';
+    const language = ['en', 'ms', 'zh', 'vi', 'th', 'tl'].includes(String(b.language)) ? String(b.language) : 'en';
     const tone = b.tone === 'formal' ? 'formal' : 'friendly';
     const group = (v: unknown) => (v === null || v === undefined || v === '' || Number.isNaN(Number(v)) ? null : Math.trunc(Number(v)));
     if (b.login && (!b.login.username || !b.login.password)) return fail(reply, 400, 'Login: enter a username and a password, or leave both empty.');

@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
-import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, isZh, kbToCSV, type Entry, type ImportGroup } from '../model';
+import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, guessLang, emptyWords, kbToCSV, type Entry, type ImportGroup } from '../model';
 import { Pill } from '../ui';
 
 type Tr = { question_examples: string[]; answer_text: string };
@@ -29,8 +29,8 @@ export default function Import() {
       const needT = new Map<string, string[]>();
       todo.forEach((g) => { const t = g.topic || g.existing?.topic; if (t) { const a = needT.get(t) || []; g.topicWords.forEach((w) => a.push(w)); needT.set(t, a); } });
       needT.forEach((words, t) => {
-        if (!d.aliases[t]) { d.aliases[t] = { en: [t], ms: [], zh: [] }; note('Added topic word "' + t + '"'); }
-        words.forEach((w) => { const l = isZh(w) ? 'zh' : 'en'; d.aliases[t][l] = d.aliases[t][l] || []; if (!Object.values(d.aliases[t]).flat().map((x) => x.toLowerCase()).includes(w)) d.aliases[t][l].push(w); });
+        if (!d.aliases[t]) { d.aliases[t] = { ...emptyWords(), en: [t] }; note('Added topic word "' + t + '"'); }
+        words.forEach((w) => { const l = guessLang(w); d.aliases[t][l] = d.aliases[t][l] || []; if (!Object.values(d.aliases[t]).flat().map((x) => x.toLowerCase()).includes(w)) d.aliases[t][l].push(w); });
       });
       todo.forEach((g) => {
         const tr = (l: string): Tr | null => (g.langs[l] ? { question_examples: g.langs[l].examples, answer_text: g.langs[l].answer } : null);

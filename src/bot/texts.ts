@@ -29,11 +29,11 @@ export const fmtAmt=n=>'RM'+Number(n).toLocaleString('en-US');
 export const TOPIC_LABEL={turnover:{en:'turnover',ms:'turnover',zh:'流水'},transfer:{en:'transfers',ms:'pindahan',zh:'转账'},refund:{en:'refunds',ms:'bayaran balik',zh:'退款'},register:{en:'registration',ms:'pendaftaran',zh:'注册'},deposit:{en:'deposits',ms:'deposit',zh:'存款'},withdraw:{en:'withdrawals',ms:'pengeluaran',zh:'提款'},password:{en:'your password',ms:'kata laluan',zh:'密码'},verify:{en:'verification',ms:'pengesahan akaun',zh:'账号验证'},customer_service:{en:'customer service',ms:'khidmat pelanggan',zh:'客服'},promotion:{en:'promotions',ms:'promosi',zh:'优惠'},bank_account:{en:'your bank account',ms:'akaun bank',zh:'银行账户'}};
 export const CHOICE_TXT={en:t=>`Sure! What would you like to know about ${t}?`,ms:t=>`Baik! Apa yang anda ingin tahu tentang ${t}?`,zh:t=>`好的！您想了解${t}的哪方面？`};
 export const PICK_TXT={en:'Which one do you need help with?',ms:'Yang mana satu yang anda perlukan?',zh:'请问您需要哪方面的帮助？'};
-export const MORE_HELP = {
+export const MORE_HELP: Record<string, string> = {
   en: 'If you need other help, you can contact an agent.',
   ms: 'Jika anda perlukan bantuan lain, anda boleh hubungi ejen.',
   zh: '如需其他帮助，可以联系人工客服。',
-} as const;
+};
 export const AGENT={en:'Talk to an agent',ms:'Cakap dengan ejen',zh:'转人工客服'};
 export const SMALL_REPLY={
  friendly:{greeting:{en:'Hi there! 😊 How can I help you today?',ms:'Hai! 😊 Apa yang boleh saya bantu hari ini?',zh:'您好！😊 请问有什么可以帮您？'},
@@ -63,7 +63,7 @@ export const NOTFOUND_TX={en:a=>`I checked your account but could not find a rec
 export const cap=s=>s.charAt(0).toUpperCase()+s.slice(1);
 export const ST={pending:{en:'is still waiting for bank confirmation',ms:'masih menunggu pengesahan bank',zh:'仍在等待银行确认'},processing:{en:'is being processed',ms:'sedang diproses',zh:'正在处理中'},success:{en:'was completed successfully',ms:'telah berjaya diselesaikan',zh:'已成功完成'},failed:{en:'was rejected by the bank',ms:'ditolak oleh bank',zh:'被银行拒绝'}};
 export const DAYT={today:{en:'today',ms:'hari ini',zh:'今天'},yesterday:{en:'yesterday',ms:'semalam',zh:'昨天'},'3d':{en:'3 days ago',ms:'3 hari lalu',zh:'3天前'}};
-export const whenT=(tx,lg)=>{ const d=DAYT[tx.day][lg]; if(!tx.hm) return d; return lg==='en'?`${d} at ${tx.hm}`:lg==='ms'?`${d} jam ${tx.hm}`:`${d}${tx.hm}`; };
+export const whenT=(tx,lg)=>{ const d=DAYT[tx.day][lg]; if(!tx.hm) return d; return lg==='en'?`${d} at ${tx.hm}`:lg==='ms'?`${d} jam ${tx.hm}`:lg==='vi'?`${d} lúc ${tx.hm}`:lg==='th'?`${d}เวลา ${tx.hm}`:lg==='tl'?`${d}, ${tx.hm}`:`${d}${tx.hm}`; };
 export const KIND_W={deposit:{en:'deposit',ms:'deposit',zh:'存款'},withdraw:{en:'withdrawal',ms:'pengeluaran',zh:'提款'}};
 export const SENT={en:(k,a,r,w,s)=>`I checked your account. Your latest ${k} of ${a} (ref ${r}), made ${w}, ${s}.`,
   ms:(k,a,r,w,s)=>`Saya telah semak akaun anda. ${k.charAt(0).toUpperCase()+k.slice(1)} terkini anda sebanyak ${a} (rujukan ${r}), dibuat ${w}, ${s}.`,
@@ -97,3 +97,10 @@ export const REASK_TXT = {
             ms: 'Maaf, kami kurang faham mesej anda. Boleh anda terangkan dengan lebih lanjut, atau pilih daripada pilihan di bawah?',
             zh: '抱歉，我们没有完全理解您的消息。请您再详细说明一下，或从下方选项中选择。' },
 };
+
+/* Vietnamese, Thai and Filipino sentences (texts_extra.ts) join the tables above, keeping their shapes. */
+import { EXTRA } from './texts_extra';
+const TABLES = { LABEL, TONE, CLARIFY_TXT, GREET, TOPIC_LABEL, CHOICE_TXT, PICK_TXT, MORE_HELP, AGENT, SMALL_REPLY, AMT_LABEL, AMT_ASK, AMT_ASK2, LIM_OK, LIM_LOW, LIM_HIGH, GUIDE_ONLY, FOUND_TX, NOTFOUND_TX,
+  ST, DAYT, KIND_W, SENT, NOTX, NOTVER, FAILHINT, ACCT_PRE, STATUS_LABEL, TXT_BAL, TXT_PTS, TXT_TXN, TYPE_W, STS, NODATA, REFUSE_TXT, KIND_DEF, REASK_TXT };
+const joinInto = (target, extra) => { for (const k of Object.keys(extra)) { const plain = extra[k] && typeof extra[k] === 'object' && !Array.isArray(extra[k]); if (plain && target[k] && typeof target[k] === 'object') joinInto(target[k], extra[k]); else target[k] = extra[k]; } };
+for (const name of Object.keys(EXTRA)) { if (!TABLES[name]) throw new Error('texts_extra: unknown table ' + name); joinInto(TABLES[name], EXTRA[name]); }
