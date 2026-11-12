@@ -5,6 +5,7 @@ import type { RowDataPacket } from 'mysql2/promise';
 import { getPool, closePool, type Pool } from './pool';
 import { Tenants, ident, migrateMerchantDb } from './tenants';
 import { splitIntoMerchantDatabases } from './steps/008_merchant_databases';
+import { allowWipe } from './guard';
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
 
@@ -48,8 +49,9 @@ export async function migrate(pool: Pool = getPool(), opts: { reset?: boolean } 
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('migrate.ts')) {
-  migrate(getPool(), { reset: process.argv.includes('--reset') })
-    .then((a) => { console.log(a.length ? `applied: ${a.join(', ')}` : 'database is up to date'); })
+  const pool = getPool(), reset = process.argv.includes('--reset');
+  (reset ? allowWipe(pool, 'db:migrate -- --reset') : Promise.resolve(true)).then((ok) => (ok ? migrate(pool, { reset }) : null))
+    .then((a) => { if (!a) return; console.log(a.length ? `applied: ${a.join(', ')}` : 'database is up to date'); })
     .catch((e) => { console.error(e); process.exitCode = 1; })
     .finally(closePool);
 }

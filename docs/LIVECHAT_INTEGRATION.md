@@ -50,7 +50,7 @@ The admin menu has **Usage & billing**. Every AI call (Claude or ChatGPT) writes
 
 ```bash
 docker compose exec ai-bot npm run user:add          # control panel login
-docker compose exec ai-bot npm run db:seed           # optional sample merchants and answers
+docker compose exec ai-bot npm run db:seed           # optional, only for a NEW empty database: it erases merchants and loads the sample ones (refuses when data exists, unless --force)
 ```
 
 Open the panel at `http://<bot-host>:3000`.

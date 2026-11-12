@@ -71,7 +71,7 @@ curl -X POST localhost:3000/api/analyze -H 'content-type: application/json' \
      -d '{"merchant":"MERCH_A","text":"I nak wd"}'
 ```
 
-`npm run db:reset` wipes the database and loads the fake data again.
+`npm run db:reset -- --force` wipes the database and loads the fake data again. **It deletes every merchant and their knowledge bases.** Without `--force` it refuses to run when there is data (the same for `npm run db:seed`). To keep your data and only bring the database up to date, use `npm run db:migrate` (the server also does this by itself when it starts).
 
 ## AI (optional)
 

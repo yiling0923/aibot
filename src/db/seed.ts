@@ -5,6 +5,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/prom
 import { getPool, closePool, type Pool } from './pool';
 import { hashPassword } from '../auth/passwords';
 import { Tenants, ident, tbl } from './tenants';
+import { allowWipe } from './guard';
 
 const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data');
 const readJson = (f: string) => JSON.parse(fs.readFileSync(path.join(dataDir, f), 'utf8'));
@@ -140,5 +141,6 @@ export async function seed(pool: Pool = getPool()) {
 }
 
 if (import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith('seed.ts')) {
-  seed().then((r) => console.log('seeded', r)).catch((e) => { console.error(e); process.exitCode = 1; }).finally(closePool);
+  const pool = getPool();
+  allowWipe(pool, 'db:seed').then((ok) => (ok ? seed(pool).then((r) => console.log('seeded', r)) : undefined)).catch((e) => { console.error(e); process.exitCode = 1; }).finally(closePool);
 }
