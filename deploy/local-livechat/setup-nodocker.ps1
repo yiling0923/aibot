@@ -159,7 +159,10 @@ if ($LASTEXITCODE -ne 0) { throw 'Could not add the merchant.' }
 
 Write-Host "7/7 Issuing the bot key for $Merchant and setting it in LiveChat..."
 Push-Location $botDir
-try { Run { $script:out = npm run --silent key:create -- $Merchant 2>&1 | Out-String } } finally { Pop-Location }
+try {
+  Run { npm run --silent db:migrate 2>&1 | Out-Null }   # brings the bot's own database up to date (creates the key table if it is missing)
+  Run { $script:out = npm run --silent key:create -- $Merchant 2>&1 | Out-String }
+} finally { Pop-Location }
 if ($out -notmatch '(aib_[A-Za-z0-9_-]+)') { throw "Could not read the bot key. Output was: $out" }
 $key = $Matches[1]
 $login = @{ email = 'admin@a.test'; password = 'Test1234!' } | ConvertTo-Json
