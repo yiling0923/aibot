@@ -48,6 +48,13 @@ export interface AppOptions { pool?: Pool; logger?: boolean; ai?: AiService }
 export async function buildApp(opts: AppOptions = {}) {
   const pool = opts.pool ?? createPool();
   const app = Fastify({ logger: opts.logger ?? true });
+  // A crash inside an admin screen shows its real reason to a signed-in admin (and is logged); everyone else only sees the usual short error.
+  app.setErrorHandler((error, req, reply) => {
+    const err = error as Error & { statusCode?: number }, status = err.statusCode ?? 500;
+    if (status >= 500) req.log.error(err);
+    if (status >= 500 && req.url.startsWith('/api/admin') && req.user?.role === 'admin') return reply.code(status).send({ error: `The server could not do this. Reason: ${err.message}` });
+    return reply.code(status).send({ statusCode: status, error: status >= 500 ? 'Internal Server Error' : err.name, message: status >= 500 ? 'Internal Server Error' : err.message });
+  });
   // Bring the databases up to date first, so a new version never meets a missing table (the same as `npm run db:migrate`).
   await migrate(pool).then((a) => { if (a.length) app.log.info(`updated the databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the databases (run npm run db:migrate)'));
   // Claude and ChatGPT are optional: with no keys set, every AI step is off and the bot answers from its own rules.

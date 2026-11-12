@@ -115,4 +115,15 @@ describe.skipIf(!reachable)('usage and billing (needs TEST_DATABASE_URL)', () =>
       totals: { chats: 0, calls: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, cost: 0, charge: 0, ownKeyCalls: 0, ownKeyTokens: 0, unpricedCalls: 0 }, byKind: [], unpricedModels: [], prices: [] };
     expect(billingCsv(r).split('\r\n')[1].startsWith("\"'=HYPERLINK(\"\"http://evil\"\")\",X,")).toBe(true);        // quoted, and the formula start is made harmless
   });
+
+  it('shows an admin the real reason when a screen crashes, and everyone else only the short error', async () => {
+    await pool!.query('RENAME TABLE billing_settings TO billing_settings_off');
+    try {
+      const a = await as(admin, 'GET', `/api/admin/billing?from=${day}&to=${day}`);
+      expect(a.statusCode).toBe(500); expect(a.json().error).toMatch(/The server could not do this\. Reason: .*billing_settings/);
+      const s = await as(staff, 'GET', '/api/admin/billing');                                           // staff are refused before anything runs
+      expect(s.statusCode).toBe(403);
+    } finally { await pool!.query('RENAME TABLE billing_settings_off TO billing_settings'); }
+    expect((await as(admin, 'GET', `/api/admin/billing?from=${day}&to=${day}`)).statusCode).toBe(200);
+  });
 });
