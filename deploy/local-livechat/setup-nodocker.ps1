@@ -47,7 +47,11 @@ function Get-Zip($url, $dest, $marker) {
   Remove-Item $zip
 }
 
-if (-not (Test-Path (Join-Path $LiveChatDir 'go.mod'))) { throw "No go.mod in $LiveChatDir. Point -LiveChatDir at the unzipped LiveChat folder." }
+if (-not (Test-Path (Join-Path $LiveChatDir 'go.mod'))) {   # an unzipped folder often holds the project one level deeper
+  $found = Get-ChildItem $LiveChatDir -Recurse -Filter go.mod -Depth 3 -ErrorAction SilentlyContinue | Select-Object -First 1
+  if ($found) { $LiveChatDir = $found.DirectoryName; Write-Host "   LiveChat project found in $LiveChatDir" }
+  else { throw "No go.mod found in or under $LiveChatDir. Is this the LiveChat folder? It should contain go.mod, cmd and internal. Check that the zip was fully unzipped." }
+}
 Write-Host '1/7 Checking the bot...'
 try { Invoke-RestMethod http://localhost:3000/health | Out-Null } catch { throw 'The bot is not running on http://localhost:3000. Run: npm run dev' }
 
