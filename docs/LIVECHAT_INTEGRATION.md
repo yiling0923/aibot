@@ -10,6 +10,24 @@ To share LiveChat's network, copy the two services from `docker-compose.yml` int
 
 If the bot runs on another server, give it an https address and use that instead.
 
+## Local test on your own PC (Docker Desktop)
+
+Nothing here touches staging or GitHub. The real staging LiveChat cannot reach your `localhost`, so this runs a local copy of LiveChat from the zip.
+
+1. Start Docker Desktop. Start the bot: `npm run dev` (http://localhost:3000).
+2. Unzip LiveChat, for example to `C:\livechat-develop`. Stop XAMPP's MySQL if it uses port 3306 (LiveChat's own MySQL uses it).
+3. In the bot folder run:
+
+```bash
+powershell -ExecutionPolicy Bypass -File deploy\local-livechat\setup.ps1 -LiveChatDir C:\livechat-develop
+```
+
+The script starts LiveChat, adds one merchant and admin (`admin@a.test` / `Test1234!`), issues the bot key for `MERCH_A`, sets the base URL `http://host.docker.internal:3000` in LiveChat, and runs "Test AI Chat". The first build takes several minutes.
+
+4. Try a visitor chat: `powershell -File deploy\local-livechat\chat.ps1 "how to deposit"`, then `chat.ps1 "blah"`, then `chat.ps1 "2"`.
+
+Stop everything: `docker compose down` in the LiveChat folder (add `-v` to delete its data).
+
 ## 2. Create the first admin and a merchant in the bot
 
 ```bash
