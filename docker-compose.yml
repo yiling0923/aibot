@@ -1,0 +1,36 @@
+# Run the AI bot on its own:   docker compose up -d --build
+# Run it next to LiveChat:     see docs/LIVECHAT_INTEGRATION.md (same service block, same network)
+services:
+  ai-bot-db:
+    image: mysql:8.0
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
+    environment:
+      MYSQL_ROOT_PASSWORD: ${BOT_DB_ROOT_PASSWORD:?set BOT_DB_ROOT_PASSWORD}
+    volumes:
+      - ai-bot-db-data:/var/lib/mysql
+      - ./deploy/mysql-init.sql:/docker-entrypoint-initdb.d/01-bot.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -uroot -p$$MYSQL_ROOT_PASSWORD --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  ai-bot:
+    build: .
+    depends_on:
+      ai-bot-db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: mysql://bot:${BOT_DB_PASSWORD:-bot-change-me}@ai-bot-db:3306/livechat_bot
+      PORT: 3000
+      SESSION_SECRET: ${BOT_SESSION_SECRET:?set BOT_SESSION_SECRET (long random text)}
+      CUSTOMER_TOKEN_SECRET: ${BOT_CUSTOMER_TOKEN_SECRET:-}
+      DEV_TOOLS: "off"
+      ASK_TIMEOUT_MS: ${ASK_TIMEOUT_MS:-8000}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    ports:
+      - "${BOT_PORT:-3000}:3000"
+    restart: unless-stopped
+
+volumes:
+  ai-bot-db-data:
