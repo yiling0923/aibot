@@ -114,7 +114,13 @@ $up = Ping-MySql
 if (-not $up) {
   Start-Process -FilePath $mysqld -ArgumentList "--defaults-file=$ini", '--console' -WindowStyle Hidden -RedirectStandardError (Join-Path $logs 'mysql.log')
   1..60 | ForEach-Object { if (-not $up) { Start-Sleep 2; $up = Ping-MySql } }
-  if (-not $up) { throw "MySQL did not start. See $logs\mysql.log" }
+  if (-not $up) {
+    Write-Host '--- MySQL did not start. Its own messages (last 40 lines) ---' -ForegroundColor Yellow
+    $lf = Join-Path $logs 'mysql.log'
+    if (Test-Path $lf) { Get-Content $lf -Tail 40 } else { Write-Host '(no log file)' }
+    Write-Host ('--- mysqld running now: ' + [bool](Get-Process mysqld -ErrorAction SilentlyContinue) + ' | port ' + $MySqlPort + ' in use by: ' + ((Get-NetTCPConnection -LocalPort $MySqlPort -ErrorAction SilentlyContinue | Select-Object -First 1 -ExpandProperty OwningProcess))) -ForegroundColor Yellow
+    throw "MySQL did not start. Copy the lines above and send them."
+  }
 }
 Run { & $mysql -uroot -h127.0.0.1 -P $MySqlPort -e "CREATE DATABASE IF NOT EXISTS livechat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'livechat'@'%' IDENTIFIED BY 'livechat'; GRANT ALL ON livechat.* TO 'livechat'@'%';" }
 if ($LASTEXITCODE -ne 0) { throw 'Could not create the LiveChat database.' }
