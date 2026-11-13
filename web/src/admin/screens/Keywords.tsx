@@ -6,6 +6,11 @@ import { Pill } from '../ui';
 import { KeywordDrawer, SetKeywordModal } from './KeywordModals';
 import { useAssign } from './assign';
 
+const OTHER_GROUPS: { label: string; test: (t: string) => boolean }[] = [
+  { label: 'Rude words', test: (t) => t.startsWith('Rude') }, { label: 'Question words', test: (t) => t.startsWith('Question word') },
+  { label: 'Fillers', test: (t) => t === 'Filler' }, { label: 'Greetings', test: (t) => t.startsWith('Greeting') },
+  { label: 'Other', test: (t) => !(t.startsWith('Rude') || t.startsWith('Question word') || t === 'Filler' || t.startsWith('Greeting')) },
+];
 const TABS: [string, string][] = [['all', 'All'], ['unassigned', 'Not assigned'], ['assigned', 'Assigned'], ['ignored', 'Ignored']];
 
 export default function Keywords() {
@@ -86,15 +91,17 @@ export default function Keywords() {
         );
       })}
       {rest.length > 0 && <div className="card kwrest"><div className="head"><div><h3 style={{ margin: 0 }}>{tab === 'ignored' ? 'Ignored words' : 'Not under a main keyword yet'} · {rest.length}</h3>
-        {tab !== 'ignored' && <div className="sub">Click a word to put it under a main keyword, or tick words and use the bar above.</div>}</div></div>
-        <div className="kwpills">{rest.map((r) => <span key={r.w} className={'kwchip' + (sel.has(r.w) ? ' on' : '')}>
-          <input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
-          <span className="kwlink" onClick={() => (r.ignored ? setDrawer(r.w) : setSetFor({ w: r.w }))}>{r.w}</span><span className="n" title="times heard">{r.n}</span>
-          {r.ignored && <button type="button" className="btn sm ghost" onClick={() => p.unignoreWord(r.w)}>Restore</button>}</span>)}</div></div>}
-      {other.length > 0 && <div className="card kwrest"><div className="head"><div><h3 style={{ margin: 0 }}>Words with another job · {other.length}</h3><div className="sub">Filler words, rude words, question words and greetings. They are not main keywords, so they are not shown above.</div></div></div>
-        <div className="kwpills">{other.map((r) => <span key={r.w} className={'kwchip' + (sel.has(r.w) ? ' on' : '')} title={r.st.t}>
-          <input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
-          <span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span><span className="n" title="times heard">{r.n}</span><span className="sub">{r.st.t.replace(/^(Question word|Greeting list): /, '$1 · ')}</span></span>)}</div></div>}
+        {tab !== 'ignored' && <div className="sub">Words customers type that the bot does not know yet. Put each one under a main keyword, or ignore it.</div>}</div>
+        <label className="kwall"><input type="checkbox" checked={rest.every((r) => sel.has(r.w))} aria-label="Select all in this box" onChange={(e) => setSel((x) => { const n = new Set(x); rest.forEach((r) => (e.target.checked ? n.add(r.w) : n.delete(r.w))); return n; })} /> Select all</label></div>
+        <table className="kwtable g-meaning"><tbody>{rest.map((r) => <tr key={r.w}>
+          <td className="cb"><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} /></td>
+          <td>{r.isNew ? <><Pill c="info">New</Pill> </> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}><b>{r.w}</b></span>{r.h && !r.isNew ? <div className="sub">{r.h}</div> : null}</td>
+          <td className="kwbc"><div className="kwbar"><i style={{ width: Math.max(6, Math.round((r.n * 100) / Math.max(1, ...rest.map((x) => x.n)))) + '%' }} /></div></td>
+          <td className="num">{r.n}</td>
+          <td className="act">{r.ignored ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button>
+            : <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>Make a main keyword</button><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add under one</button><button className="btn sm ghost" type="button" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}>Ignore</button></>}</td></tr>)}</tbody></table></div>}
+      {other.length > 0 && <div className="card kwother"><div className="head"><div><h3 style={{ margin: 0 }}>Words with another job · {other.length}</h3><div className="sub">Not main keywords, so they are not shown above. Click a word to change what it is.</div></div></div>
+        {OTHER_GROUPS.map((g) => { const ws = other.filter((r) => g.test(r.st.t)); return ws.length ? <div className="kwgrow" key={g.label}><div className="kwglbl">{g.label}<em>{ws.length}</em></div><div>{ws.map((r) => <span key={r.w} className="kwpill" role="button" tabIndex={0} onClick={() => setDrawer(r.w)} onKeyDown={(e) => { if (e.key === 'Enter') setDrawer(r.w); }}>{r.w}<small>{r.n}</small></span>)}</div></div> : null; })}</div>}
       {!byTopic.length && !rest.length && !other.length && <div className="card sub">No keywords match. Words customers type are saved here automatically.</div>}
     </>
   );
