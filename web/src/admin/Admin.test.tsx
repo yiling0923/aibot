@@ -194,14 +194,14 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByText('Flowchart'));
     expect(await screen.findByTestId('flow')).toBeTruthy();
     expect(screen.getByLabelText('Topic deposit')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: /◆ Topic/ }));                                         // a Topic block from the palette
+    await userEvent.click(screen.getByRole('button', { name: /what the customer wants/ }));                                         // a Topic block from the palette
     await userEvent.type(screen.getByLabelText('New topic name'), 'refund{enter}');
     expect(await screen.findByLabelText('Topic refund')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: /＃ Keyword/ }));                                      // a Keyword block, connected to a topic
+    await userEvent.click(screen.getByRole('button', { name: /a word that means a topic/ }));                                      // a Keyword block, connected to a topic
     await userEvent.type(screen.getByLabelText('New keyword'), 'refundlah');
     await userEvent.selectOptions(screen.getByLabelText('Connect keyword to topic'), 'refund');
     expect(await screen.findByLabelText('Remove refundlah')).toBeTruthy();                       // now a real keyword block
-    await userEvent.selectOptions(within(screen.getByLabelText('Remove refundlah').closest('.fnode') as HTMLElement).getByLabelText('Move to topic'), 'deposit');           // move it to another topic
+    await userEvent.selectOptions(within(screen.getByLabelText('Remove refundlah').closest('.fc') as HTMLElement).getByLabelText('Move refundlah to topic'), 'deposit');           // move it to another topic
     await userEvent.click(screen.getByText('List'));                                          // the list shows the same
     expect((await screen.findAllByText('refundlah')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('flow')).toBeNull();
