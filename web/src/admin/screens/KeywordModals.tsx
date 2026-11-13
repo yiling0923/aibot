@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { LANGS, LN, pushUnique, slug, unassign, guessLang, emptyWords } from '../model';
+import { LANGS, LN, addOwnTopic, pushUnique, slug, topicNames, unassign, guessLang } from '../model';
 import { Modal, Pill } from '../ui';
 
 export const RANK_TYPES: Record<string, [string, string]> = { filler: ['Filler', 'info'], slang: ['Abbreviation', 'info'], topic: ['Topic', 'ok'], question: ['Question word', 'ok'], rude: ['Rude word', 'bad'], greeting: ['Greeting', 'info'], negation: ['Negation', ''], other: ['Not classified', ''] };
@@ -25,18 +25,18 @@ export function SetKeywordModal({ word, preset, onClose }: { word: string; prese
   const dflt = lock ? 'alias' : preset || ({ filler: 'filler', slang: 'alias', topic: 'newtopic', question: p.adv ? 'aspect' : 'none', rude: 'rude_strong', greeting: 'greeting' } as Record<string, string>)[typeKey] || 'none';
   const [t, setT] = useState(dflt); const [l, setL] = useState(lg);
   const [name, setName] = useState(/^[a-z0-9 _-]+$/i.test(word) ? slug(word) : '');
-  const opts = ({ alias: [Object.keys(d.aliases), 'Topic'], aspect: [Object.keys(d.aspects), 'Question type'], greeting: [Object.keys(d.smalltalk), 'Greeting type'] } as Record<string, [string[], string]>)[t];
+  const opts = ({ alias: [topicNames(d, p.merchant), 'Topic'], aspect: [Object.keys(d.aspects), 'Question type'], greeting: [Object.keys(d.smalltalk), 'Greeting type'] } as Record<string, [string[], string]>)[t];
   const [v, setV] = useState('');
   const vv = opts && opts[0].includes(v) ? v : opts?.[0][0] || '';
 
   const apply = () => {
     const w = word.toLowerCase(); const n = slug(name);
-    if (t === 'newtopic') { if (!n) return p.toast('Type a name for the topic first'); if (d.aliases[n]) return p.toast('A topic named "' + n + '" already exists. Choose "Add to an existing topic" instead.'); }
+    if (t === 'newtopic') { if (!n) return p.toast('Type a name for the topic first'); if (topicNames(d, p.merchant).includes(n)) return p.toast('A topic named "' + n + '" already exists. Choose "Add to an existing topic" instead.'); }
     p.edit((x, note) => {
-      if (t !== 'none' && p.status(word).t !== 'Not set yet' && !(t === 'newtopic' && x.aliases[n])) unassign(x, p.merchant, w);
-      if (t === 'newtopic') { const byl: Record<string, string[]> = { ...emptyWords(), en: [n] }; if (w !== n) (byl[l] = byl[l] || []).push(w); x.aliases[n] = byl; note('Made "' + w + '" a new topic: ' + n); }
+      if (t !== 'none' && p.status(word).t !== 'Not set yet' && !(t === 'newtopic' && topicNames(x, p.merchant).includes(n))) unassign(x, p.merchant, w);
+      if (t === 'newtopic') { addOwnTopic(x, p.merchant, n, w !== n ? [w] : [], l); note('Made "' + w + '" a new topic: ' + n + ' (' + p.M.name + ')'); }
       if (t === 'filler') { pushUnique(x.fillers, l, w); note('Marked "' + w + '" as a filler word'); }
-      if (t === 'alias') { if (p.isAdmin) { x.aliases[vv][l] = x.aliases[vv][l] || []; pushUnique(x.aliases[vv], l, w); note('Added global short form "' + w + '" → ' + vv); } else { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: l, variant: w, canonical: vv }); note('Added short form "' + w + '" → ' + vv + ' (' + p.M.name + ')'); } }
+      if (t === 'alias') { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: l, variant: w, canonical: vv }); note('Added short form "' + w + '" → ' + vv + ' (' + p.M.name + ')'); }      // a keyword belongs to this merchant; an admin adds shared ones on the Topics page
       if (t === 'aspect') { pushUnique(x.aspects[vv], l, w); note('Added question word "' + w + '" (' + vv + ')'); }
       if (t === 'greeting') { pushUnique(x.smalltalk[vv], l, w); note('Added greeting phrase "' + w + '" (' + vv + ')'); }
       if (t === 'rude_strong') { pushUnique(x.guard.abuse, l, w); note('Added rude word "' + w + '"'); }

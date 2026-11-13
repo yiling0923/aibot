@@ -76,6 +76,8 @@ export class Engine {
   private aliasCache = new Map<string, [string, string][]>();
   private exCache = new Map<string, Set<string>>();
   private topics: string[];
+  /** The topics of each merchant: the shared template, plus the topics the merchant made itself (keywords with a topic name of their own, and the topics of its own entries). */
+  private topicSets = new Map<string, Set<string>>();
   private topicIntents: Record<string, string[]> = {};
   private FILLER: Set<string>; private SMALL_FILL: Set<string>; private DATA_FILLERS: string[];
   private abuseWords: string[]; private abuseSoft: string[]; private injection: string[]; private abuseCompact: string[];
@@ -88,6 +90,7 @@ export class Engine {
     k.merchants.forEach((m) => { this.merchants.set(m.code, m); this.entries.set(m.code, []); });
     k.kbEntries.forEach((e) => this.entries.get(e.merchant)?.push(e));
     this.topics = Object.keys(k.globalAliases);
+    k.merchants.forEach((m) => this.topicSets.set(m.code, new Set([...this.topics, ...m.aliases.map((a) => a.canonical), ...(this.entries.get(m.code) ?? []).map((e) => e.topic)])));
     k.kbEntries.forEach((e) => { const l = (this.topicIntents[e.topic] ??= []); if (!l.includes(e.intentKey)) l.push(e.intentKey); });
 
     this.DATA_FILLERS = Object.values(k.fillers ?? {}).flat().map((w) => fold(w.toLowerCase()));
@@ -116,7 +119,14 @@ export class Engine {
   /** The intents of a topic that this merchant has an answer for (the buttons shown after a topic word). */
   intentsOfTopic(code: string, topic: string) { const m = this.merchants.get(code); return m ? this.availIntents(m, topic) : []; }
   /** The first-level topic buttons (deposit, withdraw...) this merchant can answer. */
-  topicButtons(code: string): Option[] { return ['deposit', 'withdraw', 'password', 'promotion'].filter((x) => this.intentsOfTopic(code, x).length).map((x): Option => ({ kind: 'topic', key: x })); }
+  topicButtons(code: string): Option[] {
+    const std = ['deposit', 'withdraw', 'password', 'promotion'];
+    const own = [...(this.topicSets.get(code) ?? [])].filter((t) => !this.topics.includes(t) && this.intentsOfTopic(code, t).length)       // only topics the merchant made itself
+      .sort((a, b) => this.intentsOfTopic(code, b).length - this.intentsOfTopic(code, a).length);        // the merchant's own topics follow the usual ones, the biggest first
+    return [...std, ...own].filter((x) => this.intentsOfTopic(code, x).length).map((x): Option => ({ kind: 'topic', key: x }));
+  }
+  /** Is this word a topic of this merchant? */
+  isTopic(code: string, word: string) { return this.topicSets.get(code)?.has(word) ?? this.topics.includes(word); }
 
   /* ---------- text helpers ---------- */
   private aliasesFor(m: MerchantCfg): [string, string][] {
@@ -197,7 +207,8 @@ export class Engine {
     return { found, rest, words };
   }
   private keywordScan(text: string, m: MerchantCfg): KeywordScan {
-    const T = [...new Set((text.match(/[a-z0-9_]+/g) || []).filter((x) => this.topics.includes(x)))];
+    const mine = this.topicSets.get(m.code) ?? new Set(this.topics);
+    const T = [...new Set((text.match(/[a-z0-9_]+/g) || []).filter((x) => mine.has(x)))];
     const { found: A, rest, words } = this.findAspects(text, T.length > 0); const strong: KeywordRow[] = [], partial: KeywordRow[] = [];
     for (const e of this.entriesOf(m.code)) {
       const tOk = T.includes(e.topic), aOk = !!e.aspect && A.has(e.aspect);
@@ -276,7 +287,7 @@ export class Engine {
 
     let decision: Decision, why: string, options: Option[] = [], topic: string | null = null, conf = top.score;
     let via: 'similarity' | 'keywords' = 'similarity'; let dir: 'deposit' | 'withdraw' | null = null; let ctxDir: string | null = null;
-    const topicOptions = () => ['deposit', 'withdraw', 'password', 'promotion'].filter((x) => this.availIntents(m, x).length).map((x): Option => ({ kind: 'topic', key: x }));
+    const topicOptions = () => this.topicButtons(m.code);
 
     if (abuseHit.length) { decision = 'ABUSE'; why = (strongHit.length ? 'Rude or abusive word found.' : 'A mild word that is the whole message or comes with other insults.') + ' The bot replies kindly first and closes only if it keeps happening.'; conf = 0.99; }
     else if (guard && guard.kind === 'sensitive') { decision = 'REFUSE'; why = guard.why; conf = 0.99; }
@@ -330,7 +341,7 @@ export class Engine {
     if (decision === 'ANSWER' && (top.intent === 'deposit_time' || top.intent === 'withdraw_time') && PERSONAL_RE.test(lc)) account = { kind: top.intent === 'deposit_time' ? 'deposit' : 'withdraw' };
     // The three steps of the flow, reported: the words typed, the topic scores, the answer
     const typed = new Set<string>(); const keywords: KeywordHit[] = [];
-    for (const [v, c] of n.hits) if (this.topics.includes(c) && !typed.has(v)) { typed.add(v); keywords.push({ word: v.trim(), kind: 'topic', to: c }); }
+    for (const [v, c] of n.hits) if (this.isTopic(m.code, c) && !typed.has(v)) { typed.add(v); keywords.push({ word: v.trim(), kind: 'topic', to: c }); }
     for (const t of ks.T) if (!keywords.some((k) => k.to === t)) keywords.push({ word: t, kind: 'topic', to: t });
     keywords.push(...ks.words, ...ks.money.map((w): KeywordHit => ({ word: w, kind: 'money', to: 'money' })));
     const topicOf = new Map(this.entriesOf(m.code).map((e) => [e.id, e.topic] as const)); const ts = new Map<string, number>(ks.T.map((t) => [t, 1] as const));

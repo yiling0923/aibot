@@ -177,3 +177,21 @@ The bot understands and answers in **English (en), Malay (ms), Chinese (zh), Vie
 * **Existing databases** get the new word lists, the closing and hand-off messages, and the sample entries' translations automatically the first time the server starts (only where something is missing, and never over what you wrote).
 * **Add or change the sample words:** edit `tools/seed-languages/build.py` and run `python3 tools/seed-languages/build.py`, or edit the words in the panel.
 * **Not done yet:** amounts are still shown with `RM` and limits as written in each answer (a currency per merchant is a later step); the control panel itself is in English.
+
+
+## How the bot decides
+
+This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every message goes through three steps, and the bot reports each one (in the reply as `keywords`, `topic`, `answer_id`, and in the panel's Test chat under "what the bot did"):
+
+1. **Keywords:** the words the customer typed that the bot recognises (`depo`, `not in`, `充值`, `nạp tiền`). They are counted in the keyword reports. A keyword points to a topic (`depo` → deposit) or to a kind of question (`how long` → time).
+2. **Topic:** what the customer wants (Deposit, Withdraw, Bonus, Account, Bank...). Each merchant owns its topic list: it starts from the shared template, and the merchant can add its own topics and keywords (staff too). Another merchant never sees them.
+3. **Answer:** one answer per topic and, where needed, per kind of question. The rules decide first. Only when they are not sure does the AI pick an answer, from a **short list** (the closest entries, narrowed by topic), or say "none".
+
+**The clarify rule**
+
+* A clear question is answered straight away, with no choices.
+* An unclear one (two topics score close, nothing is sure) gets **one** question with up to 3 choices, plus the agent. Example: "my money not in" has money words and a question about time but no topic, so the bot asks "deposits or withdrawals?".
+* The customer may answer in their own words: "deposit", "depo", "1", "the first one". The bot reads that as an answer, and if the first message already said what was wanted (not in = how long it takes), it answers at once instead of asking a second question.
+* If it is still unclear, a person takes over. The bot never asks twice. (A menu of questions about a known topic is part of the answer, not a clarifying question, but showing the same menu twice is.)
+
+**LiveChat and its answer cache.** LiveChat remembers a reply by the words of the question only, for every customer, and checks that memory before it calls the bot. So the connector (a) never writes personal account data in a reply (those chats go to staff), and (b) marks every reply `cacheable: true|false`, with a confidence of 0.8 or less for the ones that must not be kept. LiveChat still needs one small change to honour the flag: see `docs/REQUEST_TO_LIVECHAT_TEAM.md`, which also has a no-code workaround.

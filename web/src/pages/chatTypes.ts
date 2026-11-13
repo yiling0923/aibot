@@ -17,6 +17,8 @@ export interface MessageTrace {
   options: Opt[]; kbAnswer?: string; smallText?: string; strike?: number; limit?: number; close?: boolean; acct: Acct | null;
   merchant: MerchantInfo; agentLabel: string; amtButtons: string[] | null;
   ai?: { picked?: string | null; confidence?: number | null; written?: boolean; rejected?: string };
+  /** The flow of the plan: the words typed, the topic scores, the answer, and the question the bot has open (it never asks twice). */
+  keywords?: { word: string; kind: string; to: string }[]; topicScores?: { topic: string; score: number }[]; answerId?: number | null; askKind?: string | null;
 }
 /** What the server says about a tapped button. */
 export interface PickTrace {

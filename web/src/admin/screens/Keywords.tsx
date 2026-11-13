@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
-import { LANG_NAMES } from '../model';
+import { LANG_NAMES, topicNames } from '../model';
 import { usePanel } from '../store';
 import { Pill } from '../ui';
 import { KeywordDrawer, SetKeywordModal } from './KeywordModals';
@@ -21,7 +21,7 @@ export default function Keywords() {
   const list = all.filter((r) => inTab(r, tab) && (!Q || r.w.toLowerCase().includes(Q) || r.h.toLowerCase().includes(Q)) && (lang === 'all' || r.lg === lang))
     .sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0) || b.n - a.n || a.w.localeCompare(b.w));
   const allSel = list.length > 0 && list.every((r) => sel.has(r.w));
-  const topics = Object.keys(p.draft.aliases); const topicNow = topics.includes(topic) ? topic : topics[0];
+  const topics = topicNames(p.draft, p.merchant); const topicNow = topics.includes(topic) ? topic : topics[0];
   const toggle = (w: string, on: boolean) => setSel((s) => { const n = new Set(s); if (on) n.add(w); else n.delete(w); return n; });
 
   const bulk = (k: string) => {

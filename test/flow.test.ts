@@ -151,3 +151,61 @@ describe('a channel that remembers replies by the words of the question (LiveCha
     const g = chat('c4'); await bot.message(g, 'deposit'); expect((await bot.message(g, 'how long'))!.cacheable).toBe(false);   // read together with the earlier message
   });
 });
+
+describe('each client owns its topic list', () => {
+  const own = () => {
+    const kn = knowledgeFromSeed(seedJson, accountsJson);
+    kn.merchants.find((m) => m.code === 'MERCH_A')!.aliases.push({ language: 'en', variant: 'visa', canonical: 'visa' }, { language: 'en', variant: 'credit card', canonical: 'visa' }, { language: 'ms', variant: 'kad kredit', canonical: 'visa' });
+    kn.kbEntries.push({ id: 99001, merchant: 'MERCH_A', category: 'Cards', intentKey: 'visa_how', topic: 'visa', aspect: 'how', topicOptional: false, translations: { en: { questionExamples: ['how to pay with visa', 'visa how', 'use credit card'], answerText: 'Choose Visa at the cashier and enter your card details.' } } });
+    kn.kbEntries.push({ id: 99002, merchant: 'MERCH_A', category: 'Cards', intentKey: 'visa_limit', topic: 'visa', aspect: 'limit', topicOptional: false, translations: { en: { questionExamples: ['visa limit', 'maximum visa payment'], answerText: 'Visa payments are limited to MYR 5,000 each.' } } });
+    return new Engine(kn);
+  };
+  it('knows a topic the merchant made, by its own keywords, in any language it added', () => {
+    const e = own();
+    expect(e.analyze('visa how', 'MERCH_A')).toMatchObject({ decision: 'ANSWER', topic: 'visa' });
+    expect(e.analyze('how to pay with credit card', 'MERCH_A').top.intent).toBe('visa_how');
+    expect(e.analyze('kad kredit had', 'MERCH_A').top.intent).toBe('visa_limit');
+    expect(e.analyze('credit card', 'MERCH_A')).toMatchObject({ decision: 'CHOICE', topic: 'visa' });            // the topic alone: which question about it?
+    expect(e.analyze('credit card limit', 'MERCH_A').keywords.map((x) => `${x.word}>${x.to}`)).toEqual(['credit card>visa', 'limit>limit']);
+  });
+  it('is private: another merchant does not know it', () => {
+    const e = own();
+    expect(e.isTopic('MERCH_A', 'visa')).toBe(true); expect(e.isTopic('MERCH_B', 'visa')).toBe(false);
+    expect(e.analyze('visa how', 'MERCH_B').keywords).toEqual([{ word: 'how', kind: 'question', to: 'how' }]);   // only the question word
+    expect(e.analyze('visa how', 'MERCH_B').decision).not.toBe('ANSWER');
+  });
+  it('still has the shared template topics, and offers its own topics after them', () => {
+    const e = own();
+    expect(e.analyze('depo how long', 'MERCH_A').decision).toBe('ANSWER');
+    expect(e.topicButtons('MERCH_A').map((o) => o.key)).toEqual(['deposit', 'withdraw', 'password', 'promotion', 'visa']);
+    expect(e.topicButtons('MERCH_B').map((o) => o.key)).not.toContain('visa');
+  });
+});
+
+
+import 'dotenv/config';
+import { beforeAll, afterAll } from 'vitest';
+import { createPool, type Pool } from '../src/db/pool';
+import { migrate } from '../src/db/migrate';
+import { seed } from '../src/db/seed';
+import { loadKnowledge } from '../src/db/loadKnowledge';
+import { readSnapshot, writeSnapshot } from '../src/admin/snapshot';
+
+const url = process.env.TEST_DATABASE_URL;
+let pool: Pool | null = null; let reachable = false;
+if (url) { pool = createPool(url, 4); try { await pool.query('select 1'); reachable = true; } catch { /* skipped below */ } }
+
+describe.skipIf(!reachable)('a merchant\'s own topic is saved and loaded (needs TEST_DATABASE_URL)', () => {
+  beforeAll(async () => { await migrate(pool!, { reset: true }); await seed(pool!); });
+  afterAll(async () => { await pool?.end(); });
+  it('is kept in the merchant\'s own database and known by the bot of that merchant only', async () => {
+    const snap = await readSnapshot(pool!);
+    snap.mAliases.MERCH_A.push({ language: 'en', variant: 'visa', canonical: 'visa' }, { language: 'en', variant: 'credit card', canonical: 'visa' });
+    await writeSnapshot(pool!, snap);
+    const engine = new Engine(await loadKnowledge(pool!));
+    expect(engine.isTopic('MERCH_A', 'visa')).toBe(true); expect(engine.isTopic('MERCH_B', 'visa')).toBe(false);
+    expect(engine.analyze('credit card limit', 'MERCH_A').keywords.map((x) => x.to)).toEqual(['visa', 'limit']);
+    expect(engine.analyze('credit card limit', 'MERCH_B').keywords.map((x) => x.to)).toEqual(['limit']);
+    const shared = await readSnapshot(pool!); expect(Object.keys(shared.aliases)).not.toContain('visa');           // the shared template is untouched
+  });
+});

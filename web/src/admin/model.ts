@@ -53,7 +53,18 @@ export const langState = (e: { translations: Entry['translations'] }, l: string)
   return a && n >= 3 ? 'on' : a || n ? 'part' : '';
 };
 
-export const topicList = (d: Draft) => Object.keys(d.aliases).filter((k) => !['balance', 'transactions', 'points'].includes(k));
+/** Every topic one merchant can use: the shared template, plus the topics that merchant made itself (its own keywords with a topic name of its own). */
+export const topicNames = (d: Draft, merchant: string): string[] => [...new Set([...Object.keys(d.aliases), ...(d.mAliases[merchant] ?? []).map((a) => a.canonical)])];
+export const topicList = (d: Draft, merchant?: string) => (merchant ? topicNames(d, merchant) : Object.keys(d.aliases)).filter((k) => !['balance', 'transactions', 'points'].includes(k));
+/** A topic that belongs to one merchant: its name and keywords are that merchant's own. Only adds what is not there yet. `lang` is the language of the words (guessed from the letters when not given). */
+export function addOwnTopic(d: Draft, merchant: string, name: string, words: string[], lang?: string): void {
+  const list = (d.mAliases[merchant] = d.mAliases[merchant] || []);
+  [name, ...words].forEach((w, i) => {
+    const lw = w.toLowerCase(); if (list.some((a) => a.variant.toLowerCase() === lw && a.canonical === name)) return;
+    if (i > 0 && Object.values(d.aliases[name] ?? {}).flat().some((x) => x.toLowerCase() === lw)) return;      // the shared topic already has this word
+    list.push({ language: i > 0 && lang ? lang : guessLang(w), variant: lw, canonical: name });
+  });
+}
 
 /* ---------- what each keyword is right now ---------- */
 export interface Status { c: string; t: string }
@@ -154,7 +165,7 @@ export function analyzeImport(text: string, d: Draft, merchant: string, merchant
     if (/^(yes|true|1|y)$/i.test(get(r, 'optional'))) g.optional = true;
     if (!g.topicWords.length) g.topicWords = get(r, 'topicwords').split(/\s*\|\s*/).map((x) => x.trim().toLowerCase()).filter(Boolean);
   });
-  const topics = topicList(d);
+  const topics = topicList(d, merchant);
   for (const g of groups.values()) {
     const ex = d.kb.find((e) => e.merchant === merchant && e.intent_key === g.key); g.exists = !!ex; g.existing = ex;
     if (!g.key) { out.entries.push(g); continue; }

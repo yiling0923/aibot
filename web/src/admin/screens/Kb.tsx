@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, clone, langState, slug, topicList, guessLang, emptyWords, type Entry } from '../model';
+import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 
 type Tr = { question_examples: string[]; answer_text: string };
@@ -104,10 +104,8 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
     const { useAspect, tab, sug: _s, newTopic: _n, newTopicW, newEx: _e, ...rest } = ed; void tab;
     const clean: Entry = { ...rest, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
     p.edit((d, note) => {
-      if (newTopic && !d.aliases[newTopic]) {
-        const byl: Record<string, string[]> = { ...emptyWords(), en: [newTopic] };
-        newTopicW.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean).forEach((w) => { const l = guessLang(w); if (!byl[l].includes(w)) byl[l].push(w); });
-        d.aliases[newTopic] = byl; note('Added topic "' + newTopic + '"');
+      if (newTopic && !topicNames(d, p.merchant).includes(newTopic)) {                 // a topic made here belongs to this merchant (the plan: each client owns its topic list)
+        addOwnTopic(d, p.merchant, newTopic, newTopicW.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)); note('Added topic "' + newTopic + '" (' + p.M.name + ')');
       }
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
       else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
@@ -125,7 +123,7 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
       <div className="form">
         <label className="fld"><span>Entry name</span><input type="text" value={ed.intent_key} onChange={(e) => set({ intent_key: e.target.value })} placeholder="e.g. daily_withdraw_limit" /></label>
         <label className="fld"><span>Status</span><select value={ed.status} onChange={(e) => set({ status: e.target.value as Entry['status'] })}><option value="live">Live</option><option value="draft">Draft (bot ignores it)</option></select></label>
-        <label className="fld"><span>Topic (required)</span><select value={ed.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">Choose a topic word…</option>{topicList(p.draft).map((x) => <option key={x}>{x}</option>)}<option value="__new">+ New topic…</option></select></label>
+        <label className="fld"><span>Topic (required)</span><select value={ed.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">Choose a topic word…</option>{topicList(p.draft, p.merchant).map((x) => <option key={x}>{x}</option>)}<option value="__new">+ New topic…</option></select></label>
         {ed.topic === '__new' && <>
           <label className="fld"><span>Name of the new topic</span><input type="text" placeholder="e.g. refund" value={ed.newTopic} onChange={(e) => set({ newTopic: e.target.value })} /></label>
           <label className="fld full"><span>Keywords for it (comma separated, any language, optional)</span><input type="text" placeholder="e.g. refunds, bayaran balik, 退款" value={ed.newTopicW} onChange={(e) => set({ newTopicW: e.target.value })} /></label></>}

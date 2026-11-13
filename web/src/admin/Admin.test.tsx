@@ -177,4 +177,15 @@ describe('Control panel', () => {
     const main = (await screen.findByLabelText('Main language')) as HTMLSelectElement;
     expect([...main.options].map((o) => o.value)).toEqual(['en', 'ms', 'zh', 'vi', 'th', 'tl']);
   });
+
+  it('lets staff create a topic of their own merchant, and an admin choose all merchants', async () => {
+    const { unmount } = open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
+    expect(await screen.findByText('Create topic')).toBeTruthy();                                  // staff can make a topic now
+    expect(screen.getByText(/Each merchant owns its topics/)).toBeTruthy();
+    expect(screen.queryByText('All merchants (template)')).toBeNull();                              // but only an admin may change the shared template
+    unmount(); open('admin', '/admin/kw');
+    await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
+    expect(await screen.findByText('All merchants (template)')).toBeTruthy();
+  });
 });

@@ -114,15 +114,18 @@ function MessageBrain({ t }: { t: MessageTrace }) {
             <div className="mono">{t.normalized}</div>
             <div style={{ marginTop: 4 }}>{t.hits.length ? t.hits.map(([a, b], i) => <span key={i}><Mono>{a}</Mono> <span className="arrow">→</span> <Mono>{b}</Mono> &nbsp; </span>) : <Sub>no short forms found</Sub>}</div>
           </Step>
-          <Step n={3} title={'Keyword scan, then ' + m.name + ' KB'}>
-            <div>Topic: {pills(t.ks.T)} &nbsp; Keyword: {pills(t.ks.A)}</div>
+          <Step n={3} title={'Keywords, then the topic (' + m.name + ')'}>
+            {t.keywords ? <>
+              <div>Keywords typed: {t.keywords.length ? t.keywords.map((k) => <span key={k.word + k.to}><Mono>{k.word}</Mono> <span className="arrow">→</span> <Pill kind={k.kind === 'topic' ? 'info' : k.kind === 'money' ? 'warn' : 'ok'}>{k.to}</Pill> &nbsp; </span>) : <Sub>none</Sub>}</div>
+              <div style={{ marginTop: 3 }}>Topic: {t.topicScores?.length ? t.topicScores.slice(0, 3).map((x) => <span key={x.topic}><Pill kind="info">{x.topic}</Pill> <Sub>{x.score.toFixed(2)}</Sub> &nbsp; </span>) : <Sub>none</Sub>}</div>
+            </> : <div>Topic: {pills(t.ks.T)} &nbsp; Keyword: {pills(t.ks.A)}</div>}
             {t.amt ? <div style={{ marginTop: 3 }}>Amount: <Pill kind="info">{fmtAmt(t.amt.n)}</Pill></div> : null}
             {t.via === 'keywords' ? <div className="sub" style={{ marginTop: 3 }}>The keywords decide. Words around them are ignored.</div>
               : <>{cands}{t.top.score > 0 ? <div className="sub">Closest example: “{t.top.example}”</div> : <div className="sub">No example is similar to this message.</div>}</>}
           </Step>
           {t.ai && t.ai.picked ? <Step n={4} title="Claude picks the entry" pill={<Pill kind="info">AI</Pill>}><Sub>No keyword matched, so Claude chose <Mono>{t.ai.picked}</Mono> ({Math.round((t.ai.confidence ?? 0) * 100)}% sure).</Sub></Step>
             : t.ai && t.ai.picked === null ? <Step n={4} title="Claude was asked" pill={<Pill kind="warn">not sure</Pill>}><Sub>No keyword matched. Claude {t.ai.confidence != null ? 'was only ' + Math.round(t.ai.confidence * 100) + '% sure' : 'found no entry'}, so it is not used.</Sub></Step> : null}
-          <Step n={asked ? 5 : 4} title="Decision"><pre className="json">{json}</pre></Step>
+          <Step n={asked ? 5 : 4} title="Answer or question">{t.askKind ? <div className="sub" style={{ marginBottom: 4 }}>The bot has asked its one question ({t.askKind}). If the next message is still unclear, a person takes over.</div> : null}<pre className="json">{json}</pre></Step>
         </>
       )}
       <Step n={t.decision === 'ABUSE' || t.guard ? 2 : asked ? 6 : t.decision === 'SMALLTALK' ? 5 : 5} title="Confidence gate" pill={<Pill kind={dec[0]}>{dec[1]}</Pill>}><Sub>{t.why}</Sub></Step>
