@@ -340,4 +340,9 @@ details.fold[open]>summary{margin-bottom:8px}
 .klabel{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding-top:5px}
 .chip.mine{outline:1.5px solid var(--accent);outline-offset:-1.5px}
 @media (max-width:640px){.kgroup{grid-template-columns:1fr}}
-.fc .kgrp{margin-bottom:4px}.fc .kgrp .klabel{display:block;padding:0 0 2px;font-size:10px}
+
+/* Keywords page: words customers typed, under their main keyword */
+.kwchip{display:inline-flex;align-items:center;gap:6px;background:var(--surface2);border-radius:99px;padding:3px 10px 3px 8px;margin:0 4px 5px 0;font-size:12.5px}
+.kwchip.on{outline:1.5px solid var(--accent);outline-offset:-1.5px;background:var(--okbg)}
+.kwchip .n{color:var(--muted);font-size:11px}.kwchip input{margin:0}
+.kwmain .head{margin-bottom:8px}.kwheard{margin-left:8px;font-size:13px;font-weight:400}

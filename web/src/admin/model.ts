@@ -85,6 +85,14 @@ export function groupKeywords<T extends { variant: string; language?: string; ki
   return KW_KINDS.map((kind) => ({ kind, label: KW_LABEL[kind], items: items.filter((x) => kwKind(main, x) === kind) })).filter((g) => g.items.length);
 }
 
+/** The main keyword (topic) a word belongs to, with the language and kind it was saved with. Null when the word is not a topic keyword. */
+export function wordTopic(d: Draft, merchant: string, w: string): { topic: string; language: string; kind?: string | null } | null {
+  const lw = w.toLowerCase();
+  for (const [k, byl] of Object.entries(d.aliases)) for (const [l, arr] of Object.entries(byl)) if (arr.some((x) => String(x).toLowerCase() === lw)) return { topic: k, language: l };
+  const ma = (d.mAliases[merchant] || []).find((a) => a.variant.toLowerCase() === lw);
+  return ma ? { topic: ma.canonical, language: ma.language, kind: ma.kind } : null;
+}
+
 /* ---------- what each keyword is right now ---------- */
 export interface Status { c: string; t: string }
 export function kwStatus(d: Draft, merchant: string, w: string): Status {

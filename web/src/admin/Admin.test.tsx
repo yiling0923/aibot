@@ -9,7 +9,7 @@ const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay' }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
   snapshot: {
-    kb: [], aliases: { deposit: { en: ['deposit'], ms: [], zh: [] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
+    kb: [], aliases: { deposit: { en: ['deposit', 'dep'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
     settings: {},
   },
 });
@@ -31,6 +31,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? { merchants: [], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
     : url.startsWith('/api/admin/report') ? REPORT
+    : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
     : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : [])));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
@@ -244,5 +245,17 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByPlaceholderText('e.g. depoo'), 'cashin{enter}');
     await screen.findByText('cashin');
     expect(screen.getAllByText('Slang').some((e) => e.className === 'klabel')).toBe(true);                     // a Slang group appeared
+  });
+  it('shows the words customers typed under their main keyword on the Keywords page, and keeps the plain list too', async () => {
+    open('staff', '/admin/store');
+    await userEvent.click(await screen.findByText('By main keyword'));
+    expect(await screen.findByText('Main keyword')).toBeTruthy();
+    expect(screen.getByText('Short forms')).toBeTruthy();                                        // dep is a short form of deposit
+    expect(screen.getByText('Other languages')).toBeTruthy();                                    // 充值 is Chinese
+    expect(screen.getByText('Not assigned to a main keyword')).toBeTruthy();                     // xyzzy has no topic yet
+    expect(screen.getByText('xyzzy')).toBeTruthy();
+    await userEvent.click(screen.getByText('List'));
+    expect(screen.queryByText('Main keyword')).toBeNull();                                       // the plain table is back
+    expect(screen.getByText('xyzzy')).toBeTruthy();
   });
 });
