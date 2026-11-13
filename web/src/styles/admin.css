@@ -367,3 +367,33 @@ details.fold[open]>summary{margin-bottom:8px}
 .kwchip.on{outline:1.5px solid var(--accent);outline-offset:-1.5px;background:var(--okbg)}
 .kwchip .n{color:var(--muted);font-size:11.5px;font-weight:600}.kwchip input{margin:0}
 @media (max-width:900px){.kwcols{grid-template-columns:1fr 1fr;row-gap:14px}.kwcol:nth-child(odd){border-left:0;padding-left:0}.kwhead{flex-wrap:wrap}}
+
+/* ---------- one look for every control, on every page ---------- */
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):not([type=color]),select,textarea{
+  background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:7px 11px;min-height:34px;box-sizing:border-box;min-width:0;transition:border-color .15s,box-shadow .15s}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):not([type=hidden]):hover,select:hover,textarea:hover{border-color:color-mix(in srgb,var(--accent) 40%,var(--line))}
+input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=file]):focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 20%,transparent)}
+input::placeholder,textarea::placeholder{color:color-mix(in srgb,var(--muted) 75%,transparent)}
+select{appearance:none;-webkit-appearance:none;padding-right:32px;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%236b7886' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 11px center}
+select.mv{background-image:none;padding:0 2px;min-height:0;border:0;box-shadow:none;background:none}
+input[type=file]{font-size:13px;color:var(--muted)}
+input[type=file]::file-selector-button{font:inherit;font-weight:600;color:var(--fg);background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 12px;margin-right:10px;cursor:pointer}
+input[type=file]::file-selector-button:hover{border-color:var(--accent)}
+
+/* the tick box: a soft rounded square that fills with the accent colour */
+input[type=checkbox]{appearance:none;-webkit-appearance:none;flex:none;width:18px;height:18px;margin:0;border:1.5px solid color-mix(in srgb,var(--muted) 45%,var(--line));border-radius:6px;background:var(--surface);display:inline-grid;place-content:center;vertical-align:middle;cursor:pointer;transition:background .15s,border-color .15s,box-shadow .15s}
+input[type=checkbox]::after{content:'';width:10px;height:10px;background:#fff;transform:scale(0);transition:transform .12s ease-out;clip-path:polygon(14% 52%,0 70%,40% 100%,100% 22%,82% 4%,40% 64%)}
+input[type=checkbox]:hover{border-color:var(--accent)}
+input[type=checkbox]:checked{background:var(--accent);border-color:var(--accent)}
+input[type=checkbox]:checked::after{transform:scale(1)}
+input[type=checkbox]:focus-visible{outline:none;box-shadow:0 0 0 3px color-mix(in srgb,var(--accent) 25%,transparent)}
+input[type=checkbox]:disabled{opacity:.5;cursor:not-allowed}
+.tog input,.kwchip input,.kwrow input{width:18px;height:18px}
+.kwchip input,.kwrow input{width:16px;height:16px;border-radius:5px}
+.switch input[type=checkbox]{width:100%;height:100%;opacity:0;border:0;border-radius:0}
+.switch input[type=checkbox]::after{display:none}
+th input[type=checkbox],td input[type=checkbox]{vertical-align:-4px}
+
+/* tables read the same everywhere */
+tbody tr{transition:background .12s}
+tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
