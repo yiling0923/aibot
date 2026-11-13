@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from 'react';
 import { api } from '../../lib/api';
-import { LANG_NAMES, LN, groupKeywords, topicNames, wordTopic } from '../model';
+import { KW_KINDS, KW_LABEL, LANG_NAMES, LN, groupKeywords, topicNames, wordTopic, type KwKind } from '../model';
 import { usePanel } from '../store';
 import { Pill } from '../ui';
 import { KeywordDrawer, SetKeywordModal } from './KeywordModals';
@@ -57,30 +57,45 @@ export default function Keywords() {
   /** The words customers typed, under their main keyword: short forms, slang, same meaning, other languages. Words with no topic stay in a table below. */
   const placed = list.map((r) => ({ r, t: r.ignored ? null : wordTopic(p.draft, p.merchant, r.w) }));
   const byTopic = topics.map((tp) => ({ tp, rows: placed.filter((x) => x.t?.topic === tp) })).filter((x) => x.rows.length);
-  const rest = placed.filter((x) => !x.t).map((x) => x.r);
-  const chip = (r: (typeof list)[number], showLang: boolean): ReactNode => <span key={r.w} className={'kwchip' + (sel.has(r.w) ? ' on' : '')}>
-    <input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
-    {r.isNew ? <Pill c="info">New</Pill> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span>
-    {showLang && <span className="lang">{LN[r.lg] ?? r.lg}</span>}<span className="n" title="times heard">{r.n}</span></span>;
+  const rest = placed.filter((x) => !x.t && (x.r.ignored || x.r.st.t === 'Not set yet')).map((x) => x.r);          // really waiting for a main keyword (or ignored)
+  const other = placed.filter((x) => !x.t && !x.r.ignored && x.r.st.t !== 'Not set yet').map((x) => x.r);       // already used for something else: filler, rude word, question word, greeting
+  const KSHADE: Record<KwKind, string> = { short: 's1', slang: 's2', meaning: 's3', lang: 's4' };
+  type Row = (typeof list)[number];
+  const wordRow = (r: Row, mx: number, tag?: string): ReactNode => <div className="kwrow" key={r.w}>
+    <label><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
+      {r.isNew ? <Pill c="info">New</Pill> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span>{tag && <span className="lang">{tag}</span>}</label>
+    <div className="kwbar"><i style={{ width: Math.max(8, Math.round((r.n * 100) / mx)) + '%' }} /></div><b className="kwn" title="times heard">{r.n}</b></div>;
   const mainView = (
     <>
+      <div className="kwlegend">{KW_KINDS.map((k) => <span key={k}><i className={KSHADE[k]} />{KW_LABEL[k]}</span>)}<span className="sub">The bar on each main keyword shows how much of the typing came from each group.</span></div>
       {sel.size > 0 && <div className="card">{bulkBar}</div>}
       {byTopic.map(({ tp, rows }) => {
         const main = rows.find((x) => x.r.w.toLowerCase() === tp.toLowerCase());
         const groups = groupKeywords(tp, rows.filter((x) => x !== main).map((x) => ({ variant: x.r.w, language: x.t!.language, kind: x.t!.kind, row: x.r })));
+        const total = rows.reduce((n, x) => n + x.r.n, 0); const sum = (g: (typeof groups)[number]) => g.items.reduce((n, x) => n + x.row.n, 0);
         return (
           <div className="card kwmain" key={tp}>
-            <div className="head"><div><span className="klabel" style={{ padding: 0 }}>Main keyword</span><h3 style={{ margin: 0 }}>{tp} {main && <span className="kwheard">{chip(main.r, false)}</span>}</h3></div>
-              <span className="sub">{rows.length} word{rows.length === 1 ? '' : 's'} heard · {rows.reduce((n, x) => n + x.r.n, 0)} times</span></div>
-            <div className="kgroups">
-              {groups.map((g) => <div className="kgroup" key={g.kind}><span className="klabel">{g.label}</span><div className="chips">{g.items.map((x) => chip(x.row, g.kind === 'lang'))}</div></div>)}
-              {!groups.length && <div className="sub">Only the main word itself was heard.</div>}
-            </div>
+            <div className="kwhead"><span className="kwname">◆ {tp}</span>
+              <div className="kwstack">{groups.map((g) => <i key={g.kind} className={KSHADE[g.kind]} style={{ flex: sum(g) }} title={g.label + ': ' + sum(g)} />)}{main && <i className="s0" style={{ flex: main.r.n }} title={'The word "' + tp + '" itself: ' + main.r.n} />}</div>
+              <span className="kwtotal"><b>{total}</b> times heard</span></div>
+            <div className="kwcols">{KW_KINDS.map((k) => { const g = groups.find((x) => x.kind === k); const mx = Math.max(1, ...(g?.items.map((x) => x.row.n) ?? [1]));
+              return <div className="kwcol" key={k}><div className="kwcolh"><span>{KW_LABEL[k]}</span><em>{g?.items.length ?? 0}</em></div>
+                {g ? g.items.map((x) => wordRow(x.row, mx, k === 'lang' ? (LN[x.row.lg] ?? x.row.lg) : undefined)) : <div className="sub">none heard</div>}</div>; })}</div>
+            {main && <div className="sub kwmainw">The main word “{tp}” itself was heard {main.r.n} times.</div>}
           </div>
         );
       })}
-      {rest.length > 0 && <div className="card scroll"><div className="head"><h3 style={{ margin: 0 }}>{tab === 'ignored' ? 'Ignored' : 'Not assigned to a main keyword'}</h3><span className="sub">{rest.length} word{rest.length === 1 ? '' : 's'}</span></div>{renderTable(rest)}</div>}
-      {!byTopic.length && !rest.length && <div className="card sub">No keywords match. Words customers type are saved here automatically.</div>}
+      {rest.length > 0 && <div className="card kwrest"><div className="head"><div><h3 style={{ margin: 0 }}>{tab === 'ignored' ? 'Ignored words' : 'Not under a main keyword yet'} · {rest.length}</h3>
+        {tab !== 'ignored' && <div className="sub">Click a word to put it under a main keyword, or tick words and use the bar above.</div>}</div></div>
+        <div className="kwpills">{rest.map((r) => <span key={r.w} className={'kwchip' + (sel.has(r.w) ? ' on' : '')}>
+          <input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
+          <span className="kwlink" onClick={() => (r.ignored ? setDrawer(r.w) : setSetFor({ w: r.w }))}>{r.w}</span><span className="n" title="times heard">{r.n}</span>
+          {r.ignored && <button type="button" className="btn sm ghost" onClick={() => p.unignoreWord(r.w)}>Restore</button>}</span>)}</div></div>}
+      {other.length > 0 && <div className="card kwrest"><div className="head"><div><h3 style={{ margin: 0 }}>Words with another job · {other.length}</h3><div className="sub">Filler words, rude words, question words and greetings. They are not main keywords, so they are not shown above.</div></div></div>
+        <div className="kwpills">{other.map((r) => <span key={r.w} className={'kwchip' + (sel.has(r.w) ? ' on' : '')} title={r.st.t}>
+          <input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
+          <span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span><span className="n" title="times heard">{r.n}</span><span className="sub">{r.st.t.replace(/^(Question word|Greeting list): /, '$1 · ')}</span></span>)}</div></div>}
+      {!byTopic.length && !rest.length && !other.length && <div className="card sub">No keywords match. Words customers type are saved here automatically.</div>}
     </>
   );
 

@@ -249,13 +249,13 @@ describe('Control panel', () => {
   it('shows the words customers typed under their main keyword on the Keywords page, and keeps the plain list too', async () => {
     open('staff', '/admin/store');
     await userEvent.click(await screen.findByText('By main keyword'));
-    expect(await screen.findByText('Main keyword')).toBeTruthy();
-    expect(screen.getByText('Short forms')).toBeTruthy();                                        // dep is a short form of deposit
-    expect(screen.getByText('Other languages')).toBeTruthy();                                    // 充值 is Chinese
-    expect(screen.getByText('Not assigned to a main keyword')).toBeTruthy();                     // xyzzy has no topic yet
+    expect(await screen.findByText('◆ deposit')).toBeTruthy();
+    expect(screen.getAllByText('Short forms').length).toBeGreaterThan(1);                        // the legend and the column: dep is a short form of deposit
+    expect(screen.getAllByText('Other languages').length).toBeGreaterThan(1);                    // 充值 is Chinese
+    expect(screen.getByText(/Not under a main keyword yet/)).toBeTruthy();                       // xyzzy has no topic yet
     expect(screen.getByText('xyzzy')).toBeTruthy();
     await userEvent.click(screen.getByText('List'));
-    expect(screen.queryByText('Main keyword')).toBeNull();                                       // the plain table is back
+    expect(screen.queryByText('◆ deposit')).toBeNull();                                          // the plain table is back
     expect(screen.getByText('xyzzy')).toBeTruthy();
   });
 });
