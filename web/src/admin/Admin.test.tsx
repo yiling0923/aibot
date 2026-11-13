@@ -26,6 +26,7 @@ const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? { merchants: [], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
@@ -198,5 +199,14 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByText('List'));                                          // the list shows the same topic
     expect((await screen.findAllByText('refund')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('flow')).toBeNull();
+  });
+  it('shows the handoff number copied from LiveChat on the merchant page, with a button to send a change to LiveChat', async () => {
+    open('admin', '/admin/merchants/A');
+    expect(await screen.findByText('Handoff number (synced with LiveChat)')).toBeTruthy();
+    const box = await screen.findByLabelText('Ask for a person after N replies') as HTMLInputElement;
+    expect(box.value).toBe('4');
+    expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(true);       // nothing to send until the number differs
+    await userEvent.clear(box); await userEvent.type(box, '6');
+    expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(false);
   });
 });

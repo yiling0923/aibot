@@ -11,6 +11,7 @@ interface Conn {
   livechat: { baseUrl: string; askUrl: string; keys: KeyRow[]; stoppedKeys: number; liveChats7d: number; lastLiveChat: string | null };
   ai: Record<'anthropic' | 'openai', AiRow>;
 }
+interface LcLink { configured: boolean; baseUrl: string | null; email: string | null; handoffAfterReplies: number | null; syncedAt: string | null; error: string | null }
 interface LinkTest { ok: boolean; ms: number; hasKey: boolean; answer: string; decision: string; choices: { label: string }[] }
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : 'never');
@@ -93,6 +94,8 @@ export default function MerchantPage() {
           </div>
         )}</div>
 
+      <HandoffSync code={m.code} />
+
       <div className="card"><h3>AI keys for this merchant</h3>
         <div className="sub">Optional. With its own key, this merchant's AI use is billed to its own account. Without one, the bot uses the shared key from <span className="mono">.env</span>, or runs without AI. Keys are saved encrypted and only the last 4 characters are ever shown.</div>
         <AiKeyRow code={m.code} provider="anthropic" title="Claude (Anthropic)" help="Picks the right answer when no keyword matches, describes new keywords, and translates answers." row={c.ai.anthropic} onChange={load} />
@@ -123,6 +126,35 @@ function AiKeyRow({ code, provider, title, help, row, onChange }: { code: string
         <button className="btn pri" type="button" disabled={busy || val.trim().length < 12} onClick={save}>{row.configured ? 'Replace key' : 'Save key'}</button>
         {row.configured && <button className="btn" type="button" onClick={remove}>Remove</button>}
       </div>
+    </div>
+  );
+}
+
+/** "Ask for a person after N bot replies": the same number in LiveChat and in the bot. LiveChat wins; a change made here goes to LiveChat first. */
+function HandoffSync({ code }: { code: string }) {
+  const p = usePanel(); const base = `/api/admin/merchants/${encodeURIComponent(code)}/livechat`;
+  const [l, setL] = useState<LcLink | null>(null); const [f, setF] = useState({ baseUrl: '', email: '', password: '' }); const [n, setN] = useState(''); const [busy, setBusy] = useState(''); const [msg, setMsg] = useState('');
+  const apply = (x: LcLink) => { setL(x); setN(x.handoffAfterReplies === null ? '' : String(x.handoffAfterReplies)); };
+  const run = async (what: string, fn: () => Promise<LcLink>, ok: string) => { setBusy(what); setMsg(''); try { apply(await fn()); p.toast(ok); } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); } };
+  useEffect(() => { api<LcLink>(base).then(apply).catch((e) => setMsg((e as Error).message)); }, [base]);
+  if (!l) return <div className="card"><h3>Handoff number (synced with LiveChat)</h3><div className="sub">{msg || 'Loading…'}</div></div>;
+  return (
+    <div className="card"><h3>Handoff number (synced with LiveChat)</h3>
+      <div className="sub">After this many bot replies, LiveChat asks the customer if they want a person (0 = never). It is one number: change it in LiveChat or here and the other follows. LiveChat is the source of truth: the bot copies it every minute and whenever this page opens. A change made here is sent to LiveChat first and saved only if LiveChat accepts it.</div>
+      {l.configured ? <>
+        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <label className="fld"><span>Ask for a person after N replies</span><input type="number" min={0} max={100} value={n} onChange={(e) => setN(e.target.value)} style={{ width: 110 }} /></label>
+          <button className="btn pri" type="button" disabled={!!busy || n === '' || Number(n) === l.handoffAfterReplies} onClick={() => run('push', () => api<LcLink>(base + '/handoff', { value: Number(n) }), 'Saved in LiveChat and here')}>Save to LiveChat</button>
+          <button className="btn" type="button" disabled={!!busy} onClick={() => run('sync', () => api<LcLink>(base + '/sync', {}), 'Copied from LiveChat')}>Sync now</button>
+          <button className="btn" type="button" disabled={!!busy} onClick={() => run('rm', async () => { await api(base + '/remove', {}); return { configured: false, baseUrl: null, email: null, handoffAfterReplies: null, syncedAt: null, error: null }; }, 'Disconnected')}>Disconnect</button></div>
+        <div className="sub" style={{ marginTop: 6 }}>Connected to <span className="mono">{l.baseUrl}</span> as {l.email}. {l.syncedAt ? 'Last copied ' + when(l.syncedAt) + '.' : ''} {l.error ? <Pill c="bad">Last sync failed: {l.error}</Pill> : <Pill c="ok">In sync</Pill>}</div>
+      </> : <>
+        <div className="form" style={{ marginTop: 10 }}>
+          <label className="fld"><span>LiveChat address</span><input value={f.baseUrl} placeholder="http://localhost:8080" onChange={(e) => setF({ ...f, baseUrl: e.target.value })} /></label>
+          <label className="fld"><span>This merchant's LiveChat email</span><input value={f.email} autoComplete="off" onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
+          <label className="fld"><span>Password (saved encrypted)</span><input type="password" value={f.password} autoComplete="off" onChange={(e) => setF({ ...f, password: e.target.value })} /></label></div>
+        <div style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!!busy} onClick={() => run('connect', () => api<LcLink>(base, f), 'Connected to LiveChat')}>{busy === 'connect' ? 'Checking…' : 'Connect and copy the number'}</button></div></>}
+      {msg && <div className="note" style={{ marginTop: 8, background: 'var(--badbg)' }}>{msg}</div>}
     </div>
   );
 }

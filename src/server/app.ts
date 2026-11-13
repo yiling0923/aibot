@@ -20,6 +20,7 @@ import { createRoutedAi, type AiService } from '../ai';
 import { MerchantAiKeys } from '../ai/merchantKeys';
 import { UsageRecorder } from '../ai/usage';
 import { billingRoutes } from '../admin/billing';
+import { LiveChatLink } from '../livechat/link';
 import { merchantPageRoutes } from '../admin/merchantPage';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
@@ -75,7 +76,8 @@ export async function buildApp(opts: AppOptions = {}) {
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
   connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs });
   billingRoutes(app, { pool, onPriceChange: () => usage.forgetPrices() });
-  merchantPageRoutes(app, { pool, getBot, store, aiKeys, timeoutMs: config.askTimeoutMs, shared: { anthropic: !!config.anthropicKey, openai: !!config.openaiKey && !!config.openaiModel }, publicUrl: config.publicUrl });
+  const link = new LiveChatLink(pool);
+  merchantPageRoutes(app, { pool, link, getBot, store, aiKeys, timeoutMs: config.askTimeoutMs, shared: { anthropic: !!config.anthropicKey, openai: !!config.openaiKey && !!config.openaiModel }, publicUrl: config.publicUrl });
   await new Tenants(pool).migrateAll().then((a) => { if (a.length) app.log.info(`updated merchant databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the merchant databases (run npm run db:migrate)'));
   await ensureVersions(pool).catch((e) => app.log.warn({ err: e }, 'could not prepare version history (run npm run db:migrate)'));
 
@@ -221,5 +223,8 @@ export async function buildApp(opts: AppOptions = {}) {
     await getBot(true); return { ok: true };
   });
 
+  if (config.livechatSyncMs > 0) {      // a change made in LiveChat reaches the bot within a minute, without anyone opening a page
+    const t = setInterval(() => { void link.pullAll().catch(() => undefined); }, config.livechatSyncMs); t.unref(); app.addHook('onClose', async () => clearInterval(t));
+  }
   return app;
 }

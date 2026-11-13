@@ -22,6 +22,8 @@ export const config = {
   /** Safety limit on AI calls per hour (cost control). */
   aiMaxCallsPerHour: Number(process.env.AI_MAX_CALLS_PER_HOUR ?? 600),
   /** How long the LiveChat connector may take before the chat is handed to a person. */
+  /** How often the bot copies each merchant's LiveChat handoff number (milliseconds, 0 = never). */
+  livechatSyncMs: Number(process.env.LIVECHAT_SYNC_MS ?? 60000),
   askTimeoutMs: Number(process.env.ASK_TIMEOUT_MS ?? 8000),
   openaiKey: process.env.OPENAI_API_KEY ?? '',
 };

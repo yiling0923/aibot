@@ -107,4 +107,12 @@ Every message goes through three steps, and the bot reports each one in the repl
 
 ## Still to do on the bot side
 
-Vietnamese / Thai / Filipino, hand-off number sync, topic flow view, per-merchant settings and keys page, usage and billing page.
+Nothing from the original plan is left on the bot side. Open items depend on the LiveChat team (see `REQUEST_TO_LIVECHAT_TEAM.md`).
+
+## Handoff number sync
+
+`ai_handoff_prompt_after_replies` ("ask for a person after N bot replies") is one number kept the same in LiveChat and the bot. **LiveChat is the source of truth.** On the merchant page (admin), save the merchant's LiveChat address, email and password (stored encrypted). Then:
+
+- A change made **in LiveChat** is copied into the bot within a minute (`LIVECHAT_SYNC_MS`, default 60000, 0 = off), when the merchant page opens, and on **Sync now**.
+- A change made **in the bot** goes to LiveChat first (`PATCH /merchant/automation`), is read back to confirm, and is saved in the bot only then. If LiveChat refuses or does not keep it, nothing changes and the page says so.
+- If LiveChat cannot be reached, the bot keeps its last number and shows "Last sync failed".

@@ -73,5 +73,5 @@ The numbered list stays in `answer`, and the bot understands "2", "the second on
 
 ## Other items we also need from LiveChat (separate from the buttons)
 1. **Member details on every ask call:** send `member: { id, name, rank }` (LiveChat already holds `externalId`, name and rank), so the bot can answer account questions for a signed-in member.
-2. **Handoff number:** a way for the bot to read and set "ask after every N bot replies" (`ai_handoff_prompt_after_replies`), so the bot panel and LiveChat show the same number. Tell us which API call and which login or token to use.
+2. **Handoff number (built on the bot side, please confirm):** the bot keeps `ai_handoff_prompt_after_replies` the same as LiveChat. It uses the calls we already know: `POST /login` (email + password of the merchant), `GET /merchant/automation` (must return `ai_handoff_prompt_after_replies`) and `PATCH /merchant/automation`. Please confirm that `GET /merchant/automation` returns that field, and give us a dedicated read/write login or token per merchant (we store it encrypted) so we do not use a person's password.
 3. **The bot's address on staging:** where it should be reachable (for example `http://ai-bot:3000` inside your network, or an https address), and who sets the base URL and the key in each merchant's AI Bot page.

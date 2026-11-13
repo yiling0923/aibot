@@ -7,10 +7,11 @@ import '../auth/types';
 import { Tenants, migrateMerchantDb, tbl } from '../db/tenants';
 import { ask } from '../connector/ask';
 import { listKeys } from '../connector/keys';
+import type { LiveChatLink } from '../livechat/link';
 import { MerchantAiKeys, PROVIDERS, type Provider } from '../ai/merchantKeys';
 
 export interface MerchantPageCtx {
-  pool: Pool; getBot: () => Promise<Bot>; store: Store; aiKeys: MerchantAiKeys; timeoutMs?: number;
+  pool: Pool; getBot: () => Promise<Bot>; store: Store; aiKeys: MerchantAiKeys; link: LiveChatLink; timeoutMs?: number;
   /** Is a shared key set in .env? Shown as "using the shared key". */
   shared: Record<Provider, boolean>;
   /** The address LiveChat should use (from PUBLIC_URL); empty: the address of the open page. */
@@ -76,5 +77,31 @@ export function merchantPageRoutes(app: FastifyInstance, ctx: MerchantPageCtx) {
     const r = await ask({ pool, bot: await ctx.getBot(), store: ctx.store, timeoutMs: ctx.timeoutMs, source: 'test' }, t.code,
       { question: String(req.body?.question ?? 'Can you help?').slice(0, 300), session_id: 'link-test-' + Date.now().toString(36) });
     return { ok: true, ms: Date.now() - started, hasKey: keys.some((k) => !k.revokedAt), answer: r.answer, decision: r.decision, choices: r.choices };
+  });
+
+  /** The "ask for a person after N bot replies" number, kept the same in LiveChat and here. LiveChat is the source of truth. */
+  app.get<{ Params: { code: string } }>(`${A}/livechat`, async (req, reply) => {
+    if (!adminOnly(req, reply)) return;
+    if (!(await known(req.params.code))) return reply.code(404).send({ error: 'There is no such merchant.' });
+    if ((await ctx.link.info(req.params.code)).configured) await ctx.link.pull(req.params.code).catch(() => undefined);   // opening the page shows LiveChat's number as it is now
+    return ctx.link.info(req.params.code);
+  });
+  app.post<{ Params: { code: string }; Body: { baseUrl?: string; email?: string; password?: string } }>(`${A}/livechat`, async (req, reply) => {
+    if (!adminOnly(req, reply)) return;
+    const { baseUrl = '', email = '', password = '' } = req.body ?? {};
+    if (!/^https?:\/\/[^\s]+$/.test(baseUrl.trim())) return reply.code(400).send({ error: 'Enter the LiveChat address, starting with http:// or https://.' });
+    if (!email.trim() || !password) return reply.code(400).send({ error: 'Enter the LiveChat email and password of this merchant.' });
+    try { return await ctx.link.connect(req.params.code, baseUrl, email, password, req.user!.username); } catch (e) { return reply.code(400).send({ error: (e as Error).message }); }
+  });
+  app.post<{ Params: { code: string } }>(`${A}/livechat/remove`, async (req, reply) => { if (!adminOnly(req, reply)) return; return { removed: await ctx.link.disconnect(req.params.code) }; });
+  app.post<{ Params: { code: string } }>(`${A}/livechat/sync`, async (req, reply) => {
+    if (!adminOnly(req, reply)) return;
+    try { await ctx.link.pull(req.params.code); return ctx.link.info(req.params.code); } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+  app.post<{ Params: { code: string }; Body: { value?: unknown } }>(`${A}/livechat/handoff`, async (req, reply) => {
+    if (!adminOnly(req, reply)) return;
+    const v = Number(req.body?.value);
+    if (!Number.isInteger(v) || v < 0 || v > 100) return reply.code(400).send({ error: 'Enter a whole number from 0 to 100.' });
+    try { await ctx.link.push(req.params.code, v); return ctx.link.info(req.params.code); } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
   });
 }
