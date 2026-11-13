@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
@@ -189,15 +189,21 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
     expect(await screen.findByText('All merchants (template)')).toBeTruthy();
   });
-  it('shows a flowchart of the topics next to the list, and moves a keyword with the Move menu in both views', async () => {
+  it('shows a flowchart canvas with blocks, adds a topic and a keyword from the block palette, and moves the keyword with the menu; the list shows the same', async () => {
     open('staff', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
     expect(await screen.findByTestId('flow')).toBeTruthy();
     expect(screen.getByLabelText('Topic deposit')).toBeTruthy();
-    await userEvent.type(screen.getByPlaceholderText('e.g. refund'), 'refund{enter}');          // new topic from the chart
+    await userEvent.click(screen.getByRole('button', { name: /◆ Topic/ }));                                         // a Topic block from the palette
+    await userEvent.type(screen.getByLabelText('New topic name'), 'refund{enter}');
     expect(await screen.findByLabelText('Topic refund')).toBeTruthy();
-    await userEvent.click(screen.getByText('List'));                                          // the list shows the same topic
-    expect((await screen.findAllByText('refund')).length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('button', { name: /＃ Keyword/ }));                                      // a Keyword block, connected to a topic
+    await userEvent.type(screen.getByLabelText('New keyword'), 'refundlah');
+    await userEvent.selectOptions(screen.getByLabelText('Connect keyword to topic'), 'refund');
+    expect(await screen.findByLabelText('Remove refundlah')).toBeTruthy();                       // now a real keyword block
+    await userEvent.selectOptions(within(screen.getByLabelText('Remove refundlah').closest('.fnode') as HTMLElement).getByLabelText('Move to topic'), 'deposit');           // move it to another topic
+    await userEvent.click(screen.getByText('List'));                                          // the list shows the same
+    expect((await screen.findAllByText('refundlah')).length).toBeGreaterThan(0);
     expect(screen.queryByTestId('flow')).toBeNull();
   });
   it('shows the handoff number copied from LiveChat on the merchant page, with a button to send a change to LiveChat', async () => {

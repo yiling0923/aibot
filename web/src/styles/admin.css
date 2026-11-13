@@ -284,17 +284,33 @@ details.fold[open]>summary{margin-bottom:8px}
 .ibtn:hover::after,.ibtn:focus-visible::after{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.ibtn::after{transition:none}}
 
-/* Topics: flowchart view */
+/* Topics: flowchart canvas */
 .flow{display:flex;flex-direction:column;gap:10px}
-.flowtray{border:1px dashed var(--line);border-radius:10px;padding:8px 10px;display:flex;gap:10px;align-items:flex-start;flex-wrap:wrap}
-.flowtray .n{color:var(--muted);font-size:11px;margin-left:4px;padding-right:6px}
-.flowrow{display:grid;grid-template-columns:minmax(0,2fr) 20px minmax(110px,1fr) 20px minmax(0,2fr) 20px minmax(110px,1fr);gap:6px;align-items:stretch}
-.fnode{background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:8px 10px;min-width:0;font-size:12.5px}
-.fnode .fh{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:4px}
-.fnode.topn{background:var(--infobg);text-align:center}
+.flowwrap{display:grid;grid-template-columns:190px minmax(0,1fr);gap:10px;align-items:start}
+.flowpal{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.flowpal .pal{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid var(--line);background:var(--surface2);border-radius:10px;padding:8px 10px;color:inherit;font:inherit;cursor:grab}
+.flowpal .pal span{font-size:11.5px;color:var(--muted)}
+.flowpal .pal.hob{cursor:default;opacity:.8}
+.flowpal .n{color:var(--muted);font-size:11px;margin-left:4px;padding-right:6px}
+.flowcanvas{position:relative;overflow:auto;height:560px;border:1px solid var(--line);border-radius:12px;background-color:var(--surface);background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);background-size:24px 24px;background-position:-1px -1px}
+.flowedges{position:absolute;left:0;top:0;pointer-events:none;color:var(--muted)}
+.flowedges .edge{fill:none;stroke:currentColor;stroke-width:1.6}
+.flowedges .edge.dash{stroke-dasharray:5 4;opacity:.7}
+.flowedges .edge.live{stroke:var(--accent);color:var(--accent)}
+.fnode{position:absolute;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:6px 10px;font-size:12.5px;box-shadow:0 1px 4px rgba(0,0,0,.08);cursor:grab;user-select:none;box-sizing:border-box}
+.fnode .fh{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin-bottom:2px;display:flex;justify-content:space-between;align-items:center}
+.fnode .x{border:0;background:none;color:var(--muted);cursor:pointer;font-size:14px;line-height:1;padding:0 2px}
+.fnode .x:hover{color:var(--bad)}
+.fnode.kwn{border-left:4px solid var(--accent)}
+.fnode.kwn.ro{opacity:.85;border-left-style:dashed}
+.fnode.topn{background:var(--infobg);border-left:4px solid var(--info,var(--accent));text-align:center}
+.fnode.topn .fh{justify-content:center}
+.fnode.ansn{border-left:4px solid var(--ok)}
+.fnode.hon{background:var(--surface2);border-left:4px solid var(--muted)}
+.fnode.hon.warn{background:var(--warnbg);border-left-color:var(--warn)}
+.fnode.pend{border-style:dashed;cursor:grab}
+.fnode.pend input{width:100%;margin:2px 0 4px;box-sizing:border-box}
 .fnode.over{outline:2px dashed var(--accent);background:var(--okbg)}
-.fnode.hon.warn{background:var(--warnbg)}
-.flowrow .arrow{align-self:center;text-align:center;color:var(--muted)}
-.flowrow .chip[draggable=true]{cursor:grab}
-.chip .mv{border:0;background:none;color:var(--muted);font-size:11px;max-width:64px;cursor:pointer}
-@media (max-width:820px){.flowrow{grid-template-columns:1fr}.flowrow .arrow{transform:rotate(90deg)}}
+.fnode .mv{border:0;background:none;color:var(--muted);font-size:11px;max-width:84px;cursor:pointer}
+.fnode .port{position:absolute;right:-7px;top:50%;margin-top:-6px;width:12px;height:12px;border-radius:50%;background:var(--accent);border:2px solid var(--surface);cursor:crosshair;touch-action:none}
+@media (max-width:820px){.flowwrap{grid-template-columns:1fr}.flowcanvas{height:480px}}

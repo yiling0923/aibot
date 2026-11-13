@@ -199,7 +199,7 @@ This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every
 
 ## Topics: list and flowchart
 
-The Topics screen has two views of the same data: **List** and **Flowchart** (keywords → topic → answers → hand to a person). Drag a keyword, an answer, or a word customers typed (not set yet) onto another topic to move it; every item also has a "Move to…" menu for keyboard and touch. Both views edit the same draft, so a change in one shows in the other. Shared keywords are read-only in the chart (admins edit them in the list).
+The Topics screen has two views of the same data: **List** and **Flowchart**, a canvas with a block palette on the left (Topic, Keyword, Answer, If not clear) and connector lines: Keyword blocks → Topic block → Answer blocks → "If not clear" (asks once, then a person). Drag a block by its title to place it (places are remembered in the browser); drag from the round dot of a Keyword or Answer block onto a Topic block to move it there; drag Topic or Keyword from the palette onto the grid to add one; drag a word customers typed (not set yet) onto a topic. Every block also has a "Move to…" menu for keyboard and touch. Both views edit the same draft, so a change in one shows in the other. Shared keywords are read-only in the chart (admins edit them in the list).
 
 ## Report
 
