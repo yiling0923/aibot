@@ -188,4 +188,15 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
     expect(await screen.findByText('All merchants (template)')).toBeTruthy();
   });
+  it('shows a flowchart of the topics next to the list, and moves a keyword with the Move menu in both views', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    expect(await screen.findByTestId('flow')).toBeTruthy();
+    expect(screen.getByLabelText('Topic deposit')).toBeTruthy();
+    await userEvent.type(screen.getByPlaceholderText('e.g. refund'), 'refund{enter}');          // new topic from the chart
+    expect(await screen.findByLabelText('Topic refund')).toBeTruthy();
+    await userEvent.click(screen.getByText('List'));                                          // the list shows the same topic
+    expect((await screen.findAllByText('refund')).length).toBeGreaterThan(0);
+    expect(screen.queryByTestId('flow')).toBeNull();
+  });
 });

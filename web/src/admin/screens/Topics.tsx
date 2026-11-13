@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePanel } from '../store';
+import TopicFlow from './TopicFlow';
 import { LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, guessLang, slug, topicNames } from '../model';
 
 const TABS: [string, string][] = [['short', 'Topics'], ['aspect', 'Question words'], ['small', 'Greetings'], ['filler', 'Fillers'], ['block', 'Block lists']];
@@ -26,6 +27,9 @@ export default function Topics() {
   const lock = !p.isAdmin; const d = p.draft;
   const cur = !p.adv && tab === 'aspect' ? 'short' : tab;
   const [shown, setShown] = useState(0);
+  const [view, setViewState] = useState<'list' | 'flow'>(() => { try { return localStorage.getItem('topicsView') === 'flow' ? 'flow' : 'list'; } catch { return 'list'; } });
+  const setView = (v: 'list' | 'flow') => { setViewState(v); try { localStorage.setItem('topicsView', v); } catch { /* ignore */ } };
+  const flow = cur === 'short' && view === 'flow';
   useEffect(() => { setShown(document.querySelectorAll('#kwlists .chip').length); });
 
   useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 60); } });
@@ -90,14 +94,15 @@ export default function Topics() {
     <div className="card"><div className="head"><div><h2>Topics</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div></div>
       <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}</button>)}</div>
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
-      <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {cur === 'short' && <div className="segs" role="group" aria-label="View" style={{ marginTop: 8 }}>{([['list', 'List'], ['flow', 'Flowchart']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
+      {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
         <details className="fold"><summary>＋ Add a topic or keyword</summary><div className="addbox"><AddBox tab={cur} dup={dup} done={done} /></div></details>
         {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 220 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <span className="sub">{shown} words shown</span></div>
         <div id="kwlists" ref={listRef}>{lists()}</div>
-      </div></div>
+      </div>}</div>
   );
 }
 

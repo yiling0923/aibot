@@ -195,3 +195,8 @@ This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every
 * If it is still unclear, a person takes over. The bot never asks twice. (A menu of questions about a known topic is part of the answer, not a clarifying question, but showing the same menu twice is.)
 
 **LiveChat and its answer cache.** LiveChat remembers a reply by the words of the question only, for every customer, and checks that memory before it calls the bot. So the connector (a) never writes personal account data in a reply (those chats go to staff), and (b) marks every reply `cacheable: true|false`, with a confidence of 0.8 or less for the ones that must not be kept. LiveChat still needs one small change to honour the flag: see `docs/REQUEST_TO_LIVECHAT_TEAM.md`, which also has a no-code workaround.
+
+
+## Topics: list and flowchart
+
+The Topics screen has two views of the same data: **List** and **Flowchart** (keywords → topic → answers → hand to a person). Drag a keyword, an answer, or a word customers typed (not set yet) onto another topic to move it; every item also has a "Move to…" menu for keyboard and touch. Both views edit the same draft, so a change in one shows in the other. Shared keywords are read-only in the chart (admins edit them in the list).
