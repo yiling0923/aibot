@@ -219,4 +219,14 @@ describe('Control panel', () => {
     await userEvent.click(screen.getAllByText('Wrong')[0]);                                         // sends the mark, then reloads the report
     expect(screen.getByText('Check recent answers')).toBeTruthy();
   });
+  it('lets staff set an entry Type, an end date and a different wording for a channel', async () => {
+    open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByText('Add entry'));
+    expect(await screen.findByLabelText('Type')).toBeTruthy();
+    expect(screen.getByLabelText('End date (optional)')).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('Type'), 'promotion');
+    expect(screen.getByText(/only true for a while/)).toBeTruthy();
+    expect(screen.getByText('A different wording for a channel (optional)')).toBeTruthy();
+    expect(screen.getByLabelText('WhatsApp')).toBeTruthy();
+  });
 });

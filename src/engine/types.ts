@@ -16,7 +16,15 @@ export interface KbEntry {
   aspect: string | null;       // question type (time, limit, how, change, hours) or null
   topicOptional: boolean;      // the question type alone is enough
   translations: Partial<Record<Lang, Translation>>;
+  /** answer (default), needs_staff (a person must answer: the bot hands over) or promotion (an answer that hides itself after endsOn). */
+  entryType?: EntryType;
+  /** The last day the entry is used (YYYY-MM-DD). Empty: no end. */
+  endsOn?: string | null;
+  /** A different wording per channel, for example whatsapp: { en: 'Short text' }. The default wording is used for any other channel. */
+  channelAnswers?: Record<string, Partial<Record<Lang, string>>>;
 }
+export type EntryType = 'answer' | 'needs_staff' | 'promotion';
+export const ENTRY_TYPES: EntryType[] = ['answer', 'needs_staff', 'promotion'];
 
 export interface MerchantCfg {
   code: string; name: string; tone: 'friendly' | 'formal'; defaultLanguage: Lang;

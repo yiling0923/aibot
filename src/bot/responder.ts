@@ -25,6 +25,8 @@ export interface Session {
   askKind?: 'reask' | 'clarify' | 'topics' | 'menu' | null;
   /** A channel that remembers replies by the words of the question (LiveChat) must never carry one customer's personal data to another: no account answers in a reply. */
   noPersonal?: boolean;
+  /** Where the customer writes from (livechat, whatsapp, …). An entry may have its own wording for a channel. */
+  channel?: string;
 }
 export const newSession = (id: string, merchant: string, token: string | null, draft: string | null = null): Session =>
   ({ id, merchant, token, draft, misses: 0, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
@@ -58,8 +60,10 @@ export class Bot {
 
   /* ---------- small helpers ---------- */
   private cfg(s: Session) { return this.engine.merchant(s.merchant); }
-  private ans(merchant: string, intent: string, lang: Lang) {
+  private ans(merchant: string, intent: string, lang: Lang, channel?: string) {
     const e: KbEntry | undefined = this.engine.entry(merchant, intent);
+    const over = channel ? e?.channelAnswers?.[channel]?.[lang]?.trim() : '';       // a wording written for this channel wins
+    if (over) return over;
     return e?.translations[lang]?.answerText || e?.translations.en?.answerText || '';
   }
   private wrap(s: Session, text: string, lang: Lang) { const t = T.TONE[this.cfg(s).tone]; return t.pre[lang] + text + t.post[lang]; }
@@ -231,9 +235,10 @@ export class Bot {
     if (asking && (asking === 'menu' ? prevAsk === 'menu' : !!prevAsk && prevAsk !== 'menu')) {
       r = { ...r, decision: 'HANDOFF', conf: r.conf, why: 'The bot already asked once and it is still unclear, so a person takes over. It never asks twice.' }; reask = false; asking = null;
     }
+    if (r.decision === 'ANSWER' && this.engine.entry(s.merchant, r.top.intent)?.entryType === 'needs_staff') r = { ...r, decision: 'HANDOFF', why: `"${r.top.intent}" is marked "needs staff" in the knowledge base, so a person answers this, not the bot.` };
     const lang = r.lang;
     const out: { kbAnswer?: string; acct?: AccountInfo; small?: string; strike?: number; limit?: number; close?: boolean } = {};
-    if (r.decision === 'ANSWER') out.kbAnswer = this.ans(s.merchant, r.top.intent, lang);
+    if (r.decision === 'ANSWER') out.kbAnswer = this.ans(s.merchant, r.top.intent, lang, s.channel);
     if (r.decision === 'ANSWER' && r.account) out.acct = this.account(s, r.account.kind, lang, out.kbAnswer ?? '');
     if (r.decision === 'ACCOUNT') out.acct = this.account(s, r.topic!, lang, '');
     if (r.decision === 'SMALLTALK') out.small = T.SMALL_REPLY[c.tone][r.small!][lang];
@@ -340,7 +345,9 @@ export class Bot {
       turn.trace = { ...turn.trace, acct: { chk: ac.chk, verified: ac.verified, call: ac.call, json: ac.json, rows: ac.rows } };
       say(ac.text); if (ac.agent) turn.buttons = this.buttons([], lang); return turn;
     }
-    const intentAnswer = (k: string) => { const a = this.ans(s.merchant, k, lang); turn.trace = { ...turn.trace, pickKind: 'intent', key: k, extra: a }; say(this.wrap(s, a, lang)); };
+    const intentAnswer = (k: string) => {
+      if (this.engine.entry(s.merchant, k)?.entryType === 'needs_staff') { const h = this.handoff(s, lang); turn.messages.push(...h.messages); turn.status = h.status; turn.trace = { ...turn.trace, pickKind: 'intent', key: k, why: 'Marked "needs staff": a person answers this.' }; return; }
+      const a = this.ans(s.merchant, k, lang, s.channel); turn.trace = { ...turn.trace, pickKind: 'intent', key: k, extra: a }; say(this.wrap(s, a, lang)); };
     if (kind === 'intent') { intentAnswer(key); return turn; }
     if (kind === 'topic') {
       const list = this.engine.intentsOfTopic(s.merchant, key);

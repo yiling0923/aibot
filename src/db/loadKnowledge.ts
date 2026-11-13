@@ -31,7 +31,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
       q(`SELECT language, variant, canonical FROM ${D('aliases')} ORDER BY id`),
       q(`SELECT kind, CAST(min_amount AS DOUBLE) AS lo, CAST(max_amount AS DOUBLE) AS hi FROM ${D('limits')}`),
       q(`SELECT tool FROM ${D('tools')} WHERE enabled ORDER BY tool`),
-      q(`SELECT e.id, c.name AS category, e.intent_key, e.topic, e.aspect, e.topic_optional FROM ${D('kb_entries')} e LEFT JOIN ${D('kb_categories')} c ON c.id = e.category_id WHERE e.status = 'live' ORDER BY e.id`),
+      q(`SELECT e.id, c.name AS category, e.intent_key, e.topic, e.aspect, e.topic_optional, e.entry_type, e.channel_overrides, DATE_FORMAT(e.valid_to, '%Y-%m-%d') AS ends_on FROM ${D('kb_entries')} e LEFT JOIN ${D('kb_categories')} c ON c.id = e.category_id WHERE e.status = 'live' ORDER BY e.id`),
       q(`SELECT kb_id, language, question_examples, answer_text FROM ${D('kb_translations')} ORDER BY id`),
     ]);
     if (!s) continue;
@@ -48,7 +48,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
       tr[x.language as Lang] = { questionExamples: asJson<string[]>(x.question_examples, []), answerText: x.answer_text };
       byKb.set(Number(x.kb_id), tr);
     }
-    for (const e of entries) kbEntries.push({ id: Number(e.id), merchant: t.code, category: e.category ?? '', intentKey: e.intent_key, topic: e.topic, aspect: e.aspect, topicOptional: !!e.topic_optional, translations: byKb.get(Number(e.id)) ?? {} });
+    for (const e of entries) kbEntries.push({ id: Number(e.id), merchant: t.code, category: e.category ?? '', intentKey: e.intent_key, topic: e.topic, aspect: e.aspect, topicOptional: !!e.topic_optional, translations: byKb.get(Number(e.id)) ?? {}, entryType: e.entry_type ?? 'answer', endsOn: e.ends_on ?? null, channelAnswers: asJson(e.channel_overrides, {}) });
   }
 
   const globalAliases: WordMap = {};

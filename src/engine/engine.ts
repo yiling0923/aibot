@@ -114,7 +114,12 @@ export class Engine {
 
   hasMerchant(code: string) { return this.merchants.has(code); }
   merchant(code: string) { return this.merchants.get(code)!; }
-  entriesOf(code: string) { return this.entries.get(code) ?? []; }
+  /** The entries in use today: an entry past its end date is hidden (the bot then answers as if it did not exist). */
+  entriesOf(code: string) {
+    const all = this.entries.get(code) ?? []; if (!all.some((e) => e.endsOn)) return all;
+    const now = new Date(), today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    return all.filter((e) => !e.endsOn || today <= e.endsOn);
+  }
   entry(code: string, intentKey: string) { return this.entriesOf(code).find((e) => e.intentKey === intentKey); }
   /** The intents of a topic that this merchant has an answer for (the buttons shown after a topic word). */
   intentsOfTopic(code: string, topic: string) { const m = this.merchants.get(code); return m ? this.availIntents(m, topic) : []; }

@@ -8,6 +8,8 @@ import { Modal, Pill } from '../ui';
 type Tr = { question_examples: string[]; answer_text: string };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
 const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: {} });
+const CHANNELS: [string, string][] = [['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['facebook', 'Facebook'], ['web', 'Web chat'], ['livechat', 'LiveChat']];
+const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
 export default function Kb() {
@@ -47,7 +49,7 @@ export default function Kb() {
             <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">missing</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' (alone)' : ''}</Pill></> : null}</td>
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
             <td>{trOf(e, 'en').answer_text.slice(0, 110)}</td>
-            <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
+            <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
           </tr>
         ))}
         {!list.length && <tr><td colSpan={5} className="sub">No entries match.</td></tr>}
@@ -123,6 +125,9 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
       <div className="form">
         <label className="fld"><span>Entry name</span><input type="text" value={ed.intent_key} onChange={(e) => set({ intent_key: e.target.value })} placeholder="e.g. daily_withdraw_limit" /></label>
         <label className="fld"><span>Status</span><select value={ed.status} onChange={(e) => set({ status: e.target.value as Entry['status'] })}><option value="live">Live</option><option value="draft">Draft (bot ignores it)</option></select></label>
+        <label className="fld"><span>Type</span><select value={ed.entry_type || 'answer'} onChange={(e) => set({ entry_type: e.target.value as Entry['entry_type'] })}><option value="answer">Answer</option><option value="needs_staff">Needs staff</option><option value="promotion">Promotion</option></select></label>
+        <label className="fld"><span>End date (optional)</span><input type="date" value={ed.ends_on || ''} onChange={(e) => set({ ends_on: e.target.value || null })} /></label>
+        <div className="sub full" style={{ marginTop: -4 }}>{TYPE_NOTE[ed.entry_type || 'answer']}{ed.ends_on ? ' The entry is used until the end of ' + ed.ends_on + ', then it hides itself.' : ''}</div>
         <label className="fld"><span>Topic (required)</span><select value={ed.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">Choose a topic word…</option>{topicList(p.draft, p.merchant).map((x) => <option key={x}>{x}</option>)}<option value="__new">+ New topic…</option></select></label>
         {ed.topic === '__new' && <>
           <label className="fld"><span>Name of the new topic</span><input type="text" placeholder="e.g. refund" value={ed.newTopic} onChange={(e) => set({ newTopic: e.target.value })} /></label>
@@ -135,6 +140,10 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
       <div className="note">The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.</div>
       <div className="tabs" role="tablist">{LANGS.map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
       <label className="fld"><span>Answer in {LN[ed.tab]} (facts only; the bot adds the tone)</span><textarea lang={ed.tab} value={t.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
+      <details className="fold" open={!!Object.values(ed.channel_overrides || {}).some((b) => Object.values(b || {}).some(Boolean))}><summary>A different wording for a channel (optional)</summary>
+        <div className="sub" style={{ margin: '6px 0' }}>Used instead of the answer above when the customer writes from that channel, in {LN[ed.tab]}. Leave empty to use the answer above. For example a shorter text for WhatsApp.</div>
+        {CHANNELS.map(([ch, name]) => <label className="fld" key={ch}><span>{name}</span><textarea rows={2} lang={ed.tab} value={ed.channel_overrides?.[ch]?.[ed.tab as 'en'] || ''} onChange={(e) => set({ channel_overrides: { ...(ed.channel_overrides || {}), [ch]: { ...(ed.channel_overrides?.[ch] || {}), [ed.tab]: e.target.value } } })} /></label>)}
+      </details>
       <div className="tools" style={{ marginTop: -4 }}>
         {ed.tab === 'en'
           ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['ms', 'zh'])}>{busy ? 'Translating…' : 'Translate to Malay and Chinese'}</button>
