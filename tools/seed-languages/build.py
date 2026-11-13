@@ -171,6 +171,11 @@ ASPECTS = {
     'th': ['ไม่สำเร็จ', 'ล้มเหลว', 'ถูกปฏิเสธ', 'ไม่ผ่าน', 'ข้อผิดพลาด', 'ร้องเรียน', 'โดนโกง', 'โกง', 'หลอก', 'ยกเลิก', 'ไม่อนุมัติ'],
     'tl': ['bigo', 'nabigo', 'tinanggihan', 'na-reject', 'reject', 'rejected', 'failed', 'error', 'kinansela', 'reklamo', 'complain', 'scam', 'na-scam', 'niloko', 'panloloko', 'hindi naaprubahan'],
   },
+  'money': {
+    'vi': ['tiền', 'số tiền', 'tiền của tôi', 'tiền của mình'],
+    'th': ['เงิน', 'ยอดเงิน', 'เงินของฉัน'],
+    'tl': ['pera', 'salapi', 'pondo', 'pera ko'],
+  },
   'help': {
     'vi': ['phải làm gì', 'làm gì bây giờ', 'tôi nên làm gì'],
     'th': ['ทำยังไงดี', 'ทำอย่างไรดี'],
@@ -438,6 +443,12 @@ HANDOFF = {
   'formal': {'vi': 'Chúng tôi sẽ kết nối quý khách với nhân viên có thể hỗ trợ tốt hơn. Xin quý khách vui lòng chờ trong giây lát.', 'th': 'เราจะโอนสายให้เจ้าหน้าที่ที่สามารถช่วยเหลือได้ดียิ่งขึ้น กรุณารอสักครู่ค่ะ', 'tl': 'Ikokonekta po namin kayo sa aming team na mas makakatulong sa inyo. Mangyaring maghintay sandali.'},
 }
 
+# Added for English, Malay and Chinese. "my money not in" has no topic word: money + a question about time makes the bot ask "deposit or withdrawal?".
+CORE_ADD = {
+  'money': {'en': ['money', 'funds', 'cash', 'payment'], 'ms': ['duit', 'wang', 'bayaran'], 'zh': ['钱', '款项', '钱款']},
+  'time': {'en': ['not in', 'not come in', 'not coming in', 'not credited', 'not showing', 'not reflected', 'not reflect'], 'ms': [], 'zh': []},
+}
+
 # Real-sounding messages (not examples). [message, decision, intent or None]. The same ones are in test/languages.test.ts.
 REAL = {
   'vi': [['xin chào', 'SMALLTALK', None], ['cảm ơn nhé', 'SMALLTALK', None], ['chào buổi sáng', 'SMALLTALK', None], ['tạm biệt', 'SMALLTALK', None],
@@ -465,8 +476,12 @@ def main():
             byl[l] = list(dict.fromkeys(words))
     for kind, byl in d['smalltalk'].items():
         for l in L: byl[l] = list(SMALLTALK[kind][l])
+    d['aspects'].setdefault('money', {})
     for kind, byl in d['aspects'].items():
         for l in L: byl[l] = list(ASPECTS[kind][l])
+    # words for English, Malay and Chinese (the other languages have theirs above): "money" words, and the ways to say a deposit has not come in
+    for lang, words in CORE_ADD['money'].items(): d['aspects']['money'][lang] = list(dict.fromkeys(words))
+    for lang, words in CORE_ADD['time'].items(): d['aspects']['time'][lang] = list(dict.fromkeys(d['aspects']['time'].get(lang, []) + words))
     for kind, byl in d['guard'].items():
         for l in L: byl[l] = list(GUARD[kind][l])
     # the database cannot keep an empty list, so an empty one is left out (the same as the existing English and Malay lists)

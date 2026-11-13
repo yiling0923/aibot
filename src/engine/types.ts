@@ -47,11 +47,15 @@ export interface Option { kind: 'intent' | 'topic'; key: string }
 export interface Amount { n: number; text: string; hasCur: boolean }
 export interface Candidate { id: number; intent: string; score: number; example: string }
 export interface KeywordRow { id: number; intent: string; topic: string; aspect: string | null; opt: boolean; tOk?: boolean; aOk?: boolean }
-export interface KeywordScan { T: string[]; A: string[]; rest: string; strong: KeywordRow[]; partial: KeywordRow[] }
+/** A word the customer typed that the bot recognised: a topic word (depo, 充值, nạp tiền) or a question word (how long, 'not in'). `to` is what it points to (the topic, or the question type). */
+export interface KeywordHit { word: string; kind: 'topic' | 'question' | 'money'; to: string }
+export interface KeywordScan { T: string[]; A: string[]; rest: string; strong: KeywordRow[]; partial: KeywordRow[]; words: KeywordHit[]; money: string[] }
 export interface Guard { kind: 'injection' | 'other-merchant' | 'sensitive' | 'human'; hit: string[]; why: string }
 
 export interface AnalyzeResult {
   raw: string; lang: Lang; normalized: string; hits: [string, string][];
+  /** Step 1 of the flow (keywords): the words the customer typed that the bot recognised. Step 2 (topic): how likely each topic is, best first. Step 3 (answer): the entry id when the decision is ANSWER. */
+  keywords: KeywordHit[]; topicScores: { topic: string; score: number }[]; answerId: number | null;
   abuseHit: string[]; guard: Guard | null; ks: KeywordScan; via: 'similarity' | 'keywords' | 'ai';
   cands: Candidate[]; top: Candidate; second: Candidate;
   decision: Decision; why: string; conf: number; options: Option[]; topic: string | null;

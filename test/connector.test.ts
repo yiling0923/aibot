@@ -111,6 +111,41 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     expect(third.answer).toContain('30 minutes');
   });
 
+  it('follows the plan: keywords, topic, answer, and "my money not in" is one question and then the answer', async () => {
+    const plain = (await call(keyA, { question: 'depo how long boss' })).json();
+    expect(plain).toMatchObject({ decision: 'answer', topic: 'deposit', cacheable: true });
+    expect(plain.keywords).toEqual(['depo', 'how long']);                                            // the words the customer typed, not the names the bot uses
+    expect(typeof plain.answer_id).toBe('number');
+    expect(plain.confidence).toBeGreaterThan(0.85);                                                  // a plain answer may be kept by LiveChat for the same words
+
+    const ask = (await call(keyA, { question: 'my money not in' })).json();
+    expect(ask.decision).toBe('clarify'); expect(ask.keywords).toEqual(['not in', 'money']);
+    expect(ask.choices.map((c: { value: string }) => c.value)).toEqual(['topic:deposit', 'topic:withdraw', 'agent:agent']);
+    expect(ask.answer).toMatch(/deposits or withdrawals\?\n\n1\. .+\n2\. .+\n3\. /);
+    expect(ask.cacheable).toBe(false); expect(ask.confidence).toBeLessThanOrEqual(0.8);              // a menu depends on the chat: LiveChat must not keep it for others
+    const answer = (await call(keyA, { question: 'deposit', session_id: ask.session_id })).json();    // the reply in the customer's own words
+    expect(answer.decision).toBe('answer'); expect(answer.answer).toContain('credited within 5 minutes');
+    expect(answer.cacheable).toBe(false); expect(answer.confidence).toBeLessThanOrEqual(0.8);        // "deposit" here depends on the question before it
+    const another = (await call(keyA, { question: 'my money not in yet' })).json();                    // (the same words twice in a row would just return the same stored reply)
+    const byNumber = (await call(keyA, { question: '2', session_id: another.session_id })).json();
+    expect(byNumber.answer).toContain('processed within 30 minutes');                                // 2 = withdrawal
+  });
+
+  it('never asks twice, even when the customer repeats the same words', async () => {
+    const first = (await call(keyA, { question: 'blorp quux' })).json();
+    expect(first.decision).toBe('clarify');                                                          // the one question
+    const second = (await call(keyA, { question: 'blorp quux', session_id: first.session_id })).json();
+    expect(second.decision).toBe('handover'); expect(second.should_escalate).toBe(true);            // then a person
+    expect((await call(keyA, { question: 'hello again', session_id: first.session_id })).json().decision).toBe('silent');   // and the bot stays out of a chat staff have taken
+  });
+
+  it('never writes personal account data, so LiveChat cannot keep it for another customer', async () => {
+    const r = (await call(keyA, { question: 'what is my balance', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' } })).json();
+    expect(r.decision).toBe('handover'); expect(JSON.stringify(r)).not.toMatch(/1,250|Tom/); expect(r.cacheable).toBe(false);
+    const dep = (await call(keyA, { question: 'my deposit not in yet', member: { externalId: '8841', name: 'Tom' } })).json();
+    expect(dep.decision).toBe('answer'); expect(dep.answer).not.toContain('Tom'); expect(dep.answer).toContain('credited within 5 minutes');   // the general answer, no lookup
+  });
+
   it('remembers the chat in the database: it survives a restart, hands over after the second miss, then stays silent', async () => {
     const one = (await call(keyA, { question: 'blorp zzz qqq' })).json();
     expect(one.decision).toBe('clarify'); expect(one.should_escalate).toBe(false);                  // asks once more
@@ -146,10 +181,12 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
   });
 
   it('saves what the customer wrote as live traffic, and knows the member only when the channel says who they are', async () => {
+    // LiveChat keeps a reply by the words of the question for every customer, so an answer about someone's own account is never written: it is for staff
     const visitor = (await call(keyA, { question: 'my balance' })).json();
-    expect(visitor.answer).toContain("can't see your account");
+    expect(visitor.decision).toBe('handover'); expect(visitor.should_escalate).toBe(true);
     const member = (await call(keyA, { question: 'my balance', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' } })).json();
-    expect(member.answer).toContain('MYR 1,250.00');
+    expect(member.decision).toBe('handover'); expect(member.answer).not.toContain('1,250'); expect(member.answer).not.toContain('Tom');
+    expect(member.cacheable).toBe(false);
     const live = await rows(`SELECT COUNT(*) AS n FROM ${tbl(merchDb('MERCH_A'), 'chat_sessions')} WHERE source = 'live'`);
     expect(Number(live[0].n)).toBeGreaterThan(1);
     const kw = await rows(`SELECT source FROM ${tbl(merchDb('MERCH_A'), 'keyword_store')} WHERE word = 'blorp'`);

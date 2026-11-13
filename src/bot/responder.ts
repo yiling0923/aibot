@@ -5,6 +5,7 @@ import { fakeMerchantApi, type MerchantApi, type Tx } from './merchantApi';
 import * as Texts from './texts';
 import { PICK_MIN_CONFIDENCE, type AiService } from '../ai/types';
 import { checkReply } from '../ai/validator';
+import { matchChoice } from './choices';
 
 /** The texts are looked up by language, tone and key at run time, so they are used untyped here. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -16,6 +17,14 @@ export interface Session {
   /** Who the customer is, when the channel (LiveChat) says so. Used for account answers instead of the signed token. */
   member?: { id: string; name: string; rank?: string } | null;
   draft: string | null; misses: number; abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
+  /** What the bot last offered as choices, so the customer can answer with a word, a number or "the first one". */
+  choices?: Button[] | null;
+  /** The language of the last turn. */
+  lang?: Lang | null;
+  /** The kind of question the bot asked last, so it never asks twice: reask (not understood), clarify (two answers close), topics (two topics close), menu (which question about this topic). Null when nothing is open. */
+  askKind?: 'reask' | 'clarify' | 'topics' | 'menu' | null;
+  /** A channel that remembers replies by the words of the question (LiveChat) must never carry one customer's personal data to another: no account answers in a reply. */
+  noPersonal?: boolean;
 }
 export const newSession = (id: string, merchant: string, token: string | null, draft: string | null = null): Session =>
   ({ id, merchant, token, draft, misses: 0, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
@@ -28,6 +37,8 @@ export interface AccountInfo { chk: TokenCheck; verified: boolean; kind: string;
 export interface Turn {
   messages: BotMsg[]; buttons: Button[] | null; locked: boolean; status: string | null;
   trace: Record<string, unknown>;
+  /** True when the reply depends on nothing but the words of the question (a plain answer): a channel that remembers replies by question may keep it. */
+  cacheable?: boolean;
   /** A line to show after the choices ("if you need other help, contact an agent"). Null when it is off or there are no choices. */
   hint?: string | null;
   /** For the keyword store and the review list. */
@@ -43,7 +54,7 @@ export class Bot {
   constructor(public readonly knowledge: Knowledge, private api: MerchantApi = fakeMerchantApi(), private ai?: AiService) { this.engine = new Engine(knowledge); }
 
   /** Who the customer is: the member the channel sent, else the signed token, else nobody. */
-  private who(s: Session): TokenCheck { return s.member ? { state: 'valid', id: String(s.member.id), name: s.member.name } : checkToken(s.token); }
+  private who(s: Session): TokenCheck { if (s.noPersonal) return { state: 'none' }; return s.member ? { state: 'valid', id: String(s.member.id), name: s.member.name } : checkToken(s.token); }
 
   /* ---------- small helpers ---------- */
   private cfg(s: Session) { return this.engine.merchant(s.merchant); }
@@ -134,13 +145,21 @@ export class Bot {
 
   /* ---------- a typed message ---------- */
   async message(s: Session, rawText: string): Promise<Turn | null> {
+    const typed = rawText.trim(); if (!typed || s.closed) return null;
+    // The customer may answer the choices in their own words: "deposit", "depo", "2", "the first one". That is an answer, not a new question.
+    if (!s.handed && s.choices?.length) {
+      const hit = matchChoice(typed, s.choices);
+      if (hit) { const picked = this.pick(s, { kind: hit.kind, key: hit.key, amt: hit.amt, label: hit.label, lang: s.lang ?? this.cfg(s).defaultLanguage }); if (picked) { picked.trace = { ...picked.trace, typedReply: typed }; return picked; } }
+    }
     const turn = await this.messageCore(s, rawText);
     return turn && this.finish(s, turn, (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? this.cfg(s).defaultLanguage) as Lang);
   }
 
   /** At most the merchant's number of choices (3 or fewer; "Talk to an agent" is extra and not counted), then the line after them. */
   private finish(s: Session, turn: Turn, lang: Lang): Turn {
-    if (!turn.buttons?.length) return turn;
+    s.lang = lang; s.choices = null;
+    if (turn.buttons?.length && s.noPersonal) turn.buttons = turn.buttons.filter((b) => b.kind !== 'status' && !(b.kind === 'amt' && b.key === 'check'));     // no account checks in a channel that remembers replies
+    if (!turn.buttons?.length) { turn.buttons = null; return turn; }
     const c = this.cfg(s), max = Math.max(1, Math.min(3, Math.round(c.maxChoices || 3)));
     const agent = turn.buttons.filter((b) => b.kind === 'agent'), opts = turn.buttons.filter((b) => b.kind !== 'agent');
     let kept = opts;
@@ -153,6 +172,7 @@ export class Bot {
     turn.buttons = [...kept, ...agent];
     turn.hint = c.moreHelpOn && kept.length ? (c.moreHelp[lang]?.trim() || T.MORE_HELP[lang]) : null;
     if (kept.length < opts.length) turn.trace = { ...turn.trace, choicesCut: { shown: kept.length, had: opts.length, max } };
+    s.choices = turn.buttons;                                  // what the customer may answer in their own words next
     return turn;
   }
 
@@ -173,25 +193,44 @@ export class Bot {
     // against the real entry list, and a low confidence is ignored, so the bot then asks again or hands off as before.
     let aiInfo: Record<string, unknown> | null = null;
     const unclear = r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard && !r.ks.T.length && !r.ks.A.length;
-    if (unclear && this.ai?.canPick) {
+    const aiTry = unclear || (r.decision === 'CLARIFY' && r.via === 'similarity');          // nothing matched, or two answers are close: let the AI pick from a short list
+    if (aiTry && this.ai?.canPick) {
+      // The AI picks an answer from a SHORT list, never from the whole knowledge base: the entries of the topics the keywords point to, else the closest ones by their sample questions.
+      const all = this.engine.entriesOf(s.merchant), byId = new Map(all.map((e) => [e.id, e] as const));
+      const topics = new Set(r.topicScores.filter((t) => t.score >= 0.5).map((t) => t.topic));
+      let pool = topics.size ? all.filter((e) => topics.has(e.topic)) : [];
+      if (!pool.length) pool = r.cands.filter((x) => x.score > 0).slice(0, r.decision === 'CLARIFY' ? 4 : 8).map((x) => byId.get(x.id)!).filter(Boolean);
+      if (!pool.length) pool = all.slice(0, 12);
       const pick = await this.ai.pickEntry({
-        merchant: s.merchant, merchantName: c.name, text: query, lang: r.lang,
-        entries: this.engine.entriesOf(s.merchant).map((e) => ({ key: e.intentKey, topic: e.topic, aspect: e.aspect, examples: e.translations[r.lang]?.questionExamples ?? e.translations.en?.questionExamples ?? [] })),
+        merchant: s.merchant, merchantName: c.name, text: query, lang: r.lang, keywords: r.keywords.map((k) => k.word), topics: [...topics],
+        entries: pool.map((e) => ({ key: e.intentKey, topic: e.topic, aspect: e.aspect, examples: e.translations[r.lang]?.questionExamples ?? e.translations.en?.questionExamples ?? [] })),
       });
       const e = pick && pick.confidence >= PICK_MIN_CONFIDENCE ? this.engine.entry(s.merchant, pick.intent) : undefined;
       if (pick && e) {
-        r = { ...r, decision: 'ANSWER', via: 'ai', conf: pick.confidence, topic: e.topic, options: [], top: { id: e.id, intent: e.intentKey, score: pick.confidence, example: '(Claude)' },
-          why: `No keyword matched, so Claude picked "${e.intentKey}" (${Math.round(pick.confidence * 100)}% sure).` };
+        r = { ...r, decision: 'ANSWER', via: 'ai', conf: pick.confidence, topic: e.topic, options: [], top: { id: e.id, intent: e.intentKey, score: pick.confidence, example: '(Claude)' }, answerId: e.id,
+          why: `The rules were not sure, so Claude picked "${e.intentKey}" from a short list (${Math.round(pick.confidence * 100)}% sure).` };
         aiInfo = { picked: e.intentKey, confidence: pick.confidence };
       } else aiInfo = { picked: null, confidence: pick ? pick.confidence : null };
+    }
+    if (s.noPersonal) {                                  // see Session.noPersonal: a general answer is fine, an answer about this customer's own account is for staff
+      if (r.decision === 'ACCOUNT') r = { ...r, decision: 'HANDOFF', conf: 0.9, why: 'The customer asks for their own account data (needs staff). This channel remembers replies by their words, so it could reach another customer: no personal data is written here.' };
+      if (r.account) r = { ...r, account: null };
     }
     if (r.decision === 'ANSWER' && /^(deposit|withdraw)/.test(r.top.intent)) s.lastTopic = r.top.intent.startsWith('deposit') ? 'deposit' : 'withdraw';
     if (r.decision === 'CHOICE' && (r.topic === 'deposit' || r.topic === 'withdraw')) s.lastTopic = r.topic;
     // Not understood = no topic or question word was found at all. The first time, ask again; only a second miss goes to a human.
     // (A message that names a topic the merchant has no answer for is not a miss: it goes to a human straight away.)
     const miss = r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard && !r.ks.T.length && !r.ks.A.length;
-    const reask = miss && s.misses < 1 && s.clarifyCount === 0;
+    let reask = miss && s.misses < 1 && s.clarifyCount === 0 && !(s.askKind && s.askKind !== 'menu');
     if (miss) s.misses++; else if (r.decision !== 'HANDOFF') s.misses = 0;
+    // The clarify rule of the plan: one question with up to 3 choices, then a person. It never asks twice.
+    // "Which question about this topic?" (menu) is part of the answer once the topic is known; it may follow any other question, but not itself.
+    let asking: Session['askKind'] = reask ? 'reask' : r.decision === 'CLARIFY' ? 'clarify' : r.decision === 'AMOUNT' && !r.dir ? 'clarify'
+      : r.decision === 'CHOICE' ? (r.options.some((o) => o.kind === 'topic') ? 'topics' : 'menu') : null;
+    const prevAsk = s.askKind ?? null;
+    if (asking && (asking === 'menu' ? prevAsk === 'menu' : !!prevAsk && prevAsk !== 'menu')) {
+      r = { ...r, decision: 'HANDOFF', conf: r.conf, why: 'The bot already asked once and it is still unclear, so a person takes over. It never asks twice.' }; reask = false; asking = null;
+    }
     const lang = r.lang;
     const out: { kbAnswer?: string; acct?: AccountInfo; small?: string; strike?: number; limit?: number; close?: boolean } = {};
     if (r.decision === 'ANSWER') out.kbAnswer = this.ans(s.merchant, r.top.intent, lang);
@@ -203,7 +242,7 @@ export class Bot {
     const turn: Turn = {
       messages: [], buttons: null, locked: false, status: null, log: null,
       trace: { kind: 'message', decision: r.decision, why: r.why, conf: r.conf, lang, via: r.via, normalized: r.normalized, hits: r.hits, raw: text,
-        abuseHit: r.abuseHit, guard: r.guard, ks: { T: r.ks.T, A: r.ks.A }, cands: r.cands.slice(0, 3), top: r.top, small: r.small, smallFallback: r.smallFallback,
+        abuseHit: r.abuseHit, guard: r.guard, ks: { T: r.ks.T, A: r.ks.A }, kw: r.keywords.map((k) => k.word), keywords: r.keywords, topicScores: r.topicScores, answerId: r.answerId, cands: r.cands.slice(0, 3), top: r.top, small: r.small, smallFallback: r.smallFallback,
         amt: r.amt, dir: r.dir, ctxDir: r.ctxDir, topic: r.topic, options: r.options.map((o) => ({ ...o, label: this.label(o, lang) })),
         kbAnswer: out.kbAnswer, smallText: out.small, strike: out.strike, limit: out.limit, close: out.close,
         acct: out.acct ? { chk: out.acct.chk, verified: out.acct.verified, call: out.acct.call, json: out.acct.json, rows: out.acct.rows } : null,
@@ -226,13 +265,13 @@ export class Bot {
         say(T.REFUSE_TXT[c.tone][lang] + hint); turn.buttons = this.buttons([], lang); break; }
       case 'SMALLTALK': say(out.small!); if (r.options.length) turn.buttons = this.buttons(r.options, lang); break;
       case 'CHOICE':
-        s.clarifyCount = 0;
+        s.clarifyCount = 0; s.pending = query;                   // a typed reply ("how long") is read together with this message
         if (r.topic) { const m = this.choiceMenu(s, r.topic, lang); turn.messages.push(m.message); turn.buttons = m.buttons; }
         else { say(T.PICK_TXT[lang]); turn.buttons = this.buttons(r.options, lang); }
         break;
       case 'CLARIFY': {
         s.clarifyCount++; s.pending = query;
-        const [a, b] = r.options.map((o) => T.lblOf(o.key, lang)); say(T.CLARIFY_TXT[lang](a, b)); turn.buttons = this.buttons(r.options, lang); break; }
+        const [a, b] = r.options.map((o) => (o.kind === 'topic' ? T.tlab(o.key, lang) : T.lblOf(o.key, lang))); say(T.CLARIFY_TXT[lang](a, b)); turn.buttons = this.buttons(r.options, lang); break; }
       case 'HANDOFF': {
         if (reask) {
           s.pending = query;                                      // the next message is read together with this one
@@ -251,6 +290,10 @@ export class Bot {
     }
     if (aiInfo || turn.trace.ai) turn.trace.ai = { ...(aiInfo ?? {}), ...((turn.trace.ai as object) ?? {}) };
     turn.log = { text, lang, decision: reask ? 'REASK' : r.decision, notUnderstood: unclear || (r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard) };
+    // what is open now: the question just asked, or nothing once the customer has an answer (a greeting or a rude word leaves it as it was)
+    s.askKind = asking ?? (['ANSWER', 'ACCOUNT', 'HANDOFF'].includes(r.decision) || (r.decision === 'AMOUNT' && !!r.dir) ? null : (s.askKind ?? null));
+    turn.cacheable = r.decision === 'ANSWER' && r.via !== 'ai' && query === text && !out.acct;       // depends only on the words of the question
+    turn.trace.askKind = s.askKind;
     return turn;
   }
 
@@ -283,8 +326,8 @@ export class Bot {
   private pickCore(s: Session, p: { kind: string; key: string; amt?: number; label: string; lang: Lang }): Turn | null {
     if (s.closed || s.handed) return null;
     const { kind, key, lang, label } = p; const c = this.cfg(s);
-    s.pending = null; s.clarifyCount = 0;
-    const turn: Turn = { messages: [], buttons: null, locked: false, status: null, log: null, trace: { kind: 'pick', pickKind: kind, key, label, lang, merchant: { name: c.name, tone: c.tone, handoffGroupId: c.handoffGroupId }, agentLabel: T.AGENT[lang] } };
+    const pending = s.pending; s.pending = null; s.clarifyCount = 0; s.misses = 0; s.askKind = null;                       // the customer answered the question
+    const turn: Turn = { messages: [], buttons: null, locked: false, status: null, log: null, cacheable: false, trace: { kind: 'pick', pickKind: kind, key, label, lang, merchant: { name: c.name, tone: c.tone, handoffGroupId: c.handoffGroupId }, agentLabel: T.AGENT[lang] } };
     const say = (t: string) => turn.messages.push({ kind: 'bot', text: t });
     if (kind === 'amt') {
       const amt = Number(p.amt);
@@ -302,7 +345,12 @@ export class Bot {
     if (kind === 'topic') {
       const list = this.engine.intentsOfTopic(s.merchant, key);
       if (list.length === 1) { intentAnswer(list[0]); return turn; }
-      const m = this.choiceMenu(s, key, lang); turn.messages.push(m.message); turn.buttons = m.buttons;
+      // "my money not in" + "deposit": the first message already said what is wanted (not in = time), so answer now instead of asking a second question
+      if (pending) {
+        const joined = this.engine.analyze(pending + ' ' + key, s.merchant, 0);
+        if (joined.decision === 'ANSWER' && joined.via === 'keywords' && list.includes(joined.top.intent)) { turn.trace = { ...turn.trace, joinedWith: pending }; intentAnswer(joined.top.intent); return turn; }
+      }
+      const m = this.choiceMenu(s, key, lang); turn.messages.push(m.message); turn.buttons = m.buttons; s.askKind = 'menu';
       turn.trace = { ...turn.trace, extra: list.map((k) => this.label({ kind: 'intent', key: k }, lang)).join(' · ') + ' · ' + T.AGENT[lang] };
       return turn;
     }

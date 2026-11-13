@@ -1,5 +1,5 @@
 import type {
-  Knowledge, MerchantCfg, KbEntry, AnalyzeResult, AnalyzeContext, Decision, Option, Amount, Candidate, KeywordScan, KeywordRow, Guard, Lang,
+  Knowledge, MerchantCfg, KbEntry, AnalyzeResult, AnalyzeContext, Decision, Option, Amount, Candidate, KeywordScan, KeywordRow, KeywordHit, Guard, Lang,
 } from './types';
 
 /* ------------------------------------------------------------------------------------------------
@@ -80,6 +80,8 @@ export class Engine {
   private FILLER: Set<string>; private SMALL_FILL: Set<string>; private DATA_FILLERS: string[];
   private abuseWords: string[]; private abuseSoft: string[]; private injection: string[]; private abuseCompact: string[];
   private aspectWords: [string, RegExp][] = [];
+  /** Words about money in general (money, funds, duit, 钱, เงิน). With a question about time and no topic they mean "is it my deposit or my withdrawal?". */
+  private moneyWords: RegExp[] = [];
   private allSmall: [string, string][]; private greetRe: RegExp; private tailRe: RegExp;
 
   constructor(private k: Knowledge) {
@@ -99,6 +101,8 @@ export class Engine {
     const all: [string, string][] = ASPECT_ORDER.flatMap((a) => flat(k.aspects, a).map((w): [string, string] => [a, w.toLowerCase()]));
     all.sort((x, y) => y[1].length - x[1].length);
     this.aspectWords = all.map(([a, w]): [string, RegExp] => [a, NOSP_RE.test(w) ? new RegExp(escRe(w), 'g') : new RegExp('(?<![a-z0-9_])' + escRe(w) + '(?![a-z0-9_])', 'g')]);
+    this.moneyWords = [...new Set(flat(k.aspects, 'money').map((w) => w.toLowerCase()))].sort((a, b) => b.length - a.length)
+      .map((w) => (NOSP_RE.test(w) ? new RegExp(escRe(w), 'g') : new RegExp('(?<![a-z0-9_])' + escRe(w) + '(?![a-z0-9_])', 'g')));
     const sp = (kind: string) => flat(k.smalltalk, kind);
     this.allSmall = SMALL_KINDS.flatMap((kind) => sp(kind).map((p): [string, string] => [p, kind])).sort((a, b) => b[0].length - a[0].length);
     this.greetRe = new RegExp('^(?:\\s*(?:' + [...sp('greeting'), ...sp('morning'), ...CALL_PREFIX].sort((a, b) => b.length - a.length).map(reEsc).join('|') + ')[\\s,.!?，。！、:-]*)+', 'i');
@@ -183,18 +187,18 @@ export class Engine {
   }
 
   /* ---------- keywords: topic word + question type, found ANYWHERE in the sentence ---------- */
-  private findAspects(text: string, hasTopic: boolean): { found: Set<string>; rest: string } {
-    let rest = ' ' + text + ' '; const found = new Set<string>();
+  private findAspects(text: string, hasTopic: boolean): { found: Set<string>; rest: string; words: KeywordHit[] } {
+    let rest = ' ' + text + ' '; const found = new Set<string>(); const words: KeywordHit[] = [];
     // A number with a unit (2 hours, 30 minit, 3天) is about time, when the sentence also names a topic (deposit 2 hours already).
     // "24 hours" is opening hours and is left for the word list, and an amount such as rm500 is not a number of days.
     const duration = /(?<![\d/]|rm|myr)(?!24\s*(?:hours?|hrs?|jam|gio|oras|ชั่วโมง|小时))\d+(?:\.\d+)?\s*(?:hours?(?![a-z])|hrs?(?![a-z])|minutes?(?![a-z])|mins?(?![a-z])|days?(?![a-z])|jam(?![a-z])|minit(?![a-z])|hari(?![a-z])|gio(?![a-z])|phut(?![a-z])|ngay(?![a-z])|oras(?![a-z])|minuto(?![a-z])|araw(?![a-z])|ชั่วโมง|นาที|วัน|小时|分钟|天)/g;
-    if (hasTopic && duration.test(rest)) { found.add('time'); rest = rest.replace(duration, ' '); }
-    for (const [a, re] of this.aspectWords) { re.lastIndex = 0; if (re.test(rest)) { found.add(a); re.lastIndex = 0; rest = rest.replace(re, ' '); } }
-    return { found, rest };
+    if (hasTopic) { duration.lastIndex = 0; const d = rest.match(duration); if (d) { found.add('time'); d.forEach((w) => words.push({ word: w.trim(), kind: 'question', to: 'time' })); rest = rest.replace(duration, ' '); } }
+    for (const [a, re] of this.aspectWords) { re.lastIndex = 0; if (re.test(rest)) { found.add(a); re.lastIndex = 0; (rest.match(re) ?? []).forEach((w) => words.push({ word: w.trim(), kind: 'question', to: a })); re.lastIndex = 0; rest = rest.replace(re, ' '); } }
+    return { found, rest, words };
   }
   private keywordScan(text: string, m: MerchantCfg): KeywordScan {
     const T = [...new Set((text.match(/[a-z0-9_]+/g) || []).filter((x) => this.topics.includes(x)))];
-    const { found: A, rest } = this.findAspects(text, T.length > 0); const strong: KeywordRow[] = [], partial: KeywordRow[] = [];
+    const { found: A, rest, words } = this.findAspects(text, T.length > 0); const strong: KeywordRow[] = [], partial: KeywordRow[] = [];
     for (const e of this.entriesOf(m.code)) {
       const tOk = T.includes(e.topic), aOk = !!e.aspect && A.has(e.aspect);
       const s = !e.aspect ? tOk : (e.topicOptional ? aOk : (tOk && aOk));
@@ -202,7 +206,8 @@ export class Engine {
       if (s) strong.push(row); else if (tOk || aOk) partial.push({ ...row, tOk, aOk });
     }
     const nonOpt = strong.filter((s) => !s.opt);       // an "aspect only" match (hours) gives way to topic + aspect
-    return { T, A: [...A], rest, strong: nonOpt.length ? nonOpt : strong, partial };
+    const money = this.moneyWords.flatMap((re) => { re.lastIndex = 0; return (text.match(re) ?? []).map((w) => w.trim()); });
+    return { T, A: [...A], rest, strong: nonOpt.length ? nonOpt : strong, partial, words, money: [...new Set(money)] };
   }
 
   /* ---------- guards: rule-change attempts, other merchants, secrets ---------- */
@@ -306,6 +311,11 @@ export class Engine {
       decision = 'HANDOFF'; via = 'keywords'; conf = 0.9; topic = ks.T[0];
       why = 'The customer asks about "' + ks.T[0] + '", which ' + m.name + ' has no answer for, so a human takes over.';
     }
+    else if (!ks.T.length && ks.money.length && ks.A.includes('time') && topicOptions().filter((o) => ['deposit', 'withdraw'].includes(o.key)).length === 2) {
+      // "my money not in": money, and a question about time, but nothing says deposit or withdrawal. Two topics score the same, so ask once.
+      decision = 'CLARIFY'; via = 'keywords'; conf = 0.6; options = topicOptions().filter((o) => ['deposit', 'withdraw'].includes(o.key));
+      why = 'Money words ("' + ks.money.join('", "') + '") and a question about time, but no topic. Deposit and withdrawal score the same, so ask once which one it is.';
+    }
     else if (ks.A.length && shortMsg && aspectOnly && ks.partial.some((p) => p.aOk) && !(top.score >= m.answerThreshold && top.score - second.score >= GAP)) {
       decision = 'CLARIFY'; via = 'keywords'; options = ks.partial.filter((p) => p.aOk).slice(0, 3).map((p): Option => ({ kind: 'intent', key: p.intent }));
       why = 'A keyword ("' + ks.A.join('", "') + '") but no topic, so show the matching questions as buttons.';
@@ -318,6 +328,14 @@ export class Engine {
 
     let account: AnalyzeResult['account'] = null;
     if (decision === 'ANSWER' && (top.intent === 'deposit_time' || top.intent === 'withdraw_time') && PERSONAL_RE.test(lc)) account = { kind: top.intent === 'deposit_time' ? 'deposit' : 'withdraw' };
-    return { raw: rawIn, lang, normalized: n.text, hits: n.hits, abuseHit, guard, ks, via, cands, top, second, decision, why, conf, options, topic, small, smallFallback, account, amt, dir, ctxDir };
+    // The three steps of the flow, reported: the words typed, the topic scores, the answer
+    const typed = new Set<string>(); const keywords: KeywordHit[] = [];
+    for (const [v, c] of n.hits) if (this.topics.includes(c) && !typed.has(v)) { typed.add(v); keywords.push({ word: v.trim(), kind: 'topic', to: c }); }
+    for (const t of ks.T) if (!keywords.some((k) => k.to === t)) keywords.push({ word: t, kind: 'topic', to: t });
+    keywords.push(...ks.words, ...ks.money.map((w): KeywordHit => ({ word: w, kind: 'money', to: 'money' })));
+    const topicOf = new Map(this.entriesOf(m.code).map((e) => [e.id, e.topic] as const)); const ts = new Map<string, number>(ks.T.map((t) => [t, 1] as const));
+    for (const c of cands) { const t = topicOf.get(c.id); if (t && !ks.T.includes(t) && c.score > (ts.get(t) ?? 0)) ts.set(t, Math.min(0.99, c.score)); }
+    const topicScores = [...ts].map(([topic, score]) => ({ topic, score: Math.round(score * 100) / 100 })).sort((a, b) => b.score - a.score).slice(0, 5);
+    return { raw: rawIn, lang, normalized: n.text, hits: n.hits, keywords, topicScores, answerId: decision === 'ANSWER' ? top.id : null, abuseHit, guard, ks, via, cands, top, second, decision, why, conf, options, topic, small, smallFallback, account, amt, dir, ctxDir };
   }
 }

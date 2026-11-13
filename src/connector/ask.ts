@@ -5,7 +5,6 @@ import { Tenants, tbl } from '../db/tenants';
 import { newSession, type Bot, type Button, type Session, type Turn } from '../bot/responder';
 import type { Store } from '../bot/store';
 import type { Lang } from '../engine/types';
-import { fold } from '../engine/engine';
 
 /**
  * The LiveChat connector. LiveChat calls POST /api/v1/ai/ask with a question; this turns it into a bot decision and back.
@@ -24,7 +23,10 @@ export interface Choice { label: string; value: string }
 export interface AskResponse {
   answer: string; confidence: number; should_escalate: boolean; should_close: boolean; close_message: string | null; session_id: string;
   decision: 'answer' | 'clarify' | 'handover' | 'close' | 'silent';
-  topic: string | null; keywords: string[]; choices: Choice[];
+  /** The flow of the plan: the words the customer typed (keywords), what they want (topic), and the answer (answer_id, the knowledge base entry). */
+  topic: string | null; keywords: string[]; choices: Choice[]; answer_id: number | null;
+  /** True only for a plain answer that depends on nothing but the words of the question. LiveChat keeps a reply by those words for every customer, so every other reply is marked false and given a confidence under its cache limit. */
+  cacheable: boolean;
 }
 interface State { session: Session; choices: Button[] | null; lang: Lang | null }
 export interface AskDeps { pool: Pool; bot: Bot; store: Store; timeoutMs?: number; /** 'test' for the panel's "Test the link" button: saved as a test chat, not as live traffic. Default 'live'. */ source?: 'live' | 'test' }
@@ -44,25 +46,7 @@ export function parseMember(raw: unknown): Member | null {
   return { id: sid, name: String(o.name ?? '').slice(0, 255), rank: o.rank != null ? String(o.rank).slice(0, 64) : o.member_rank != null ? String(o.member_rank).slice(0, 64) : undefined };
 }
 
-const NUMBER_WORDS: Record<string, number> = { first: 1, '1st': 1, one: 1, second: 2, '2nd': 2, two: 2, third: 3, '3rd': 3, three: 3, pertama: 1, kedua: 2, ketiga: 3, '第一': 1, '第二': 2, '第三': 3, '一': 1, '二': 2, '三': 3,
-  mot: 1, hai: 2, ba: 3, nhat: 1, 'หนึ่ง': 1, 'สอง': 2, 'สาม': 3, una: 1, ikalawa: 2, pangalawa: 2, ikatlo: 3, pangatlo: 3 };
-const clean = (s: string) => fold(s.toLowerCase()).replace(/[.,!?;:'"()[\]{}]/g, ' ').replace(/\s+/g, ' ').trim();          // accents do not matter (Vietnamese)
-
-/** Which of the offered choices a reply means: "2", "the second one", or words from the choice itself. Null when it is a new question. */
-export function matchChoice(text: string, choices: Button[]): Button | null {
-  const t = clean(text); if (!t) return null;
-  const num = /^(?:no\.?\s*)?#?(\d{1,2})$/.exec(t);
-  if (num) { const i = Number(num[1]); return i >= 1 && i <= choices.length ? choices[i - 1] : null; }
-  const ord = /^(?:the\s+|yang\s+|option\s+|pilihan\s+|lua chon\s+|so\s+|cai\s+|ข้อ\s*|ตัวเลือก\s*|ang\s+|yung\s+|opsyon\s+|选项\s*)?([a-z0-9฀-๿一二三第]+?)(?:\s+one|\s+yang|\s+thu|\s*個|\s*个|\s*项)?$/.exec(t);
-  if (ord && NUMBER_WORDS[ord[1]] && NUMBER_WORDS[ord[1]] <= choices.length) return choices[NUMBER_WORDS[ord[1]] - 1];
-  const labels = choices.map((c) => ({ c, l: clean(c.label) }));
-  const exact = labels.filter((x) => x.l === t); if (exact.length === 1) return exact[0].c;
-  if (t.length >= 3) {
-    const hit = labels.filter((x) => x.l.includes(t) || (x.l.length >= 3 && t.includes(x.l)));
-    if (hit.length === 1) return hit[0].c;
-  }
-  return null;
-}
+export { matchChoice } from '../bot/choices';
 
 function renderChoices(buttons: Button[]): { text: string; choices: Choice[] } {
   return { text: buttons.map((b, i) => `${i + 1}. ${b.label}`).join('\n'), choices: buttons.map((b) => ({ label: b.label, value: `${b.kind}:${b.key}` })) };
@@ -111,31 +95,35 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     const cfg = bot.engine.hasMerchant(merchant) ? bot.engine.merchant(merchant) : null;
     const lang = state.lang ?? (cfg?.defaultLanguage as Lang) ?? 'en';
     const text = cfg ? (cfg.handoff[lang] ?? cfg.handoff.en ?? '') : '';
-    return { answer: text, confidence: 0, should_escalate: true, should_close: false, close_message: null, session_id: id, decision: 'handover', topic: null, keywords: [], choices: [] };
+    return { answer: text, confidence: 0, should_escalate: true, should_close: false, close_message: null, session_id: id, decision: 'handover', topic: null, keywords: [], choices: [], answer_id: null, cacheable: false };
   };
 
   let abandoned = false;
   const work = async (): Promise<AskResponse> => {
     if (!bot.engine.hasMerchant(merchant)) return fallback();
     const s = state.session;
-    if (s.handed || s.closed) return { answer: '', confidence: 0, should_escalate: s.handed, should_close: s.closed, close_message: null, session_id: id, decision: 'silent', topic: null, keywords: [], choices: [] };
+    if (s.handed || s.closed) return { answer: '', confidence: 0, should_escalate: s.handed, should_close: s.closed, close_message: null, session_id: id, decision: 'silent', topic: null, keywords: [], choices: [], answer_id: null, cacheable: false };
 
-    const picked = state.choices ? matchChoice(question, state.choices) : null;
-    let turn: Turn | null = picked ? bot.pick(s, { kind: picked.kind, key: picked.key, amt: picked.amt, label: picked.label, lang: state.lang ?? 'en' }) : null;
+    // LiveChat keeps a reply by the words of the question, for every customer: so no reply carries personal account data (it is for staff).
+    s.noPersonal = true;
+    if (state.choices && !s.choices) s.choices = state.choices;       // a chat saved before the choices moved into the session
     state.choices = null;
-    if (!turn) turn = await bot.message(s, question);
+    // A reply to the choices ("deposit", "depo", "2", "the first one") is read by the bot itself, so every channel behaves the same.
+    const turn: Turn | null = await bot.message(s, question);
     if (!turn) return fallback();
 
-    const lang = (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? state.lang) as Lang | null; state.lang = lang;
+    const lang = (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? s.lang ?? state.lang) as Lang | null; state.lang = lang;
     let answer = turn.messages.filter((m) => m.kind === 'bot').map((m) => m.text).join('\n\n');
     let choices: Choice[] = [];
-    if (turn.buttons?.length) { state.choices = turn.buttons; const r = renderChoices(turn.buttons); answer = (answer ? answer + '\n\n' : '') + r.text + (turn.hint ? '\n\n' + turn.hint : ''); choices = r.choices; }
-    const ks = (turn.trace.ks ?? {}) as { T?: string[]; A?: string[] };
+    if (turn.buttons?.length) { const r = renderChoices(turn.buttons); answer = (answer ? answer + '\n\n' : '') + r.text + (turn.hint ? '\n\n' + turn.hint : ''); choices = r.choices; }
     const decision = decisionOf(turn, s, choices.length > 0);
+    const cacheable = decision === 'answer' && !!turn.cacheable;
+    const conf = Math.min(1, Math.max(0, Number(turn.trace.conf ?? 0)));
     const res: AskResponse = {
-      answer, confidence: Math.min(1, Math.max(0, Number(turn.trace.conf ?? 0))), should_escalate: s.handed, should_close: turn.locked || s.closed,
+      answer, confidence: cacheable ? conf : Math.min(conf, 0.8), should_escalate: s.handed, should_close: turn.locked || s.closed,
       close_message: turn.locked || s.closed ? answer : null, session_id: id, decision,
-      topic: typeof turn.trace.topic === 'string' ? turn.trace.topic : null, keywords: [...(ks.T ?? []), ...(ks.A ?? [])], choices,
+      topic: typeof turn.trace.topic === 'string' ? turn.trace.topic : null, keywords: Array.isArray(turn.trace.kw) ? (turn.trace.kw as string[]) : [], choices,
+      answer_id: decision === 'answer' && typeof turn.trace.answerId === 'number' ? turn.trace.answerId : null, cacheable,
     };
     if (!abandoned && turn.log) {
       const matched = turn.trace.decision === 'ANSWER' ? ((turn.trace.top as { id?: number } | undefined)?.id ?? null) : null;

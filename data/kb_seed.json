@@ -1531,7 +1531,14 @@
     "eta",
     "how many days",
     "how many hours",
-    "how many minutes"
+    "how many minutes",
+    "not in",
+    "not come in",
+    "not coming in",
+    "not credited",
+    "not showing",
+    "not reflected",
+    "not reflect"
    ],
    "ms": [
     "berapa lama",
@@ -2021,6 +2028,41 @@
     "ano ang gagawin ko",
     "ano gagawin",
     "anong gagawin"
+   ]
+  },
+  "money": {
+   "vi": [
+    "tiền",
+    "số tiền",
+    "tiền của tôi",
+    "tiền của mình"
+   ],
+   "th": [
+    "เงิน",
+    "ยอดเงิน",
+    "เงินของฉัน"
+   ],
+   "tl": [
+    "pera",
+    "salapi",
+    "pondo",
+    "pera ko"
+   ],
+   "en": [
+    "money",
+    "funds",
+    "cash",
+    "payment"
+   ],
+   "ms": [
+    "duit",
+    "wang",
+    "bayaran"
+   ],
+   "zh": [
+    "钱",
+    "款项",
+    "钱款"
    ]
   }
  },

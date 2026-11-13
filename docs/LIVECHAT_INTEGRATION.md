@@ -78,6 +78,16 @@ The key (`aib_...`) is shown **once**. Running the command again replaces it, so
 
 Press **Test AI Chat**. A reply with numbered choices means the link works.
 
+## How the bot decides (the flow of the plan)
+
+Every message goes through three steps, and the bot reports each one in the reply (`keywords`, `topic`, `answer_id`) and in the panel's Test chat:
+
+1. **Keywords:** the words the customer typed that the bot recognises, such as `depo`, `not in`, `充值`, `nạp tiền`. They are counted in the reports.
+2. **Topic:** what the customer wants (Deposit, Withdraw, Bonus, Account, Bank...). It comes from the keywords. Each merchant has its own topic list.
+3. **Answer:** one answer for the topic (and the question type, such as how long, how to, limit). The rules decide first. When they are not sure, the AI picks an answer from a **short list** of the closest entries, or says "none".
+
+**The clarify rule:** a clear question gets its answer straight away. An unclear one (two topics score close, or nothing is sure) gets **one** question with up to 3 choices. The customer may answer in their own words ("deposit", "depo", "1", "the first one"); the bot reads that as an answer and, if the first message already said what was wanted ("my money **not in**"), answers at once. If it is still unclear, a person takes over. It never asks twice.
+
 ## What the bot does with each LiveChat call
 
 - Sends back `answer`, `confidence`, `should_escalate`, `should_close`, `close_message`, `session_id`.

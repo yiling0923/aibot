@@ -3,6 +3,8 @@
 export interface PickInput {
   /** The merchant code: the AI key saved for that merchant is used (else the shared one). */
   merchant?: string; merchantName: string; text: string; lang: string;
+  /** Step 1 and 2 of the flow, as far as the rules got: the keywords found and the topics they point to. The AI chooses from `entries`, which is already a short list. */
+  keywords?: string[]; topics?: string[];
   entries: { key: string; topic: string; aspect: string | null; examples: string[] }[];
 }
 export interface Pick { intent: string; confidence: number }

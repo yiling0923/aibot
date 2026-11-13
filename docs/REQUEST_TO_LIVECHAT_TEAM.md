@@ -35,6 +35,39 @@ Every reply from `POST {base}/api/v1/ai/ask` already carries the choices in a se
 4. Disable or hide the buttons once the visitor has answered, or when a newer bot message arrives.
 5. Show the `answer` text as it is. It already contains the numbered list and the closing line. If the widget shows buttons, it may cut the numbered lines (the lines that start with "1. ", "2. " …) from the text. The simple way is to keep the full text and show the buttons too.
 
+## IMPORTANT first: LiveChat's answer cache can show one customer's reply to another
+
+In `internal/automation/answer_cache.go` and `ai_reply.go`, LiveChat keeps every bot reply by **the words of the question only** (per merchant, nothing else), and it looks there **before** it calls the bot:
+
+- The first layer (`L1`, 2 hours) keeps **every** reply that has text. The second layer (`L2`, 7 days) keeps replies with `confidence >= 0.85`.
+- So if customer A asks "my money not in" and the bot answers with a question and choices, customer B's identical words get A's cached reply and the bot is never asked.
+- A customer who answers the choices with "2" would get the answer that the *previous* customer's "2" produced.
+- A customer who repeats "blah" would get the same "please explain" for 2 hours and never reach a person, because the bot never sees the second message.
+- A reply that contains one customer's own details (balance, name) would reach the next customer who types the same words.
+
+What the bot does about it already (nothing for you to do for these):
+1. It **never writes personal account data** in a LiveChat reply (it hands those chats to staff).
+2. Every reply has `"cacheable": true|false`. Only a plain answer that depends on nothing but the question words is `true`. Menus, replies to menus, anything read together with an earlier message, and hand-overs are `false`, and their `confidence` is kept at **0.8 or less** so they never reach the 7-day layer.
+
+What is still needed (the first layer ignores confidence):
+
+**Option A: a one-line fix (recommended).** At the top of `LayeredAnswerCache.Put`, before anything is stored:
+
+```go
+if cacheable, ok := response["cacheable"].(bool); ok && !cacheable {
+    return nil
+}
+```
+
+**Option B: no code change, until Option A is done.** Set these two values for the worker (they turn the cache almost off):
+
+```
+LIVECHAT_AI_CACHE_L1_TTL_SECONDS=1
+LIVECHAT_AI_CACHE_MIN_CONFIDENCE=1.0
+```
+
+Until one of these is in place, do not turn the AI bot on for real customers: clarifying questions and number replies will not work reliably.
+
 ## Nothing breaks if LiveChat does not do this
 The numbered list stays in `answer`, and the bot understands "2", "the second one" and words from the choice. Older widgets keep working. The bot needs **no change** for this feature.
 
