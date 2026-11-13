@@ -8,7 +8,6 @@ import { Modal, Pill } from '../ui';
 type Tr = { question_examples: string[]; answer_text: string };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
 const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: {} });
-const CHANNELS: [string, string][] = [['whatsapp', 'WhatsApp'], ['telegram', 'Telegram'], ['facebook', 'Facebook'], ['web', 'Web chat'], ['livechat', 'LiveChat']];
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
@@ -140,10 +139,6 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
       <div className="note">The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.</div>
       <div className="tabs" role="tablist">{LANGS.map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
       <label className="fld"><span>Answer in {LN[ed.tab]} (facts only; the bot adds the tone)</span><textarea lang={ed.tab} value={t.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
-      <details className="fold" open={!!Object.values(ed.channel_overrides || {}).some((b) => Object.values(b || {}).some(Boolean))}><summary>A different wording for a channel (optional)</summary>
-        <div className="sub" style={{ margin: '6px 0' }}>Used instead of the answer above when the customer writes from that channel, in {LN[ed.tab]}. Leave empty to use the answer above. For example a shorter text for WhatsApp.</div>
-        {CHANNELS.map(([ch, name]) => <label className="fld" key={ch}><span>{name}</span><textarea rows={2} lang={ed.tab} value={ed.channel_overrides?.[ch]?.[ed.tab as 'en'] || ''} onChange={(e) => set({ channel_overrides: { ...(ed.channel_overrides || {}), [ch]: { ...(ed.channel_overrides?.[ch] || {}), [ed.tab]: e.target.value } } })} /></label>)}
-      </details>
       <div className="tools" style={{ marginTop: -4 }}>
         {ed.tab === 'en'
           ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['ms', 'zh'])}>{busy ? 'Translating…' : 'Translate to Malay and Chinese'}</button>

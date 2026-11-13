@@ -205,12 +205,11 @@ The Topics screen has two views of the same data: **List** and **Flowchart** (ke
 
 The Report screen shows, per merchant and for 7 or 30 days: messages, share answered / not understood / handed to a person, messages per day, answers used most, **top topics**, **top keywords**, **topics handed to a person most** (a topic with many hand-offs needs a better answer) and the **wrong-answer rate**. The rate comes from staff marking recent answers *Right* or *Wrong* under "Check recent answers"; it is empty until some are marked. Topics and keywords are recorded from now on (older chats are not counted in those two lists).
 
-## Knowledge base entry fields: type, end date, channel wording
+## Knowledge base entry fields: type and end date
 
-Each entry has three more optional fields (Knowledge base → Add/Edit entry):
+Each entry has two more optional fields (Knowledge base → Add/Edit entry):
 
 - **Type:** *Answer* (default), *Needs staff* (the bot never answers it: the chat goes to a person; use it for anything about the customer's own account) or *Promotion*.
 - **End date:** the entry is used until the end of that day, then hides itself (the bot behaves as if it did not exist). Works for any type, meant for promotions. The list shows "until" / "ended".
-- **A different wording for a channel:** for example a shorter text for WhatsApp. The channel comes from an optional `channel` field in the `/api/v1/ai/ask` request (default `livechat`). Any channel without its own wording gets the normal answer.
 
 Saved through the same draft/publish path as every other entry change. Databases are updated when the server starts.

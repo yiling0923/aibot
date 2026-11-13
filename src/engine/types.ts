@@ -20,8 +20,6 @@ export interface KbEntry {
   entryType?: EntryType;
   /** The last day the entry is used (YYYY-MM-DD). Empty: no end. */
   endsOn?: string | null;
-  /** A different wording per channel, for example whatsapp: { en: 'Short text' }. The default wording is used for any other channel. */
-  channelAnswers?: Record<string, Partial<Record<Lang, string>>>;
 }
 export type EntryType = 'answer' | 'needs_staff' | 'promotion';
 export const ENTRY_TYPES: EntryType[] = ['answer', 'needs_staff', 'promotion'];

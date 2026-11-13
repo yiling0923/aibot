@@ -9,8 +9,6 @@ export interface SnapEntry {
   entry_type?: 'answer' | 'needs_staff' | 'promotion';
   /** Last day the entry is used, YYYY-MM-DD; empty = no end. */
   ends_on?: string | null;
-  /** A different wording per channel: { whatsapp: { en: '…' } }. */
-  channel_overrides?: Record<string, Partial<Record<Lang, string>>>;
   translations: Partial<Record<Lang, { question_examples: string[]; answer_text: string }>>;
 }
 export interface SnapSettings {

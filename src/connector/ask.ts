@@ -106,7 +106,6 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
 
     // LiveChat keeps a reply by the words of the question, for every customer: so no reply carries personal account data (it is for staff).
     s.noPersonal = true;
-    s.channel = typeof body.channel === 'string' && /^[a-z0-9_-]{1,20}$/i.test(body.channel.trim()) ? body.channel.trim().toLowerCase() : 'livechat';
     if (state.choices && !s.choices) s.choices = state.choices;       // a chat saved before the choices moved into the session
     state.choices = null;
     // A reply to the choices ("deposit", "depo", "2", "the first one") is read by the bot itself, so every channel behaves the same.
