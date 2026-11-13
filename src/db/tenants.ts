@@ -87,6 +87,8 @@ const REQUIRED: { table: string; column: string; add: string; after?: string }[]
   { table: 'chat_sessions', column: 'source', add: "ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'live' AFTER status" },
   { table: 'settings', column: 'max_choices', add: 'ADD COLUMN max_choices INT NOT NULL DEFAULT 3' },
   { table: 'settings', column: 'more_help_on', add: 'ADD COLUMN more_help_on TINYINT(1) NOT NULL DEFAULT 1' },
+  { table: 'bot_decisions', column: 'topic', add: 'ADD COLUMN topic VARCHAR(100) NULL' },
+  { table: 'bot_decisions', column: 'keywords', add: 'ADD COLUMN keywords VARCHAR(500) NULL' },
   { table: 'settings', column: 'more_help_msg', add: 'ADD COLUMN more_help_msg JSON NULL' },
 ];
 async function repairs(c: import('mysql2/promise').PoolConnection, db: string): Promise<string[]> {

@@ -211,7 +211,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);
     const days = Number(req.query.days) === 30 ? 30 : 7; const includeTest = req.query.test !== '0';
     const D = await mt(req.query.merchant, 'bot_decisions'), M = await mt(req.query.merchant, 'chat_messages'), S = await mt(req.query.merchant, 'chat_sessions'), E = await mt(req.query.merchant, 'kb_entries'), U = await mt(req.query.merchant, 'unmatched_messages');
-    const empty = { days, total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0 };
+    const empty = { days, total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0, topTopics: [] as unknown[], handedByTopic: [] as unknown[], topKeywords: [] as unknown[], accuracy: { right: 0, wrong: 0, checked: 0, wrongRate: null as number | null }, recent: [] as unknown[] };
     if (!D || !M || !S || !E || !U) return empty;
     const where = `d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
     const base = `FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE ${where}`;
@@ -227,8 +227,36 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const top = await q(pool, `SELECT e.intent_key AS intent, COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id JOIN ${E} e ON e.id = d.matched_kb_id WHERE ${where} AND d.decision = 'ANSWER' GROUP BY e.intent_key ORDER BY n DESC, e.intent_key LIMIT 8`, [days - 1]);
     const missing = await q(pool, `SELECT text, hits FROM ${U} WHERE resolved = false ORDER BY hits DESC, last_seen DESC LIMIT 5`);
     const [t] = await q(pool, `SELECT COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND s.source = 'test' AND d.decision <> 'HANDED'`, [days - 1]);
+    // the plan's reports: top topics, topics handed to a person most, top keywords, and how often staff marked an answer wrong
+    const F = await mt(req.query.merchant, 'feedback');
+    const topics = await q(pool, `SELECT d.topic AS topic, COUNT(*) AS n, SUM(d.decision = 'HANDOFF') AS handed, SUM(d.decision = 'REASK') AS reask ${base} AND d.topic IS NOT NULL GROUP BY d.topic ORDER BY n DESC`, [days - 1]);
+    const kwRows = await q(pool, `SELECT d.keywords AS k ${base} AND d.keywords IS NOT NULL ORDER BY d.id DESC LIMIT 5000`, [days - 1]);
+    const kwCount = new Map<string, number>(); for (const r of kwRows) for (const w of String(r.k).split('\n')) { const x = w.trim().toLowerCase(); if (x) kwCount.set(x, (kwCount.get(x) ?? 0) + 1); }
+    let right = 0, wrong = 0; let recent: Record<string, unknown>[] = [];
+    if (F) {
+      const fb = await q(pool, `SELECT v.verdict, COUNT(*) AS n FROM (SELECT d.id, (SELECT f.verdict FROM ${F} f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS verdict ${base}) v WHERE v.verdict IS NOT NULL GROUP BY v.verdict`, [days - 1]);
+      for (const r of fb) { if (r.verdict === 'right') right = Number(r.n); if (r.verdict === 'wrong') wrong = Number(r.n); }
+      recent = await q(pool, `SELECT d.id, m.text AS question, d.reply_text AS answer, d.topic, DATE_FORMAT(d.created_at, '%Y-%m-%d %H:%i') AS at, (SELECT f.verdict FROM ${F} f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS verdict ${base} AND d.decision = 'ANSWER' ORDER BY d.id DESC LIMIT 10`, [days - 1]);
+    }
     return { days, total: sum(() => true), helped: sum((k) => HELPED.has(k)), notUnderstood: byDecision.REASK ?? 0, handedOver: byDecision.HANDOFF ?? 0, rude: byDecision.ABUSE ?? 0, byDecision, daily,
-      topAnswers: top.map((r) => ({ intent: r.intent, n: Number(r.n) })), topMissing: missing.map((r) => ({ text: r.text, hits: Number(r.hits) })), tests: Number(t.n) };
+      topAnswers: top.map((r) => ({ intent: r.intent, n: Number(r.n) })), topMissing: missing.map((r) => ({ text: r.text, hits: Number(r.hits) })), tests: Number(t.n),
+      topTopics: topics.slice(0, 8).map((r) => ({ topic: r.topic, n: Number(r.n) })),
+      handedByTopic: topics.map((r) => ({ topic: r.topic, handed: Number(r.handed) + Number(r.reask), total: Number(r.n) })).filter((r) => r.handed > 0).sort((a, b) => b.handed - a.handed).slice(0, 8),
+      topKeywords: [...kwCount].sort((a, b) => b[1] - a[1]).slice(0, 10).map(([word, n]) => ({ word, n })),
+      accuracy: { right, wrong, checked: right + wrong, wrongRate: right + wrong ? wrong / (right + wrong) : null },
+      recent: recent.map((r) => ({ id: Number(r.id), question: r.question, answer: r.answer, topic: r.topic, at: r.at, verdict: r.verdict ?? null })) };
+  });
+
+  /** Staff mark a bot answer right or wrong (or take the mark back). The report shows the share marked wrong. */
+  app.post<{ Body: { merchant: string; decisionId: number; verdict: 'right' | 'wrong' | null } }>(`${A}/feedback`, async (req, reply) => {
+    const { merchant, decisionId, verdict } = req.body ?? ({} as never);
+    if (!mayUse(req, merchant)) return forbidden(reply);
+    if (verdict !== 'right' && verdict !== 'wrong' && verdict !== null) return reply.code(400).send({ error: 'The mark must be right or wrong.' });
+    const D = await mt(merchant, 'bot_decisions'), F = await mt(merchant, 'feedback'); if (!D || !F) return reply.code(404).send({ error: 'There is no such merchant.' });
+    const [d] = await q(pool, `SELECT id FROM ${D} WHERE id = ?`, [Number(decisionId)]); if (!d) return reply.code(404).send({ error: 'That answer was not found.' });
+    await pool.query(`DELETE FROM ${F} WHERE decision_id = ?`, [d.id]);
+    if (verdict) await pool.query(`INSERT INTO ${F}(decision_id, agent_id, verdict) VALUES(?,?,?)`, [d.id, req.user!.username, verdict]);
+    return { ok: true, verdict };
   });
 
   /** Recent customer messages that contain a word (the "Recent chats with this word" list). */

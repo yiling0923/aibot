@@ -129,7 +129,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
       const matched = turn.trace.decision === 'ANSWER' ? ((turn.trace.top as { id?: number } | undefined)?.id ?? null) : null;
       await store.hear(merchant, turn.log.text, turn.log.lang, turn.log.notUnderstood, deps.source ?? 'live');
       void store.logTurn({ merchant, sessionKey: id, customerRef: member?.id ?? null, text: turn.log.text, lang: turn.log.lang, decision: turn.log.decision, confidence: res.confidence,
-        reply: answer, matchedKbId: matched, why: String(turn.trace.why ?? '').slice(0, 500), source: deps.source ?? 'live' });
+        reply: answer, matchedKbId: matched, why: String(turn.trace.why ?? '').slice(0, 500), topic: typeof turn.trace.topic === 'string' ? turn.trace.topic : null, keywords: Array.isArray(turn.trace.kw) ? (turn.trace.kw as string[]) : [], source: deps.source ?? 'live' });
     }
     return res;
   };

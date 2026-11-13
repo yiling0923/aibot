@@ -200,3 +200,7 @@ This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every
 ## Topics: list and flowchart
 
 The Topics screen has two views of the same data: **List** and **Flowchart** (keywords → topic → answers → hand to a person). Drag a keyword, an answer, or a word customers typed (not set yet) onto another topic to move it; every item also has a "Move to…" menu for keyboard and touch. Both views edit the same draft, so a change in one shows in the other. Shared keywords are read-only in the chart (admins edit them in the list).
+
+## Report
+
+The Report screen shows, per merchant and for 7 or 30 days: messages, share answered / not understood / handed to a person, messages per day, answers used most, **top topics**, **top keywords**, **topics handed to a person most** (a topic with many hand-offs needs a better answer) and the **wrong-answer rate**. The rate comes from staff marking recent answers *Right* or *Wrong* under "Check recent answers"; it is empty until some are marked. Topics and keywords are recorded from now on (older chats are not counted in those two lists).

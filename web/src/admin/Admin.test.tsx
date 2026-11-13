@@ -14,7 +14,7 @@ const state = (role: 'admin' | 'staff') => ({
   },
 });
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
-const REPORT = { days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }] };
+const REPORT = { topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }] };
 const CONN = () => ({ merchant: { code: 'A', name: 'LuckyPay', language: 'en', tone: 'friendly', entries: 11, logins: ['luckypay'] }, livechat: { baseUrl: 'http://localhost:3000', askUrl: 'http://localhost:3000/api/v1/ai/ask', keys: [], stoppedKeys: 0, liveChats7d: 4, lastLiveChat: null },
   ai: { anthropic: { provider: 'anthropic', configured: true, last4: 'wxyz', updatedAt: '2026-11-12T08:00:00Z', updatedBy: 'admin', using: 'merchant' }, openai: { provider: 'openai', configured: false, last4: null, updatedAt: null, updatedBy: null, using: 'none' } } });
 const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
@@ -208,5 +208,15 @@ describe('Control panel', () => {
     expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(true);       // nothing to send until the number differs
     await userEvent.clear(box); await userEvent.type(box, '6');
     expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(false);
+  });
+  it('shows top topics, top keywords, topics handed over, the wrong-answer rate, and lets staff mark an answer', async () => {
+    open('staff', '/admin/report');
+    expect(await screen.findByText('Top topics')).toBeTruthy();
+    expect(screen.getByText('Top keywords')).toBeTruthy(); expect(screen.getByText('Topics handed to a person most')).toBeTruthy();
+    expect(screen.getByText('25%')).toBeTruthy();                                                   // 1 wrong of 4 checked
+    expect(screen.getByText(/withdraw \(50% of 6\)/)).toBeTruthy();
+    expect(screen.getByText('Check recent answers')).toBeTruthy();
+    await userEvent.click(screen.getAllByText('Wrong')[0]);                                         // sends the mark, then reloads the report
+    expect(screen.getByText('Check recent answers')).toBeTruthy();
   });
 });

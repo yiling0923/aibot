@@ -6,6 +6,8 @@ import { usePanel } from '../store';
 interface Report {
   days: number; total: number; helped: number; notUnderstood: number; handedOver: number; rude: number; byDecision: Record<string, number>; tests: number;
   daily: { day: string; total: number; helped: number; notUnderstood: number; handedOver: number }[];
+  topTopics: { topic: string; n: number }[]; handedByTopic: { topic: string; handed: number; total: number }[]; topKeywords: { word: string; n: number }[];
+  accuracy: { right: number; wrong: number; checked: number; wrongRate: number | null }; recent: { id: number; question: string; answer: string; topic: string | null; at: string; verdict: 'right' | 'wrong' | null }[];
   topAnswers: { intent: string; n: number }[]; topMissing: { text: string; hits: number }[];
 }
 /** One big number with a coloured edge and, for shares, a thin bar. */
@@ -18,6 +20,10 @@ function Tile({ label, value, note, color, share }: { label: string; value: stri
       {share !== undefined && <div style={{ background: 'var(--surface2)', borderRadius: 6, height: 6, marginTop: 4 }}><div style={{ width: Math.max(2, share * 100) + '%', height: 6, borderRadius: 6, background: color }} /></div>}
     </div>
   );
+}
+function Bars({ rows }: { rows: [string, number][] }) {
+  const m = Math.max(1, ...rows.map((x) => x[1]));
+  return <table><tbody>{rows.map(([k, n]) => <tr key={k}><td><b>{k}</b></td><td className="num">{n}</td><td style={{ width: '35%' }}><div style={{ background: 'var(--surface2)', borderRadius: 6, height: 10 }}><div style={{ width: (n / m) * 100 + '%', height: 10, borderRadius: 6, background: 'var(--accent)' }} /></div></td></tr>)}</tbody></table>;
 }
 const pct = (n: number, t: number) => (t ? Math.round((n / t) * 100) : 0) + '%';
 
@@ -32,6 +38,9 @@ export default function Report() {
     return () => { alive = false; };
   }, [p.merchant, days, withTest]);
 
+  const mark = async (id: number, verdict: 'right' | 'wrong' | null) => {
+    try { await api('/api/admin/feedback', { merchant: p.merchant, decisionId: id, verdict }); setR(await api<Report>(`/api/admin/report?merchant=${encodeURIComponent(p.merchant)}&days=${days}&test=${withTest ? 1 : 0}`)); } catch (e) { p.toast((e as Error).message); }
+  };
   const max = Math.max(1, ...(r?.daily.map((d) => d.total) ?? [1]));
   const bw = 100 / Math.max(1, r?.daily.length ?? 7);
   return (
@@ -66,6 +75,20 @@ export default function Report() {
               {r.topAnswers.map((a) => <tr key={a.intent}><td><b>{a.intent}</b></td><td className="num">{a.n}</td><td><div style={{ background: 'var(--surface2)', borderRadius: 6, height: 10 }}><div style={{ width: (a.n / r.topAnswers[0].n) * 100 + '%', height: 10, borderRadius: 6, background: 'var(--accent)' }} /></div></td></tr>)}</tbody></table>
               : <div className="sub">No answer was used in this period.</div>}</div>
         </>}
+        <div className="grid2" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 14 }}>
+          <div className="card"><h3>Top topics</h3>{r.topTopics.length ? <Bars rows={r.topTopics.map((t) => [t.topic, t.n])} /> : <div className="sub">No topic was asked about in this period.</div>}</div>
+          <div className="card"><h3>Top keywords</h3>{r.topKeywords.length ? <Bars rows={r.topKeywords.map((k) => [k.word, k.n])} /> : <div className="sub">No keyword was used yet. Chats before this report was added are not counted.</div>}</div>
+          <div className="card"><h3>Topics handed to a person most</h3><div className="sub">Messages on this topic that went to a person or were not understood. A topic here often needs a better answer.</div>
+            {r.handedByTopic.length ? <Bars rows={r.handedByTopic.map((t) => [t.topic + ' (' + pct(t.handed, t.total) + ' of ' + t.total + ')', t.handed])} /> : <div className="sub">None in this period.</div>}</div>
+          <div className="card"><h3>Wrong-answer rate</h3>
+            {r.accuracy.wrongRate === null ? <div className="sub">No answer has been checked yet. Mark answers below as right or wrong.</div>
+              : <><div style={{ fontSize: 34, fontWeight: 700, color: r.accuracy.wrongRate > 0.1 ? 'var(--bad)' : 'var(--ok)' }}>{Math.round(r.accuracy.wrongRate * 100)}%</div><div className="sub">{r.accuracy.wrong} wrong, {r.accuracy.right} right (of {r.accuracy.checked} checked answers)</div></>}</div>
+        </div>
+        <div className="card"><h3>Check recent answers</h3><div className="sub">The last answers the bot gave. Mark each one right or wrong; this feeds the wrong-answer rate.</div>
+          {r.recent.length ? r.recent.map((x) => <div className="q" key={x.id}><div className="t">“{x.question}”{x.topic ? <> <span className="pill info">{x.topic}</span></> : null}</div>
+            <div className="sub" style={{ whiteSpace: 'pre-wrap' }}>{x.answer}</div>
+            <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>{(['right', 'wrong'] as const).map((v) => <button key={v} type="button" className={'btn sm' + (x.verdict === v ? ' pri' : '')} aria-pressed={x.verdict === v} onClick={() => void mark(x.id, x.verdict === v ? null : v)}>{v === 'right' ? 'Right' : 'Wrong'}</button>)}</div></div>)
+            : <div className="sub">No answers in this period.</div>}</div>
         <div className="card"><div className="head"><h3>Not understood most</h3><button className="btn sm" type="button" onClick={() => nav('/admin/unm')}>Open the full list</button></div>
           {r.topMissing.length ? r.topMissing.map((m) => <div className="q" key={m.text}><div className="t">“{m.text}”</div><span className="sub">{m.hits} time{m.hits === 1 ? '' : 's'}</span></div>) : <div className="sub">Nothing is waiting. Every message was understood or already dealt with.</div>}</div>
       </>}
