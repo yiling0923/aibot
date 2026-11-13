@@ -18,7 +18,7 @@ export interface SnapSettings {
 }
 /** Everything the control panel edits. The panel works on a copy of this and sends it back on Publish. */
 export interface Snapshot {
-  kb: SnapEntry[]; aliases: Words; mAliases: Record<string, { language: string; variant: string; canonical: string }[]>;
+  kb: SnapEntry[]; aliases: Words; mAliases: Record<string, { language: string; variant: string; canonical: string; kind?: string | null }[]>;
   aspects: Words; smalltalk: Words; guard: Words; fillers: Record<string, string[]>; settings: Record<string, SnapSettings>;
 }
 export interface MerchantMeta { code: string; name: string; default_language: Lang; livechat_group_id: number | null }

@@ -30,7 +30,7 @@ export interface MerchantCfg {
   closing: Partial<Record<Lang, string>>; handoff: Partial<Record<Lang, string>>;
   maxChoices: number; moreHelpOn: boolean; moreHelp: Partial<Record<Lang, string>>;   // choices shown at once (1-3), and the line after them
   abuseCloseAfter: number; answerThreshold: number; clarifyThreshold: number; kindReply: Partial<Record<Lang, string>>;
-  aliases: { language: string; variant: string; canonical: string }[];   // merchant-only keywords
+  aliases: { language: string; variant: string; canonical: string; kind?: string | null }[];   // merchant-only keywords (kind: short | slang | meaning, only for the panel)
   tools: string[];                                                      // enabled account tools
   limits: Partial<Record<'deposit' | 'withdraw', [number, number]>>;
 }

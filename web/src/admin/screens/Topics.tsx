@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePanel } from '../store';
 import TopicFlow from './TopicFlow';
-import { LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, guessLang, slug, topicNames } from '../model';
+import { KW_PICK, LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, groupKeywords, guessLang, slug, topicNames } from '../model';
 
 const TABS: [string, string][] = [['short', 'Topics'], ['aspect', 'Question words'], ['small', 'Greetings'], ['filler', 'Fillers'], ['block', 'Block lists']];
 const SMALL_NAMES: Record<string, string> = { morning: 'Morning greetings', greeting: 'Other greetings', callout: 'Calling for attention', thanks: 'Thanks', bye: 'Goodbye', ack: 'Short acknowledgements' };
@@ -65,18 +65,22 @@ export default function Topics() {
     if (cur === 'short') {
       const mine = (d.mAliases[p.merchant] || []).map((a, i) => [a, i] as const);
       const known = Object.keys(d.aliases);
-      Object.entries(d.aliases).forEach(([k, byl]) => {
-        const it = mine.filter(([a]) => a.canonical === k && langOk(a.language) && matchQ(a.variant, k));
-        const inner = <>
-          {it.length ? <div style={{ marginBottom: 6 }}><span className="lang">{p.M.name}</span><div className="chips" style={{ display: 'inline-flex' }}>{it.map(([a, i]) => <span key={i} className={'chip ' + (fresh.has(a.variant.toLowerCase()) ? 'new' : '')}>{a.variant}<button type="button" aria-label="Remove" onClick={() => remove('malias', '', '', i)}>×</button></span>)}</div></div> : null}
-          <Chips byl={byl} kind="alias" k={k} extra={k} ro={lock} /></>;
-        const has = it.length || LANGS.some((l) => byl[l] && langOk(l) && byl[l].some((w) => matchQ(w, k)));
-        if (has) out.push(<Group key={k} title={k} sub={lock ? 'global · admin only' : 'global · all merchants'}>{inner}</Group>);
-      });
+      // one main keyword (the topic) with the words under it: short forms, slang, same meaning, other languages
+      type W = { variant: string; language: string; kind?: string | null; own: boolean; i: number; l: string };
+      const under = (k: string, shared: Words) => {
+        const own: W[] = mine.filter(([a]) => a.canonical === k).map(([a, i]) => ({ variant: a.variant, language: a.language, kind: a.kind, own: true, i, l: a.language }));
+        const sh: W[] = LANGS.flatMap((l) => (shared[l] || []).map((w, i) => ({ variant: w, language: l, own: false, i, l })));
+        const groups = groupKeywords(k, [...own, ...sh].filter((w) => langOk(w.language) && matchQ(w.variant, k)));
+        if (!groups.length) return null;
+        return <div className="kgroups">{groups.map((g) => <div className="kgroup" key={g.kind}><span className="klabel">{g.label}</span>
+          <div className="chips">{g.items.map((w) => <span key={(w.own ? 'o' : 's') + w.l + w.i} className={'chip ' + (w.own ? 'mine ' : '') + (!w.own && lock ? 'ro ' : '') + (fresh.has(w.variant.toLowerCase()) ? 'new' : '')} title={w.own ? p.M.name + ' only' : 'Shared by all merchants'}>
+            {w.variant}{g.kind === 'lang' && <span className="lang" style={{ marginLeft: 6 }}>{LN[w.language] ?? w.language}</span>}
+            {(w.own || !lock) && <button type="button" aria-label="Remove" onClick={() => (w.own ? remove('malias', '', '', w.i) : remove('alias', k, w.l, w.i))}>×</button>}</span>)}</div></div>)}</div>;
+      };
+      Object.entries(d.aliases).forEach(([k, byl]) => { const inner = under(k, byl); if (inner) out.push(<Group key={k} title={k} sub={'main keyword · ' + (lock ? 'global · admin only' : 'global · all merchants')}>{inner}</Group>); });
       // the topics this merchant made itself: its own keywords under a topic name that is not in the shared template
       [...new Set(mine.filter(([a]) => !known.includes(a.canonical)).map(([a]) => a.canonical))].forEach((topic) => {
-        const own = mine.filter(([a]) => a.canonical === topic && langOk(a.language) && matchQ(a.variant, topic)); if (!own.length) return;
-        out.push(<Group key={'own-' + topic} title={topic} sub={'this merchant only · ' + p.M.name + "'s own topic"}><div className="chips">{own.map(([a, i]) => <span className={'chip ' + (fresh.has(a.variant.toLowerCase()) ? 'new' : '')} key={i}>{a.variant}<span className="lang" style={{ marginLeft: 6 }}>{LN[a.language] ?? a.language}</span><button type="button" aria-label="Remove" onClick={() => remove('malias', '', '', i)}>×</button></span>)}</div></Group>);
+        const inner = under(topic, {}); if (inner) out.push(<Group key={'own-' + topic} title={topic} sub={'main keyword · this merchant only · ' + p.M.name + "'s own topic"}>{inner}</Group>);
       });
     }
     const chipBlock = (kind: string, k: string, byl: Words, title: string, sub: string, extra?: string) => {
@@ -118,11 +122,11 @@ function AddBox({ tab, dup, done }: { tab: string; dup: (v: string) => boolean; 
   const clear = () => setF({});
 
   const addAlias = () => {
-    const w = v('al_v').trim().toLowerCase(), k = v('al_k', first(topicNames(d, p.merchant))), l = v('al_l', 'en'), sc = v('al_s', 'm');
+    const w = v('al_v').trim().toLowerCase(), k = v('al_k', (topicNames(d, p.merchant)[0] ?? '')), l = v('al_l', 'en'), sc = v('al_s', 'm'), kd = v('al_t', '');
     if (need(w, 'Type the short form first') || dup(w)) return;
     if (sc === 'g' && p.isAdmin && !d.aliases[k]) return p.toast('"' + k + '" is a topic of this merchant only, so a keyword cannot be added to all merchants.');
     if (sc === 'g' && p.isAdmin) { p.edit((x, note) => { (x.aliases[k][l] = x.aliases[k][l] || []).push(w); note('Added global short form "' + w + '" → ' + k); }); done('Added "' + w + '" → ' + k + ' (all merchants).', w + ' → ' + k + ' · all merchants', w); }
-    else { p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: l, variant: w, canonical: k }); note('Added short form "' + w + '" → ' + k + ' (' + p.M.name + ')'); }); done('Added "' + w + '" → ' + k + ' (' + p.M.name + ' only). It is in the "' + k + '" group, on the ' + p.M.name + ' line.', w + ' → ' + k + ' · ' + p.M.name + ' only', w); }
+    else { p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: l, variant: w, canonical: k, ...(kd ? { kind: kd } : {}) }); note('Added short form "' + w + '" → ' + k + ' (' + p.M.name + ')'); }); done('Added "' + w + '" → ' + k + ' (' + p.M.name + ' only). It is in the "' + k + '" group, on the ' + p.M.name + ' line.', w + ' → ' + k + ' · ' + p.M.name + ' only', w); }
     clear();
   };
   const addTopic = () => {
@@ -165,9 +169,10 @@ function AddBox({ tab, dup, done }: { tab: string; dup: (v: string) => boolean; 
       <label className="fld w2"><span>Keywords (comma separated, any language)</span><input type="text" placeholder="e.g. refunds, bayaran balik, 退款" value={v('tp_w')} onChange={on('tp_w')} /></label>
       {!lock && <label className="fld"><span>Applies to</span><select value={v('tp_s', 'm')} onChange={on('tp_s')}><option value="m">{p.M.name} only</option><option value="g">All merchants (template)</option></select></label>}
       <button className="btn pri" type="button" onClick={addTopic}>Create topic</button></>, addTopic)}</div>
-    <div className="group"><div className="lbl"><b>Add a keyword</b></div>{row(<>
+    <div className="group"><div className="lbl"><b>Add a keyword</b><span className="lock">Pick the main keyword (topic), then the short form, slang or same-meaning word that points to it. For example dp → deposit.</span></div>{row(<>
       <label className="fld"><span>Keyword</span><input type="text" placeholder="e.g. depoo" value={v('al_v')} onChange={on('al_v')} /></label>
-      <label className="fld"><span>Topic</span><select value={v('al_k', first(topicNames(d, p.merchant)))} onChange={on('al_k')}>{topicNames(d, p.merchant).map((k) => <option key={k}>{k}</option>)}</select></label>{langSel('al_l')}
+      <label className="fld"><span>Topic</span><select value={v('al_k', (topicNames(d, p.merchant)[0] ?? ''))} onChange={on('al_k')}>{topicNames(d, p.merchant).map((k) => <option key={k}>{k}</option>)}</select></label>{langSel('al_l')}
+      <label className="fld"><span>Kind</span><select value={v('al_t', '')} onChange={on('al_t')}>{KW_PICK.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
       <label className="fld"><span>Applies to</span><select value={v('al_s', 'm')} onChange={on('al_s')}><option value="m">{p.M.name} only</option>{!lock && <option value="g">All merchants</option>}</select></label>
       <button className="btn pri" type="button" onClick={addAlias}>Add</button></>, addAlias)}</div></>;
   if (lock) return <div className="lock">Global lists are read-only for staff. You can request new words from an admin, or add short forms for your own merchant on the Short forms tab.</div>;

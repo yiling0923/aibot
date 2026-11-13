@@ -50,13 +50,13 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
   for (const t of tenants) {
     const D = (table: string) => tbl(t.db, table);
     const [own, entries, trans, [st], tools] = await Promise.all([
-      rows(pool, `SELECT language, variant, canonical FROM ${D('aliases')} ORDER BY id`),
+      rows(pool, `SELECT language, variant, canonical, kind FROM ${D('aliases')} ORDER BY id`),
       rows(pool, `SELECT e.id, c.name AS category, e.intent_key, e.topic, e.aspect, e.topic_optional, e.status, e.updated_at, e.entry_type, DATE_FORMAT(e.valid_to, '%Y-%m-%d') AS ends_on FROM ${D('kb_entries')} e LEFT JOIN ${D('kb_categories')} c ON c.id = e.category_id ORDER BY e.id`),
       rows(pool, `SELECT kb_id, language, question_examples, answer_text FROM ${D('kb_translations')} ORDER BY id`),
       rows(pool, `SELECT * FROM ${D('settings')} WHERE id = 1`),
       rows(pool, `SELECT tool, enabled FROM ${D('tools')}`),
     ]);
-    snap.mAliases[t.code] = own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical }));
+    snap.mAliases[t.code] = own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical, ...(a.kind ? { kind: a.kind as string } : {}) }));
     const byKb = new Map<number, SnapEntry['translations']>();
     for (const x of trans) {
       const m = byKb.get(Number(x.kb_id)) ?? {};
@@ -115,7 +115,7 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScop
       const D = (table: string) => tbl(t.db, table); const s = snap.settings[t.code];
       await c.query('UPDATE merchants SET handoff_group_id = ? WHERE id = ?', [s.handoff_group, t.id]);
       await c.query(`DELETE FROM ${D('aliases')}`);
-      await bulk(D('aliases'), 'language,variant,canonical', (snap.mAliases[t.code] ?? []).map((a) => [a.language, a.variant, a.canonical]));
+      await bulk(D('aliases'), 'language,variant,canonical,kind', (snap.mAliases[t.code] ?? []).map((a) => [a.language, a.variant, a.canonical, ['short', 'slang', 'meaning'].includes(String(a.kind)) ? a.kind : null]));
       await c.query(`UPDATE ${D('settings')} SET tone=?, answer_threshold=?, clarify_threshold=?, abuse_close_after=?, kind_reply=?, closing_msg=?, handoff_msg=?, max_choices=?, more_help_on=?, more_help_msg=? WHERE id = 1`,
         [s.tone, s.answer, s.clarify, s.abuse_close_after, JSON.stringify(s.kind), JSON.stringify(s.closing), JSON.stringify(s.handoff), Math.max(1, Math.min(3, Math.round(Number(s.max_choices) || 3))), s.more_help_on ? 1 : 0, JSON.stringify(s.more_help ?? {})]);
       for (const [tool, enabled] of Object.entries(s.tools))

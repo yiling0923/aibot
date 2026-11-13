@@ -66,6 +66,25 @@ export function addOwnTopic(d: Draft, merchant: string, name: string, words: str
   });
 }
 
+/* ---------- a main keyword and the words under it ---------- */
+export type KwKind = 'short' | 'slang' | 'meaning' | 'lang';
+export const KW_KINDS: KwKind[] = ['short', 'slang', 'meaning', 'lang'];
+export const KW_LABEL: Record<KwKind, string> = { short: 'Short forms', slang: 'Slang', meaning: 'Same meaning', lang: 'Other languages' };
+export const KW_PICK: [string, string][] = [['', 'Auto (the panel decides)'], ['short', 'Short form (dep, dp)'], ['slang', 'Slang'], ['meaning', 'Same meaning']];
+const subsequence = (s: string, of: string) => { let i = 0; for (const c of of) if (c === s[i]) i++; return i === s.length; };
+/** Where a word sits under its main keyword. A kind chosen by a person wins; otherwise: another language, or an abbreviation of the main word (dep, depo, dp), or the same meaning. */
+export function kwKind(main: string, v: { variant: string; language?: string; kind?: string | null }): KwKind {
+  if (v.kind === 'short' || v.kind === 'slang' || v.kind === 'meaning') return v.kind;
+  const m = main.toLowerCase(), w = v.variant.toLowerCase(), mainLang = guessLang(main);
+  if ((v.language || guessLang(v.variant)) !== mainLang) return 'lang';
+  if (w.length >= 2 && w.length < m.length && w[0] === m[0] && subsequence(w, m)) return 'short';
+  return 'meaning';
+}
+/** The words under a main keyword, in groups: short forms, slang, same meaning, other languages. Empty groups are left out. */
+export function groupKeywords<T extends { variant: string; language?: string; kind?: string | null }>(main: string, items: T[]): { kind: KwKind; label: string; items: T[] }[] {
+  return KW_KINDS.map((kind) => ({ kind, label: KW_LABEL[kind], items: items.filter((x) => kwKind(main, x) === kind) })).filter((g) => g.items.length);
+}
+
 /* ---------- what each keyword is right now ---------- */
 export interface Status { c: string; t: string }
 export function kwStatus(d: Draft, merchant: string, w: string): Status {

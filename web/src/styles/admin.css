@@ -333,3 +333,11 @@ details.fold[open]>summary{margin-bottom:8px}
 .leg s{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:5px;vertical-align:-1px;text-decoration:none}
 .s-kw{background:var(--kw)}.s-tp{background:var(--tp)}.s-an{background:var(--an)}.s-ho{background:var(--ho)}
 @media (max-width:820px){.flowwrap{grid-template-columns:1fr}.flowcanvas{height:520px}}
+
+/* Topics list: a main keyword with its words in groups */
+.kgroups{display:flex;flex-direction:column;gap:8px}
+.kgroup{display:grid;grid-template-columns:118px minmax(0,1fr);gap:4px 10px;align-items:start}
+.klabel{font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);padding-top:5px}
+.chip.mine{outline:1.5px solid var(--accent);outline-offset:-1.5px}
+@media (max-width:640px){.kgroup{grid-template-columns:1fr}}
+.fc .kgrp{margin-bottom:4px}.fc .kgrp .klabel{display:block;padding:0 0 2px;font-size:10px}

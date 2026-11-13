@@ -32,4 +32,13 @@ describe.skipIf(!reachable)('entry type and end date are saved and loaded (needs
     expect(k.find((x) => x.intentKey === a.intent_key)).toMatchObject({ entryType: 'promotion', endsOn: '2030-01-02' });
     expect(k.find((x) => x.intentKey === c.intent_key)?.entryType).toBe('needs_staff');
   });
+
+  it('keeps the kind of a merchant keyword (short form, slang, same meaning) and ignores an unknown one', async () => {
+    const snap = await readSnapshot(pool!);
+    snap.mAliases.MERCH_A = [{ language: 'en', variant: 'dp', canonical: 'deposit', kind: 'short' }, { language: 'en', variant: 'cashin', canonical: 'deposit', kind: 'slang' }, { language: 'en', variant: 'topup', canonical: 'deposit', kind: 'bogus' }, { language: 'en', variant: 'depox', canonical: 'deposit' }];
+    await writeSnapshot(pool!, snap, { merchants: ['MERCH_A'], shared: false });
+    const back = (await readSnapshot(pool!)).mAliases.MERCH_A;
+    expect(back.find((a) => a.variant === 'dp')?.kind).toBe('short'); expect(back.find((a) => a.variant === 'cashin')?.kind).toBe('slang');
+    expect(back.find((a) => a.variant === 'topup')?.kind).toBeUndefined(); expect(back.find((a) => a.variant === 'depox')?.kind).toBeUndefined();
+  });
 });

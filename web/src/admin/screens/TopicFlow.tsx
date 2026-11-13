@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type DragEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
-import { addOwnTopic, findDup, guessLang, slug, topicNames, type Entry } from '../model';
+import { addOwnTopic, findDup, groupKeywords, guessLang, slug, topicNames, type Entry } from '../model';
 import { useAssign } from './assign';
 
 /**
@@ -22,11 +22,14 @@ const COL = { kw: 30, topic: 360, ans: 640, ho: 960 }, W = { kw: 270, topic: 200
 const GAP = 124;                                                             // distance between answer cards
 const TYPE_LABEL: Record<string, string> = { needs_staff: 'Needs staff', promotion: 'Promotion' };
 
-/** About how tall a keywords card is: its chips wrap inside the card width. */
-const kwHeight = (words: string[]) => {
-  let rows = 1, used = 0; for (const w of words) { const c = w.length * 7.6 + 34; if (used + c > W.kw - 24) { rows++; used = 0; } used += c; }
-  return 40 + rows * 34 + 12;
+/** About how tall a keywords card is: a label per group, and the chips of each group wrap inside the card width. */
+const kwHeight = (groups: string[][]) => {
+  let h = 40 + 12;
+  for (const words of groups) { let rows = 1, used = 0; for (const w of words) { const c = w.length * 7.6 + 34; if (used + c > W.kw - 24) { rows++; used = 0; } used += c; } h += 20 + rows * 34; }
+  return Math.max(h, 40 + 34 + 12);
 };
+type KwItem = { variant: string; language: string; kind?: string | null; own: boolean; i: number };
+const SHOW_SHARED = 4;                                                         // shared words shown per group; the rest is "+N shared"
 const previewOf = (e: Entry) => { const t = e.translations as Record<string, { answer_text?: string }>; return (t.en?.answer_text || Object.values(t).find((x) => x?.answer_text)?.answer_text || '').replace(/\s+/g, ' ').trim(); };
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -78,6 +81,12 @@ export default function TopicFlow() {
     const n = pend.length; setPend((l) => [...l, { id: nextId.current++, kind, x: x ?? 40 + n * 20, y: y ?? 30 + n * 70, text: '' }]);
   };
 
+  /** The main keyword's words in groups (short forms, slang, same meaning, other languages); each group shows all of this merchant's words and a few shared ones. */
+  const cardGroups = (t: string) => {
+    const own: KwItem[] = mine.filter(([a]) => a.canonical === t).map(([a, i]) => ({ variant: a.variant, language: a.language, kind: a.kind, own: true, i }));
+    const sh: KwItem[] = Object.entries(d.aliases[t] || {}).flatMap(([l, ws]) => ws.map((w) => ({ variant: w, language: l, own: false, i: -1 })));
+    return groupKeywords(t, [...own, ...sh]).map((g) => { const mineW = g.items.filter((x) => x.own), shW = g.items.filter((x) => !x.own); return { ...g, items: [...mineW, ...shW.slice(0, SHOW_SHARED)], more: Math.max(0, shW.length - SHOW_SHARED), all: shW.map((x) => x.variant) }; });
+  };
   /* ---------- layout: every card has a default place in its lane; a dragged card keeps the place you gave it ---------- */
   const nodes: Node[] = []; const edges: { a: string; b: string; kind: 'kw' | 'ans' | 'ho' }[] = []; const groups = new Map<string, string[]>();
   const lanes: { topic: string; x: number; y: number; w: number; h: number }[] = [];
@@ -85,7 +94,7 @@ export default function TopicFlow() {
   const add = (topic: string, key: string, kind: Kind, x: number, y: number, w: number, h: number) => { const o = pos[key]; nodes.push({ key, kind, topic, x: o?.x ?? x, y: o?.y ?? y, w, h }); groups.set(topic, [...(groups.get(topic) ?? []), key]); };
   topics.forEach((t) => {
     const shared = Object.values(d.aliases[t] || {}).flat(); const own = mine.filter(([a]) => a.canonical === t); const ans = entries.filter((e) => e.topic === t);
-    const kwH = kwHeight([...own.map(([a]) => a.variant + '    '), ...shared.slice(0, 3), shared.length > 3 ? '+99 shared' : '']);
+    const kwH = kwHeight(cardGroups(t).map((g) => [...g.items.map((x) => x.variant + (x.own ? '    ' : '')), g.more ? '+99 shared' : ''].filter(Boolean)));
     const laneH = Math.max(ans.length * GAP, kwH, H.topic) + 60; const cy = cursor + laneH / 2;
     add(t, 'kw:' + t, 'kw', COL.kw, cy - kwH / 2, W.kw, kwH); edges.push({ a: 'kw:' + t, b: 'topic:' + t, kind: 'kw' });
     add(t, 'topic:' + t, 'topic', COL.topic, cy - H.topic / 2, W.topic, H.topic);
@@ -168,11 +177,14 @@ export default function TopicFlow() {
               const t = n.topic;
               if (n.kind === 'topic') return <div key={n.key} className={'fc tp' + (over === t ? ' over' : '')} style={box(n)} data-topic={t} aria-label={'Topic ' + t} onPointerDown={(e) => dragNode(n.key, e)} onDragOver={(e) => { e.preventDefault(); setOver(t); }} onDragLeave={() => setOver(null)} onDrop={html5Drop(t)}>
                 <div className="hd">◆ Topic</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
-              if (n.kind === 'kw') { const shared = Object.values(d.aliases[t] || {}).flat(); const own = mine.filter(([a]) => a.canonical === t);
+              if (n.kind === 'kw') { const groups = cardGroups(t);
                 return <div key={n.key} className="fc kw" style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd"># Keywords</div><div className="bd">
-                  {own.map(([a, i]) => <span key={i} className="kc" onPointerDown={(e) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i }, to))} title="Drag onto a topic to move it">{a.variant}{moveMenu('Move ' + a.variant + ' to topic', t, { t: 'kw', i })}<button type="button" className="x" aria-label={'Remove ' + a.variant} onClick={() => removeKw(i)}>×</button></span>)}
-                  {shared.slice(0, 3).map((w) => <span key={w} className="kc sh" title="Shared by all merchants (an admin edits it in the list view)">{w}</span>)}
-                  {shared.length > 3 && <span className="kc sh" title={shared.join(', ')}>+{shared.length - 3} shared</span>}</div><span className="port r" /></div>; }
+                  {groups.map((g) => <div key={g.kind} className="kgrp"><span className="klabel">{g.label}</span><div>
+                    {g.items.map((x) => x.own
+                      ? <span key={'o' + x.i} className="kc" onPointerDown={(e) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i: x.i }, to))} title="Drag onto a topic to move it">{x.variant}{moveMenu('Move ' + x.variant + ' to topic', t, { t: 'kw', i: x.i })}<button type="button" className="x" aria-label={'Remove ' + x.variant} onClick={() => removeKw(x.i)}>×</button></span>
+                      : <span key={'s' + x.variant} className="kc sh" title="Shared by all merchants (an admin edits it in the list view)">{x.variant}</span>)}
+                    {g.more > 0 && <span className="kc sh" title={g.all.join(', ')}>+{g.more} shared</span>}</div></div>)}
+                  {!groups.length && <span className="sub">No keywords yet</span>}</div><span className="port r" /></div>; }
               if (n.kind === 'ans') { const e = entries.find((x) => x.id === Number(n.key.slice(4))); if (!e) return null; const ty = e.entry_type ?? 'answer'; const ended = !!e.ends_on && e.ends_on < today();
                 return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}</div>
                   <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>

@@ -213,3 +213,7 @@ Each entry has two more optional fields (Knowledge base → Add/Edit entry):
 - **End date:** the entry is used until the end of that day, then hides itself (the bot behaves as if it did not exist). Works for any type, meant for promotions. The list shows "until" / "ended".
 
 Saved through the same draft/publish path as every other entry change. Databases are updated when the server starts.
+
+## Main keyword and the words under it
+
+On the Topics screen the topic name is the **main keyword** (for example `deposit`). The words that point to it are grouped under it: **Short forms** (dep, depo, dp), **Slang**, **Same meaning** (topup, cash in) and **Other languages** (充值, tambah nilai). The panel groups them by itself: another language, or an abbreviation of the main word (the letters appear in order, starting with the same letter), or otherwise same meaning. When you add a keyword you can also choose its kind yourself (Kind: Short form / Slang / Same meaning) for your own merchant's words; the choice is saved and wins over the guess. Shared words (all merchants) are grouped by the guess only. The same groups show in the flowchart's Keywords card. The bot's matching is not affected: every word still means the topic.

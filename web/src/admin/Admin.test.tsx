@@ -233,4 +233,16 @@ describe('Control panel', () => {
     await userEvent.selectOptions(screen.getByLabelText('Type'), 'promotion');
     expect(screen.getByText(/only true for a while/)).toBeTruthy();
   });
+  it('shows the words under a main keyword in groups: short forms, slang, same meaning', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
+    await userEvent.type(await screen.findByPlaceholderText('e.g. depoo'), 'dp{enter}');                         // a short form of deposit
+    expect(await screen.findByText('Short forms')).toBeTruthy();                                            // under the main keyword "deposit", not under a topic called 0
+    expect(screen.queryByText(/own topic/)).toBeNull();
+    expect(screen.getAllByText(/main keyword/).length).toBeGreaterThan(0);
+    await userEvent.selectOptions(screen.getByLabelText('Kind'), 'slang');
+    await userEvent.type(screen.getByPlaceholderText('e.g. depoo'), 'cashin{enter}');
+    await screen.findByText('cashin');
+    expect(screen.getAllByText('Slang').some((e) => e.className === 'klabel')).toBe(true);                     // a Slang group appeared
+  });
 });
