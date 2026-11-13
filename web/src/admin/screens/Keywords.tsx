@@ -59,7 +59,7 @@ export default function Keywords() {
   const byTopic = topics.map((tp) => ({ tp, rows: placed.filter((x) => x.t?.topic === tp) })).filter((x) => x.rows.length);
   const rest = placed.filter((x) => !x.t && (x.r.ignored || x.r.st.t === 'Not set yet')).map((x) => x.r);          // really waiting for a main keyword (or ignored)
   const other = placed.filter((x) => !x.t && !x.r.ignored && x.r.st.t !== 'Not set yet').map((x) => x.r);       // already used for something else: filler, rude word, question word, greeting
-  const KSHADE: Record<KwKind, string> = { short: 's1', slang: 's2', meaning: 's3', lang: 's4' };
+  const KSHADE: Record<KwKind, string> = { short: 'g-short', slang: 'g-slang', meaning: 'g-meaning', lang: 'g-lang' };
   type Row = (typeof list)[number];
   const wordRow = (r: Row, mx: number, tag?: string): ReactNode => <div className="kwrow" key={r.w}>
     <label><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
@@ -79,7 +79,7 @@ export default function Keywords() {
               <div className="kwstack">{groups.map((g) => <i key={g.kind} className={KSHADE[g.kind]} style={{ flex: sum(g) }} title={g.label + ': ' + sum(g)} />)}{main && <i className="s0" style={{ flex: main.r.n }} title={'The word "' + tp + '" itself: ' + main.r.n} />}</div>
               <span className="kwtotal"><b>{total}</b> times heard</span></div>
             <div className="kwcols">{KW_KINDS.map((k) => { const g = groups.find((x) => x.kind === k); const mx = Math.max(1, ...(g?.items.map((x) => x.row.n) ?? [1]));
-              return <div className="kwcol" key={k}><div className="kwcolh"><span>{KW_LABEL[k]}</span><em>{g?.items.length ?? 0}</em></div>
+              return <div className={'kwcol ' + KSHADE[k]} key={k}><div className="kwcolh"><span>{KW_LABEL[k]}</span><em>{g?.items.length ?? 0}</em></div>
                 {g ? g.items.map((x) => wordRow(x.row, mx, k === 'lang' ? (LN[x.row.lg] ?? x.row.lg) : undefined)) : <div className="sub">none heard</div>}</div>; })}</div>
             {main && <div className="sub kwmainw">The main word “{tp}” itself was heard {main.r.n} times.</div>}
           </div>
