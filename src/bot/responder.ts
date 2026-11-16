@@ -93,6 +93,7 @@ export class Bot {
     if (chk.state !== 'valid') {
       res.text = tone.pre[lang] + (ACCT_TOPICS.includes(kind) ? '' : kbAnswer + sp(lang)) + T.NOTVER[lang]; res.agent = true; return res;
     }
+    if (this.api.failed?.(s.merchant, chk.id)) { res.text = T.API_DOWN[lang]; res.agent = true; res.call = `merchant API (customer_id=${chk.id})`; res.json = JSON.stringify({ error: 'the merchant API did not answer' }); return res; }
     const a = this.api.getAccount(s.merchant, chk.id);
     if (ACCT_TOPICS.includes(kind)) {
       res.call = `${TOOLNAME[kind]}(customer_id=${chk.id})`; let body: string;
@@ -131,6 +132,7 @@ export class Bot {
     const c = this.cfg(s), tone = T.TONE[c.tone], chk = this.who(s);
     const res: AccountInfo = { chk, verified: chk.state === 'valid', kind: 'check', agent: true, text: '', rows: [] };
     if (chk.state !== 'valid') { res.text = tone.pre[lang] + T.NOTVER[lang]; return res; }
+    if (this.api.failed?.(s.merchant, chk.id)) { res.text = T.API_DOWN[lang]; res.agent = true; return res; }
     const list = this.api.getAccount(s.merchant, chk.id)?.transactions ?? [];
     res.call = `get_recent_transactions(customer_id=${chk.id})`;
     res.json = JSON.stringify(list.map((x) => ({ ref: x.ref, type: x.type, amount: x.amount, status: x.status })));
@@ -147,9 +149,18 @@ export class Bot {
     return { message: { kind: 'bot' as const, text: T.CHOICE_TXT[lang](T.tlab(topic, lang)) }, buttons: this.buttons(opts, lang) };
   }
 
+  /** Asks the merchant's system for this customer's account ahead of time, when the customer is logged in (the answer is kept for a short while).
+   *  Call it before `pick` too: a tapped button may need the account. A channel that never shows account data (LiveChat) skips it. */
+  async warm(s: Session): Promise<void> {
+    if (s.noPersonal || s.handed || s.closed || !this.api.load) return;
+    const chk = this.who(s); if (chk.state !== 'valid') return;
+    try { await this.api.load(s.merchant, chk.id); } catch { /* the account answer then says it could not be read */ }
+  }
+
   /* ---------- a typed message ---------- */
   async message(s: Session, rawText: string): Promise<Turn | null> {
     const typed = rawText.trim(); if (!typed || s.closed) return null;
+    await this.warm(s);
     // The customer may answer the choices in their own words: "deposit", "depo", "2", "the first one". That is an answer, not a new question.
     if (!s.handed && s.choices?.length) {
       const hit = matchChoice(typed, s.choices);

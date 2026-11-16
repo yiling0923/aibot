@@ -99,6 +99,16 @@ export const REASK_TXT = {
             zh: '抱歉，我们没有完全理解您的消息。请您再详细说明一下，或从下方选项中选择。' },
 };
 
+/** Said when the merchant's system could not be asked (it is down or slow): never "no account found", which would be wrong. */
+export const API_DOWN: Record<Lang, string> = {
+  en: "Sorry, I can't reach your account details right now. Let me connect you to an agent who can check it. 🙏",
+  ms: 'Maaf, saya tidak dapat melihat maklumat akaun anda sekarang. Saya sambungkan anda kepada ejen yang boleh menyemaknya. 🙏',
+  zh: '抱歉，我现在无法查看您的账户信息。我马上为您转接人工客服帮您查询。🙏',
+  vi: 'Xin lỗi, hiện mình chưa xem được thông tin tài khoản của bạn. Mình kết nối bạn với nhân viên để kiểm tra nhé. 🙏',
+  th: 'ขออภัย ตอนนี้ไม่สามารถดูข้อมูลบัญชีของคุณได้ ขอโอนไปยังเจ้าหน้าที่เพื่อตรวจสอบนะคะ 🙏',
+  tl: 'Pasensya na, hindi ko makita ang account details ninyo ngayon. Ikokonekta ko kayo sa agent para ma-check ito. 🙏',
+};
+
 /** Said when a customer asks for the deposit bank account or PayNow QR. These change often, so a person gives them. The amount (if written) is repeated so the agent sees it. */
 export const PAYINFO: Record<Lang, (amt: string) => string> = {
   en: (a) => `I'll bring in a team member now to give you the latest deposit account${a}. Please wait a moment 🙏`,

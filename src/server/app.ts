@@ -26,6 +26,9 @@ import { basicsRoutes } from '../admin/basics';
 import { livechatChatRoutes } from '../admin/livechatChat';
 import { purgeOldChats } from '../db/retention';
 import { merchantPageRoutes } from '../admin/merchantPage';
+import { merchantApiRoutes } from '../admin/merchantApiRoutes';
+import { MerchantApiStore } from '../bot/merchantApiHttp';
+import { fakeMerchantApi } from '../bot/merchantApi';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
 import { COOKIE, clearCookie, makeSession, parseCookies, readSession, sessionCookie, type SessionUser } from '../auth/session';
@@ -74,10 +77,12 @@ export async function buildApp(opts: AppOptions = {}) {
   const store = new Store(pool);
   const sessions = new Map<string, Session & { owner: string }>();
   const drafts = new Map<string, Bot>();      // copies of the bot built from the control panel's unpublished changes
-  const getBot = async (reload = false) => { if (!bot || reload) bot = new Bot(await loadKnowledge(pool), undefined, ai); return bot; };
+  const merchantApis = new MerchantApiStore(pool); const accountApi = merchantApis.live(fakeMerchantApi());   // a merchant with an API connected is read live; others use the sample customers
+  const getBot = async (reload = false) => { if (!bot || reload) bot = new Bot(await loadKnowledge(pool), accountApi, ai); return bot; };
   /** The bot a chat talks to: the published one, or a draft copy when the control panel's Test chat opened it. */
   const botFor = async (s: Session) => (s.draft && drafts.get(s.draft)) || (await getBot());
-  adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai });
+  adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai, api: accountApi });
+  merchantApiRoutes(app, { pool, api: merchantApis, reloadBot: () => getBot(true) });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
   connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs });
   billingRoutes(app, { pool, onPriceChange: () => usage.forgetPrices() });
@@ -201,7 +206,8 @@ export async function buildApp(opts: AppOptions = {}) {
   app.post<{ Body: { sessionId: string; kind: string; key: string; amt?: number; label: string; lang: Lang } }>('/api/chat/pick', async (req, reply) => {
     const body = req.body ?? ({} as never);
     const s = own(req, sessions.get(body.sessionId)); if (!s) return reply.code(404).send({ error: 'unknown session, start a new chat' });
-    return turnJson(s, (await botFor(s)).pick(s, body));
+    const b = await botFor(s); await b.warm(s);                // a tapped button may need the customer's account
+    return turnJson(s, b.pick(s, body));
   });
 
   /** What has been saved automatically from the chats so far. */

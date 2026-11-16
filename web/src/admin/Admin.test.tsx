@@ -293,6 +293,16 @@ describe('Control panel', () => {
     lcLines = [{ from: 'agent', sender: 'operator', text: 'Hello, this is an agent.' }];            // written in LiveChat, not in this page
     expect(await screen.findByText('Hello, this is an agent.', {}, { timeout: 5000 })).toBeTruthy();   // the page looks again by itself
   }, 10000);
+  it('merchant page: connects the merchant API with a try-first button', async () => {
+    open('admin', '/admin/merchants/A');
+    expect(await screen.findByText('Account data')).toBeTruthy();
+    expect(screen.getByText('Sample customers only')).toBeTruthy();
+    expect(screen.getByText(/What the merchant's API must provide/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(true);        // address and key are needed
+    await userEvent.type(screen.getByLabelText(/^API address/), 'https://api.merchant.test/bot');
+    await userEvent.type(screen.getByLabelText(/^API key/), 'secret-key-123');
+    expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

@@ -17,7 +17,7 @@ import { knowledgeFromSnapshot, readMerchants, readSnapshot, writeSnapshot, type
 import { Tenants, tbl } from '../db/tenants';
 import { ensureVersions, readVersion, merchantSig, merchantSlice, recordVersion, sharedSig, sharedSlice, versionState, withMerchantSlice, withSharedSlice, type MerchantSlice, type SharedSlice } from './versions';
 
-export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: Map<string, Bot>; ai: AiService }
+export interface AdminCtx { pool: Pool; reloadBot: () => Promise<Bot>; drafts: Map<string, Bot>; ai: AiService; api?: import('../bot/merchantApi').MerchantApi }
 
 const q = async <T extends RowDataPacket = RowDataPacket>(pool: Pool, sql: string, p: unknown[] = []) => (await pool.query<T[]>(sql, p))[0];
 
@@ -139,7 +139,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const snap = effectiveSnapshot(user, await readSnapshot(pool), req.body.snapshot);
     const known = await loadKnowledge(pool);
     const limits = Object.fromEntries(known.merchants.map((m) => [m.code, m.limits]));
-    const bot = new Bot(knowledgeFromSnapshot(snap, await merchantsFor(pool, user), limits, !!req.body.includeDrafts), undefined, ctx.ai);
+    const bot = new Bot(knowledgeFromSnapshot(snap, await merchantsFor(pool, user), limits, !!req.body.includeDrafts), ctx.api, ctx.ai);
     const id = randomUUID(); ctx.drafts.set(id, bot);
     while (ctx.drafts.size > 20) ctx.drafts.delete(ctx.drafts.keys().next().value!);
     return { draftId: id };

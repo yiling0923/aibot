@@ -255,3 +255,30 @@ Steps you can add: **Message** (the bot says it), **Question** (the customer tap
 - Flows follow the same rules as answers: they are part of the draft, are listed in the Publish window (a live flow that is not finished is flagged there), keep a version history per merchant and can be rolled back. Staff can draw flows for their own merchant.
 - A customer who writes rude words, asks for a person, or writes an account number leaves the flow and is handled as usual. A question that is not understood twice in a row hands over to a person. A flow that loops by mistake stops after 40 steps.
 - Where it lives: table `flows` in each merchant's database (`db/merchant/010_flows.sql`), the runner is `src/engine/flow.ts`, the bot hooks are in `src/bot/responder.ts`.
+
+## Merchant API (a customer's balance, points, deposits and withdrawals)
+
+When a **logged-in** customer asks "check my balance", "where is my deposit" and similar, the bot reads the account from the merchant's own system. Connect it on the merchant page, **Account data** card (admin only): the API address, the API key, and a customer id to try. **Try it** shows what the API sent without saving anything; **Connect** saves it (the key is stored encrypted, only its last 4 characters are shown again). A merchant with nothing connected uses the built-in sample customers (`data/fake_accounts.json`), which is only for the demo.
+
+**What the merchant's API must provide.** One read-only call:
+
+```
+GET {address}/customers/{customer id}/account
+Authorization: Bearer {key}
+```
+
+- `200` with JSON, `404` when there is no such customer. Any other answer, no answer within 4 seconds, or something that is not JSON counts as "could not ask": the bot then says it cannot look right now and offers a person, it never says "no account found".
+- The customer id is the one the website signs into the chat token (`customer_id`). The bot never takes it from what the customer types.
+- The JSON (a wrapper `{"account": {...}}` or `{"data": {...}}` is accepted). Every field is optional, unknown fields are ignored:
+
+```json
+{ "name": "Tom Lee", "balance": 1250.50, "points": 320, "level": "Gold",
+  "deposits":     [{ "ref": "D-20931", "amount": 100, "status": "pending",   "created_at": "2026-11-16T14:02:00+08:00" }],
+  "withdrawals":  [{ "ref": "W-5512",  "amount": 200, "status": "processing", "created_at": "2026-11-16T09:30:00+08:00" }],
+  "transactions": [{ "ref": "T-1", "type": "deposit", "amount": 100, "status": "completed", "created_at": "2026-11-15T21:15:00+08:00" }] }
+```
+
+  Statuses are understood in many spellings (`pending`, `processing`, `success`/`completed`/`paid`, `failed`/`rejected`/`cancelled` ...). A number is shown with the merchant's money sign (see Merchant settings). A row without a reference or amount is skipped. At most 20 rows of each list are read.
+- It is used for logged-in customers on the website chat and the panel's chat page. It is **not** used in LiveChat replies, where the bot never shows account data (LiveChat keeps replies by the words of the question, for every customer).
+- The answer is kept for 30 seconds per customer, so a busy chat does not call the merchant for every message. A failed call is tried again at once.
+- The code: `src/bot/merchantApi.ts` (the call and the reading), `src/bot/merchantApiHttp.ts` (saved settings and the live API), `src/admin/merchantApiRoutes.ts` (the panel's routes), table `merchant_api` (`db/migrations/018_merchant_api.sql`). If a merchant's real API looks different, only `parseAccount` and the URL in `fetchAccount` need to change.
