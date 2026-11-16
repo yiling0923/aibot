@@ -7,6 +7,7 @@ import type { MerchantAiKeys } from './merchantKeys';
 import type { AiService, DescribeInput, PickInput, TranslateInput, WriteInput } from './types';
 
 export * from './types';
+import type { MerchantLimits } from './limits';
 export { checkReply, checkTranslation } from './validator';
 
 export interface AiOptions {
@@ -60,7 +61,7 @@ export function createAi(o: AiOptions): AiService {
 
 /** The AI service with each merchant's own keys: a merchant that saved a Claude or ChatGPT key uses it, the others use the shared key from .env.
  *  Callers say which merchant a call is for (the `merchant` field). Nothing changes for a merchant without its own key. */
-export function createRoutedAi(base: AiOptions, keys: MerchantAiKeys): AiService {
+export function createRoutedAi(base: AiOptions, keys: MerchantAiKeys, gate?: MerchantLimits): AiService {
   const tag = (own: (p: UsageEvent['provider']) => boolean) => (e: UsageEvent) => base.onUsage?.({ ...e, own: own(e.provider) });
   const shared = createAi({ ...base, onUsage: tag(() => false) });
   const built = new Map<string, { sig: string; svc: AiService }>();
@@ -79,9 +80,10 @@ export function createRoutedAi(base: AiOptions, keys: MerchantAiKeys): AiService
     get canWrite() { return shared.canWrite || (keys.anyHas.openai && !!base.openaiModel); },
     get canDescribe() { return shared.canDescribe || keys.anyHas.anthropic; },
     get canTranslate() { return shared.canTranslate || keys.anyHas.anthropic; },
-    pickEntry: async (i: PickInput) => (await forMerchant(i.merchant)).pickEntry(i),
-    writeReply: async (i: WriteInput) => (await forMerchant(i.merchant)).writeReply(i),
-    describeWord: async (i: DescribeInput) => (await forMerchant(i.merchant)).describeWord(i),
-    translate: async (i: TranslateInput) => (await forMerchant(i.merchant)).translate(i),
+    // a merchant over its monthly token limit gets no AI help (the bot goes on from the knowledge base); the style rules are added to the wording jobs
+    pickEntry: async (i: PickInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).pickEntry(i)),
+    writeReply: async (i: WriteInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).writeReply({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) })),
+    describeWord: async (i: DescribeInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).describeWord({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) })),
+    translate: async (i: TranslateInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).translate({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) })),
   };
 }

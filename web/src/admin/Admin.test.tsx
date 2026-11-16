@@ -5,12 +5,14 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
 
+const SET = () => ({ tone: 'friendly', handoff_group: 1, answer: 0.72, clarify: 0.45, abuse_close_after: 3, kind: {}, closing: {}, handoff: {}, tools: { deposit_status: true }, max_choices: 3, more_help_on: true, more_help: {}, ai_instructions: '' });
+const BASICS = { name: 'LuckyPay', domain: '', defaultLanguage: 'en', languages: ['en', 'ms', 'zh', 'vi', 'th', 'tl'], monthlyTokenLimit: 500000, tokensMonth: 12400, tokensToday: 300, entries: 11, questionsToday: 7, avgConfidence: 0.81 };
 const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay' }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
   snapshot: {
     kb: [], aliases: { deposit: { en: ['deposit', 'dep'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
-    settings: {},
+    settings: { A: SET(), B: SET() },
   },
 });
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
@@ -26,6 +28,7 @@ const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
@@ -256,5 +259,25 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByText('List'));
     expect(screen.queryByText('◆ deposit')).toBeNull();                                          // the plain table is back
     expect(screen.getByText('xyzzy')).toBeTruthy();
+  });
+  it('shows the stat tiles, the basics and the bot instructions with presets on Merchant settings, and locks the basics for staff', async () => {
+    const { unmount } = open('admin', '/admin/set');
+    expect(await screen.findByText('Questions today')).toBeTruthy();
+    expect(screen.getByText('81%')).toBeTruthy();                                                   // average confidence
+    expect((await screen.findByLabelText(/^Monthly AI token limit/) as HTMLInputElement).value).toBe('500000');
+    expect(screen.getByText(/Used this month: 12,400/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'English' }) as HTMLButtonElement).disabled).toBe(true);   // the main language stays on
+    const box = screen.getByLabelText('Bot instructions') as HTMLTextAreaElement;
+    await userEvent.click(screen.getByRole('button', { name: /Formal tone/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Max 2 sentences/ }));
+    await userEvent.click(screen.getByRole('button', { name: /Formal tone/ }));                       // the same preset is not added twice
+    expect(box.value).toBe('- Always use formal, professional language.\n- Keep every translation or reworded reply to 2 sentences at most.');
+    expect(screen.getByText('110 / 5000')).toBeTruthy();
+    unmount();
+    open('staff', '/admin/set');
+    expect(await screen.findByText('Only an admin can change these')).toBeTruthy();
+    expect((await screen.findByLabelText(/^Monthly AI token limit/) as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Bot instructions') as HTMLTextAreaElement).disabled).toBe(false);   // staff may write the style rules
   });
 });

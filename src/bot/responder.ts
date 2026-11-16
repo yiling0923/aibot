@@ -189,6 +189,7 @@ export class Bot {
     if (s.pending) { const alone = this.engine.analyze(text, s.merchant, s.clarifyCount); if (['CHOICE', 'CLARIFY', 'HANDOFF'].includes(alone.decision)) query = s.pending + ' ' + text; }
     s.pending = null;
     let r = this.engine.analyze(query, s.merchant, s.clarifyCount, { lastTopic: s.lastTopic }); r.raw = text;
+    { const cfgL = this.cfg(s); if (cfgL.languages?.length && !cfgL.languages.includes(r.lang)) r.lang = cfgL.defaultLanguage; }      // a language switched off for this merchant: reply in its main language
     // A second chance for a message no keyword matched: Claude may know which entry it is about. Its pick is checked
     // against the real entry list, and a low confidence is ignored, so the bot then asks again or hands off as before.
     let aiInfo: Record<string, unknown> | null = null;

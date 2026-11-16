@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { zodOutputFormat } from '@anthropic-ai/sdk/helpers/zod';
 import { z } from 'zod';
-import { WORD_TYPES, type DescribeInput, type Pick, type PickInput, type TranslateInput, type Translation, type WordNote } from './types';
+import { WORD_TYPES, styleBlock, type DescribeInput, type Pick, type PickInput, type TranslateInput, type Translation, type WordNote } from './types';
 
 const PickSchema = z.object({ intent_key: z.string().nullable(), confidence: z.number() });
 const TranslationSchema = z.object({ answer: z.string(), examples: z.array(z.string()) });
@@ -51,7 +51,7 @@ export async function claudePick(client: Anthropic, model: string, input: PickIn
 export async function claudeDescribe(client: Anthropic, model: string, input: DescribeInput, used?: UsageHook): Promise<WordNote | null> {
   const res = await client.messages.parse({
     model, max_tokens: 1024, system: DESCRIBE_SYSTEM,
-    messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTopics the bot knows: ${input.topics.join(', ')}\nWord: <word>${input.word}</word>\nSample message: <sample>${input.sample}</sample>` }],
+    messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTopics the bot knows: ${input.topics.join(', ')}\nWord: <word>${input.word}</word>\nSample message: <sample>${input.sample}</sample>${styleBlock(input.style)}` }],
     output_config: { effort: 'low', format: zodOutputFormat(NoteSchema) },
   });
   used?.(res.usage?.input_tokens ?? 0, res.usage?.output_tokens ?? 0);
@@ -73,7 +73,7 @@ Return the same number of examples, in the same order. If the list is empty retu
 export async function claudeTranslate(client: Anthropic, model: string, input: TranslateInput, used?: UsageHook): Promise<Translation | null> {
   const res = await client.messages.parse({
     model, max_tokens: 2048, system: TRANSLATE_SYSTEM,
-    messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTranslate from ${LANG_NAME[input.from]} into ${LANG_NAME[input.to]}.\n<answer>${input.answer}</answer>\n<examples>${JSON.stringify(input.examples)}</examples>` }],
+    messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTranslate from ${LANG_NAME[input.from]} into ${LANG_NAME[input.to]}.\n<answer>${input.answer}</answer>\n<examples>${JSON.stringify(input.examples)}</examples>${styleBlock(input.style)}` }],
     output_config: { effort: 'low', format: zodOutputFormat(TranslationSchema) },
   });
   used?.(res.usage?.input_tokens ?? 0, res.usage?.output_tokens ?? 0);

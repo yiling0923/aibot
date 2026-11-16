@@ -32,6 +32,10 @@ export interface MerchantCfg {
   abuseCloseAfter: number; answerThreshold: number; clarifyThreshold: number; kindReply: Partial<Record<Lang, string>>;
   aliases: { language: string; variant: string; canonical: string; kind?: string | null }[];   // merchant-only keywords (kind: short | slang | meaning, only for the panel)
   tools: string[];                                                      // enabled account tools
+  /** The languages the bot answers in (empty or missing: all). A customer writing in another language gets the main language. */
+  languages?: Lang[];
+  /** Style rules for the AI (wording and tone only). */
+  aiInstructions?: string;
   limits: Partial<Record<'deposit' | 'withdraw', [number, number]>>;
 }
 

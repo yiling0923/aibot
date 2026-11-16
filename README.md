@@ -221,3 +221,10 @@ On the Topics screen the topic name is the **main keyword** (for example `deposi
 ## Merchants & logins, and the merchant page
 
 **Merchants & logins** lists each merchant with its tone, number of answers, staff login and a **LiveChat link** tag: *Connected · used 2h ago* when the merchant has an active bot key (and when LiveChat last used it), or *No bot key yet*. Logins show their role as a tag and have the buttons *Change password* and *Delete*. The **merchant page** is four numbered steps, each with a status tag and a tick when done: 1 LiveChat connection (bot address and key), 2 Test the link, 3 Handoff number (synced with LiveChat), 4 AI keys.
+
+## Merchant settings: basics, token limit, languages, bot instructions
+
+At the top of **Merchant settings** each merchant has four tiles (answers, questions today, AI tokens today, average confidence of today's answers), then:
+
+- **Basics** (admin only, saved at once with *Save basics*): the merchant's **name**, an optional **domain**, a **monthly AI token limit** and the **languages the bot answers in**. When the monthly limit is used up (counted from the usage table, from the 1st of the month) the bot keeps answering from the knowledge base; only the AI help (choosing an answer, describing new words, translating, rewording) stops until next month. A customer writing in a language that is switched off still gets understood, and the reply is in the merchant's main language, which always stays on.
+- **Bot instructions (style rules)**, up to 5000 characters, with quick presets (formal tone, "Dear Member", 2 sentences...). Staff may write them for their own merchant; they go to the draft like the other settings. They are added to the prompt of the wording jobs: **translating answers, describing new words and rewording a reply**. They only shape wording and tone and the prompt tells the AI never to add facts or change numbers. Choosing an answer from the short list does not use them. A fixed reply such as "if the customer asks about promotions, always say..." belongs in the Knowledge base as an answer, because the bot answers word for word from there and never invents replies.

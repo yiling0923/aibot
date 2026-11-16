@@ -1,6 +1,7 @@
 import type { RowDataPacket } from 'mysql2/promise';
 import { asJson, type Pool } from './pool';
 import { Tenants, tbl } from './tenants';
+import { LANGS } from '../engine/types';
 import type { Knowledge, KbEntry, MerchantCfg, WordMap, Lang } from '../engine/types';
 
 const group = (rows: RowDataPacket[]): WordMap => {
@@ -10,6 +11,9 @@ const group = (rows: RowDataPacket[]): WordMap => {
 };
 
 /** Reads the live knowledge of ALL merchants into the engine's data shape: each merchant from its own database, the shared word lists from the main one. */
+/** 'en,zh' → ['en','zh']; empty or unknown → undefined (all languages). */
+export const parseLangs = (v: unknown): Lang[] | undefined => { const l = String(v ?? '').split(',').map((x) => x.trim()).filter((x): x is Lang => (LANGS as readonly string[]).includes(x)); return l.length ? l : undefined; };
+
 export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
   const q = async (sql: string) => (await pool.query<RowDataPacket[]>(sql))[0];
   const tenants = await new Tenants(pool).list();
@@ -19,7 +23,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
     q('SELECT kind AS k, language, phrase AS w FROM shared_smalltalk ORDER BY id'),
     q('SELECT kind AS k, language, phrase AS w FROM shared_guard ORDER BY id'),
     q('SELECT language, word FROM filler_words ORDER BY id'),
-    q("SELECT code, name, default_language, livechat_group_id, handoff_group_id FROM merchants WHERE status = 'active' ORDER BY id"),
+    q("SELECT code, name, default_language, livechat_group_id, handoff_group_id, languages FROM merchants WHERE status = 'active' ORDER BY id"),
   ]);
   const meta = new Map(merchantRows.map((m) => [m.code as string, m]));
 
@@ -38,7 +42,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
     const cfg: MerchantCfg = {
       code: t.code, name: m.name, tone: s.tone, defaultLanguage: m.default_language, livechatGroupId: m.livechat_group_id, handoffGroupId: m.handoff_group_id,
       closing: asJson(s.closing_msg, {}), handoff: asJson(s.handoff_msg, {}), maxChoices: Math.max(1, Math.min(3, Number(s.max_choices ?? 3))), moreHelpOn: !!(s.more_help_on ?? 1), moreHelp: asJson(s.more_help_msg, {}), abuseCloseAfter: s.abuse_close_after, answerThreshold: Number(s.answer_threshold), clarifyThreshold: Number(s.clarify_threshold),
-      kindReply: asJson(s.kind_reply, {}), aliases: own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical })), tools: tools.map((x) => x.tool), limits: {},
+      kindReply: asJson(s.kind_reply, {}), ...(String(s.ai_instructions ?? '').trim() ? { aiInstructions: String(s.ai_instructions) } : {}), ...(parseLangs(m.languages) ? { languages: parseLangs(m.languages) } : {}), aliases: own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical })), tools: tools.map((x) => x.tool), limits: {},
     };
     for (const l of limits) cfg.limits[l.kind as 'deposit' | 'withdraw'] = [l.lo, l.hi];
     cfgs.push(cfg);

@@ -419,3 +419,9 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .mrow{display:flex;gap:8px;align-items:center}
 .keyline{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
 @media (max-width:760px){.mstats{grid-template-columns:1fr 1fr}.mstep{grid-template-columns:34px 1fr}.mstep>.pill{grid-column:2;justify-self:start}}
+
+/* Merchant settings: tiles, basics, instructions presets */
+.mtiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.mtile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px}.mtile small{display:block;color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}.mtile b{font-size:24px}
+.presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.preset{border:0;background:var(--surface2);border-radius:99px;padding:4px 12px;font-weight:600;font-size:12.5px;cursor:pointer;color:inherit}.preset:hover{background:color-mix(in srgb,var(--accent) 14%,var(--surface2))}
+@media (max-width:760px){.mtiles{grid-template-columns:1fr 1fr}}

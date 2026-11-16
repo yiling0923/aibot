@@ -76,7 +76,7 @@ function Editor({ ed, setEd, onClose, onSaved }: { ed: Ed; setEd: (e: Ed) => voi
       const cur = trOf({ ...ed, translations: next as Entry['translations'] }, l);
       if (cur.answer_text.trim() && !confirm(`Replace the current ${LN[l]} answer with a new translation?`)) continue;
       try {
-        const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: l, answer: en.answer_text, examples: en.question_examples });
+        const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: l, answer: en.answer_text, examples: en.question_examples, style: p.draft.settings[p.merchant]?.ai_instructions ?? '' });
         const have = new Set(cur.question_examples.map((x) => x.toLowerCase()));
         next = { ...next, [l]: { answer_text: r.answer, question_examples: [...cur.question_examples, ...r.examples.filter((x) => !have.has(x.toLowerCase()))] } };
         done.push(LN[l]);

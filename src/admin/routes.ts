@@ -166,7 +166,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
 
   /** Translates an entry's answer (and its example questions) into another language, as a draft for a person to check.
    *  The numbers, links and menu paths of the answer must come back unchanged, otherwise the translation is refused. */
-  app.post<{ Body: { merchant: string; from?: string; to: string; answer: string; examples?: string[] } }>(`${A}/translate`, async (req, reply) => {
+  app.post<{ Body: { merchant: string; from?: string; to: string; answer: string; examples?: string[]; style?: string } }>(`${A}/translate`, async (req, reply) => {
     const b = req.body ?? ({} as never);
     if (!mayUse(req, b.merchant)) return forbidden(reply);
     const langs = ['en', 'ms', 'zh', 'vi', 'th', 'tl'] as const; type L = (typeof langs)[number];
@@ -177,7 +177,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     if (!ctx.ai.canTranslate) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });
     const examples = (Array.isArray(b.examples) ? b.examples : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20);
     const name = (await tenants.get(b.merchant))?.name ?? b.merchant;
-    const t = await ctx.ai.translate({ merchant: b.merchant, merchantName: name, from, to, answer: answer.slice(0, 4000), examples });
+    const t = await ctx.ai.translate({ merchant: b.merchant, style: typeof b.style === 'string' ? b.style.slice(0, 5000) : undefined, merchantName: name, from, to, answer: answer.slice(0, 4000), examples });
     if (!t) return reply.code(502).send({ error: 'The translation could not be made. Try again in a moment.' });
     const check = checkTranslation(t.answer, answer);
     if (!check.ok) return reply.code(422).send({ error: `The translation was refused because ${check.reason}. Try again, or write it yourself.` });

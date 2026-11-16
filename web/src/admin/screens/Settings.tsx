@@ -1,9 +1,19 @@
-import { useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { LANGS, LN, clone } from '../model';
+import { LANGS, LANG_NAMES, LN, clone } from '../model';
 
 const TN: Record<string, string> = { deposit_status: 'Deposit status', withdraw_status: 'Withdrawal status', balance: 'Balance', transactions: 'Recent transactions', points: 'Points and level' };
 const FN: Record<string, string> = { deposit_status: 'get_recent_deposits', withdraw_status: 'get_recent_withdrawals', balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
+
+interface Basics { name: string; domain: string; defaultLanguage: string; languages: string[]; monthlyTokenLimit: number | null; tokensMonth: number; tokensToday: number; entries: number; questionsToday: number; avgConfidence: number | null }
+const PRESETS: [string, string][] = [
+  ['Formal tone', 'Always use formal, professional language.'], ['Warm and friendly', 'Use a warm, friendly and casual tone.'],
+  ['Address as “Dear Member”', 'Address the customer as "Dear Member".'], ['Max 2 sentences', 'Keep every translation or reworded reply to 2 sentences at most.'],
+  ['Simple everyday words', 'Use simple everyday words, avoid jargon.'], ['Never use emoji', 'Never use emoji.'],
+];
+const MAX_INSTRUCTIONS = 5000;
+const LNAME: Record<string, string> = Object.fromEntries(LANG_NAMES);
 
 export default function Settings() {
   const p = usePanel();
@@ -14,11 +24,24 @@ function Form() {
   const p = usePanel(); const lock = !p.isAdmin;
   const [s, setS] = useState(() => clone(p.draft.settings[p.merchant]));
   const [lang, setLang] = useState('en');
+  const [b, setB] = useState<Basics | null>(null); const [f, setF] = useState({ name: '', domain: '', limit: '', languages: new Set<string>() }); const [busy, setBusy] = useState(false);
+  const loadBasics = useCallback(async () => {
+    try { const x = await api<Basics>(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`); setB(x); setF({ name: x.name, domain: x.domain, limit: x.monthlyTokenLimit === null ? '' : String(x.monthlyTokenLimit), languages: new Set(x.languages) }); } catch { setB(null); }
+  }, [p.merchant]);
+  useEffect(() => { void loadBasics(); }, [loadBasics]);
+  const saveBasics = async () => {
+    setBusy(true);
+    try {
+      await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), languages: [...f.languages] });
+      await loadBasics(); await p.reloadAll(); p.toast('Basics saved');
+    } catch (e) { p.toast((e as Error).message); } finally { setBusy(false); }
+  };
+  const addPreset = (line: string) => { const cur = s.ai_instructions ?? ''; if (cur.includes(line)) return; const next = (cur.trim() ? cur.replace(/\s+$/, '') + '\n' : '') + '- ' + line; if (next.length <= MAX_INSTRUCTIONS) up({ ai_instructions: next }); };
   const up = (patch: Partial<typeof s>) => setS({ ...s, ...patch });
   const msg = (k: 'kind' | 'closing' | 'handoff' | 'more_help', v: string) => up({ [k]: { ...s[k], [lang]: v } });
   const save = () => {
     p.edit((d, note) => {
-      const t = d.settings[p.merchant]; t.tone = s.tone; t.kind = s.kind; t.closing = s.closing; t.handoff = s.handoff; t.more_help = s.more_help; t.more_help_on = s.more_help_on;
+      const t = d.settings[p.merchant]; t.ai_instructions = (s.ai_instructions ?? '').slice(0, MAX_INSTRUCTIONS); t.tone = s.tone; t.kind = s.kind; t.closing = s.closing; t.handoff = s.handoff; t.more_help = s.more_help; t.more_help_on = s.more_help_on;
       if (p.isAdmin) { t.handoff_group = s.handoff_group; t.answer = s.answer; t.clarify = s.clarify; t.tools = s.tools; t.abuse_close_after = Math.max(0, Math.min(10, +s.abuse_close_after || 0)); t.max_choices = Math.max(1, Math.min(3, Math.round(+s.max_choices || 3))); }
       note('Changed settings for ' + p.M.name);
     });
@@ -26,7 +49,27 @@ function Form() {
   };
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Merchant settings · {p.M.name}</h2><div className="sub">How the bot behaves for this merchant.</div></div><button className="btn pri" type="button" onClick={save}>Save to draft</button></div>
+      <div className="head"><div><h2 style={{ margin: 0 }}>Merchant settings · {p.M.name}</h2><div className="sub">How the bot behaves for this merchant. The instructions and replies go to the draft, then Publish. The basics are saved at once.</div></div><button className="btn pri" type="button" onClick={save}>Save to draft</button></div>
+      {b && <div className="mtiles"><div className="mtile"><small>Answers (knowledge base)</small><b>{b.entries}</b></div><div className="mtile"><small>Questions today</small><b>{b.questionsToday}</b></div>
+        <div className="mtile"><small>AI tokens today</small><b>{b.tokensToday.toLocaleString()}</b></div><div className="mtile"><small>Average confidence</small><b>{b.avgConfidence === null ? '—' : Math.round(b.avgConfidence * 100) + '%'}</b></div></div>}
+      {b && <div className="card"><div className="head"><h3 style={{ margin: 0 }}>Basics</h3>{lock ? <span className="lock">Only an admin can change these</span> : <button className="btn" type="button" disabled={busy} onClick={saveBasics}>{busy ? 'Saving…' : 'Save basics'}</button>}</div>
+        <div className="form" style={{ marginTop: 10 }}>
+          <label className="fld"><span>Name</span><input value={f.name} disabled={lock} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
+          <label className="fld"><span>Domain (optional)</span><input value={f.domain} placeholder="merchant-domain.com" disabled={lock} onChange={(e) => setF({ ...f, domain: e.target.value })} /></label>
+          <div><label className="fld"><span>Monthly AI token limit (empty = unlimited)</span><input type="number" min={0} value={f.limit} placeholder="e.g. 500000" disabled={lock} onChange={(e) => setF({ ...f, limit: e.target.value })} /></label>
+            <div className="sub" style={{ marginTop: 4 }}>Used this month: {b.tokensMonth.toLocaleString()}. When the limit is reached the bot keeps answering from the knowledge base; only the AI help stops until next month.</div></div>
+          <div className="full"><div className="fld"><span>Languages the bot answers in</span></div>
+            <div className="segs" role="group" aria-label="Languages">{LANGS.map((l) => <button key={l} type="button" aria-pressed={f.languages.has(l)} disabled={lock || l === b.defaultLanguage} title={l === b.defaultLanguage ? 'The main language stays on' : ''}
+              onClick={() => setF((x) => { const n = new Set(x.languages); if (n.has(l)) n.delete(l); else n.add(l); return { ...x, languages: n }; })}>{LNAME[l] ?? l}</button>)}</div>
+            <div className="sub" style={{ marginTop: 4 }}>A customer writing in a language that is switched off gets this merchant's main language ({LNAME[b.defaultLanguage] ?? b.defaultLanguage}).</div></div>
+        </div></div>}
+      <div className="card"><h3 style={{ margin: 0 }}>Bot instructions (style rules)</h3>
+        <div className="sub" style={{ margin: '2px 0 10px' }}>Added to the rules the AI follows when it helps: describing new words, translating answers and rewording a reply. It only shapes wording and tone and never writes new facts. A fixed reply such as “if the customer asks about promotions, always say…” belongs in the Knowledge base as an answer.</div>
+        <textarea rows={6} maxLength={MAX_INSTRUCTIONS} aria-label="Bot instructions" placeholder={'- Always use formal, professional language.\n- Address the customer as "Dear Member".'} value={s.ai_instructions ?? ''} onChange={(e) => up({ ai_instructions: e.target.value })} />
+        <div style={{ display: 'flex', justifyContent: 'space-between' }} className="sub"><span>Added to the AI rules for this merchant. Max {MAX_INSTRUCTIONS} characters.</span><span>{(s.ai_instructions ?? '').length} / {MAX_INSTRUCTIONS}</span></div>
+        <div className="fld" style={{ marginTop: 10 }}><span>Quick presets, click to add</span></div>
+        <div className="presets">{PRESETS.map(([label, line]) => <button key={label} type="button" className="preset" onClick={() => addPreset(line)}>＋ {label}</button>)}</div></div>
+      <div className="card"><h3 style={{ margin: 0 }}>Replies and matching</h3>
         <div className="form" style={{ marginTop: 12 }}>
           <label className="fld"><span>Tone of replies</span><select value={s.tone} onChange={(e) => up({ tone: e.target.value as 'friendly' | 'formal' })}><option value="friendly">Friendly</option><option value="formal">Formal</option></select></label>
           <label className="fld"><span>Human group for handoff {lock ? '(admin only)' : ''}</span><input type="number" value={s.handoff_group ?? ''} disabled={lock} onChange={(e) => up({ handoff_group: e.target.value === '' ? null : +e.target.value })} /></label>
