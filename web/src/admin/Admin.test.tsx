@@ -195,23 +195,19 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
     expect(await screen.findByText('All merchants (template)')).toBeTruthy();
   });
-  it('shows every shared keyword on the card when asked, and adds a keyword right on the card', async () => {
+  it('shows every shared keyword inside the card, finds one, and adds a keyword right on the card', async () => {
     open('staff', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
-    const card = (await screen.findByLabelText('Topic deposit')).closest('.fc')!.parentElement!;
-    expect(screen.queryByText('dps')).toBeNull();                                              // only 3 shared words show at first
-    await userEvent.click(await screen.findByRole('button', { name: /\+2 shared/ }));
-    expect(screen.getByText('dps')).toBeTruthy(); expect(screen.getByText('depo')).toBeTruthy();
+    expect(await screen.findByLabelText('Topic deposit')).toBeTruthy();
+    expect(screen.getByText('dps')).toBeTruthy(); expect(screen.getByText('depo')).toBeTruthy();   // all of them are in the card (it scrolls)
     expect(screen.queryByLabelText('Remove shared dps')).toBeNull();                           // staff cannot remove shared words
     await userEvent.type(screen.getByLabelText('Add a keyword to deposit'), 'topupz{enter}');
     expect(await screen.findByLabelText('Remove topupz')).toBeTruthy();
-    expect(card).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
-    await userEvent.click(await screen.findByRole('button', { name: /\+2 shared/ }));
-    await userEvent.click(screen.getByLabelText('Remove shared dps'));
+    await userEvent.click(await screen.findByLabelText('Remove shared dps'));
     expect(screen.queryByText('dps')).toBeNull();
   });
   it('shows a flowchart canvas with blocks, adds a topic and a keyword from the block palette, and moves the keyword with the menu; the list shows the same', async () => {

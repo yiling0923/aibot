@@ -12,13 +12,14 @@ import { useAssign } from './assign';
  * - Drag Topic or Keyword from the palette onto the grid (or click it) to add one.
  * - Every keyword and answer also has a "⇄" menu to move it, for keyboard and touch.
  */
-type Src = { t: 'kw'; i: number } | { t: 'entry'; id: number } | { t: 'word'; w: string };
+type Src = { t: 'kw'; i: number } | { t: 'sh'; topic: string; l: string; w: string } | { t: 'entry'; id: number } | { t: 'word'; w: string };
 type Pending = { id: number; kind: 'topic' | 'keyword'; x: number; y: number; text: string };
 type Pos = Record<string, { x: number; y: number }>;
 type Kind = 'kw' | 'topic' | 'ans' | 'ho';
 type Node = { key: string; kind: Kind; topic: string; x: number; y: number; w: number; h: number };
 const MIME = 'application/x-aibot-flow';
 const COL = { kw: 30, topic: 360, ans: 640, ho: 960 }, W = { kw: 270, topic: 200, ans: 270, ho: 170 }, H = { topic: 100, ans: 116, ho: 88 };
+const KWSCROLL = 200;                                                         // the most height the keywords inside a card take before they scroll
 const GAP = 124;                                                             // distance between answer cards
 const TYPE_LABEL: Record<string, string> = { needs_staff: 'Needs staff', promotion: 'Promotion' };
 
@@ -40,8 +41,7 @@ export default function TopicFlow() {
   const persist = (n: Pos) => { try { localStorage.setItem(storeKey, JSON.stringify(n)); } catch { /* ignore */ } };
   const [pend, setPend] = useState<Pending[]>([]); const nextId = useRef(1);
   const [over, setOver] = useState<string | null>(null);
-  const [open, setOpen] = useState<Set<string>>(new Set());                    // topics whose keywords card shows every shared word
-  const toggleOpen = (t: string) => setOpen((o) => { const n = new Set(o); if (n.has(t)) n.delete(t); else n.add(t); return n; });
+  const [kwq, setKwq] = useState<Record<string, string>>({});                // the filter typed on each keywords card
   const [scale, setScale] = useState(1);
   const [link, setLink] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
 
@@ -55,6 +55,10 @@ export default function TopicFlow() {
     if (what.t === 'kw') {
       const a = (d.mAliases[p.merchant] || [])[what.i]; if (!a || a.canonical === topic) return;
       p.edit((x, note) => { const m = x.mAliases[p.merchant][what.i]; note('Moved keyword "' + m.variant + '" from ' + m.canonical + ' to ' + topic); m.canonical = topic; });
+    } else if (what.t === 'sh') {
+      if (what.topic === topic) return;
+      if (!d.aliases[topic]) return p.toast('"' + topic + '" is a topic of this merchant only, so a shared word cannot go there.');
+      p.edit((x, note) => { const a = x.aliases[what.topic]?.[what.l]; const i = a ? a.indexOf(what.w) : -1; if (i < 0) return; a.splice(i, 1); (x.aliases[topic][what.l] = x.aliases[topic][what.l] || []).push(what.w); note('Moved shared word "' + what.w + '" from ' + what.topic + ' to ' + topic + ' (all merchants)'); });
     } else if (what.t === 'entry') {
       const e = d.kb.find((k) => k.id === what.id && k.merchant === p.merchant); if (!e || e.topic === topic) return;
       p.edit((x, note) => { const k = x.kb.find((z) => z.id === what.id && z.merchant === p.merchant) as Entry; note('Moved answer "' + k.intent_key + '" from ' + k.topic + ' to ' + topic); k.topic = topic; k.dirty = true; });
@@ -95,8 +99,8 @@ export default function TopicFlow() {
   const add = (topic: string, key: string, kind: Kind, x: number, y: number, w: number, h: number) => { const o = pos[key]; nodes.push({ key, kind, topic, x: o?.x ?? x, y: o?.y ?? y, w, h }); groups.set(topic, [...(groups.get(topic) ?? []), key]); };
   topics.forEach((t) => {
     const shared = Object.values(d.aliases[t] || {}).flat(); const own = mine.filter(([a]) => a.canonical === t); const ans = entries.filter((e) => e.topic === t);
-    const isOpen = open.has(t);
-    const kwH = kwHeight([...own.map(([a]) => a.variant + '    '), ...(isOpen ? shared.map((w) => w + (p.isAdmin ? '    ' : '')) : shared.slice(0, 3)), shared.length > 3 ? '+99 shared' : '']) + (isOpen ? 44 : 0);
+    const all = [...own.map(([a]) => a.variant + '    '), ...shared.map((w) => w + (p.isAdmin ? '    ' : ''))];
+    const kwH = 40 + 12 + 40 + (all.length > 10 ? 40 : 0) + Math.min(kwHeight(all) - 52, KWSCROLL);   // the chips scroll inside the card when there are many
     const laneH = Math.max(ans.length * GAP, kwH, H.topic) + 60; const cy = cursor + laneH / 2;
     add(t, 'kw:' + t, 'kw', COL.kw, cy - kwH / 2, W.kw, kwH); edges.push({ a: 'kw:' + t, b: 'topic:' + t, kind: 'kw' });
     add(t, 'topic:' + t, 'topic', COL.topic, cy - H.topic / 2, W.topic, H.topic);
@@ -180,11 +184,14 @@ export default function TopicFlow() {
               if (n.kind === 'topic') return <div key={n.key} className={'fc tp' + (over === t ? ' over' : '')} style={box(n)} data-topic={t} aria-label={'Topic ' + t} onPointerDown={(e) => dragNode(n.key, e)} onDragOver={(e) => { e.preventDefault(); setOver(t); }} onDragLeave={() => setOver(null)} onDrop={html5Drop(t)}>
                 <div className="hd">◆ Topic</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
               if (n.kind === 'kw') { const sharedL = Object.entries(d.aliases[t] || {}).flatMap(([l, ws]) => ws.map((w): [string, string] => [w, l])); const own = mine.filter(([a]) => a.canonical === t);
-                return <div key={n.key} className="fc kw" style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd"># Keywords</div><div className="bd">
-                  {own.map(([a, i]) => <span key={i} className="kc" onPointerDown={(e) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i }, to))} title="Drag onto a topic to move it">{a.variant}{moveMenu('Move ' + a.variant + ' to topic', t, { t: 'kw', i })}<button type="button" className="x" aria-label={'Remove ' + a.variant} onClick={() => removeKw(i)}>×</button></span>)}
-                  {(open.has(t) ? sharedL : sharedL.slice(0, 3)).map(([w, l]) => <span key={l + w} className="kc sh" title={p.isAdmin ? 'Shared by all merchants' : 'Shared by all merchants (an admin edits it)'} onPointerDown={(e) => e.stopPropagation()}>{w}{p.isAdmin && open.has(t) && <button type="button" className="x" aria-label={'Remove shared ' + w} onClick={() => removeShared(t, l, w)}>×</button>}</span>)}
-                  {sharedL.length > 3 && <button type="button" className="kc sh more" onPointerDown={(e) => e.stopPropagation()} onClick={() => toggleOpen(t)} title={open.has(t) ? 'Show fewer' : 'Show all ' + sharedL.length + ' shared keywords'}>{open.has(t) ? 'show less' : '+' + (sharedL.length - 3) + ' shared'}</button>}
-                  {open.has(t) && <input className="kadd" placeholder="＋ add a keyword, press Enter" aria-label={'Add a keyword to ' + t} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key !== 'Enter') return; const v = (e.target as HTMLInputElement).value; if (addKeyword(t, v)) (e.target as HTMLInputElement).value = ''; }} />}</div><span className="port r" /></div>; }
+                const q = (kwq[t] || '').trim().toLowerCase(); const hit = (w: string) => !q || w.toLowerCase().includes(q); const total = own.length + sharedL.length;
+                return <div key={n.key} className="fc kw" style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd"># Keywords <span className="cnt">{total}</span></div><div className="bd kwbd">
+                  <input className="kadd" placeholder="＋ Add a keyword, press Enter" aria-label={'Add a keyword to ' + t} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key !== 'Enter') return; const el = e.target as HTMLInputElement; if (addKeyword(t, el.value)) el.value = ''; }} />
+                  {total > 10 && <input className="kadd find" type="search" placeholder="Find a keyword" aria-label={'Find a keyword in ' + t} value={kwq[t] || ''} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => setKwq({ ...kwq, [t]: e.target.value })} />}
+                  <div className="kwscroll" style={{ maxHeight: KWSCROLL }} onPointerDown={(e) => { if (e.target === e.currentTarget) dragNode(n.key, e); }}>
+                  {own.filter(([a]) => hit(a.variant)).map(([a, i]) => <span key={i} className="kc" onPointerDown={(e) => { e.stopPropagation(); startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i }, to)); }} title="Drag onto a topic to move it">{a.variant}{moveMenu('Move ' + a.variant + ' to topic', t, { t: 'kw', i })}<button type="button" className="x" aria-label={'Remove ' + a.variant} onClick={() => removeKw(i)}>×</button></span>)}
+                  {sharedL.filter(([w]) => hit(w)).map(([w, l]) => <span key={l + w} className={'kc sh' + (p.isAdmin ? ' adm' : '')} title={p.isAdmin ? 'Shared by all merchants. Drag onto another topic to move it.' : 'Shared by all merchants (an admin edits it)'} onPointerDown={(e) => { e.stopPropagation(); if (p.isAdmin) startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'sh', topic: t, l, w }, to)); }}>{w}{p.isAdmin && <button type="button" className="x" aria-label={'Remove shared ' + w} onClick={() => removeShared(t, l, w)}>×</button>}</span>)}
+                  {q && ![...own.map(([a]) => a.variant), ...sharedL.map(([w]) => w)].some(hit) && <span className="sub">No keyword matches.</span>}</div></div><span className="port r" /></div>; }
               if (n.kind === 'ans') { const e = entries.find((x) => x.id === Number(n.key.slice(4))); if (!e) return null; const ty = e.entry_type ?? 'answer'; const ended = !!e.ends_on && e.ends_on < today();
                 return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}</div>
                   <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>

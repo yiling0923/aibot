@@ -468,6 +468,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 @media (max-width:1000px){.rptiles{grid-template-columns:repeat(2,minmax(0,1fr))}.rpg2,.rpg3,.rpg2b{grid-template-columns:1fr}}
 .rpg2,.rpg3,.rpg2b{align-items:start}
 
-.kc.sh.more{border:0;font:inherit;font-weight:600;cursor:pointer;color:var(--accent)}.kc.sh.more:hover{background:var(--kwbg)}
-.kc.sh .x{margin-left:2px}
-.kadd{display:block;width:100%;margin-top:2px;border:1px dashed var(--line);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;background:var(--surface)}
+.fc.kw .kwbd{display:flex;flex-direction:column;gap:6px}
+.fc.kw .hd .cnt{margin-left:6px;background:var(--surface);border-radius:99px;padding:0 8px;font-size:11px;color:var(--muted)}
+.kwscroll{overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 0 0;scrollbar-width:thin}
+.kc.sh.adm{cursor:grab}.kc.sh .x{margin-left:2px}
+.kadd{display:block;width:100%;border:1px dashed var(--line);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;background:var(--surface)}.kadd.find{border-style:solid}
