@@ -20,8 +20,6 @@ export default function Keywords() {
   const [topic, setTopic] = useState(''); const [busy, setBusy] = useState(false);
   const [setFor, setSetFor] = useState<{ w: string; preset?: string } | null>(null); const [drawer, setDrawer] = useState<string | null>(null);
 
-  const [view, setViewState] = useState<'list' | 'main'>(() => { try { return localStorage.getItem('keywordsView') === 'main' ? 'main' : 'list'; } catch { return 'list'; } });
-  const setView = (v: 'list' | 'main') => { setViewState(v); try { localStorage.setItem('keywordsView', v); } catch { /* ignore */ } };
   const [showAll, setShowAllState] = useState(() => { try { return localStorage.getItem('kwShowAll') === '1'; } catch { return false; } });   // also show the words of each main keyword that nobody has typed yet
   const setShowAll = (v: boolean) => { setShowAllState(v); try { localStorage.setItem('kwShowAll', v ? '1' : '0'); } catch { /* ignore */ } };
   const [more, setMore] = useState<Set<string>>(new Set());                          // columns opened to show every word
@@ -29,10 +27,10 @@ export default function Keywords() {
   const inTab = (r: (typeof all)[number], t: string) => t === 'all' || (t === 'ignored' ? r.ignored : t === 'unassigned' ? !r.ignored && r.st.t === 'Not set yet' : !r.ignored && r.st.t !== 'Not set yet');
   const counts = Object.fromEntries(TABS.map(([k]) => [k, all.filter((r) => inTab(r, k)).length]));
   const Q = q.trim().toLowerCase();
-  // the words each main keyword knows but no customer has typed: shown with 0 when asked (in the "by main keyword" view only)
+  // the words each main keyword knows but no customer has typed: shown with 0 when asked
   const heard = new Set(all.map((r) => r.w.toLowerCase())); const seen = new Set<string>();
   const topicsAll = topicNames(p.draft, p.merchant);
-  const synth = (showAll && view === 'main' ? topicsAll.flatMap((tp) => [
+  const synth = (showAll ? topicsAll.flatMap((tp) => [
     ...Object.entries(p.draft.aliases[tp] ?? {}).flatMap(([l, ws]) => ws.map((w) => [w, l] as const)),
     ...(p.draft.mAliases[p.merchant] ?? []).filter((a) => a.canonical === tp).map((a) => [a.variant, a.language] as const),
   ]) : []).filter(([w]) => { const k = w.toLowerCase(); if (heard.has(k) || seen.has(k)) return false; seen.add(k); return true; })
@@ -58,19 +56,6 @@ export default function Keywords() {
 
   const bulkBar = <div className="bulk"><b>{sel.size} selected</b><span className="tools"><select aria-label="Topic" value={topicNow} onChange={(e) => setTopic(e.target.value)}>{topics.map((k) => <option key={k}>{k}</option>)}</select>
           <button className="btn sm pri" type="button" onClick={() => bulk('topic')}>Add to this topic</button><button className="btn sm" type="button" disabled={lock} onClick={() => bulk('filler')}>Mark as filler</button><button className="btn sm" type="button" disabled={lock} onClick={() => bulk('rude')}>Mark as rude word</button><button className="btn sm" type="button" onClick={() => bulk('exclude')}>Ignore</button><button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>Clear</button></span></div>;
-  const renderTable = (rows: typeof list) => { const mxn = Math.max(1, ...rows.map((x) => x.n)); return (
-        <table style={{ minWidth: 960 }}><thead><tr><th style={{ width: 34 }}><input type="checkbox" checked={rows.length > 0 && rows.every((r) => sel.has(r.w))} aria-label="Select all shown" onChange={(e) => setSel((s) => { const n = new Set(s); rows.forEach((r) => (e.target.checked ? n.add(r.w) : n.delete(r.w))); return n; })} /></th><th>Keyword</th><th className="num">Heard</th><th>Status</th><th></th></tr></thead><tbody>
-          {rows.map((r) => { const todo = !r.ignored && r.st.t === 'Not set yet'; const stt = r.ignored ? { c: '', t: 'Ignored' } : r.st;
-            return (
-              <tr key={r.w} className={(r.ignored ? 'excl ' : '') + (todo ? 'todo' : '')}>
-                <td><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} /></td>
-                <td>{r.isNew ? <><Pill c="info">New</Pill> </> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span>{r.h && !r.isNew ? <div className="sub">{r.h}</div> : null}</td>
-                <td className="num"><b>{r.n}</b><div className="mbar"><i style={{ width: Math.max(4, Math.round((r.n * 100) / mxn)) + '%' }} /></div></td><td><Pill c={stt.c}>{stt.t}</Pill></td>
-                <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{r.ignored ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button>
-                  : todo ? <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add to a topic</button> <button className="btn sm" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>New topic</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>
-                  : <><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w })}>Change…</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>}</td></tr>); })}
-          {!rows.length && <tr><td colSpan={5}><div className="kwempty"><b>{all.length ? 'No keyword matches this filter.' : 'No words yet.'}</b><span>{all.length ? 'Try another tab, language or search.' : 'Words customers type in chats are saved here automatically.'}</span></div></td></tr>}</tbody></table>
-  ); };
   /** The words customers typed, under their main keyword: short forms, slang, same meaning, other languages. Words with no topic stay in a table below. */
   const placed = list.map((r) => ({ r, t: r.ignored ? null : wordTopic(p.draft, p.merchant, r.w) }));
   const byTopic = topics.map((tp) => ({ tp, rows: placed.filter((x) => x.t?.topic === tp) })).filter((x) => x.rows.length);
@@ -125,15 +110,13 @@ export default function Keywords() {
       <div className="card kwtop">
         <div className="head"><div><h2>Keywords</h2><div className="sub">Every word customers type is saved here automatically. Put each one under a topic, or ignore it.{p.ai.describe ? '' : <span className="dimnote" title="Add the Anthropic key to .env"> AI descriptions are off.</span>}</div></div>
           <div className="tools">{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
-            <div className="segs" role="group" aria-label="View">{([['list', 'List'], ['main', 'By main keyword']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div></div></div>
+</div></div>
         <div className="kwfilter">
           <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
           <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
             <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
             <span className="sub">{list.length} shown</span></div></div></div>
-      {view === 'main' ? mainView : <div className="card scroll">
-        {sel.size > 0 && bulkBar}
-        {renderTable(list)}</div>}
+      {mainView}
       {drawer && <KeywordDrawer word={drawer} count={p.kwMap[drawer]?.n ?? 0} onClose={() => setDrawer(null)} onSet={() => { setSetFor({ w: drawer }); setDrawer(null); }} />}
       {setFor && <SetKeywordModal word={setFor.w} preset={setFor.preset} onClose={() => setSetFor(null)} />}
     </>

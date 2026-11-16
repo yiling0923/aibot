@@ -331,7 +331,7 @@ describe('Control panel', () => {
   });
   it('Keywords by main keyword: can also show the words of a topic that nobody has typed yet', async () => {
     open('staff', '/admin/store');
-    await userEvent.click(await screen.findByText('By main keyword'));
+    expect(await screen.findByText('◆ deposit')).toBeTruthy();
     expect(screen.queryByText('dps')).toBeNull();                                               // nobody typed "dps"
     await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
     expect(await screen.findByText('dps')).toBeTruthy();
@@ -343,9 +343,10 @@ describe('Control panel', () => {
     open('staff', '/admin/rank');
     expect(await screen.findByRole('heading', { name: 'Keyword ranking' })).toBeTruthy();
     const week = screen.getByRole('group', { name: 'Week' });
-    expect(within(week).getByText('This week')).toBeTruthy(); expect(within(week).getByText('Nov 10 – Nov 16')).toBeTruthy();
+    expect(within(week).getByText('This week')).toBeTruthy(); expect(await within(week).findByText('Nov 10 – Nov 16')).toBeTruthy();
     expect((within(week).getByRole('button', { name: 'Next week' }) as HTMLButtonElement).disabled).toBe(true);      // nothing after this week
     expect((within(week).getByRole('button', { name: 'Previous week' }) as HTMLButtonElement).disabled).toBe(false);
+    await screen.findByText('wd');
     const rows = document.querySelectorAll('.rkcard tbody tr');
     expect(rows.length).toBe(2);                                                                                       // the top three are in the cards above, the table starts at rank 4
     expect(document.querySelectorAll('.rkcard td.num .mbar').length).toBe(2);
@@ -426,14 +427,12 @@ describe('Control panel', () => {
   });
   it('shows the words customers typed under their main keyword on the Keywords page, and keeps the plain list too', async () => {
     open('staff', '/admin/store');
-    await userEvent.click(await screen.findByText('By main keyword'));
-    expect(await screen.findByText('◆ deposit')).toBeTruthy();
+    expect(screen.queryByText('By main keyword')).toBeNull();                                    // there is only one view now: no switch
+    expect(screen.queryByRole('button', { name: 'List' })).toBeNull();
+    expect(await screen.findByText('◆ deposit')).toBeTruthy();                                   // the main keywords show at once
     expect(screen.getAllByText('Short forms').length).toBeGreaterThan(1);                        // the legend and the column: dep is a short form of deposit
     expect(screen.getAllByText('Other languages').length).toBeGreaterThan(1);                    // 充值 is Chinese
     expect(screen.getByText(/Not under a main keyword yet/)).toBeTruthy();                       // xyzzy has no topic yet
-    expect(screen.getByText('xyzzy')).toBeTruthy();
-    await userEvent.click(screen.getByText('List'));
-    expect(screen.queryByText('◆ deposit')).toBeNull();                                          // the plain table is back
     expect(screen.getByText('xyzzy')).toBeTruthy();
   });
   it('shows the stat tiles, the basics and the bot instructions with presets on Merchant settings, and locks the basics for staff', async () => {
