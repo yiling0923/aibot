@@ -17,6 +17,7 @@ export interface ChatOpts {
 /** The field names tried, in this order, for the file in the upload (LiveChat answers 400, 415 or 422 when the name is not the one it reads). */
 export const FILE_FIELDS = ['file', 'attachment', 'image'];
 /** The upload addresses tried in turn ({id} is the chat). */
+/** Learned from LiveChat's own answers: the upload address is the first one, and the form field is `file`. The others are only tried when LiveChat does not know the first. */
 export const UPLOAD_PATHS = ['/widget/conversations/{id}/attachments', '/widget/conversations/{id}/uploads', '/widget/conversations/{id}/files', '/widget/attachments', '/widget/uploads', '/widget/upload'];
 
 const kindOf = (sender: string): ChatLine['from'] => (/visitor|customer|member|user/i.test(sender) ? 'customer' : /agent|staff|human|operator/i.test(sender) ? 'agent' : /system|event/i.test(sender) ? 'system' : 'bot');
@@ -69,6 +70,10 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
         catch { throw new Error(`Could not reach LiveChat at ${base}. Is it running?`); }
         const full = await r.text().catch(() => ''); const body = full.slice(0, 200);
         tried.push(`POST ${path} (field "${field}") -> ${r.status} ${body}`.trim());
+        let code = '', said = ''; try { const e = JSON.parse(full); code = String(e.error ?? ''); said = String(e.message ?? ''); } catch { /* not JSON */ }
+        if (code === 'attachment_invalid') {                                                          // the address and the field are right: LiveChat looked at the file and refused it
+          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}, ${file.data.length} bytes) at ${path}. The upload itself works, so try another kind of file, a .jpg picture for example. If a .jpg is refused too, tell the developer.`);
+        }
         if (r.ok) {
           let j: Record<string, any> | null = null; try { j = JSON.parse(full); } catch { /* an answer that is not JSON: the message is assumed to be made */ }   // eslint-disable-line @typescript-eslint/no-explicit-any
           const att = j?.attachment ?? (j?.url ? j : null);

@@ -10,7 +10,7 @@ import { buildApp } from '../src/server/app';
 import { chatThroughLiveChat } from '../src/livechat/chat';
 
 /** A small stand-in for LiveChat's website widget API: it starts chats, takes visitor messages and answers like the bot does after a moment. */
-function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string } = {}) {
+function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string; refuseType?: string } = {}) {
   const chats = new Map<string, { visitor: string; status: string; messages: { senderType: string; body: string }[] }>(); let n = 0;
   const calls: string[] = []; const posts: Record<string, unknown>[] = []; const uploads: { field: string; name: string; fields: string[] }[] = [];
   const srv = http.createServer((req, res) => {
@@ -27,6 +27,7 @@ function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string }
         const part = /name="([^"]+)"; filename="([^"]+)"/.exec(raw); const fields = [...raw.matchAll(/name="([^"]+)"(?!; filename)/g)].map((x) => x[1]);
         if (!part || part[1] !== (opts.fileField ?? 'file')) return send(422, { error: 'the file field must be called ' + (opts.fileField ?? 'file') });
         if (!chats.has(up[1])) return send(404, {});
+        if (opts.refuseType && new RegExp('Content-Type: ' + opts.refuseType, 'i').test(raw)) return send(422, { error: 'attachment_invalid', message: 'Unsupported attachment type.' });
         uploads.push({ field: part[1], name: part[2], fields });
         chats.get(up[1])!.messages.push({ senderType: 'visitor', body: part[2], messageType: 'image', attachment: { kind: 'image', name: part[2], url: '/uploads/x.png', mimeType: 'image/png', size: 4 } } as never);
         reply(up[1], part[2]); return send(200, { conversation: view(up[1]) });
@@ -72,6 +73,15 @@ describe('chatting through a LiveChat', () => {
     await expect(chatThroughLiveChat({ ...o, file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } })).rejects.toThrow(/addresses and form fields tried were: POST \/widget\/conversations\/conv-\d+\/attachments \(field "file"\) -> 422.*\(field "image"\) -> 422.*\/widget\/uploads \(field "file"\) -> 404/s);
     const wrongTenant = await chatThroughLiveChat({ ...o, tenant: '9', file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } }).catch((e: Error) => e.message);
     expect(String(wrongTenant)).toMatch(/404/);                                                                                  // an unknown tenant stops at once
+    lc.close();
+  });
+  it('stops at once when LiveChat looks at the file and refuses its type, and says which file it was', async () => {
+    const lc = await fakeLiveChat({ refuseType: 'image/png' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-type', pollMs: 40, waitMs: 500 };
+    const err = await chatThroughLiveChat({ ...o, file: { name: 'slip.png', type: 'image/png', data: new Uint8Array([1, 2, 3]) } }).catch((e: Error) => e.message);
+    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*a \.jpg picture/s);
+    expect(lc.uploads).toHaveLength(0);                                                                                           // nothing was stored, and no other field names were tried
+    const ok = await chatThroughLiveChat({ ...o, visitor: 'vis-type2', file: { name: 'slip.jpg', type: 'image/jpeg', data: new Uint8Array([1, 2, 3]) } });
+    expect(ok.messages.some((m) => m.attachment?.name === 'slip.jpg')).toBe(true);                                                // another type goes through
     lc.close();
   });
   it('reads a picture an agent sent: the link is completed with the LiveChat address, and only safe links are kept', async () => {
