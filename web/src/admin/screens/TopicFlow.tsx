@@ -40,6 +40,8 @@ export default function TopicFlow() {
   const persist = (n: Pos) => { try { localStorage.setItem(storeKey, JSON.stringify(n)); } catch { /* ignore */ } };
   const [pend, setPend] = useState<Pending[]>([]); const nextId = useRef(1);
   const [over, setOver] = useState<string | null>(null);
+  const [open, setOpen] = useState<Set<string>>(new Set());                    // topics whose keywords card shows every shared word
+  const toggleOpen = (t: string) => setOpen((o) => { const n = new Set(o); if (n.has(t)) n.delete(t); else n.add(t); return n; });
   const [scale, setScale] = useState(1);
   const [link, setLink] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
 
@@ -61,6 +63,14 @@ export default function TopicFlow() {
     }
   };
   const removeKw = (i: number) => p.edit((x, note) => { note('Removed short form "' + x.mAliases[p.merchant].splice(i, 1)[0].variant + '" (' + p.M.name + ')'); });
+  const removeShared = (t: string, l: string, w: string) => p.edit((x, note) => { const a = x.aliases[t]?.[l]; const i = a ? a.indexOf(w) : -1; if (i >= 0) { a.splice(i, 1); note('Removed shared short form "' + w + '" from ' + t + ' (all merchants)'); } });
+  /** Adds a keyword for this merchant to a topic, straight from the card. Returns true when it was added. */
+  const addKeyword = (t: string, text: string) => {
+    const w = text.trim().toLowerCase(); if (!w) return false;
+    const dup = findDup(d, p.merchant, p.M.name, w); if (dup.length) { p.toast('"' + w + '" is already ' + dup[0] + '. Nothing was added.'); return false; }
+    p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: guessLang(w), variant: w, canonical: t }); note('Added keyword "' + w + '" to topic "' + t + '" (' + p.M.name + ')'); });
+    p.toast('"' + w + '" now means ' + t); return true;
+  };
   const createTopic = (id: number) => {
     const b = pend.find((x) => x.id === id); if (!b) return; const n = slug(b.text);
     if (!n) return p.toast('Type a name first');
@@ -85,7 +95,8 @@ export default function TopicFlow() {
   const add = (topic: string, key: string, kind: Kind, x: number, y: number, w: number, h: number) => { const o = pos[key]; nodes.push({ key, kind, topic, x: o?.x ?? x, y: o?.y ?? y, w, h }); groups.set(topic, [...(groups.get(topic) ?? []), key]); };
   topics.forEach((t) => {
     const shared = Object.values(d.aliases[t] || {}).flat(); const own = mine.filter(([a]) => a.canonical === t); const ans = entries.filter((e) => e.topic === t);
-    const kwH = kwHeight([...own.map(([a]) => a.variant + '    '), ...shared.slice(0, 3), shared.length > 3 ? '+99 shared' : '']);
+    const isOpen = open.has(t);
+    const kwH = kwHeight([...own.map(([a]) => a.variant + '    '), ...(isOpen ? shared.map((w) => w + (p.isAdmin ? '    ' : '')) : shared.slice(0, 3)), shared.length > 3 ? '+99 shared' : '']) + (isOpen ? 44 : 0);
     const laneH = Math.max(ans.length * GAP, kwH, H.topic) + 60; const cy = cursor + laneH / 2;
     add(t, 'kw:' + t, 'kw', COL.kw, cy - kwH / 2, W.kw, kwH); edges.push({ a: 'kw:' + t, b: 'topic:' + t, kind: 'kw' });
     add(t, 'topic:' + t, 'topic', COL.topic, cy - H.topic / 2, W.topic, H.topic);
@@ -168,11 +179,12 @@ export default function TopicFlow() {
               const t = n.topic;
               if (n.kind === 'topic') return <div key={n.key} className={'fc tp' + (over === t ? ' over' : '')} style={box(n)} data-topic={t} aria-label={'Topic ' + t} onPointerDown={(e) => dragNode(n.key, e)} onDragOver={(e) => { e.preventDefault(); setOver(t); }} onDragLeave={() => setOver(null)} onDrop={html5Drop(t)}>
                 <div className="hd">◆ Topic</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
-              if (n.kind === 'kw') { const shared = Object.values(d.aliases[t] || {}).flat(); const own = mine.filter(([a]) => a.canonical === t);
+              if (n.kind === 'kw') { const sharedL = Object.entries(d.aliases[t] || {}).flatMap(([l, ws]) => ws.map((w): [string, string] => [w, l])); const own = mine.filter(([a]) => a.canonical === t);
                 return <div key={n.key} className="fc kw" style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd"># Keywords</div><div className="bd">
                   {own.map(([a, i]) => <span key={i} className="kc" onPointerDown={(e) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i }, to))} title="Drag onto a topic to move it">{a.variant}{moveMenu('Move ' + a.variant + ' to topic', t, { t: 'kw', i })}<button type="button" className="x" aria-label={'Remove ' + a.variant} onClick={() => removeKw(i)}>×</button></span>)}
-                  {shared.slice(0, 3).map((w) => <span key={w} className="kc sh" title="Shared by all merchants (an admin edits it in the list view)">{w}</span>)}
-                  {shared.length > 3 && <span className="kc sh" title={shared.join(', ')}>+{shared.length - 3} shared</span>}</div><span className="port r" /></div>; }
+                  {(open.has(t) ? sharedL : sharedL.slice(0, 3)).map(([w, l]) => <span key={l + w} className="kc sh" title={p.isAdmin ? 'Shared by all merchants' : 'Shared by all merchants (an admin edits it)'} onPointerDown={(e) => e.stopPropagation()}>{w}{p.isAdmin && open.has(t) && <button type="button" className="x" aria-label={'Remove shared ' + w} onClick={() => removeShared(t, l, w)}>×</button>}</span>)}
+                  {sharedL.length > 3 && <button type="button" className="kc sh more" onPointerDown={(e) => e.stopPropagation()} onClick={() => toggleOpen(t)} title={open.has(t) ? 'Show fewer' : 'Show all ' + sharedL.length + ' shared keywords'}>{open.has(t) ? 'show less' : '+' + (sharedL.length - 3) + ' shared'}</button>}
+                  {open.has(t) && <input className="kadd" placeholder="＋ add a keyword, press Enter" aria-label={'Add a keyword to ' + t} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key !== 'Enter') return; const v = (e.target as HTMLInputElement).value; if (addKeyword(t, v)) (e.target as HTMLInputElement).value = ''; }} />}</div><span className="port r" /></div>; }
               if (n.kind === 'ans') { const e = entries.find((x) => x.id === Number(n.key.slice(4))); if (!e) return null; const ty = e.entry_type ?? 'answer'; const ended = !!e.ends_on && e.ends_on < today();
                 return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}</div>
                   <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>

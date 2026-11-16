@@ -467,3 +467,7 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .rpact{display:inline-flex;gap:6px}.ibtn.on{border-color:var(--accent);color:var(--accent);background:color-mix(in srgb,var(--accent) 12%,var(--surface))}.ibtn.danger.on{border-color:var(--bad);color:var(--bad);background:color-mix(in srgb,var(--bad) 10%,var(--surface))}
 @media (max-width:1000px){.rptiles{grid-template-columns:repeat(2,minmax(0,1fr))}.rpg2,.rpg3,.rpg2b{grid-template-columns:1fr}}
 .rpg2,.rpg3,.rpg2b{align-items:start}
+
+.kc.sh.more{border:0;font:inherit;font-weight:600;cursor:pointer;color:var(--accent)}.kc.sh.more:hover{background:var(--kwbg)}
+.kc.sh .x{margin-left:2px}
+.kadd{display:block;width:100%;margin-top:2px;border:1px dashed var(--line);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;background:var(--surface)}

@@ -11,7 +11,7 @@ const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay' }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
   snapshot: {
-    kb: [], aliases: { deposit: { en: ['deposit', 'dep'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
+    kb: [], aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
     settings: { A: SET(), B: SET() },
   },
 });
@@ -194,6 +194,25 @@ describe('Control panel', () => {
     unmount(); open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
     expect(await screen.findByText('All merchants (template)')).toBeTruthy();
+  });
+  it('shows every shared keyword on the card when asked, and adds a keyword right on the card', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    const card = (await screen.findByLabelText('Topic deposit')).closest('.fc')!.parentElement!;
+    expect(screen.queryByText('dps')).toBeNull();                                              // only 3 shared words show at first
+    await userEvent.click(await screen.findByRole('button', { name: /\+2 shared/ }));
+    expect(screen.getByText('dps')).toBeTruthy(); expect(screen.getByText('depo')).toBeTruthy();
+    expect(screen.queryByLabelText('Remove shared dps')).toBeNull();                           // staff cannot remove shared words
+    await userEvent.type(screen.getByLabelText('Add a keyword to deposit'), 'topupz{enter}');
+    expect(await screen.findByLabelText('Remove topupz')).toBeTruthy();
+    expect(card).toBeTruthy();
+  });
+  it('lets an admin remove a shared keyword from the card', async () => {
+    open('admin', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    await userEvent.click(await screen.findByRole('button', { name: /\+2 shared/ }));
+    await userEvent.click(screen.getByLabelText('Remove shared dps'));
+    expect(screen.queryByText('dps')).toBeNull();
   });
   it('shows a flowchart canvas with blocks, adds a topic and a keyword from the block palette, and moves the keyword with the menu; the list shows the same', async () => {
     open('staff', '/admin/kw');
