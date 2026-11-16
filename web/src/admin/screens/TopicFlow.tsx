@@ -93,6 +93,19 @@ export default function TopicFlow() {
     p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: guessLang(w), variant: w, canonical: topic }); note('Added keyword "' + w + '" to topic "' + topic + '" (' + p.M.name + ')'); });
     setPend((l) => l.filter((x) => x.id !== b.id)); p.toast('"' + w + '" now means ' + topic);
   };
+  const trash = <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></svg>;
+  const deleteAnswer = (id: number) => {
+    const e = entries.find((x) => x.id === id); if (!e || !confirm('Delete the answer "' + e.intent_key + '"? It is removed from the draft until you publish.')) return;
+    p.edit((x, note) => { x.kb = x.kb.filter((k) => !(k.id === id && k.merchant === p.merchant)); note('Deleted answer "' + e.intent_key + '" (' + p.M.name + ')'); });
+    setPos((o) => { const n = { ...o }; delete n['ans:' + id]; persist(n); return n; }); p.toast('Answer deleted. Press Publish to make it final.');
+  };
+  const deleteTopic = (t: string) => {
+    const n = entries.filter((x) => x.topic === t).length;
+    if (n) return p.toast('"' + t + '" still has ' + n + ' answer' + (n === 1 ? '' : 's') + '. Delete or move them first.');
+    if (!confirm('Delete the topic "' + t + '" and its keywords? It is removed from the draft until you publish.')) return;
+    p.edit((x, note) => { x.mAliases[p.merchant] = (x.mAliases[p.merchant] || []).filter((a) => a.canonical !== t); note('Deleted topic "' + t + '" (' + p.M.name + ')'); });
+    p.toast('Topic deleted. Press Publish to make it final.');
+  };
   const createAnswer = (b: Pending) => {
     const name = slug(b.text); const topic = b.topic || '';
     if (!name) return p.toast('Give the answer a name first');
@@ -219,7 +232,7 @@ export default function TopicFlow() {
             {nodes.map((n) => {
               const t = n.topic;
               if (n.kind === 'topic') return <div key={n.key} className={'fc tp' + (over === t ? ' over' : '')} style={box(n)} data-topic={t} aria-label={'Topic ' + t} onPointerDown={(e) => dragNode(n.key, e)} onDragOver={(e) => { e.preventDefault(); setOver(t); }} onDragLeave={() => setOver(null)} onDrop={html5Drop(t)}>
-                <div className="hd">◆ Topic</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
+                <div className="hd">◆ Topic{!d.aliases[t] && <button type="button" className="x del" aria-label={'Delete topic ' + t} title="Delete this topic (only topics made for this merchant)" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => deleteTopic(t)}>{trash}</button>}</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
               if (n.kind === 'kw') { const sharedL = Object.entries(d.aliases[t] || {}).flatMap(([l, ws]) => ws.map((w): [string, string] => [w, l])); const own = mine.filter(([a]) => a.canonical === t);
                 const q = (kwq[t] || '').trim().toLowerCase(); const hit = (w: string) => !q || w.toLowerCase().includes(q); const total = own.length + sharedL.length;
                 return <div key={n.key} className="fc kw" style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd"># Keywords <span className="cnt">{total}</span></div><div className="bd kwbd">
@@ -230,7 +243,7 @@ export default function TopicFlow() {
                   {sharedL.filter(([w]) => hit(w)).map(([w, l]) => <span key={l + w} className={'kc sh' + (p.isAdmin ? ' adm' : '')} title={p.isAdmin ? 'Shared by all merchants. Drag onto another topic to move it.' : 'Shared by all merchants (an admin edits it)'} onPointerDown={(e) => { e.stopPropagation(); if (p.isAdmin) startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'sh', topic: t, l, w }, to)); }}>{w}{p.isAdmin && <button type="button" className="x" aria-label={'Remove shared ' + w} onClick={() => removeShared(t, l, w)}>×</button>}</span>)}
                   {q && ![...own.map(([a]) => a.variant), ...sharedL.map(([w]) => w)].some(hit) && <span className="sub">No keyword matches.</span>}</div></div><span className="port r" /></div>; }
               if (n.kind === 'ans') { const e = entries.find((x) => x.id === Number(n.key.slice(4))); if (!e) return null; const ty = e.entry_type ?? 'answer'; const ended = !!e.ends_on && e.ends_on < today();
-                return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}</div>
+                return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}<button type="button" className="x del" aria-label={'Delete answer ' + e.intent_key} title="Delete this answer" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => deleteAnswer(e.id)}>{trash}</button></div>
                   <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{e.status === 'draft' && <div><span className="badge b-end ended" title="A draft answer is ignored by the bot. Set it to Live in Knowledge base.">draft: bot ignores it</span></div>}{!Object.values(e.translations as Record<string, { question_examples?: string[] }>).some((x) => x?.question_examples?.length) && <div><span className="badge b-end ended" title="The bot finds an answer by the questions listed for it. Add some in Knowledge base.">no questions yet</span></div>}{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>
                   <span className="port l" /><span className="port r" title="Drag onto a topic to move this answer" onPointerDown={(ev) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, ev, (to) => move({ t: 'entry', id: e.id }, to))} /></div>; }
               const has = entries.some((x) => x.topic === t);

@@ -241,6 +241,21 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: /Show blocks/ }));
     expect(screen.getByLabelText('Blocks')).toBeTruthy();
   });
+  it('deletes an answer from its card in the flowchart', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    await userEvent.click(screen.getByRole('button', { name: /Answer/ }));
+    await userEvent.type(screen.getByLabelText('New answer name'), 'temp one');
+    await userEvent.type(screen.getByLabelText('Questions customers ask'), 'temp question');
+    await userEvent.type(screen.getByLabelText('New answer text'), 'temp text');
+    await userEvent.selectOptions(screen.getByLabelText('Topic for the answer'), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: 'Add answer' }));
+    expect(await screen.findByText('temp_one')).toBeTruthy();
+    const yes = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await userEvent.click(screen.getByLabelText('Delete answer temp_one'));
+    expect(screen.queryByText('temp_one')).toBeNull();
+    yes.mockRestore();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

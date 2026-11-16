@@ -512,3 +512,7 @@ tr.row{cursor:pointer}
 .zoom{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .zoom button{border:0;background:var(--surface);width:30px;height:30px;font-size:16px;cursor:pointer;color:var(--fg)}.zoom button:hover{background:var(--surface2)}
 .zoom .zoomv{min-width:50px;text-align:center;font-weight:600;font-size:12.5px;border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:30px}
+
+.fc .hd .x.del{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:7px;color:var(--muted);margin-left:2px}
+.fc .hd .x.del:hover{background:var(--badbg);color:var(--bad)}
+.fc.an .hd .mv{margin-left:auto}.fc.an .hd .x.del{margin-left:0}
