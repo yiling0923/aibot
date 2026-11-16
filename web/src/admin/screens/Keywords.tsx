@@ -58,19 +58,19 @@ export default function Keywords() {
 
   const bulkBar = <div className="bulk"><b>{sel.size} selected</b><span className="tools"><select aria-label="Topic" value={topicNow} onChange={(e) => setTopic(e.target.value)}>{topics.map((k) => <option key={k}>{k}</option>)}</select>
           <button className="btn sm pri" type="button" onClick={() => bulk('topic')}>Add to this topic</button><button className="btn sm" type="button" disabled={lock} onClick={() => bulk('filler')}>Mark as filler</button><button className="btn sm" type="button" disabled={lock} onClick={() => bulk('rude')}>Mark as rude word</button><button className="btn sm" type="button" onClick={() => bulk('exclude')}>Ignore</button><button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>Clear</button></span></div>;
-  const renderTable = (rows: typeof list) => (
+  const renderTable = (rows: typeof list) => { const mxn = Math.max(1, ...rows.map((x) => x.n)); return (
         <table style={{ minWidth: 960 }}><thead><tr><th style={{ width: 34 }}><input type="checkbox" checked={rows.length > 0 && rows.every((r) => sel.has(r.w))} aria-label="Select all shown" onChange={(e) => setSel((s) => { const n = new Set(s); rows.forEach((r) => (e.target.checked ? n.add(r.w) : n.delete(r.w))); return n; })} /></th><th>Keyword</th><th className="num">Heard</th><th>Status</th><th></th></tr></thead><tbody>
           {rows.map((r) => { const todo = !r.ignored && r.st.t === 'Not set yet'; const stt = r.ignored ? { c: '', t: 'Ignored' } : r.st;
             return (
               <tr key={r.w} className={(r.ignored ? 'excl ' : '') + (todo ? 'todo' : '')}>
                 <td><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} /></td>
                 <td>{r.isNew ? <><Pill c="info">New</Pill> </> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span>{r.h && !r.isNew ? <div className="sub">{r.h}</div> : null}</td>
-                <td className="num">{r.n}</td><td><Pill c={stt.c}>{stt.t}</Pill></td>
+                <td className="num"><b>{r.n}</b><div className="mbar"><i style={{ width: Math.max(4, Math.round((r.n * 100) / mxn)) + '%' }} /></div></td><td><Pill c={stt.c}>{stt.t}</Pill></td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{r.ignored ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button>
-                  : todo ? <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>Make a topic</button> <button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add to a topic</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>
+                  : todo ? <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add to a topic</button> <button className="btn sm" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>New topic</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>
                   : <><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w })}>Change…</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>}</td></tr>); })}
-          {!rows.length && <tr><td colSpan={5} className="sub">No keywords match. Words customers type are saved here automatically.</td></tr>}</tbody></table>
-  );
+          {!rows.length && <tr><td colSpan={5}><div className="kwempty"><b>{all.length ? 'No keyword matches this filter.' : 'No words yet.'}</b><span>{all.length ? 'Try another tab, language or search.' : 'Words customers type in chats are saved here automatically.'}</span></div></td></tr>}</tbody></table>
+  ); };
   /** The words customers typed, under their main keyword: short forms, slang, same meaning, other languages. Words with no topic stay in a table below. */
   const placed = list.map((r) => ({ r, t: r.ignored ? null : wordTopic(p.draft, p.merchant, r.w) }));
   const byTopic = topics.map((tp) => ({ tp, rows: placed.filter((x) => x.t?.topic === tp) })).filter((x) => x.rows.length);
@@ -84,8 +84,8 @@ export default function Keywords() {
     <div className="kwbar">{r.n > 0 && <i style={{ width: Math.max(8, Math.round((r.n * 100) / mx)) + '%' }} />}</div><b className={'kwn' + (r.n ? '' : ' zero')} title={r.n ? 'times heard' : 'nobody has typed this yet'}>{r.n}</b></div>;
   const mainView = (
     <>
-      <label className="switch kwall2"><input type="checkbox" role="switch" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /><span className="track"><span className="thumb" /></span> Also show the words nobody has typed yet</label>
-      <div className="kwlegend">{KW_KINDS.map((k) => <span key={k}><i className={KSHADE[k]} />{KW_LABEL[k]}</span>)}<span className="sub">The bar on each main keyword shows how much of the typing came from each group.</span></div>
+      <div className="kwtools"><label className="switch"><input type="checkbox" role="switch" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /><span className="track"><span className="thumb" /></span> Also show the words nobody has typed yet</label>
+        <div className="kwlegend" title="The bar on each main keyword shows how much of the typing came from each group.">{KW_KINDS.map((k) => <span key={k}><i className={KSHADE[k]} />{KW_LABEL[k]}</span>)}</div></div>
       {sel.size > 0 && <div className="card">{bulkBar}</div>}
       {byTopic.map(({ tp, rows }) => {
         const main = rows.find((x) => x.r.w.toLowerCase() === tp.toLowerCase());
@@ -122,14 +122,15 @@ export default function Keywords() {
 
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Keywords</h2><div className="sub">Every word customers type is saved here automatically. Make a keyword a topic, or add it to a topic.</div></div>
-        <div className="tools">{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
-          <div className="segs" role="group" aria-label="View">{([['list', 'List'], ['main', 'By main keyword']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div></div></div>
-        <div className="kwstats"><span className="st"><b>{all.length}</b> saved</span><span className={'st' + (counts.unassigned ? ' warn' : '')}><b>{counts.unassigned}</b> not assigned yet</span><span className="st"><b>{counts.assigned}</b> assigned</span>{p.ai.describe ? null : <span className="st dim" title="Add the Anthropic key to .env">AI descriptions are off</span>}</div></div>
-      <div className="card rkfilter"><div className="head"><div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
-        <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          <span className="sub">{list.length} keywords shown</span></div></div></div>
+      <div className="card kwtop">
+        <div className="head"><div><h2>Keywords</h2><div className="sub">Every word customers type is saved here automatically. Put each one under a topic, or ignore it.{p.ai.describe ? '' : <span className="dimnote" title="Add the Anthropic key to .env"> AI descriptions are off.</span>}</div></div>
+          <div className="tools">{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
+            <div className="segs" role="group" aria-label="View">{([['list', 'List'], ['main', 'By main keyword']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div></div></div>
+        <div className="kwfilter">
+          <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
+          <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
+            <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+            <span className="sub">{list.length} shown</span></div></div></div>
       {view === 'main' ? mainView : <div className="card scroll">
         {sel.size > 0 && bulkBar}
         {renderTable(list)}</div>}

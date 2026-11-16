@@ -542,3 +542,14 @@ tr.row{cursor:pointer}
 .hout.ok{background:var(--okbg);color:var(--ok)}.hout.warn{background:var(--warnbg);color:var(--warn)}.hout.bad{background:var(--badbg);color:var(--bad)}.hout.info{background:var(--infobg);color:#2f5fa8}
 .hout span{color:var(--fg);opacity:.85}
 @media (max-width:760px){.howlane{grid-template-columns:1fr}.harrow{transform:rotate(90deg)}}
+
+/* Keywords page: one heading card, a tools row, calmer rows */
+.kwtop{display:flex;flex-direction:column;gap:12px}
+.kwtop .head{margin-bottom:0}
+.kwfilter{display:flex;align-items:center;gap:12px;flex-wrap:wrap;border-top:1px solid var(--line);padding-top:12px}
+.kwfilter .filt{flex:1 1 360px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.kwfilter .filt input[type=search]{flex:1 1 220px}
+.dimnote{color:var(--muted);font-style:italic;cursor:help}
+.kwtools{display:flex;align-items:center;justify-content:space-between;gap:12px 20px;flex-wrap:wrap;margin:2px 2px 4px}
+.kwtools .kwlegend{margin:0}
+td.num .mbar{height:4px;width:70px;margin:4px 0 0 auto;background:var(--surface2);border-radius:4px}td.num .mbar i{display:block;height:4px;border-radius:4px;background:color-mix(in srgb,var(--accent) 55%,var(--surface))}
+.kwempty{display:flex;flex-direction:column;align-items:center;gap:4px;padding:34px 12px;text-align:center}.kwempty span{color:var(--muted);font-size:13px}
