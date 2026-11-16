@@ -40,6 +40,7 @@ export default function Ranking() {
   const toggle = (w: string, on: boolean) => setSel((s) => { const n = new Set(s); if (on) n.add(w); else n.delete(w); return n; });
   const sumN = vis.reduce((s, r) => s + r.n, 0); void sumN;
   const th = (k: string, l: string, tip?: string, cls?: string) => <th className={'sort ' + (cls || '')} title={tip || ''} onClick={() => setSort(sort.k === k ? { k, d: -sort.d } : { k, d: 1 })}>{l}{sort.k === k ? (sort.d === 1 ? ' ▴' : ' ▾') : ''}</th>;
+  const mxn = Math.max(1, ...list.map((x) => x.n));
   const label = data ? data.from + ' – ' + data.to : '';
 
   const bulk = (kind: string) => {
@@ -52,30 +53,33 @@ export default function Ranking() {
   return (
     <>
       <div className="card"><div className="head"><div style={{ maxWidth: 560 }}><h2>Keyword ranking</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Click a word to see its chats.</div></div>
-        <div className="tools"><button className="btn" type="button" style={{ padding: '10px 16px', fontSize: 18 }} disabled={week <= -4} aria-label="Previous week" onClick={() => setWeek(week - 1)}>‹</button><span className="stat" style={{ padding: '10px 26px', minWidth: 230, alignItems: 'center', textAlign: 'center' }}><b style={{ fontSize: 13 }}>Date</b><span style={{ fontSize: 17, fontWeight: 700 }}>{label}</span></span><button className="btn" type="button" style={{ padding: '10px 16px', fontSize: 18 }} disabled={week >= 0} aria-label="Next week" onClick={() => setWeek(week + 1)}>›</button></div></div></div>
-      <div className="kwstats"><span className="st"><b>{total.toLocaleString()}</b> words written this week</span><span className="st"><b>{vis.length}</b> different keywords</span><span className={'st' + (counts.unset ? ' warn' : '')}><b>{counts.unset}</b> need a decision</span>
+        <div className="wk" role="group" aria-label="Week"><button type="button" aria-label="Previous week" disabled={week <= -4} onClick={() => setWeek(week - 1)}>‹</button>
+          <span className="wkl"><small>{week === 0 ? 'This week' : week === -1 ? 'Last week' : Math.abs(week) + ' weeks ago'}</small><b>{label}</b></span>
+          <button type="button" aria-label="Next week" disabled={week >= 0} onClick={() => setWeek(week + 1)}>›</button></div></div></div>
+      <div className="kwstats"><span className="st"><b>{total.toLocaleString()}</b> words written this week</span><span className="st"><b>{vis.length}</b> different keywords</span>
         <span className="st dim info" tabIndex={0} title="Count: how many times customers wrote it (repeats count). Share: its part of all keywords. Change: compared with the 7 days before. To decide what a word is, use the Keywords screen.">ⓘ How to read this</span></div>
       {top.length > 0 && <>
         <div className="podium">{top.map((r, i) => (
           <div key={r.w} className={'pod p' + (i + 1)}><div className="pod-head"><Medal n={i + 1} /><div className="pod-main"><span className="kwlink pod-nm" onClick={() => setDrawer(r.w)}>{r.w}</span><div className="sub">{r.n} time{r.n === 1 ? '' : 's'} · {r.share.toFixed(2)}%</div></div><ChgPill c={r.c} /></div>
             <div className="pod-trend"><Spark v={r.series} w={260} h={38} /></div>
             <div className="pod-foot"><span className="pods">{r.isNew ? <Pill c="info">New</Pill> : null}<Pill c={r.st.c}>{r.st.t}</Pill></span></div></div>))}</div></>}
-      <div className="card rkfilter"><div className="head"><div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
-        <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 180 }} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> Show excluded{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} keywords shown</span></div></div></div>
-      <div className="card scroll">
+      <div className="card scroll rkcard">
+        <div className="kwfilter" style={{ borderTop: 0, paddingTop: 0 }}>
+          <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
+          <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
+            <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+            <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> Show excluded{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} shown</span></div></div>
         {sel.size > 0 && <div className="bulk"><b>{sel.size} selected</b><span className="tools">{[['filler', 'Mark as filler'], ['rude', 'Mark as rude word'], ['mild', 'Mark as mild rude word']].map(([k, l]) => <button key={k} className="btn sm" type="button" disabled={lock} onClick={() => bulk(k)}>{l}</button>)}<button className="btn sm" type="button" onClick={() => bulk('exclude')}>Exclude</button><button className="btn sm ghost" type="button" onClick={() => bulk('clear')}>Clear</button></span>{lock && <span className="lock">Only admins can change these lists.</span>}</div>}
         <table style={{ minWidth: 940 }}><thead><tr><th style={{ width: 34 }}><input type="checkbox" checked={allSel} aria-label="Select all shown" onChange={(e) => setSel((s) => { const n = new Set(s); list.forEach((r) => (e.target.checked ? n.add(r.w) : n.delete(r.w))); return n; })} /></th>
           {th('rank', 'Rank', 'Position by count', ' ')}{th('w', 'Keyword')}{th('type', 'Type')}<th>Trend</th>{th('n', 'Count', 'How many times customers wrote it. Repeating the same message counts.', 'num')}{th('c', 'Change', 'Compared with the previous 7 days.')}{th('st', 'Status', 'What the bot does with this word now.')}<th></th></tr></thead><tbody>
           {list.map((r) => { const ex = p.ignored.has(r.w); const ty = RANK_TYPES[r.t]; const todo = r.st.t === 'Not set yet';
             return (
               <tr key={r.w} className={(ex ? 'excl ' : '') + (todo && !ex ? 'todo' : '')}>
-                <td><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} /></td><td>{r.pos}</td>
+                <td><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} /></td><td><span className="rkn">{r.pos}</span></td>
                 <td>{r.isNew ? <><Pill c="info">New</Pill> </> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span><div className="sub">{r.h}{r.live && !r.isNew ? ' · +' + r.live + ' from Test chat' : ''}{r.isNew && (r.live || 0) > 1 ? ' · ' + r.live + ' times' : ''}</div></td>
-                <td><Pill c={ty[1]} title={TIPS[r.t]}>{ty[0]}</Pill></td><td><Spark v={r.series} w={110} h={28} /></td><td className="num">{r.n}</td><td><ChgPill c={r.c} /></td><td><Pill c={r.st.c}>{r.st.t}</Pill></td>
+                <td><Pill c={ty[1]} title={TIPS[r.t]}>{ty[0]}</Pill></td><td><Spark v={r.series} w={110} h={28} /></td><td className="num"><b>{r.n}</b><div className="mbar"><i style={{ width: Math.max(4, Math.round((r.n * 100) / mxn)) + '%' }} /></div></td><td><ChgPill c={r.c} /></td><td><Pill c={r.st.c}>{r.st.t}</Pill></td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{ex ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button> : null}</td></tr>); })}
-          {!list.length && <tr><td colSpan={10} className="sub">No keyword matches.</td></tr>}</tbody></table></div>
+          {!list.length && <tr><td colSpan={10}><div className="kwempty"><b>{vis.length ? 'No keyword matches this filter.' : 'No words this week.'}</b><span>{vis.length ? 'Try another tab, language or search.' : 'Customer messages appear here as soon as chats come in.'}</span></div></td></tr>}</tbody></table></div>
       {drawer && <KeywordDrawer word={drawer} count={vis.find((r) => r.w === drawer)?.n ?? p.kwMap[drawer]?.n ?? 0} share={vis.find((r) => r.w === drawer)?.share} onClose={() => setDrawer(null)} />}
     </>
   );

@@ -16,6 +16,7 @@ const state = (role: 'admin' | 'staff') => ({
   },
 });
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
+const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
 const REPORT = { topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }] };
 const CONN = () => ({ merchant: { code: 'A', name: 'LuckyPay', language: 'en', tone: 'friendly', entries: 11, logins: ['luckypay'] }, livechat: { baseUrl: 'http://localhost:3000', askUrl: 'http://localhost:3000/api/v1/ai/ask', keys: [], stoppedKeys: 0, liveChats7d: 4, lastLiveChat: null },
   ai: { anthropic: { provider: 'anthropic', configured: true, last4: 'wxyz', updatedAt: '2026-11-12T08:00:00Z', updatedBy: 'admin', using: 'merchant' }, openai: { provider: 'openai', configured: false, last4: null, updatedAt: null, updatedBy: null, using: 'none' } } });
@@ -42,6 +43,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
     : url.startsWith('/api/admin/report') ? REPORT
+    : url.startsWith('/api/admin/ranking') ? RANKING
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
     : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : []))));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
@@ -336,6 +338,20 @@ describe('Control panel', () => {
     expect(screen.getAllByTitle('nobody has typed this yet').length).toBeGreaterThan(0);
     await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
     expect(screen.queryByText('dps')).toBeNull();
+  });
+  it('Keyword ranking: top three, a compact week picker, filters and the table in one card, a bar behind each count', async () => {
+    open('staff', '/admin/rank');
+    expect(await screen.findByRole('heading', { name: 'Keyword ranking' })).toBeTruthy();
+    const week = screen.getByRole('group', { name: 'Week' });
+    expect(within(week).getByText('This week')).toBeTruthy(); expect(within(week).getByText('Nov 10 – Nov 16')).toBeTruthy();
+    expect((within(week).getByRole('button', { name: 'Next week' }) as HTMLButtonElement).disabled).toBe(true);      // nothing after this week
+    expect((within(week).getByRole('button', { name: 'Previous week' }) as HTMLButtonElement).disabled).toBe(false);
+    const rows = document.querySelectorAll('.rkcard tbody tr');
+    expect(rows.length).toBe(2);                                                                                       // the top three are in the cards above, the table starts at rank 4
+    expect(document.querySelectorAll('.rkcard td.num .mbar').length).toBe(2);
+    expect(screen.getByLabelText('Filter keywords').closest('.rkcard')).toBeTruthy();                                // the filter sits in the table card
+    await userEvent.type(screen.getByLabelText('Filter keywords'), 'zzzz');
+    expect(await screen.findByText('No keyword matches this filter.')).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
