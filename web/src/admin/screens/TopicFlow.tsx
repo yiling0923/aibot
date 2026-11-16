@@ -13,7 +13,7 @@ import { useAssign } from './assign';
  * - Every keyword and answer also has a "⇄" menu to move it, for keyboard and touch.
  */
 type Src = { t: 'kw'; i: number } | { t: 'sh'; topic: string; l: string; w: string } | { t: 'entry'; id: number } | { t: 'word'; w: string };
-type Pending = { id: number; kind: 'topic' | 'keyword' | 'answer'; x: number; y: number; text: string; body?: string; topic?: string };
+type Pending = { id: number; kind: 'topic' | 'keyword' | 'answer'; x: number; y: number; text: string; body?: string; topic?: string; qs?: string };
 type Pos = Record<string, { x: number; y: number }>;
 type Kind = 'kw' | 'topic' | 'ans' | 'ho';
 type Node = { key: string; kind: Kind; topic: string; x: number; y: number; w: number; h: number };
@@ -94,11 +94,13 @@ export default function TopicFlow() {
   const createAnswer = (b: Pending) => {
     const name = slug(b.text); const topic = b.topic || '';
     if (!name) return p.toast('Give the answer a name first');
+    const qs = (b.qs || '').split('\n').map((x) => x.trim()).filter(Boolean);
+    if (!qs.length) return p.toast('Type at least one question a customer would ask. The bot finds the answer by these questions.');
     if (!(b.body || '').trim()) return p.toast('Type the English answer first');
     if (!topic) return p.toast('Choose a topic for this answer');
     if (entries.some((e) => e.intent_key === name)) return p.toast('There is already an answer called "' + name + '"');
-    p.edit((x, note) => { x.kb.push({ id: Math.max(0, ...x.kb.map((e) => e.id)) + 1, merchant: p.merchant, intent_key: name, topic, aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: { en: { question_examples: [], answer_text: (b.body || '').trim() } }, dirty: true } as Entry); note('Added answer "' + name + '" to topic "' + topic + '" (' + p.M.name + ')'); });
-    setPend((l) => l.filter((z) => z.id !== b.id)); p.toast('Answer "' + name + '" added to the draft. Open Knowledge base to add example questions or other languages.');
+    p.edit((x, note) => { x.kb.push({ id: Math.max(0, ...x.kb.map((e) => e.id)) + 1, merchant: p.merchant, intent_key: name, topic, aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: { en: { question_examples: qs, answer_text: (b.body || '').trim() } }, dirty: true } as Entry); note('Added answer "' + name + '" to topic "' + topic + '" (' + p.M.name + ')'); });
+    setPend((l) => l.filter((z) => z.id !== b.id)); p.toast('Answer "' + name + '" added to the draft. Press Publish to make it live for customers.');
   };
   const addBlock = (kind: 'topic' | 'keyword' | 'answer', x?: number, y?: number, topic?: string) => {
     const n = pend.length; setPend((l) => [...l, { id: nextId.current++, kind, x: x ?? 40 + n * 20, y: y ?? 30 + n * 70, text: '', body: '', topic }]);
@@ -221,7 +223,7 @@ export default function TopicFlow() {
                   {q && ![...own.map(([a]) => a.variant), ...sharedL.map(([w]) => w)].some(hit) && <span className="sub">No keyword matches.</span>}</div></div><span className="port r" /></div>; }
               if (n.kind === 'ans') { const e = entries.find((x) => x.id === Number(n.key.slice(4))); if (!e) return null; const ty = e.entry_type ?? 'answer'; const ended = !!e.ends_on && e.ends_on < today();
                 return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}</div>
-                  <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>
+                  <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{!Object.values(e.translations as Record<string, { question_examples?: string[] }>).some((x) => x?.question_examples?.length) && <div><span className="badge b-end ended" title="The bot finds an answer by the questions listed for it. Add some in Knowledge base.">no questions yet</span></div>}{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>
                   <span className="port l" /><span className="port r" title="Drag onto a topic to move this answer" onPointerDown={(ev) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, ev, (to) => move({ t: 'entry', id: e.id }, to))} /></div>; }
               const has = entries.some((x) => x.topic === t);
               return <div key={n.key} className={'fc ho' + (has ? '' : ' warn')} style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd">⚑ If not clear</div><div className="bd"><b>{has ? 'Ask once,' : 'A person'}</b><div className="pv">{has ? 'then a person' : 'no answer yet'}</div></div><span className="port l" /></div>;
@@ -229,7 +231,8 @@ export default function TopicFlow() {
             {pend.map((b) => <div key={b.id} className={'fc pend ' + (b.kind === 'topic' ? 'tp' : b.kind === 'answer' ? 'an' : 'kw')} style={{ left: b.x, top: b.y, width: 240 }} onPointerDown={(e) => dragNode('p' + b.id, e, (x, y) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, x, y } : z))))}>
               <div className="hd">{b.kind === 'topic' ? '◆ New topic' : b.kind === 'answer' ? '▤ New answer' : '# New keyword'}<button type="button" className="x" aria-label="Cancel" onClick={() => setPend((l) => l.filter((z) => z.id !== b.id))}>×</button></div>
               <div className="bd"><input type="text" aria-label={b.kind === 'topic' ? 'New topic name' : b.kind === 'answer' ? 'New answer name' : 'New keyword'} placeholder={b.kind === 'topic' ? 'e.g. refund' : b.kind === 'answer' ? 'name, e.g. daily_limit' : 'e.g. depoo'} value={b.text} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, text: e.target.value } : z)))} onKeyDown={(e) => { if (e.key === 'Enter' && b.kind === 'topic') { e.preventDefault(); createTopic(b.id); } }} />
-                {b.kind === 'answer' && <><textarea aria-label="New answer text" rows={3} placeholder="The answer the bot says (English)" value={b.body || ''} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, body: e.target.value } : z)))} />
+                 {b.kind === 'answer' && <><textarea aria-label="Questions customers ask" rows={3} placeholder={'Questions customers ask, one per line\ne.g. what is the daily limit'} value={b.qs || ''} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, qs: e.target.value } : z)))} />
+                  <textarea aria-label="New answer text" rows={3} placeholder="The answer the bot says (English)" value={b.body || ''} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, body: e.target.value } : z)))} />
                   <select className="mv wide" aria-label="Topic for the answer" value={b.topic || ''} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, topic: e.target.value } : z)))}><option value="">Choose a topic…</option>{topics.map((t) => <option key={t} value={t}>{t}</option>)}</select>
                   <button type="button" className="btn sm pri" onClick={() => createAnswer(b)}>Add answer</button></>}
                 {b.kind === 'topic' ? <button type="button" className="btn sm pri" onClick={() => createTopic(b.id)}>Create topic</button>

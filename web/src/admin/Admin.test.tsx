@@ -215,6 +215,7 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByText('Flowchart'));
     await userEvent.click(screen.getByRole('button', { name: /Answer/ }));                        // an Answer block (it no longer jumps to Knowledge base)
     await userEvent.type(screen.getByLabelText('New answer name'), 'daily limit');
+    await userEvent.type(screen.getByLabelText('Questions customers ask'), 'what is the daily limit');
     await userEvent.type(screen.getByLabelText('New answer text'), 'The limit is 5000.');
     await userEvent.selectOptions(screen.getByLabelText('Topic for the answer'), 'deposit');
     await userEvent.click(screen.getByRole('button', { name: 'Add answer' }));
