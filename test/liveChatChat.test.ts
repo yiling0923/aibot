@@ -21,15 +21,15 @@ function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string }
       const isForm = String(req.headers['content-type']).startsWith('multipart/form-data');
       const body = raw && !isForm ? JSON.parse(raw) : {}; if (req.method === 'POST' && !isForm) posts.push(body); const view = (id: string) => { const c = chats.get(id)!; return { publicId: id, status: c.status, aiHandoffStatus: 'none', messages: c.messages }; };
       const reply = (id: string, q: string) => { if (opts.replyAfterMs === null) return; setTimeout(() => chats.get(id)?.messages.push({ senderType: 'ai', body: 'Bot says: ' + q }), opts.replyAfterMs ?? 150); };
-      if (req.method === 'POST' && String(req.headers['content-type']).startsWith('multipart/form-data')) {          // an upload: read the form
+      if (req.method === 'POST' && isForm) {                                                                          // a form: only the upload address takes one, the message address answers like the real LiveChat
+        const up = /^\/widget\/conversations\/([^/]+)\/attachments$/.exec(url.pathname);
+        if (!up) return send(url.pathname.endsWith('/messages') || url.pathname === '/widget/conversations' ? 400 : 404, { error: 'invalid_json', message: 'Widget message request body is invalid.' });
         const part = /name="([^"]+)"; filename="([^"]+)"/.exec(raw); const fields = [...raw.matchAll(/name="([^"]+)"(?!; filename)/g)].map((x) => x[1]);
         if (!part || part[1] !== (opts.fileField ?? 'file')) return send(422, { error: 'the file field must be called ' + (opts.fileField ?? 'file') });
+        if (!chats.has(up[1])) return send(404, {});
         uploads.push({ field: part[1], name: part[2], fields });
-        const form = (n: string) => new RegExp('name="' + n + '"\\r\\n\\r\\n([^\\r]*)').exec(raw)?.[1] ?? '';
-        const vis = form('visitor_session_id'); let id = [...chats].find(([, c]) => c.visitor === vis)?.[0];
-        if (!id) { id = 'conv-' + ++n; chats.set(id, { visitor: vis, status: 'open', messages: [] }); }
-        chats.get(id)!.messages.push({ senderType: 'visitor', body: form('body'), messageType: 'image', attachment: { kind: 'image', name: part[2], url: '/uploads/x.png', mimeType: 'image/png', size: 4 } } as never);
-        reply(id, form('body')); return send(200, { conversation: view(id) });
+        chats.get(up[1])!.messages.push({ senderType: 'visitor', body: part[2], messageType: 'image', attachment: { kind: 'image', name: part[2], url: '/uploads/x.png', mimeType: 'image/png', size: 4 } } as never);
+        reply(up[1], part[2]); return send(200, { conversation: view(up[1]) });
       }
       if (url.pathname === '/widget/conversations/current') { const v = url.searchParams.get('visitor_session_id'); const id = [...chats].find(([, c]) => c.visitor === v)?.[0]; return id ? send(200, { conversation: view(id) }) : send(404, { error: 'none' }); }
       if (url.pathname === '/widget/conversations' && req.method === 'POST') { const id = 'conv-' + ++n; chats.set(id, { visitor: body.visitor_session_id, status: 'open', messages: [{ senderType: 'visitor', body: body.body }] }); reply(id, body.body); return send(200, { conversation: view(id) }); }
@@ -59,19 +59,19 @@ describe('chatting through a LiveChat', () => {
     lc.close();
   });
 
-  it('sends a picture as a form, tries the next field name when LiveChat does not read the first, and the bot answers', async () => {
+  it('uploads a picture to LiveChat\'s upload address as a form (never to the message address), tries the next field name, and the bot answers', async () => {
     const lc = await fakeLiveChat({ fileField: 'attachment' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-up', pollMs: 40, waitMs: 3000 };
     const r = await chatThroughLiveChat({ ...o, file: { name: 'slip.png', type: 'image/png', data: new Uint8Array([137, 80, 78, 71]) } });
     expect(lc.uploads).toHaveLength(1); expect(lc.uploads[0]).toMatchObject({ field: 'attachment', name: 'slip.png' });        // 'file' was refused with 422, 'attachment' was accepted
-    expect(lc.uploads[0].fields).toEqual(expect.arrayContaining(['visitor_session_id', 'body', 'member_external_id']));
-    expect(r.replied).toBe(true); expect(r.messages[0]).toMatchObject({ from: 'customer', text: 'slip.png', attachment: { name: 'slip.png', url: lc.base + '/uploads/x.png' } });
+    expect(lc.uploads[0].fields).toEqual(expect.arrayContaining(['visitor_session_id', 'conversation_id']));
+    expect(r.replied).toBe(true); expect(r.messages.find((m) => m.attachment)).toMatchObject({ from: 'customer', text: 'slip.png', attachment: { name: 'slip.png', url: lc.base + '/uploads/x.png' } });
     lc.close();
   });
   it('says what LiveChat answered when no field name works, and does not retry on other errors', async () => {
     const lc = await fakeLiveChat({ fileField: 'nothing-we-try' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-up2', pollMs: 40, waitMs: 500 };
-    await expect(chatThroughLiveChat({ ...o, file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } })).rejects.toThrow(/did not accept the file \(422.*Tried the form fields: file, attachment, image/s);
+    await expect(chatThroughLiveChat({ ...o, file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } })).rejects.toThrow(/addresses and form fields tried were: POST \/widget\/conversations\/conv-\d+\/attachments \(field "file"\) -> 422.*\(field "image"\) -> 422.*\/widget\/uploads \(field "file"\) -> 404/s);
     const wrongTenant = await chatThroughLiveChat({ ...o, tenant: '9', file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } }).catch((e: Error) => e.message);
-    expect(String(wrongTenant)).toMatch(/404/);                                                                                  // a 404 is not retried with another field name
+    expect(String(wrongTenant)).toMatch(/404/);                                                                                  // an unknown tenant stops at once
     lc.close();
   });
   it('reads a picture an agent sent: the link is completed with the LiveChat address, and only safe links are kept', async () => {
@@ -142,7 +142,7 @@ describe.skipIf(!reachable)('the LiveChat test route (needs TEST_DATABASE_URL)',
     expect((await post(staff, { baseUrl: lc.base, visitor: 'vis-route-up', file: { name: 'a.png', type: 'image/png', data: png } })).statusCode).toBe(403);
     const ok = await f({ name: '../../evil slip.png', type: 'image/png', data: png });
     expect(ok.statusCode).toBe(200); expect(lc.uploads[0].name).toBe('.._.._evil slip.png');                              // a path in the name is made harmless
-    expect(ok.json().messages[0].attachment).toMatchObject({ name: '.._.._evil slip.png', mimeType: 'image/png' });
+    expect(ok.json().messages.find((m: { attachment?: unknown }) => m.attachment).attachment).toMatchObject({ name: '.._.._evil slip.png', mimeType: 'image/png' });
     lc.close();
   });
 });

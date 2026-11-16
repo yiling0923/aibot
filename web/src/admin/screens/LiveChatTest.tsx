@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
+import { IconBtn } from '../ui';
 
 interface Attachment { kind: string; name: string; url: string; mimeType: string; size: number | null }
 interface Line { from: 'customer' | 'bot' | 'agent' | 'system'; sender: string; text: string; attachment?: Attachment }
+/** A small paperclip drawn like the panel's other icons (the 📎 emoji looks different on every computer). */
+const Clip = () => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: '-2px' }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></svg>;
 const kb = (n: number | null) => (n === null ? '' : n < 1024 ? n + ' B' : n < 1048576 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
 /** A file in a message: a picture is shown (click to open it big), anything else is a link with its name. */
 function Attached({ a }: { a: Attachment }) {
@@ -11,8 +14,8 @@ function Attached({ a }: { a: Attachment }) {
   const isImg = (a.kind === 'image' || a.mimeType.startsWith('image/')) && !bad;
   return isImg
     ? <a className="lcpic" href={a.url} target="_blank" rel="noreferrer" title={'Open ' + a.name}><img src={a.url} alt={a.name} loading="lazy" onError={() => setBad(true)} /><span className="sub">{a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span></a>
-    : !a.url ? <span className="lcfile">📎 {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span>
-    : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer">📎 {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' (the picture could not be loaded here)' : ''}</a>;
+    : !a.url ? <span className="lcfile"><Clip /> {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span>
+    : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer"><Clip /> {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' (the picture could not be loaded here)' : ''}</a>;
 }
 interface Result { conversationId: string | null; status: string | null; handoff: string | null; messages: Line[]; replied: boolean }
 const store = (k: string, dflt: string) => { try { return localStorage.getItem(k) || dflt; } catch { return dflt; } };
@@ -106,10 +109,10 @@ export default function LiveChatTest() {
       <div className="lcstat sub">{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/*,application/pdf,.txt,.csv,.doc,.docx,.xls,.xlsx" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
-        <button className="btn" type="button" aria-label="Attach a picture or file" title="Attach a picture or file" disabled={busy} onClick={() => fileIn.current?.click()}>📎</button>
+        <IconBtn tip="Attach a picture or file" onClick={() => { if (!busy) fileIn.current?.click(); }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></IconBtn>
         <input aria-label="Message" value={text} placeholder={pick ? 'Add a line to go with it (optional)' : 'Type a customer message'} onChange={(e) => setText(e.target.value)} disabled={busy} />
         <button className="btn pri" type="submit" disabled={busy || (!text.trim() && !pick)}>{busy ? 'Waiting…' : 'Send'}</button></form>
-      {pick && <div className="lcpick"><span>📎 {pick.name} · {kb(pick.size)}</span><button type="button" className="x" aria-label="Remove the file" onClick={() => setPick(null)}>×</button></div>}
+      {pick && <div className="lcpick"><span><Clip /> {pick.name} · {kb(pick.size)}</span><button type="button" className="x" aria-label="Remove the file" onClick={() => setPick(null)}>×</button></div>}
     </div>
   );
 }

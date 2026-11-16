@@ -16,6 +16,8 @@ export interface ChatOpts {
 
 /** The field names tried, in this order, for the file in the upload (LiveChat answers 400, 415 or 422 when the name is not the one it reads). */
 export const FILE_FIELDS = ['file', 'attachment', 'image'];
+/** The upload addresses tried in turn ({id} is the chat). */
+export const UPLOAD_PATHS = ['/widget/conversations/{id}/attachments', '/widget/conversations/{id}/uploads', '/widget/conversations/{id}/files', '/widget/attachments', '/widget/uploads', '/widget/upload'];
 
 const kindOf = (sender: string): ChatLine['from'] => (/visitor|customer|member|user/i.test(sender) ? 'customer' : /agent|staff|human|operator/i.test(sender) ? 'agent' : /system|event/i.test(sender) ? 'system' : 'bot');
 
@@ -52,24 +54,41 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
   const before = id ? lines(await read(id)).filter((m) => m.from !== 'customer').length : 0;
   const who = o.member === undefined ? { id: 'm-100', name: 'Tester', rank: 'GOLD' } : o.member;       // null: not logged in, so no member fields are sent
   const msg = { visitor_session_id: o.visitor, visitor_name: who?.name ?? 'Guest', body: text, ...(who ? { member_external_id: who.id, member_name: who.name, ...(who.rank ? { member_rank: who.rank } : {}) } : {}) };
-  // A file goes as a form (multipart), the way a browser uploads it. If LiveChat does not read the field name, the next name is tried (only after a 400, 415 or 422, so nothing is sent twice).
-  const upload = async (path: string): Promise<Record<string, any> | null> => {                                      // eslint-disable-line @typescript-eslint/no-explicit-any
-    const file = o.file!; let last = '';
-    for (const field of FILE_FIELDS) {
-      const form = new FormData();
-      for (const [k, v] of Object.entries(msg)) if (k !== 'body' || text) form.append(k, String(v));
-      if (!text) form.append('body', file.name);
-      form.append(field, new Blob([file.data as unknown as ArrayBuffer], { type: file.type }), file.name);
-      let r: Response;
-      try { r = await f(base + path, { method: 'POST', headers: { 'X-Tenant-ID': o.tenant }, body: form, signal: AbortSignal.timeout(30_000) }); }
-      catch { throw new Error(`Could not reach LiveChat at ${base}. Is it running?`); }
-      if (r.ok) return (await r.json().catch(() => null)) as Record<string, any> | null;                            // eslint-disable-line @typescript-eslint/no-explicit-any
-      last = `${r.status} ${(await r.text().catch(() => '')).slice(0, 300)}`.trim();
-      if (![400, 415, 422].includes(r.status)) break;
+  // A file cannot go in the message itself (LiveChat's message address answers "invalid_json" to a form), so it is uploaded to a separate address, as a form.
+  // The address was not known when this was written: the likely ones are tried in turn (404 or 405: not this one, try the next; 400, 415 or 422: the address is right but
+  // the form field is not, try the next field name) and every answer is kept, so a failure shows exactly what LiveChat said.
+  const upload = async (convId: string): Promise<void> => {
+    const file = o.file!; const tried: string[] = []; const cid = encodeURIComponent(convId);
+    for (const path of UPLOAD_PATHS.map((p) => p.replace('{id}', cid))) {
+      for (const field of FILE_FIELDS) {
+        const form = new FormData();
+        form.append('visitor_session_id', o.visitor); form.append('conversation_id', convId); if (text) form.append('body', text);
+        form.append(field, new Blob([file.data as unknown as ArrayBuffer], { type: file.type }), file.name);
+        let r: Response;
+        try { r = await f(base + path, { method: 'POST', headers: { 'X-Tenant-ID': o.tenant }, body: form, signal: AbortSignal.timeout(30_000) }); }
+        catch { throw new Error(`Could not reach LiveChat at ${base}. Is it running?`); }
+        const full = await r.text().catch(() => ''); const body = full.slice(0, 200);
+        tried.push(`POST ${path} (field "${field}") -> ${r.status} ${body}`.trim());
+        if (r.ok) {
+          let j: Record<string, any> | null = null; try { j = JSON.parse(full); } catch { /* an answer that is not JSON: the message is assumed to be made */ }   // eslint-disable-line @typescript-eslint/no-explicit-any
+          const att = j?.attachment ?? (j?.url ? j : null);
+          if (att && !j?.message && !j?.conversation) {                                              // the upload only stored the file: now the message that carries it
+            const kind = file.type.startsWith('image/') ? 'image' : 'file';
+            await call(`/widget/conversations/${cid}/messages`, 'POST', { ...msg, body: text || file.name, message_type: kind, attachment: att });
+          }
+          return;
+        }
+        if (r.status === 404 || r.status === 405) break;                                              // not the address: the next one
+        if (![400, 415, 422].includes(r.status)) throw new Error(`LiveChat did not accept the file. ${tried.join(' | ')}`);
+      }
     }
-    throw new Error(`LiveChat did not accept the file (${last}). Tried the form fields: ${FILE_FIELDS.join(', ')}. Tell the developer this message so the upload can be matched to LiveChat.`);
+    throw new Error(`LiveChat did not accept the file. The addresses and form fields tried were: ${tried.join(' | ')}. Tell the developer this message so the upload can be matched to LiveChat.`);
   };
-  if (o.file) { if (id) await upload(`/widget/conversations/${encodeURIComponent(id)}/messages`); else id = (await upload('/widget/conversations'))?.conversation?.publicId ?? null; }
+  if (o.file) {
+    if (!id) id = (await call('/widget/conversations', 'POST', { ...msg, body: text || o.file.name }))?.conversation?.publicId ?? null;      // a chat must exist first
+    if (!id) throw new Error('LiveChat did not start a chat. Check the tenant id.');
+    await upload(id);
+  }
   else if (id) await call(`/widget/conversations/${encodeURIComponent(id)}/messages`, 'POST', msg);
   else id = (await call('/widget/conversations', 'POST', msg))?.conversation?.publicId ?? null;
   if (!id) throw new Error('LiveChat did not start a chat. Check the tenant id.');
