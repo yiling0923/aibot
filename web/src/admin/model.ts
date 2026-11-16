@@ -53,6 +53,17 @@ export const langState = (e: { translations: Entry['translations'] }, l: string)
 };
 
 /** Every topic one merchant can use: the shared template, plus the topics that merchant made itself (its own keywords with a topic name of its own). */
+/** What stops the bot from using an answer, in plain words (empty when it is ready). */
+export const entryProblems = (e: { status?: string; translations: unknown }): string[] => {
+  const tr = Object.values((e.translations ?? {}) as Record<string, { answer_text?: string; question_examples?: string[] }>);
+  const out: string[] = [];
+  if (e.status === 'draft') out.push('Status is Draft, so the bot ignores it. Set it to Live.');
+  if (!(tr as { answer_text?: string }[]).some((t) => t?.answer_text?.trim())) out.push('There is no answer text yet.');
+  const most = Math.max(0, ...tr.map((t) => t?.question_examples?.length ?? 0));
+  if (most === 0) out.push('There are no example questions, so the bot cannot find this answer. Add at least 3, with slang.');
+  else if (most < 3) out.push('Only ' + most + ' example question' + (most === 1 ? '' : 's') + '. Add at least 3, with slang, so the bot finds it more often.');
+  return out;
+};
 export const topicNames = (d: Draft, merchant: string): string[] => [...new Set([...Object.keys(d.aliases), ...(d.mAliases[merchant] ?? []).map((a) => a.canonical)])];
 export const topicList = (d: Draft, merchant?: string) => (merchant ? topicNames(d, merchant) : Object.keys(d.aliases)).filter((k) => !['balance', 'transactions', 'points'].includes(k));
 /** A topic that belongs to one merchant: its name and keywords are that merchant's own. Only adds what is not there yet. `lang` is the language of the words (guessed from the letters when not given). */

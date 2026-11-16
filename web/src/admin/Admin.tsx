@@ -3,7 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import '../styles/admin.css';
 import { api } from '../lib/api';
 import { PanelProvider, usePanel } from './store';
-import { snapshotOf } from './model';
+import { entryProblems, snapshotOf } from './model';
 import { Modal, NavIcon } from './ui';
 import Kb from './screens/Kb';
 import Import from './screens/Import';
@@ -126,10 +126,14 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
   };
   if (!res) return <Modal small label="Publish" onClose={onClose}><h2>Checking your changes…</h2><div className="note">Running the sample customer messages on your draft.</div></Modal>;
   const fails = res.total - res.pass; const n = p.changes.length;
+  const risky = p.draft.kb.filter((e) => e.dirty).map((e) => ({ e, why: entryProblems(e) })).filter((x) => x.why.length);   // answers changed in this draft that the bot cannot use yet
   return (
     <Modal small label="Publish" onClose={onClose}>
       <h2>Publish {n} change{n > 1 ? 's' : ''}?</h2>
       <ul className="plain">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
+      {risky.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>Check these answers first:</b>
+        <ul className="plain">{risky.map(({ e, why }) => <li key={e.merchant + e.id}><b>{e.intent_key}</b> ({p.merchants.find((m) => m.code === e.merchant)?.name ?? e.merchant}): {why[0]}</li>)}</ul>
+        <div className="sub">You can still publish, but the bot will not use these answers well yet. Choose Cancel, then open Knowledge base to fix them.</div></div>}
       <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed (listed below). You can still publish.` : '.'} The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.</div>
       {fails > 0 && <ul className="plain" aria-label="Failed tests">{res.results.filter((t) => !t.ok).slice(0, 6).map((t, i) => <li key={i}><b>{p.merchants.find((m) => m.code === t.merchant)?.name ?? t.merchant}</b>: “{t.message}” should be {t.expected}, the bot gave {t.got}</li>)}{fails > 6 && <li className="sub">and {fails - 6} more</li>}</ul>}
       <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish'}</button></div>

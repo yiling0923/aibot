@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, langState, slug, topicList, topicNames, type Entry } from '../model';
+import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 
 type Tr = { question_examples: string[]; answer_text: string };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
-const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: {} });
+const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'live', category: 'General', translations: {} });
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
@@ -35,7 +35,7 @@ export default function Kb() {
       <div className="card scroll"><table><thead><tr><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
-            <td><b>{e.intent_key}</b></td>
+            <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).join(' ')}>needs work</span> : null}</td>
             <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">missing</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' (alone)' : ''}</Pill></> : null}</td>
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
             <td>{trOf(e, 'en').answer_text.slice(0, 110)}</td>
@@ -102,7 +102,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
       else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
     });
-    onClose(); p.toast('Saved to draft');
+    onClose(); const left = entryProblems(clean); p.toast(left.length ? 'Saved to draft, but the bot cannot use it yet: ' + left[0] : 'Saved to draft. Press Publish to make it live.');
   };
   const del = () => {
     p.edit((d, note) => { d.kb = d.kb.filter((e) => e.id !== ed.id); note('Deleted entry "' + ed.intent_key + '" (' + p.M.name + ')'); });
@@ -144,6 +144,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
         <div className="it" key={i}><span>{x}</span><span>
           <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) }, translations: { ...ed.translations, [ed.tab]: { ...t, question_examples: [...t.question_examples, x] } } })}>Approve</button>{' '}
           <button className="btn sm" type="button" onClick={() => set({ sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) } })}>Dismiss</button></span></div>))}</div>}
+      {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>Before the bot can use this answer:</b><ul className="plain">{pr.map((x, i) => <li key={i}>{x}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>✓ Ready: Live, with an answer and example questions. Save it, then Publish.</div>; })()}
       <div className="head" style={{ marginTop: 'auto' }}><span className="sub">Saved as a draft change until you publish.</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>Delete</button> : null}<button className="btn pri" type="button" onClick={save}>Save to draft</button></span></div>
     </Modal>
   );

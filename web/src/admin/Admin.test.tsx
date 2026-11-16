@@ -225,6 +225,13 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: /If not clear/ }));
     expect(document.querySelector('.fc.ho')).not.toBeNull();
   });
+  it('warns before publishing an answer the bot cannot use yet', async () => {
+    open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByText('Add entry'));
+    await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'promo_two');
+    expect(screen.getByText(/Before the bot can use this answer/)).toBeTruthy();                // the checklist shows what is missing
+    expect(screen.getByText(/no example questions/i)).toBeTruthy();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
