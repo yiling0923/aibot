@@ -173,6 +173,17 @@ describe('Control panel', () => {
     expect((screen.getByRole('button', { name: 'Save markup' }) as HTMLButtonElement).disabled).toBe(false);
     expect(screen.getByText('claude-haiku-5-5')).toBeTruthy();
   });
+  it('usage and billing: coloured tiles, a badge per merchant with the biggest charge first, and one Pricing card', async () => {
+    open('admin', '/admin/billing');
+    expect(await screen.findByText('Per merchant')).toBeTruthy();
+    expect(document.querySelectorAll('.btiles .rptile').length).toBe(4); expect(document.querySelector('.btiles .rptile.strong')?.textContent).toMatch(/To charge/);
+    const names = [...document.querySelectorAll('tbody tr td:first-child b')].map((x) => x.textContent).filter((x) => x === 'LuckyPay' || x === 'SwiftWallet');
+    expect(names).toEqual(['LuckyPay', 'SwiftWallet']);                                              // the one that costs most is first
+    expect(document.querySelectorAll('.av').length).toBe(2);
+    const card = screen.getByRole('heading', { name: 'Pricing' }).closest('.card') as HTMLElement;
+    expect(within(card).getByRole('heading', { name: 'Markup' })).toBeTruthy(); expect(within(card).getByRole('heading', { name: 'Prices per model' })).toBeTruthy();
+    expect(screen.getByText(/Showing/).textContent).toMatch(/2026-11-0?1.*to.*20/);
+  });
   it('keeps usage and billing for admins only, also in the menu', async () => {
     open('staff', '/admin/billing');
     expect(await screen.findByText('Only an admin can use this screen.')).toBeTruthy();

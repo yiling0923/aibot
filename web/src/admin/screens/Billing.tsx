@@ -3,6 +3,14 @@ import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { Pill } from '../ui';
 
+const TINTS: [string, string][] = [['#e3f1f3', '#0f6f78'], ['#efe9fb', '#6d3fc0'], ['#fdecdc', '#b45309'], ['#e2f3ea', '#177a4b'], ['#e8f1fb', '#2563a8'], ['#fbe6ee', '#be185d']];
+/** A round badge with the first letters of a merchant's name, in a soft colour that stays the same for the same merchant. */
+function Av({ name, seed }: { name: string; seed: string }) {
+  let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const [bg, fg] = TINTS[h % TINTS.length]; const ini = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  return <span className="av" style={{ background: bg, color: fg }} aria-hidden="true">{ini}</span>;
+}
+
 interface Row { code: string; name: string; chats: number; calls: number; inputTokens: number; outputTokens: number; totalTokens: number; cost: number; charge: number; ownKeyCalls: number; ownKeyTokens: number; unpricedCalls: number; problem?: string }
 interface Price { provider: 'anthropic' | 'openai'; model: string; inputPerMTok: number; outputPerMTok: number; updatedBy: string | null; updatedAt: string }
 interface Report {
@@ -45,19 +53,19 @@ export default function Billing() {
         <div className="sub">What each merchant used the AI for in the period, and what to charge for it. Tokens are the words the AI reads and writes; the provider bills by the million.</div></div>
         <div className="tools"><div className="segs" role="group" aria-label="Period">
           {([['this', 'This month'], ['last', 'Last month'], ['30', 'Last 30 days'], ['custom', 'Choose dates']] as [Preset, string][]).map(([k, l]) => <button key={k} type="button" aria-pressed={preset === k} onClick={() => setPreset(k)}>{l}</button>)}</div>
-          <a className="btn" style={{ textDecoration: 'none', color: 'inherit' }} href={`/api/admin/billing.csv?from=${from}&to=${to}`}>Download CSV</a></div></div>
+          <a className="btn dl" href={`/api/admin/billing.csv?from=${from}&to=${to}`}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>Download CSV</a></div></div>
         {preset === 'custom' && <div style={{ display: 'flex', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
           <label className="fld"><span>From</span><input type="date" value={custom.from} max={custom.to || undefined} onChange={(e) => setCustom({ ...custom, from: e.target.value })} /></label>
           <label className="fld"><span>To</span><input type="date" value={custom.to} min={custom.from || undefined} onChange={(e) => setCustom({ ...custom, to: e.target.value })} /></label></div>}
-        <div className="sub" style={{ marginTop: 8 }}>Showing {from} to {to}.</div>
+        <div className="rangechip">Showing <b>{from}</b> to <b>{to}</b></div>
         {err && <div className="note" style={{ background: 'var(--badbg)' }}>{err}</div>}</div>
 
       {r && t && <>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: 14 }}>
-          <Tile label="AI calls" value={n0(t.calls)} note={`${n0(t.chats)} real chats`} />
-          <Tile label="Tokens" value={n0(t.totalTokens)} note={`${n0(t.inputTokens)} read · ${n0(t.outputTokens)} written`} />
-          <Tile label="AI cost" value={usd(t.cost)} note="paid to the AI provider on the shared key" />
-          <Tile label="To charge" value={usd(t.charge)} note={`cost + ${r.markupPct}% markup`} strong />
+        <div className="btiles">
+          <Tile label="AI calls" value={n0(t.calls)} note={`${n0(t.chats)} real chats`} tint="#7fa8e8" />
+          <Tile label="Tokens" value={n0(t.totalTokens)} note={`${n0(t.inputTokens)} read · ${n0(t.outputTokens)} written`} tint="#9b8bd8" />
+          <Tile label="AI cost" value={usd(t.cost)} note="paid to the AI provider on the shared key" tint="#f0c27b" />
+          <Tile label="To charge" value={usd(t.charge)} note={`cost + ${r.markupPct}% markup`} tint="var(--accent)" strong />
         </div>
         {r.unpricedModels.length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}>
           <b>No price set for {r.unpricedModels.map((m) => m.model).join(', ')}.</b> Its tokens are counted, but its cost shows as $0.00 until you set the price below ({calls(r.unpricedModels.reduce((a, m) => a + m.calls, 0))} waiting).</div>}
@@ -66,32 +74,31 @@ export default function Billing() {
           <div style={{ overflowX: 'auto' }}><table style={{ marginTop: 8 }}>
             <thead><tr><th>Merchant</th><th className="num">Chats</th><th className="num">AI calls</th><th className="num">Tokens read</th><th className="num">Tokens written</th><th className="num">Total tokens</th><th className="num">AI cost</th><th className="num">To charge</th><th>Notes</th></tr></thead>
             <tbody>
-              {r.merchants.map((m) => (
-                <tr key={m.code}><td><b>{m.name}</b> <span className="mono sub">{m.code}</span></td>
+              {[...r.merchants].sort((a, b) => b.charge - a.charge || b.totalTokens - a.totalTokens || a.name.localeCompare(b.name)).map((m) => (
+                <tr key={m.code} className={m.calls || m.chats === 0 ? '' : 'quiet'}><td><div className="mcell"><Av name={m.name} seed={m.code} /><div><b>{m.name}</b> <span className="mono sub">{m.code}</span></div></div></td>
                   <td className="num">{n0(m.chats)}</td><td className="num">{n0(m.calls)}</td><td className="num">{n0(m.inputTokens)}</td><td className="num">{n0(m.outputTokens)}</td><td className="num">{n0(m.totalTokens)}</td>
                   <td className="num">{usd(m.cost)}</td><td className="num"><b>{usd(m.charge)}</b></td>
                   <td>{m.ownKeyCalls > 0 && <Pill c="info" title="These calls used the merchant's own AI key, so the merchant pays the AI provider for them. They are not in AI cost or To charge.">Own key: {calls(m.ownKeyCalls)}</Pill>}{m.unpricedCalls > 0 && <> <Pill c="warn">{calls(m.unpricedCalls)} not priced</Pill></>}{m.problem && <> <Pill c="bad" title={m.problem}>Chats not counted</Pill></>}</td></tr>
               ))}
               <tr style={{ fontWeight: 700 }}><td>Total</td><td className="num">{n0(t.chats)}</td><td className="num">{n0(t.calls)}</td><td className="num">{n0(t.inputTokens)}</td><td className="num">{n0(t.outputTokens)}</td><td className="num">{n0(t.totalTokens)}</td><td className="num">{usd(t.cost)}</td><td className="num">{usd(t.charge)}</td><td /></tr>
             </tbody></table></div>
-          {!t.calls && <div className="sub" style={{ marginTop: 8 }}>No AI calls in this period. The bot only uses the AI when a message matches no keyword, when a new keyword is described, or when you translate an answer, and only for merchants with an AI key.</div>}</div>
+          {!t.calls && <div className="note" style={{ marginTop: 10 }}><b>No AI used in this period.</b> The bot only uses the AI when a message matches no keyword, when a new keyword is described, or when you translate an answer, and only for merchants with an AI key.</div>}</div>
 
         {r.byKind.length > 0 && <div className="card"><h3>What the AI was used for</h3>
           <table style={{ marginTop: 8 }}><thead><tr><th>Use</th><th className="num">Calls</th><th className="num">Tokens</th><th className="num">Cost</th></tr></thead>
             <tbody>{r.byKind.map((k) => <tr key={k.kind}><td>{KIND[k.kind] ?? k.kind}</td><td className="num">{n0(k.calls)}</td><td className="num">{n0(k.totalTokens)}</td><td className="num">{usd(k.cost)}</td></tr>)}</tbody></table></div>}
 
-        <Markup pct={r.markupPct} onSaved={load} />
-        <Prices prices={r.prices} onChanged={load} />
+        <div className="card pricing"><h3>Pricing</h3>
+          <Markup pct={r.markupPct} onSaved={load} />
+          <Prices prices={r.prices} onChanged={load} /></div>
       </>}
     </>
   );
 }
 
-function Tile({ label, value, note, strong }: { label: string; value: string; note: string; strong?: boolean }) {
+function Tile({ label, value, note, tint, strong }: { label: string; value: string; note: string; tint: string; strong?: boolean }) {
   return (
-    <div className="card" style={{ margin: 0, ...(strong ? { borderColor: 'var(--accent)' } : null) }}>
-      <div className="sub">{label}</div><div style={{ fontSize: 26, fontWeight: 700, margin: '2px 0' }}>{value}</div><div className="sub">{note}</div>
-    </div>
+    <div className={'rptile' + (strong ? ' strong' : '')}><i style={{ background: tint }} /><small>{label}</small><b>{value}</b><span>{note}</span></div>
   );
 }
 
@@ -99,7 +106,7 @@ function Markup({ pct, onSaved }: { pct: number; onSaved: () => Promise<void> })
   const p = usePanel(); const [v, setV] = useState(String(pct)); useEffect(() => setV(String(pct)), [pct]);
   const save = async () => { try { await api('/api/admin/billing/markup', { pct: Number(v) }); await onSaved(); p.toast('Markup saved'); } catch (e) { p.toast((e as Error).message); } };
   return (
-    <div className="card"><h3>Markup</h3>
+    <div className="psec"><h4>Markup</h4>
       <div className="sub">The extra percent added to the AI cost when you charge a merchant. 0 charges exactly what the provider charged you. It applies to the whole period shown, including past days.</div>
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 8 }}>
         <input type="number" min="0" max="1000" step="0.5" value={v} onChange={(e) => setV(e.target.value)} style={{ width: 110 }} aria-label="Markup percent" /> %
@@ -119,7 +126,7 @@ function Prices({ prices, onChanged }: { prices: Price[]; onChanged: () => Promi
     try { await api('/api/admin/billing/price/remove', { provider: x.provider, model: x.model }); await onChanged(); } catch (e) { p.toast((e as Error).message); }
   };
   return (
-    <div className="card"><h3>Prices</h3>
+    <div className="psec"><h4>Prices per model</h4>
       <div className="sub">US dollars per million tokens, as the AI provider publishes them. Check them against the provider's current price list: the starting prices were copied once and can go out of date. A price applies to calls from the moment you save it; earlier calls keep the price they had.</div>
       <div style={{ overflowX: 'auto' }}><table style={{ marginTop: 8 }}>
         <thead><tr><th>Provider</th><th>Model</th><th className="num">Read (per 1M)</th><th className="num">Written (per 1M)</th><th>Last changed</th><th /></tr></thead>

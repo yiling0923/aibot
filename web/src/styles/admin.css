@@ -568,3 +568,12 @@ td.num .mbar{height:4px;width:70px;margin:4px 0 0 auto;background:var(--surface2
 .pbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 2px}.pbar input[type=search]{width:min(320px,100%)}
 .card .ptable{margin-top:14px}
 .ptable tr.row{cursor:pointer}.ptable tr.row:hover td{background:var(--surface2)}
+
+/* Usage & billing: soft tiles, a badge per merchant, one pricing card */
+.btiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.rptile.strong{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}
+.rangechip{display:inline-block;margin-top:10px;background:var(--surface2);border-radius:99px;padding:3px 13px;font-size:12.5px;color:var(--muted)}.rangechip b{color:var(--fg)}
+.btn.dl{display:inline-flex;align-items:center;gap:7px;text-decoration:none;color:inherit}
+tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
+.pricing{display:flex;flex-direction:column;gap:6px}.pricing .psec+.psec{border-top:1px solid var(--line);padding-top:16px;margin-top:10px}
+.pricing h4{margin:0 0 4px;font-size:14px}
