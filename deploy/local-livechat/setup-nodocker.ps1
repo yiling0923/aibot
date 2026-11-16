@@ -90,8 +90,13 @@ if ($MySqlDir) {
   if (-not (Test-Path (Join-Path $MySqlDir 'bin\mysqld.exe'))) { throw "No bin\mysqld.exe in $MySqlDir. Point -MySqlDir at the folder that contains the bin folder." }
   $mysqlRoot = (Resolve-Path $MySqlDir).Path
 } else {
+  if ($MySqlZip -and ((Split-Path $MySqlZip -Leaf) -match 'mysql-(\d+\.\d+\.\d+)-winx64')) { $MySqlVersion = $Matches[1] }   # a zip of another 8.4 version: use the folder name of that version
   $mysqlRoot = Join-Path $ToolsDir "mysql-$MySqlVersion-winx64"
   Get-Zip @("https://dev.mysql.com/get/Downloads/MySQL-8.4/mysql-$MySqlVersion-winx64.zip", "https://downloads.mysql.com/archives/get/p/23/file/mysql-$MySqlVersion-winx64.zip") $ToolsDir "mysql-$MySqlVersion-winx64\bin\mysqld.exe" $MySqlZip
+  if (-not (Test-Path (Join-Path $mysqlRoot 'bin\mysqld.exe'))) {   # the zip unpacked into a folder with another name: find it
+    $found = Get-ChildItem $ToolsDir -Recurse -Filter mysqld.exe -Depth 4 -ErrorAction SilentlyContinue | Where-Object { $_.FullName -match '\\bin\\mysqld\.exe$' } | Select-Object -First 1
+    if ($found) { $mysqlRoot = $found.Directory.Parent.FullName }
+  }
 }
 $mysqld = Join-Path $mysqlRoot 'bin\mysqld.exe'; $mysql = Join-Path $mysqlRoot 'bin\mysql.exe'; $mysqladmin = Join-Path $mysqlRoot 'bin\mysqladmin.exe'
 $data = Join-Path $ToolsDir 'mysql-data'
