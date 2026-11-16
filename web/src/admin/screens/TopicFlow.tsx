@@ -141,9 +141,14 @@ export default function TopicFlow() {
     };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
-  const html5Drop = (topic: string) => (e: DragEvent) => { e.preventDefault(); setOver(null); try { move(JSON.parse(e.dataTransfer.getData(MIME)) as Src, topic); } catch { /* not ours */ } };
+  const html5Drop = (topic: string) => (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setOver(null); try { move(JSON.parse(e.dataTransfer.getData(MIME)) as Src, topic); } catch { /* not ours */ } };
+  /** The topic lane under the pointer: dropping a word anywhere in a lane (on its keywords, answers or the empty space) puts it in that topic. */
+  const laneAt = (cx: number, cy: number) => { const c = toCanvas(cx, cy); return lanes.find((l) => c.x >= l.x && c.x <= l.x + l.w && c.y >= l.y && c.y <= l.y + l.h)?.topic ?? null; };
+  const onCanvasOver = (e: DragEvent) => { e.preventDefault(); const t = laneAt(e.clientX, e.clientY); if (t !== over) setOver(t); };
   const onCanvasDrop = (e: DragEvent) => {
     e.preventDefault(); let k = ''; try { k = e.dataTransfer.getData('application/x-aibot-block'); } catch { /* none */ }
+    const t = laneAt(e.clientX, e.clientY); setOver(null);
+    if (t) { try { const src = JSON.parse(e.dataTransfer.getData(MIME)) as Src; move(src, t); return; } catch { /* not a word or keyword */ } }
     if (k === 'topic' || k === 'keyword') { const c = toCanvas(e.clientX, e.clientY); addBlock(k, Math.max(0, c.x - 100), Math.max(0, c.y - 30)); }
   };
   const moveMenu = (label: string, from: string, src: Src) => <select className="mv" aria-label={label} value="" onChange={(e) => e.target.value && move(src, e.target.value)}>
@@ -169,10 +174,10 @@ export default function TopicFlow() {
         {unset.length > 0 && <><h4 style={{ marginTop: 14 }}>Words not set yet</h4><div className="sub" style={{ marginBottom: 6 }}>Drag onto a topic</div>
           <div className="chips">{unset.map((r) => <span key={r.w} className="chip ro" draggable onDragStart={(e) => { e.dataTransfer.setData(MIME, JSON.stringify({ t: 'word', w: r.w } as Src)); }}>{r.w}<span className="n">{r.n}</span></span>)}</div></>}
       </aside>
-      <div className="flowcanvas" ref={canvas} onDragOver={(e) => e.preventDefault()} onDrop={onCanvasDrop}>
+      <div className="flowcanvas" ref={canvas} onDragOver={onCanvasOver} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(null); }} onDrop={onCanvasDrop}>
         <div style={{ width: width * scale, height: height * scale }}>
           <div className="flowinner" style={{ position: 'relative', width, height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
-            {lanes.map((l) => <div key={'lane' + l.topic} className="lane" style={{ left: l.x, top: l.y, width: l.w, height: l.h }}><span className="lt">{l.topic}</span></div>)}
+            {lanes.map((l) => <div key={'lane' + l.topic} className={'lane' + (over === l.topic ? ' over' : '')} style={{ left: l.x, top: l.y, width: l.w, height: l.h }}><span className="lt">{l.topic}</span></div>)}
             <svg className="flowedges" width={width} height={height} aria-hidden="true">
               <defs>{(['kw', 'ans', 'ho'] as const).map((k) => <marker key={k} id={'arr-' + k} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className={'ar-' + k} /></marker>)}
                 <marker id="arr-live" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className="ar-live" /></marker></defs>
