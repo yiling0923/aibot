@@ -85,6 +85,10 @@ describe.skipIf(!reachable)('saved handoff rules and the retention sweep (needs 
     await mk('old', 100); await mk('mid', 40); await mk('new', 1);
     const count = async () => Number(((await pool!.query<import('mysql2/promise').RowDataPacket[]>(`SELECT COUNT(*) n FROM ${S}`))[0] as { n: number }[])[0].n);
     expect(await purgeOldChats(pool!)).toEqual({}); expect(await count()).toBe(3);                    // no retention set: nothing is deleted
+    expect((await as(admin, 'POST', '/api/admin/merchants/MERCH_A/basics', { currency: 'SGD' })).statusCode).toBe(200);
+    expect((await as(admin, 'GET', '/api/admin/merchants/MERCH_A/basics')).json().currency).toBe('SGD');
+    expect((await as(admin, 'POST', '/api/admin/merchants/MERCH_A/basics', { currency: 'S G' })).statusCode).toBe(400);
+    await as(admin, 'POST', '/api/admin/merchants/MERCH_A/basics', { currency: 'RM' });
     expect((await as(admin, 'POST', '/api/admin/merchants/MERCH_A/basics', { retentionDays: 90 })).statusCode).toBe(200);
     expect((await as(admin, 'GET', '/api/admin/merchants/MERCH_A/basics')).json().retentionDays).toBe(90);
     expect(await purgeOldChats(pool!)).toEqual({ MERCH_A: 1 }); expect(await count()).toBe(2);        // only the 100 day old chat goes

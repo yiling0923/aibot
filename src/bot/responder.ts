@@ -63,14 +63,14 @@ export class Bot {
     return e?.translations[lang]?.answerText || e?.translations.en?.answerText || '';
   }
   private wrap(s: Session, text: string, lang: Lang) { const t = T.TONE[this.cfg(s).tone]; return t.pre[lang] + text + t.post[lang]; }
-  private label(o: { kind: string; key: string; amt?: number }, lang: Lang): string {
+  private label(o: { kind: string; key: string; amt?: number; cur?: string }, lang: Lang): string {
     if (o.kind === 'agent') return T.AGENT[lang];
     if (o.kind === 'status') return T.STATUS_LABEL[o.key][lang];
-    if (o.kind === 'amt') return T.AMT_LABEL[o.key][lang](T.fmtAmt(o.amt!));
+    if (o.kind === 'amt') return T.AMT_LABEL[o.key][lang](T.fmtAmt(o.amt!, o.cur));
     if (o.kind === 'topic') return T.cap(T.tlab(o.key, lang));
     return T.cap(T.lblOf(o.key, lang));
   }
-  private buttons(opts: { kind: string; key: string; amt?: number }[], lang: Lang): Button[] {
+  private buttons(opts: { kind: string; key: string; amt?: number; cur?: string }[], lang: Lang): Button[] {
     return [...opts, { kind: 'agent', key: 'agent' }].map((o) => ({ kind: o.kind as Button['kind'], key: o.key, amt: o.amt, label: this.label(o, lang) }));
   }
   private handoff(s: Session, lang: Lang): { messages: BotMsg[]; status: string } {
@@ -116,8 +116,8 @@ export class Bot {
   }
 
   private amountAnswer(s: Session, kind: 'deposit' | 'withdraw', amt: number, lang: Lang) {
-    const c = this.cfg(s), lim = c.limits[kind], a = T.fmtAmt(amt), parts: string[] = [];
-    if (lim) { const [lo, hi] = lim; parts.push(amt < lo ? T.LIM_LOW[lang](a, T.KIND_W[kind][lang], T.fmtAmt(lo)) : amt > hi ? T.LIM_HIGH[lang](a, T.fmtAmt(hi)) : T.LIM_OK[lang](a, T.fmtAmt(lo), T.fmtAmt(hi))); }
+    const c = this.cfg(s), lim = c.limits[kind], a = T.fmtAmt(amt, c.currency), parts: string[] = [];
+    if (lim) { const [lo, hi] = lim; parts.push(amt < lo ? T.LIM_LOW[lang](a, T.KIND_W[kind][lang], T.fmtAmt(lo, c.currency)) : amt > hi ? T.LIM_HIGH[lang](a, T.fmtAmt(hi, c.currency)) : T.LIM_OK[lang](a, T.fmtAmt(lo, c.currency), T.fmtAmt(hi, c.currency))); }
     const how = this.ans(s.merchant, kind + '_how', lang); if (how) parts.push(how);
     parts.push(T.GUIDE_ONLY[lang]);
     return this.wrap(s, parts.join(sp(lang)), lang);
@@ -133,7 +133,7 @@ export class Bot {
     const num = (v: string) => parseFloat(String(v).replace(/[^0-9.]/g, ''));
     const hit = list.find((x) => num(x.amount) === amt);
     if (hit) { res.agent = hit.status === 'failed'; res.text = T.ACCT_PRE[c.tone][lang](chk.name) + T.FOUND_TX[lang] + '\n• ' + `${T.TYPE_W[hit.type!][lang]} ${hit.amount}, ${T.whenT(hit, lang)}, ${T.STS[hit.status][lang]} (${hit.ref})`; }
-    else res.text = T.ACCT_PRE[c.tone][lang](chk.name) + T.NOTFOUND_TX[lang](T.fmtAmt(amt));
+    else res.text = T.ACCT_PRE[c.tone][lang](chk.name) + T.NOTFOUND_TX[lang](T.fmtAmt(amt, c.currency));
     return res;
   }
 
@@ -249,7 +249,7 @@ export class Bot {
         kbAnswer: out.kbAnswer, smallText: out.small, strike: out.strike, limit: out.limit, close: out.close,
         acct: out.acct ? { chk: out.acct.chk, verified: out.acct.verified, call: out.acct.call, json: out.acct.json, rows: out.acct.rows } : null,
         merchant: { name: c.name, tone: c.tone, handoffGroupId: c.handoffGroupId }, agentLabel: T.AGENT[lang],
-        amtButtons: r.decision === 'AMOUNT' && !r.dir && r.amt ? this.amountOptions(r, lang).map((o) => this.label(o, lang)) : null },
+        amtButtons: r.decision === 'AMOUNT' && !r.dir && r.amt ? this.amountOptions(r, lang, c.currency).map((o) => this.label(o, lang)) : null },
     };
     const say = (t: string) => turn.messages.push({ kind: 'bot', text: t });
     switch (r.decision) {
@@ -259,7 +259,7 @@ export class Bot {
         break;
       case 'AMOUNT':
         if (r.dir) { s.lastTopic = r.dir; say(this.amountAnswer(s, r.dir, r.amt!.n, lang)); }
-        else { const a = T.fmtAmt(r.amt!.n); say(r.ctxDir ? T.AMT_ASK2[lang](a, r.ctxDir) : T.AMT_ASK[lang](a)); turn.buttons = this.buttons(this.amountOptions(r, lang), lang); }
+        else { const a = T.fmtAmt(r.amt!.n, c.currency); say(r.ctxDir ? T.AMT_ASK2[lang](a, r.ctxDir) : T.AMT_ASK[lang](a)); turn.buttons = this.buttons(this.amountOptions(r, lang, c.currency), lang); }
         break;
       case 'ACCOUNT': say(out.acct!.text); if (out.acct!.agent) turn.buttons = this.buttons([], lang); break;
       case 'REFUSE': {
@@ -315,10 +315,10 @@ export class Bot {
     return this.wrap(s, facts, lang);
   }
 
-  private amountOptions(r: AnalyzeResult, lang: Lang) {
+  private amountOptions(r: AnalyzeResult, lang: Lang, cur?: string) {
     void lang;
     const order = r.ctxDir ? [r.ctxDir, r.ctxDir === 'deposit' ? 'withdraw' : 'deposit'] : ['deposit', 'withdraw'];
-    return order.map((k) => ({ kind: 'amt', key: k, amt: r.amt!.n })).concat([{ kind: 'amt', key: 'check', amt: r.amt!.n }]);
+    return order.map((k) => ({ kind: 'amt', key: k, amt: r.amt!.n, cur })).concat([{ kind: 'amt', key: 'check', amt: r.amt!.n, cur }]);
   }
 
   /* ---------- a tapped button (fixed value, so no guessing and no search) ---------- */

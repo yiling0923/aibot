@@ -7,7 +7,7 @@ import { LANGS, LANG_NAMES, LN, clone } from '../model';
 const TN: Record<string, string> = { deposit_status: 'Deposit status', withdraw_status: 'Withdrawal status', balance: 'Balance', transactions: 'Recent transactions', points: 'Points and level' };
 const FN: Record<string, string> = { deposit_status: 'get_recent_deposits', withdraw_status: 'get_recent_withdrawals', balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
 
-interface Basics { retentionDays: number; name: string; domain: string; defaultLanguage: string; languages: string[]; monthlyTokenLimit: number | null; tokensMonth: number; tokensToday: number; entries: number; questionsToday: number; avgConfidence: number | null }
+interface Basics { currency: string; retentionDays: number; name: string; domain: string; defaultLanguage: string; languages: string[]; monthlyTokenLimit: number | null; tokensMonth: number; tokensToday: number; entries: number; questionsToday: number; avgConfidence: number | null }
 const PRESETS: [string, string][] = [
   ['Formal tone', 'Always use formal, professional language.'], ['Warm and friendly', 'Use a warm, friendly and casual tone.'],
   ['Address as “Dear Member”', 'Address the customer as "Dear Member".'], ['Max 2 sentences', 'Keep every translation or reworded reply to 2 sentences at most.'],
@@ -36,15 +36,15 @@ function Form() {
   const [tab, setTabState] = useState(() => { try { return localStorage.getItem('settingsTab') || 'general'; } catch { return 'general'; } });
   const setTab = (t: string) => { setTabState(t); try { localStorage.setItem('settingsTab', t); } catch { /* ignore */ } };
   const base = useRef(clone(p.draft.settings[p.merchant]));        // what the draft held when the page opened or was last saved
-  const [b, setB] = useState<Basics | null>(null); const [f, setF] = useState({ name: '', domain: '', limit: '', retention: '', languages: new Set<string>() }); const [busy, setBusy] = useState(false);
+  const [b, setB] = useState<Basics | null>(null); const [f, setF] = useState({ name: '', domain: '', limit: '', retention: '', currency: 'RM', languages: new Set<string>() }); const [busy, setBusy] = useState(false);
   const loadBasics = useCallback(async () => {
-    try { const x = await api<Basics>(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`); setB(x); setF({ name: x.name, domain: x.domain, limit: x.monthlyTokenLimit === null ? '' : String(x.monthlyTokenLimit), retention: x.retentionDays ? String(x.retentionDays) : '', languages: new Set(x.languages) }); } catch { setB(null); }
+    try { const x = await api<Basics>(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`); setB(x); setF({ name: x.name, domain: x.domain, limit: x.monthlyTokenLimit === null ? '' : String(x.monthlyTokenLimit), retention: x.retentionDays ? String(x.retentionDays) : '', currency: x.currency || 'RM', languages: new Set(x.languages) }); } catch { setB(null); }
   }, [p.merchant]);
   useEffect(() => { void loadBasics(); }, [loadBasics]);
   const saveBasics = async () => {
     setBusy(true);
     try {
-      await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), retentionDays: f.retention.trim() === '' ? 0 : Number(f.retention), languages: [...f.languages] });
+      await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), retentionDays: f.retention.trim() === '' ? 0 : Number(f.retention), currency: f.currency.trim(), languages: [...f.languages] });
       await loadBasics(); await p.reloadAll(); p.toast('Basics saved');
     } catch (e) { p.toast((e as Error).message); } finally { setBusy(false); }
   };
@@ -63,7 +63,7 @@ function Form() {
   const LABEL: Record<string, string> = { tone: 'Tone', answer: 'Match levels', clarify: 'Match levels', ai_instructions: 'Bot instructions', handoff_complaint: 'Complaint or dispute', handoff_account: 'Account details', trigger_phrases: 'Trigger phrases', tools: 'Account tools', max_choices: 'Choices', more_help_on: 'Line after choices', abuse_close_after: 'Rude messages', kind: 'Messages', closing: 'Messages', handoff: 'Messages', more_help: 'Messages', handoff_group: 'Human group' };
   const changed = [...new Set((Object.keys(s) as (keyof typeof s)[]).filter((k) => JSON.stringify(s[k] ?? null) !== JSON.stringify(base.current[k] ?? null)).map((k) => LABEL[k as string] ?? String(k)))];
   const discard = () => { setS(clone(base.current)); p.toast('Changes discarded'); };
-  const basicsDirty = !!b && (f.name !== b.name || f.domain !== b.domain || f.limit !== (b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit)) || f.retention !== (b.retentionDays ? String(b.retentionDays) : '') || [...f.languages].sort().join() !== [...b.languages].sort().join());
+  const basicsDirty = !!b && (f.name !== b.name || f.domain !== b.domain || f.limit !== (b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit)) || f.retention !== (b.retentionDays ? String(b.retentionDays) : '') || f.currency !== (b.currency || 'RM') || [...f.languages].sort().join() !== [...b.languages].sort().join());
   const TABS: [string, string][] = [['general', 'General'], ['replies', 'Replies'], ['handoff', 'Handoff'], ['ai', 'AI help'], ['messages', 'Messages'], ['tools', 'Account tools']];
   const cur = TABS.some(([k]) => k === tab) ? tab : 'general';
   return (
@@ -79,6 +79,7 @@ function Form() {
           <label className="fld"><span>Domain (optional)</span><input value={f.domain} placeholder="merchant-domain.com" disabled={lock} onChange={(e) => setF({ ...f, domain: e.target.value })} /></label>
           <div><label className="fld"><span>Monthly AI token limit (empty = unlimited)</span><input type="number" min={0} value={f.limit} placeholder="e.g. 500000" disabled={lock} onChange={(e) => setF({ ...f, limit: e.target.value })} /></label>
             <div className="sub" style={{ marginTop: 4 }}>Used this month: {b.tokensMonth.toLocaleString()}. When the limit is reached the bot keeps answering from the knowledge base; only the AI help stops until next month.</div></div>
+          <label className="fld"><span>Money sign in bot messages</span><input value={f.currency} maxLength={8} placeholder="RM" disabled={lock} onChange={(e) => setF({ ...f, currency: e.target.value })} /><span className="lock">For example RM, SGD, $ or ฿. It appears in "RM500 is within the limits".</span></label>
           <div><label className="fld"><span>Keep conversations for (days)</span><input type="number" min={0} max={3650} value={f.retention} placeholder="0" disabled={lock} onChange={(e) => setF({ ...f, retention: e.target.value })} /></label>
             <div className="sub" style={{ marginTop: 4 }}>Chats older than this are deleted every day. Empty or 0 keeps them for ever. The Report only counts chats that are kept. The keyword counts are not changed.</div></div>
           <div className="full"><div className="fld"><span>Languages the bot answers in</span></div>

@@ -20,7 +20,7 @@ export function basicsRoutes(app: FastifyInstance, ctx: BasicsCtx) {
 
   app.get<{ Params: { code: string } }>(P, async (req, reply) => {
     const { code } = req.params; if (!may(req, code)) return reply.code(403).send({ error: 'You can only work with your own merchant.' });
-    const [m] = await q(pool, "SELECT code, name, default_language, domain, monthly_token_limit, languages, retention_days FROM merchants WHERE code = ? AND status = 'active'", [code]);
+    const [m] = await q(pool, "SELECT code, name, default_language, domain, monthly_token_limit, languages, retention_days, currency FROM merchants WHERE code = ? AND status = 'active'", [code]);
     const t = m ? await new Tenants(pool).get(code) : null; if (!m || !t) return reply.code(404).send({ error: 'There is no such merchant.' });
     ctx.limits.forget(code); const info = await ctx.limits.info(code);
     const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
@@ -31,12 +31,12 @@ export function basicsRoutes(app: FastifyInstance, ctx: BasicsCtx) {
     } catch { /* an older merchant database: the tiles show zero */ }
     return {
       name: m.name, domain: m.domain ?? '', defaultLanguage: m.default_language, languages: parseLangs(m.languages) ?? [...LANGS],
-      retentionDays: Number(m.retention_days ?? 0), monthlyTokenLimit: info.limit, tokensMonth: info.usedMonth, tokensToday: info.usedToday,
+      retentionDays: Number(m.retention_days ?? 0), currency: String(m.currency ?? 'RM'), monthlyTokenLimit: info.limit, tokensMonth: info.usedMonth, tokensToday: info.usedToday,
       entries: Number(n?.n ?? 0), questionsToday: questions, avgConfidence: conf,
     };
   });
 
-  app.post<{ Params: { code: string }; Body: { name?: unknown; domain?: unknown; monthlyTokenLimit?: unknown; languages?: unknown; retentionDays?: unknown } }>(P, async (req, reply) => {
+  app.post<{ Params: { code: string }; Body: { name?: unknown; domain?: unknown; monthlyTokenLimit?: unknown; languages?: unknown; retentionDays?: unknown; currency?: unknown } }>(P, async (req, reply) => {
     const { code } = req.params;
     if (req.user?.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can do this.' });
     const [m] = await q(pool, "SELECT id, default_language FROM merchants WHERE code = ? AND status = 'active'", [code]); if (!m) return reply.code(404).send({ error: 'There is no such merchant.' });
@@ -62,6 +62,11 @@ export function basicsRoutes(app: FastifyInstance, ctx: BasicsCtx) {
       const v = b.retentionDays === null || b.retentionDays === '' ? 0 : Number(b.retentionDays);
       if (!Number.isInteger(v) || v < 0 || v > 3650) return bad('Keep conversations for a whole number of days from 1 to 3650, or 0 to keep them for ever.');
       sets.push('retention_days = ?'); vals.push(v === 0 ? null : v);
+    }
+    if (b.currency !== undefined) {
+      const c = String(b.currency ?? '').trim();
+      if (!c || c.length > 8 || /[\d\s<>"']/.test(c)) return bad('Write the money sign without spaces or digits, up to 8 characters, for example RM, SGD, $ or ฿.');
+      sets.push('currency = ?'); vals.push(c);
     }
     if (!sets.length) return bad('Nothing to save.');
     await pool.query(`UPDATE merchants SET ${sets.join(', ')} WHERE id = ?`, [...vals, m.id]);

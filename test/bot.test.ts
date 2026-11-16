@@ -20,6 +20,19 @@ describe('customer token', () => {
   });
 });
 
+describe('merchant currency', () => {
+  const sayWith = async (currency: string | undefined, msg: string) => {
+    const k = knowledgeFromSeed(seedJson, accountsJson); if (currency) k.merchants.find((m) => m.code === 'MERCH_A')!.currency = currency;
+    return text((await new Bot(k).message(newSession('cur', 'MERCH_A', null), msg))!);
+  };
+  it('writes RM by default, and the merchant\'s own sign when set', async () => {
+    expect(await sayWith(undefined, 'deposit 500')).toContain('RM500');
+    expect(await sayWith('$', 'deposit 500')).toContain('$500');
+    expect(await sayWith('SGD', 'deposit 500')).toContain('SGD 500');                 // a code of three or more letters gets a space
+    expect(await sayWith('SGD', 'deposit 500')).not.toContain('RM');
+  });
+});
+
 describe('deposit account requests', () => {
   it('hands the chat to a person and repeats the amount the customer wrote', async () => {
     const s = newSession('pay1', 'MERCH_A', null);

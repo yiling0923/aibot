@@ -27,7 +27,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
     q('SELECT kind AS k, language, phrase AS w FROM shared_smalltalk ORDER BY id'),
     q('SELECT kind AS k, language, phrase AS w FROM shared_guard ORDER BY id'),
     q('SELECT language, word FROM filler_words ORDER BY id'),
-    q("SELECT code, name, default_language, livechat_group_id, handoff_group_id, languages FROM merchants WHERE status = 'active' ORDER BY id"),
+    q("SELECT code, name, default_language, livechat_group_id, handoff_group_id, languages, currency FROM merchants WHERE status = 'active' ORDER BY id"),
   ]);
   const meta = new Map(merchantRows.map((m) => [m.code as string, m]));
 
@@ -47,7 +47,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
       code: t.code, name: m.name, tone: s.tone, defaultLanguage: m.default_language, livechatGroupId: m.livechat_group_id, handoffGroupId: m.handoff_group_id,
       closing: asJson(s.closing_msg, {}), handoff: asJson(s.handoff_msg, {}), maxChoices: Math.max(1, Math.min(3, Number(s.max_choices ?? 3))), moreHelpOn: !!(s.more_help_on ?? 1), moreHelp: asJson(s.more_help_msg, {}), abuseCloseAfter: s.abuse_close_after, answerThreshold: Number(s.answer_threshold), clarifyThreshold: Number(s.clarify_threshold),
       kindReply: asJson(s.kind_reply, {}), ...(!(s.handoff_complaint ?? 1) ? { handoffComplaint: false } : {}), ...(!(s.handoff_account ?? 1) ? { handoffAccount: false } : {}), ...(cleanPhrases(s.trigger_phrases).length ? { triggerPhrases: cleanPhrases(s.trigger_phrases) } : {}),
-      ...(String(s.ai_instructions ?? '').trim() ? { aiInstructions: String(s.ai_instructions) } : {}), ...(parseLangs(m.languages) ? { languages: parseLangs(m.languages) } : {}), aliases: own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical })), tools: tools.map((x) => x.tool), limits: {},
+      ...(String(s.ai_instructions ?? '').trim() ? { aiInstructions: String(s.ai_instructions) } : {}), ...(parseLangs(m.languages) ? { languages: parseLangs(m.languages) } : {}), ...(m.currency && m.currency !== 'RM' ? { currency: String(m.currency) } : {}), aliases: own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical })), tools: tools.map((x) => x.tool), limits: {},
     };
     for (const l of limits) cfg.limits[l.kind as 'deposit' | 'withdraw'] = [l.lo, l.hi];
     cfgs.push(cfg);
