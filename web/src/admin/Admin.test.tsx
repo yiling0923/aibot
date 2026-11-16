@@ -259,6 +259,22 @@ describe('Control panel', () => {
     expect(screen.queryByText('temp_one')).toBeNull();
     yes.mockRestore();
   });
+  it('Topics: the tabs show counts, each tab says what it is for, and Greetings, Fillers and Block lists have a "How it works" picture', async () => {
+    open('staff', '/admin/kw');
+    expect(await screen.findByText(/A main keyword \(topic\) and the words that point to it/)).toBeTruthy();
+    const tabs = screen.getByRole('tablist');
+    expect(within(tabs).getByRole('tab', { name: /Fillers/ }).textContent).toMatch(/Fillers\d/);                       // a count on every tab
+    await userEvent.click(within(tabs).getByRole('tab', { name: /Block lists/ }));
+    expect(screen.getByText(/make the bot reply carefully, refuse, or hand the chat to a person/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'How it works' }));
+    const how = await screen.findByLabelText('How it works');
+    expect(within(how).getByText('Hand to a person')).toBeTruthy(); expect(within(how).getByText('Refuse politely')).toBeTruthy();
+    expect(screen.queryByLabelText('Filter words')).toBeNull();                                                      // the picture has nothing to filter
+    await userEvent.click(within(tabs).getByRole('tab', { name: /Fillers/ }));
+    expect(within(await screen.findByLabelText('How it works')).getByText('Dropped before matching')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    expect(screen.getByLabelText('Filter words')).toBeTruthy();
+  });
   it('hides the Flows menu item until Advanced options is on', async () => {
     open('staff', '/admin/kb');
     await screen.findByText('Knowledge base');

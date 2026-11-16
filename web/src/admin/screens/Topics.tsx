@@ -23,6 +23,34 @@ const BLOCK_GROUPS: [string, string, string][] = [
 ];
 
 type Words = Record<string, string[]>;
+/** One line under the tabs: what the tab is for. */
+const INTRO: Record<string, string> = {
+  short: 'A main keyword (topic) and the words that point to it: short forms, slang, the same meaning and other languages. The bot looks for them anywhere in the customer\'s sentence.',
+  aspect: 'The words that tell the bot what the customer wants to know about a topic: how long, the limit, how to.',
+  small: 'Phrases that get a friendly reply and no answer lookup: hello, thanks, goodbye.',
+  filler: 'Words with no meaning of their own. The bot drops them before it looks for keywords.',
+  block: 'Words that make the bot reply carefully, refuse, or hand the chat to a person.',
+};
+const flatCount = (o: Record<string, string[]> | undefined) => Object.values(o ?? {}).flat().length;
+
+type Lst = { id: string; name: string; n: number; sample: string[] };
+type Outcome = { title: string; desc: string; tone: 'ok' | 'warn' | 'bad' | 'info'; lists: Lst[] };
+
+/** A read-only picture of what each list does: the lists on the left, what the bot does with them on the right. Click a list to open it. */
+function HowItWorks({ outcomes, onOpen }: { outcomes: Outcome[]; onOpen: (id: string) => void }) {
+  return (
+    <div className="how" aria-label="How it works">
+      {outcomes.map((o) => (
+        <div className="howlane" key={o.title}>
+          <div className="howin">{o.lists.map((l) => (
+            <button key={l.id} type="button" className="hbox" onClick={() => onOpen(l.id)} title="Open this list">
+              <b>{l.name}</b><span>{l.n} word{l.n === 1 ? '' : 's'}</span>{l.sample.length > 0 && <em>{l.sample.join(' · ')}</em>}</button>))}</div>
+          <svg className="harrow" viewBox="0 0 48 24" width="48" height="24" aria-hidden="true"><path d="M2 12h38M32 5l8 7-8 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+          <div className={'hout ' + o.tone}><b>{o.title}</b><span>{o.desc}</span></div>
+        </div>))}
+    </div>
+  );
+}
 
 export default function Topics() {
   const p = usePanel();
@@ -35,6 +63,32 @@ export default function Topics() {
   const [view, setViewState] = useState<'list' | 'flow'>(() => { try { return localStorage.getItem('topicsView') === 'flow' ? 'flow' : 'list'; } catch { return 'list'; } });
   const setView = (v: 'list' | 'flow') => { setViewState(v); try { localStorage.setItem('topicsView', v); } catch { /* ignore */ } };
   const flow = cur === 'short' && view === 'flow';
+  const [how, setHowState] = useState(() => { try { return localStorage.getItem('topicsHow') === '1'; } catch { return false; } });   // Greetings, Fillers, Block lists: the "How it works" picture
+  const setHow = (v: boolean) => { setHowState(v); try { localStorage.setItem('topicsHow', v ? '1' : '0'); } catch { /* ignore */ } };
+  const showHow = (cur === 'small' || cur === 'filler' || cur === 'block') && how;
+  const openList = (id: string) => { setHow(false); setTimeout(() => { const el = document.getElementById('grp-' + id); el?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }); el?.classList.add('flash'); setTimeout(() => el?.classList.remove('flash'), 1600); }, 80); };
+  const sample = (byl: Record<string, string[]> | undefined) => (byl?.en ?? Object.values(byl ?? {})[0] ?? []).slice(0, 4);
+  const stopAfter = d.settings[p.merchant]?.abuse_close_after;
+  const outcomes = (): Outcome[] => {
+    const sm = (k: string): Lst => ({ id: 'small-' + k, name: SMALL_NAMES[k] || k, n: flatCount(d.smalltalk[k]), sample: sample(d.smalltalk[k]) });
+    const gd = (k: string): Lst => ({ id: 'guard-' + k, name: BLOCK_GROUPS.find((x) => x[0] === k)?.[1].replace(/:.*$/, '') ?? k, n: flatCount(d.guard[k]), sample: sample(d.guard[k]) });
+    if (cur === 'small') return [
+      { title: 'A friendly hello', desc: 'The bot says hello and shows the topic buttons, then waits for the question.', tone: 'ok', lists: ['morning', 'greeting', 'callout'].map(sm) },
+      { title: 'A polite reply', desc: 'The bot says you are welcome or goodbye. No answer is looked up.', tone: 'info', lists: ['thanks', 'bye'].map(sm) },
+      { title: 'A short acknowledgement', desc: 'A word like "ok" gets "Anything else I can help with?".', tone: 'info', lists: ['ack'].map(sm) },
+    ];
+    if (cur === 'filler') return [{ title: 'Dropped before matching', desc: 'These words carry no meaning, so the bot ignores them and finds the topic from the words that are left.', tone: 'info',
+      lists: [{ id: 'filler-filler', name: 'Filler words', n: flatCount(d.fillers), sample: sample(d.fillers) }] }];
+    return [
+      { title: 'Reply kindly, close if it continues', desc: stopAfter ? `The chat is closed after ${stopAfter} rude message${stopAfter === 1 ? '' : 's'} (Merchant settings).` : 'The chat is never closed (Merchant settings).', tone: 'warn', lists: ['abuse', 'abuse_soft'].map(gd) },
+      { title: 'Hand to a person', desc: 'The customer asked for a person, or tried to change the bot\'s rules. A person takes over at once.', tone: 'bad', lists: ['human_request', 'injection'].map(gd) },
+      { title: 'Hand to a person with the amount', desc: 'Asking for the deposit bank account or PayNow QR. A person gives the latest one; the amount is repeated for them.', tone: 'bad', lists: ['pay_method', 'pay_ask', 'pay_deposit'].map(gd) },
+      { title: 'Answered as normal', desc: 'These words show it is a question, not a request for the account, so the bot answers.', tone: 'ok', lists: ['pay_except'].map(gd) },
+      { title: 'Refuse politely', desc: 'The bot never shows passwords, OTPs or full bank, card or ID numbers in a chat.', tone: 'bad', lists: ['reveal_verb', 'secret_object', 'secret_phrase', 'reveal_except'].map(gd) },
+    ];
+  };
+  const tabCount = (k: string) => (k === 'short' ? topicNames(d, p.merchant).length : k === 'aspect' ? Object.values(d.aspects).reduce((n, b) => n + flatCount(b), 0)
+    : k === 'small' ? Object.values(d.smalltalk).reduce((n, b) => n + flatCount(b), 0) : k === 'filler' ? flatCount(d.fillers) : Object.values(d.guard).reduce((n, b) => n + flatCount(b), 0));
   useEffect(() => { setShown(document.querySelectorAll('#kwlists .chip').length); });
 
   useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 60); } });
@@ -57,7 +111,7 @@ export default function Topics() {
       return <div style={{ marginBottom: 6 }} key={l}><span className="lang">{LN[l]}</span><div className="chips" style={{ display: 'inline-flex' }}>
         {items.map(([w, i]) => <span key={i} className={'chip ' + (ro ? 'ro ' : '') + (fresh.has(w.toLowerCase()) ? 'new' : '')}>{w}{!ro && <button type="button" aria-label="Remove" onClick={() => remove(kind, k, l, i)}>×</button>}</span>)}</div></div>;
     })}</>;
-  const Group = ({ title, sub, n, children }: { title: string; sub: string; n?: number; children: ReactNode }) => children ? <div className="group"><div className="lbl"><b>{title}</b>{n ? <span className="wc">{n} words</span> : null}<span className="lock">{sub}</span></div><div>{children}</div></div> : null;
+  const Group = ({ title, sub, n, gid, children }: { title: string; sub: string; n?: number; gid?: string; children: ReactNode }) => children ? <div className="group" id={gid ? 'grp-' + gid : undefined}><div className="lbl"><b>{title}</b>{n ? <span className="wc">{n} words</span> : null}<span className="lock">{sub}</span></div><div>{children}</div></div> : null;
 
   const remove = (kind: string, k: string, l: string, i: number) => p.edit((x, note) => {
     if (kind === 'alias') note('Removed short form "' + x.aliases[k][l].splice(i, 1)[0] + '" → ' + k);
@@ -94,7 +148,7 @@ export default function Topics() {
     }
     const chipBlock = (kind: string, k: string, byl: Words, title: string, sub: string, extra?: string) => {
       const has = LANGS.some((l) => byl[l] && langOk(l) && byl[l].some((w) => matchQ(w, extra)));
-      if (has) out.push(<Group key={kind + k} title={title} sub={sub}><Chips byl={byl} kind={kind} k={k} extra={extra} ro={lock} /></Group>);
+      if (has) out.push(<Group key={kind + k} gid={kind + '-' + k} title={title} sub={sub}><Chips byl={byl} kind={kind} k={k} extra={extra} ro={lock} /></Group>);
     };
     if (cur === 'aspect') Object.entries(d.aspects).forEach(([k, byl]) => chipBlock('aspect', k, byl, k, (ASPECT_NAMES[k] || '') + (lock ? ' · admin only' : ''), k));
     if (cur === 'small') Object.entries(d.smalltalk).forEach(([k, byl]) => chipBlock('small', k, byl, SMALL_NAMES[k] || k, lock ? 'global · admin only' : 'global', SMALL_NAMES[k]));
@@ -105,15 +159,19 @@ export default function Topics() {
 
   return (
     <div className="card"><div className="head"><div><h2>Topics</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>＋ Add a topic or keyword</button></div>
-      <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}</button>)}</div>
+      <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}<span className="tn">{tabCount(k)}</span></button>)}</div>
+      <p className="tabintro">{INTRO[cur]}</p>
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
-      {cur === 'short' && <div className="segs" role="group" aria-label="View" style={{ marginTop: 8 }}>{([['list', 'List'], ['flow', 'Flowchart']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
-      {adding && <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={done} /></div>}
-      {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
-        <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 220 }} />
+      <div className="tbar">
+        {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['list', 'List'], ['flow', 'Flowchart']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
+        {(cur === 'small' || cur === 'filler' || cur === 'block') && <div className="segs" role="group" aria-label="View">{([[false, 'List'], [true, 'How it works']] as const).map(([k, l]) => <button key={l} type="button" aria-pressed={how === k} className={how === k ? 'on' : ''} onClick={() => setHow(k)}>{l}</button>)}</div>}
+        {!flow && !showHow && <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          <span className="sub">{shown} words shown</span></div>
+          <span className="sub">{shown} words shown</span></div>}
+      </div>
+      {adding && <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={done} /></div>}
+      {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : showHow ? <div style={{ marginTop: 10 }}><HowItWorks outcomes={outcomes()} onOpen={openList} /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div id="kwlists" ref={listRef}>{lists()}</div>
       </div>}</div>
   );
