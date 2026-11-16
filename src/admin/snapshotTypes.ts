@@ -14,6 +14,8 @@ export interface SnapEntry {
 export interface SnapSettings {
   tone: 'friendly' | 'formal'; handoff_group: number | null; answer: number; clarify: number; abuse_close_after: number;
   kind: Record<string, string>; closing: Record<string, string>; handoff: Record<string, string>; tools: Record<string, boolean>;
+  /** Handoff rules: complaint/dispute and account details written in the chat (default on), and the merchant's own trigger phrases (comma separated). */
+  handoff_complaint?: boolean; handoff_account?: boolean; trigger_phrases?: string;
   /** Style rules for the AI, up to 5000 characters. */
   ai_instructions?: string;
   max_choices: number; more_help_on: boolean; more_help: Record<string, string>;

@@ -15,6 +15,8 @@ const NOSP_RE = /[฀-๿一-鿿]/;
 const THAI_RE = /[฀-๿]/;
 /** Vietnamese is written with many accents, and customers often leave them out. Both the message and every word list are folded to plain letters
  *  (nạp tiền = nap tien), so one list entry matches both ways of typing. Other Latin-script languages have no accents here, so nothing changes. */
+/** 8 to 16 digits in a row (single spaces or dashes between groups are allowed): a phone or bank account number, not an amount. */
+const ACCOUNT_NUMBER = /(?<![\d,.])\+?\d(?:[ -]?\d){7,15}(?![\d,.]\d)(?!\d)/;
 export const fold = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/đ/g, 'd').replace(/Đ/g, 'D').normalize('NFC');
 const VI_ACCENT_RE = /[ăâđêôơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỷỹỵ]/i;
 const thaiSeg = typeof Intl !== 'undefined' && 'Segmenter' in Intl ? new Intl.Segmenter('th', { granularity: 'word' }) : null;
@@ -243,6 +245,11 @@ export class Engine {
     // asking for a person: hand over straight away instead of showing buttons
     const hr = g('human_request').filter(hasP);
     if (hr.length) return { kind: 'human', hit: hr, why: 'The customer asks for a human agent, so the chat is handed over.' };
+    // this merchant's own trigger phrases
+    const tp = (m.triggerPhrases ?? []).map((p) => fold(p).toLowerCase()).filter(hasP);
+    if (tp.length) return { kind: 'trigger', hit: tp, why: 'The message contains a trigger phrase set by ' + m.name + ' ("' + tp[0] + '"), so a human takes over.' };
+    // a phone or bank account number written in the chat: a person handles it, and the bot never repeats it
+    if (m.handoffAccount !== false && ACCOUNT_NUMBER.test(raw)) return { kind: 'account-details', hit: [], why: 'The customer wrote account details (a phone or bank account number). A human takes over, and the bot never repeats them.' };
     return null;
   }
 
@@ -304,7 +311,7 @@ export class Engine {
       else if (!this.toolOn(m, kd)) { decision = 'HANDOFF'; why = m.name + ' has not turned on the "' + TOOLNAME[kd] + '" tool, so a human takes over.'; }
       else { decision = 'ACCOUNT'; why = 'The customer asks for personal account data ("' + kd + '"). This needs a verified customer and a lookup.'; }
     }
-    else if (ks.A.includes('problem') && !acctKinds.length) {
+    else if (ks.A.includes('problem') && !acctKinds.length && m.handoffComplaint !== false) {
       decision = 'HANDOFF'; via = 'keywords'; conf = 0.9; topic = ks.T[0] ?? null;
       why = 'The customer reports a problem (a rejected or failed transaction, an error, or a complaint). The bot cannot see the reason, so a human takes over.';
     }

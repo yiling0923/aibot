@@ -36,6 +36,7 @@ export function effectiveSnapshot(user: SessionUser, current: Snapshot, incoming
   const inc = incoming.settings?.[m], cur = out.settings[m];
   if (inc && cur) {
     if (inc.tone === 'friendly' || inc.tone === 'formal') cur.tone = inc.tone;
+    if (typeof inc.trigger_phrases === 'string') cur.trigger_phrases = inc.trigger_phrases.slice(0, 4000);        // staff may add their own trigger phrases (more handoff is always safe); the two switches are admin only
     if (typeof inc.ai_instructions === 'string') cur.ai_instructions = inc.ai_instructions.slice(0, 5000);   // staff may write the style rules for the AI
     if (typeof inc.more_help_on === 'boolean') cur.more_help_on = inc.more_help_on;   // staff may switch the extra line on or off and reword it; the number of choices is admin only
     for (const k of ['kind', 'closing', 'handoff', 'more_help'] as const) if (inc[k] && typeof inc[k] === 'object') cur[k] = { ...cur[k], ...clone(inc[k]) };

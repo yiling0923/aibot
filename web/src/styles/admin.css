@@ -425,3 +425,10 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .mtile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 18px}.mtile small{display:block;color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}.mtile b{font-size:24px}
 .presets{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.preset{border:0;background:var(--surface2);border-radius:99px;padding:4px 12px;font-weight:600;font-size:12.5px;cursor:pointer;color:inherit}.preset:hover{background:color-mix(in srgb,var(--accent) 14%,var(--surface2))}
 @media (max-width:760px){.mtiles{grid-template-columns:1fr 1fr}}
+
+/* Merchant settings: a setting as a row with a switch on the right */
+.srow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:14px;align-items:center;padding:12px 0;border-top:1px solid var(--line)}
+.srow:first-of-type{border-top:0}.srow b{font-size:14.5px}.srow .sub{font-size:12.5px}.srow.dim{opacity:.6}
+.stag{margin-left:8px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--muted);border-radius:99px;padding:1px 9px;vertical-align:1px}
+.srow-last{padding-top:12px;border-top:1px solid var(--line)}
+.switch input:disabled+.track{opacity:.55}.switch input:disabled{cursor:not-allowed}

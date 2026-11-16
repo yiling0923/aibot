@@ -2,7 +2,7 @@ import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/prom
 import type { Pool } from '../db/pool';
 import { asJson } from '../db/pool';
 import { Tenants, ident, tbl } from '../db/tenants';
-import { parseLangs } from '../db/loadKnowledge';
+import { parseLangs, cleanPhrases } from '../db/loadKnowledge';
 import type { Knowledge, KbEntry, MerchantCfg, WordMap, Lang } from '../engine/types';
 import { LANGS } from '../engine/types';
 
@@ -74,7 +74,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     snap.settings[t.code] = {
       tone: st.tone, handoff_group: handoff.get(t.code) ?? null, answer: Number(st.answer_threshold), clarify: Number(st.clarify_threshold), abuse_close_after: st.abuse_close_after,
       kind: { ...blankTexts(), ...asJson<Record<string, string>>(st.kind_reply, {}) }, closing: asJson(st.closing_msg, {}), handoff: asJson(st.handoff_msg, {}),
-      ai_instructions: String(st.ai_instructions ?? ''), max_choices: Number(st.max_choices ?? 3), more_help_on: !!(st.more_help_on ?? 1), more_help: { ...blankTexts(), ...asJson<Record<string, string>>(st.more_help_msg, {}) },
+      ai_instructions: String(st.ai_instructions ?? ''), handoff_complaint: !!(st.handoff_complaint ?? 1), handoff_account: !!(st.handoff_account ?? 1), trigger_phrases: String(st.trigger_phrases ?? ''), max_choices: Number(st.max_choices ?? 3), more_help_on: !!(st.more_help_on ?? 1), more_help: { ...blankTexts(), ...asJson<Record<string, string>>(st.more_help_msg, {}) },
       tools: Object.fromEntries(TOOLS.map((k) => [k, k.endsWith('_status') ? true : on.has(k)])),
     };
   }
@@ -117,8 +117,8 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScop
       await c.query('UPDATE merchants SET handoff_group_id = ? WHERE id = ?', [s.handoff_group, t.id]);
       await c.query(`DELETE FROM ${D('aliases')}`);
       await bulk(D('aliases'), 'language,variant,canonical,kind', (snap.mAliases[t.code] ?? []).map((a) => [a.language, a.variant, a.canonical, ['short', 'slang', 'meaning'].includes(String(a.kind)) ? a.kind : null]));
-      await c.query(`UPDATE ${D('settings')} SET tone=?, answer_threshold=?, clarify_threshold=?, abuse_close_after=?, kind_reply=?, closing_msg=?, handoff_msg=?, max_choices=?, more_help_on=?, more_help_msg=?, ai_instructions=? WHERE id = 1`,
-        [s.tone, s.answer, s.clarify, s.abuse_close_after, JSON.stringify(s.kind), JSON.stringify(s.closing), JSON.stringify(s.handoff), Math.max(1, Math.min(3, Math.round(Number(s.max_choices) || 3))), s.more_help_on ? 1 : 0, JSON.stringify(s.more_help ?? {}), String(s.ai_instructions ?? '').slice(0, 5000) || null]);
+      await c.query(`UPDATE ${D('settings')} SET tone=?, answer_threshold=?, clarify_threshold=?, abuse_close_after=?, kind_reply=?, closing_msg=?, handoff_msg=?, max_choices=?, more_help_on=?, more_help_msg=?, ai_instructions=?, handoff_complaint=?, handoff_account=?, trigger_phrases=? WHERE id = 1`,
+        [s.tone, s.answer, s.clarify, s.abuse_close_after, JSON.stringify(s.kind), JSON.stringify(s.closing), JSON.stringify(s.handoff), Math.max(1, Math.min(3, Math.round(Number(s.max_choices) || 3))), s.more_help_on ? 1 : 0, JSON.stringify(s.more_help ?? {}), String(s.ai_instructions ?? '').slice(0, 5000) || null, s.handoff_complaint === false ? 0 : 1, s.handoff_account === false ? 0 : 1, cleanPhrases(s.trigger_phrases).join(', ') || null]);
       for (const [tool, enabled] of Object.entries(s.tools))
         await c.query(`INSERT INTO ${D('tools')}(tool,enabled) VALUES(?,?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled)`, [tool, enabled]);
 
@@ -158,6 +158,7 @@ export function knowledgeFromSnapshot(snap: Snapshot, merchants: MerchantMeta[],
     return {
       code: m.code, name: m.name, tone: s.tone, defaultLanguage: m.default_language, livechatGroupId: m.livechat_group_id, handoffGroupId: s.handoff_group,
       closing: s.closing, handoff: s.handoff, maxChoices: s.max_choices, moreHelpOn: s.more_help_on, moreHelp: s.more_help, abuseCloseAfter: s.abuse_close_after, answerThreshold: s.answer, clarifyThreshold: s.clarify, kindReply: s.kind,
+      ...(s.handoff_complaint === false ? { handoffComplaint: false } : {}), ...(s.handoff_account === false ? { handoffAccount: false } : {}), ...(cleanPhrases(s.trigger_phrases).length ? { triggerPhrases: cleanPhrases(s.trigger_phrases) } : {}),
       ...((s.ai_instructions ?? '').trim() ? { aiInstructions: s.ai_instructions } : {}), ...(parseLangs(m.languages) ? { languages: parseLangs(m.languages) } : {}),
       aliases: snap.mAliases[m.code] ?? [], tools: Object.entries(s.tools).filter(([, on]) => on).map(([k]) => k).sort(), limits: limits[m.code] ?? {},
     };

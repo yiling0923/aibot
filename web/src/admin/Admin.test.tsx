@@ -5,8 +5,8 @@ import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
 
-const SET = () => ({ tone: 'friendly', handoff_group: 1, answer: 0.72, clarify: 0.45, abuse_close_after: 3, kind: {}, closing: {}, handoff: {}, tools: { deposit_status: true }, max_choices: 3, more_help_on: true, more_help: {}, ai_instructions: '' });
-const BASICS = { name: 'LuckyPay', domain: '', defaultLanguage: 'en', languages: ['en', 'ms', 'zh', 'vi', 'th', 'tl'], monthlyTokenLimit: 500000, tokensMonth: 12400, tokensToday: 300, entries: 11, questionsToday: 7, avgConfidence: 0.81 };
+const SET = () => ({ tone: 'friendly', handoff_group: 1, answer: 0.72, clarify: 0.45, abuse_close_after: 3, kind: {}, closing: {}, handoff: {}, tools: { deposit_status: true }, max_choices: 3, more_help_on: true, more_help: {}, ai_instructions: '', handoff_complaint: true, handoff_account: true, trigger_phrases: '' });
+const BASICS = { retentionDays: 90, name: 'LuckyPay', domain: '', defaultLanguage: 'en', languages: ['en', 'ms', 'zh', 'vi', 'th', 'tl'], monthlyTokenLimit: 500000, tokensMonth: 12400, tokensToday: 300, entries: 11, questionsToday: 7, avgConfidence: 0.81 };
 const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay' }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
@@ -279,5 +279,22 @@ describe('Control panel', () => {
     expect(await screen.findByText('Only an admin can change these')).toBeTruthy();
     expect((await screen.findByLabelText(/^Monthly AI token limit/) as HTMLInputElement).disabled).toBe(true);
     expect((screen.getByLabelText('Bot instructions') as HTMLTextAreaElement).disabled).toBe(false);   // staff may write the style rules
+  });
+  it('shows the handoff rules as switches (two locked on, one not available), trigger phrases and the retention days', async () => {
+    const { unmount } = open('admin', '/admin/set');
+    const complaint = await screen.findByRole('switch', { name: 'Complaint or dispute' }) as HTMLInputElement;
+    expect(complaint.checked).toBe(true); expect(complaint.disabled).toBe(false);
+    await userEvent.click(complaint); expect(complaint.checked).toBe(false);                      // an admin may switch the rule off
+    expect((screen.getByRole('switch', { name: 'Customer asks for a person' }) as HTMLInputElement).disabled).toBe(true);        // always on
+    expect((screen.getByRole('switch', { name: 'Same question again, or the bot cannot answer' }) as HTMLInputElement).checked).toBe(true);
+    const file = screen.getByRole('switch', { name: 'Picture or file sent' }) as HTMLInputElement; expect(file.checked).toBe(false); expect(file.disabled).toBe(true);
+    await userEvent.type(screen.getByLabelText('Custom trigger phrases'), 'vip, urgent');
+    expect((screen.getByLabelText('Custom trigger phrases') as HTMLInputElement).value).toBe('vip, urgent');
+    expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).value).toBe('90');
+    unmount();
+    open('staff', '/admin/set');
+    expect(((await screen.findByRole('switch', { name: 'Complaint or dispute' })) as HTMLInputElement).disabled).toBe(true);       // staff cannot switch the rules
+    expect((screen.getByLabelText('Custom trigger phrases') as HTMLInputElement).disabled).toBe(false);                            // but may add phrases
+    expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).disabled).toBe(true);
   });
 });

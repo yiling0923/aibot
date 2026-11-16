@@ -24,6 +24,8 @@ export const config = {
   /** How long the LiveChat connector may take before the chat is handed to a person. */
   /** How often the bot copies each merchant's LiveChat handoff number (milliseconds, 0 = never). */
   livechatSyncMs: Number(process.env.LIVECHAT_SYNC_MS ?? 60000),
+  /** How often old conversations are deleted, for merchants that set a retention (milliseconds, 0 = never). */
+  retentionSweepMs: Number(process.env.RETENTION_SWEEP_MS ?? 6 * 3600_000),
   askTimeoutMs: Number(process.env.ASK_TIMEOUT_MS ?? 8000),
   openaiKey: process.env.OPENAI_API_KEY ?? '',
 };

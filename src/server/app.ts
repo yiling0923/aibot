@@ -23,6 +23,7 @@ import { billingRoutes } from '../admin/billing';
 import { LiveChatLink } from '../livechat/link';
 import { MerchantLimits } from '../ai/limits';
 import { basicsRoutes } from '../admin/basics';
+import { purgeOldChats } from '../db/retention';
 import { merchantPageRoutes } from '../admin/merchantPage';
 import { peopleRoutes } from '../admin/people';
 import { checkLogin } from '../auth/users';
@@ -227,6 +228,9 @@ export async function buildApp(opts: AppOptions = {}) {
     await getBot(true); return { ok: true };
   });
 
+  if (config.retentionSweepMs > 0) {      // old conversations are deleted for the merchants that set a retention
+    const r = setInterval(() => { void purgeOldChats(pool).catch(() => undefined); }, config.retentionSweepMs); r.unref(); app.addHook('onClose', async () => clearInterval(r));
+  }
   if (config.livechatSyncMs > 0) {      // a change made in LiveChat reaches the bot within a minute, without anyone opening a page
     const t = setInterval(() => { void link.pullAll().catch(() => undefined); }, config.livechatSyncMs); t.unref(); app.addHook('onClose', async () => clearInterval(t));
   }

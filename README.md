@@ -228,3 +228,14 @@ At the top of **Merchant settings** each merchant has four tiles (answers, quest
 
 - **Basics** (admin only, saved at once with *Save basics*): the merchant's **name**, an optional **domain**, a **monthly AI token limit** and the **languages the bot answers in**. When the monthly limit is used up (counted from the usage table, from the 1st of the month) the bot keeps answering from the knowledge base; only the AI help (choosing an answer, describing new words, translating, rewording) stops until next month. A customer writing in a language that is switched off still gets understood, and the reply is in the merchant's main language, which always stays on.
 - **Bot instructions (style rules)**, up to 5000 characters, with quick presets (formal tone, "Dear Member", 2 sentences...). Staff may write them for their own merchant; they go to the draft like the other settings. They are added to the prompt of the wording jobs: **translating answers, describing new words and rewording a reply**. They only shape wording and tone and the prompt tells the AI never to add facts or change numbers. Choosing an answer from the short list does not use them. A fixed reply such as "if the customer asks about promotions, always say..." belongs in the Knowledge base as an answer, because the bot answers word for word from there and never invents replies.
+
+## Handoff rules and cleaning up (per merchant)
+
+On **Merchant settings**, under *Handoff rules*, every on/off setting is a switch row:
+
+- **Customer asks for a person** and **Same question again, or the bot cannot answer** are always on (a customer must always be able to reach a person; the bot asks once, then hands over). **Picture or file sent** is shown but not available: LiveChat does not send files to the bot.
+- **Complaint or dispute** (admin only): on = a rejected or failed transaction, "money not received", "scam" and similar go to a person. Off = the bot answers from the knowledge base as for any question.
+- **Account details written in the chat** (admin only): 8 to 16 digits in a row (single spaces or dashes allowed), like a phone or bank account number, go to a person and the bot never repeats them. A short amount such as 100000, or 1,000,000 with commas, is not mistaken for one.
+- **Custom trigger phrases** (staff may edit): comma separated, any language. A message containing one of them (as a whole word) goes straight to a person.
+
+*Cleaning up* (admin only): **Keep conversations for (days)**. Chats older than this are deleted by a sweep every 6 hours (`RETENTION_SWEEP_MS`, 0 = never), together with their messages, the connector's chat memory and request log. Empty or 0 keeps everything, which is the default. The Report counts only chats that are kept; the keyword counts and the words list are separate and are not changed.
