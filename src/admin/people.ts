@@ -32,10 +32,13 @@ export function peopleRoutes(app: FastifyInstance, ctx: PeopleCtx) {
       const [st] = await q(pool, `SELECT tone FROM ${tbl(t.db, 'settings')} WHERE id = 1`); const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
       merchants.push({ ...m, tone: st?.tone ?? 'friendly', entries: n.n } as RowDataPacket);
     }
+    const keyInfo = new Map<string, { last: Date | null }>();           // an active bot key per merchant, and when LiveChat last used it
+    try { for (const r of await q(pool, 'SELECT m.code, MAX(k.last_used_at) AS last FROM bot_api_keys k JOIN merchants m ON m.id = k.merchant_id WHERE k.revoked_at IS NULL GROUP BY m.code')) keyInfo.set(r.code, { last: r.last ?? null }); } catch { /* no key table yet */ }
     const users = await q(pool, 'SELECT u.username, u.role, m.code AS merchant FROM admin_users u LEFT JOIN merchants m ON m.id = u.merchant_id ORDER BY u.role, u.username');
     return {
       merchants: merchants.map((m) => ({ code: m.code, name: m.name, language: m.default_language, tone: m.tone, entries: Number(m.entries), livechatGroup: m.livechat_group_id, handoffGroup: m.handoff_group_id,
-        logins: users.filter((u) => u.merchant === m.code).map((u) => u.username) })),
+        logins: users.filter((u) => u.merchant === m.code).map((u) => u.username),
+        link: { hasKey: keyInfo.has(m.code), lastUsedAt: keyInfo.get(m.code)?.last ?? null } })),
       users: users.map((u) => ({ username: u.username, role: u.role, merchant: u.merchant })),
     };
   });

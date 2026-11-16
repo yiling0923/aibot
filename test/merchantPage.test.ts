@@ -117,4 +117,13 @@ describe.skipIf(!reachable)('the merchant page (needs TEST_DATABASE_URL)', () =>
     await keys.clear('MERCH_A', 'anthropic'); await ai.pickEntry(input('MERCH_A'));
     expect(used.at(-1)).toBe('sk-ant-shared-key-ssss');                                   // removed: back to the shared key
   });
+
+  it('shows on the merchants list which merchant has an active bot key (the LiveChat link column)', async () => {
+    const list = async () => (await as(admin, 'GET', '/api/admin/people')).json().merchants as { code: string; link: { hasKey: boolean; lastUsedAt: string | null } }[];
+    await as(admin, 'POST', '/api/admin/merchants/MERCH_B/bot-key/revoke', {});
+    expect((await list()).find((m) => m.code === 'MERCH_B')?.link).toEqual({ hasKey: false, lastUsedAt: null });
+    await as(admin, 'POST', '/api/admin/merchants/MERCH_B/bot-key', {});
+    const b = (await list()).find((m) => m.code === 'MERCH_B')!;
+    expect(b.link.hasKey).toBe(true); expect(b.link.lastUsedAt).toBeNull();                 // made, not used by LiveChat yet
+  });
 });

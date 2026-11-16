@@ -2,9 +2,11 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { IconBtn, Modal } from '../ui';
+import { Modal } from '../ui';
 
-interface PeopleData { merchants: { code: string; name: string; tone: string; entries: number; logins: string[] }[]; users: { username: string; role: string; merchant: string | null }[] }
+interface PeopleData { merchants: { code: string; name: string; tone: string; entries: number; logins: string[]; link?: { hasKey: boolean; lastUsedAt: string | null } }[]; users: { username: string; role: string; merchant: string | null }[] }
+/** "2h ago", "3d ago": how long since a time. */
+const ago = (iso: string | null) => { if (!iso) return ''; const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
 type Dlg = { kind: 'merchant' } | { kind: 'user' } | { kind: 'reset'; user: string } | null;
 
 export default function People() {
@@ -18,14 +20,20 @@ export default function People() {
   };
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Merchants</h2><div className="sub">Each merchant has its own knowledge base, words and settings. A new merchant starts empty. Click a merchant's name to open its page: the LiveChat connection, the bot key and its own AI keys.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>Add merchant</button></div>
-        <table style={{ marginTop: 10 }}><thead><tr><th>Merchant</th><th>Code</th><th>Tone</th><th className="num">Entries</th><th>Logins</th></tr></thead><tbody>
-          {P.merchants.map((m) => <tr key={m.code}><td><b><a href={'/admin/merchants/' + m.code} onClick={(e) => { e.preventDefault(); nav('/admin/merchants/' + m.code); }}>{m.name}</a></b></td><td className="mono">{m.code}</td><td>{m.tone}</td><td className="num">{m.entries}</td><td>{m.logins.length ? m.logins.join(', ') : <span className="sub">none</span>}</td></tr>)}</tbody></table></div>
-      <div className="card"><div className="head"><div><h2>Logins</h2><div className="sub">Staff are locked to one merchant. Admins see every merchant.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'user' })}>Add login</button></div>
-        <table style={{ marginTop: 10 }}><thead><tr><th>Username</th><th>Role</th><th>Merchant</th><th></th></tr></thead><tbody>
+      <div className="card"><div className="head"><div><h2>Merchants</h2><div className="sub">Each merchant has its own answers, words and settings. Open a merchant to connect it to LiveChat and set its AI keys.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>＋ Add merchant</button></div>
+        <table className="ptable"><thead><tr><th>Merchant</th><th>Tone</th><th className="num">Answers</th><th>Staff login</th><th>LiveChat link</th><th></th></tr></thead><tbody>
+          {P.merchants.map((m) => <tr key={m.code}>
+            <td><a className="mname" href={'/admin/merchants/' + m.code} onClick={(e) => { e.preventDefault(); nav('/admin/merchants/' + m.code); }}>{m.name}</a><span className="mcode">{m.code}</span></td>
+            <td><span className="pill">{m.tone}</span></td><td className="num">{m.entries}</td>
+            <td>{m.logins.length ? m.logins.join(', ') : <span className="sub">none</span>}</td>
+            <td>{m.link?.hasKey ? <span className="pill ok">Connected{m.link.lastUsedAt ? ' · used ' + ago(m.link.lastUsedAt) : ' · not used yet'}</span> : <span className="pill warn">No bot key yet</span>}</td>
+            <td className="num"><button className="btn sm" type="button" onClick={() => nav('/admin/merchants/' + m.code)}>Open</button></td></tr>)}</tbody></table></div>
+      <div className="card"><div className="head"><div><h2>Logins</h2><div className="sub">Staff can only see their own merchant. Admins see every merchant.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'user' })}>＋ Add login</button></div>
+        <table className="ptable"><thead><tr><th>Username</th><th>Role</th><th>Merchant</th><th></th></tr></thead><tbody>
           {P.users.map((u) => (
-            <tr key={u.username}><td><b>{u.username}</b>{u.username === p.me.username ? <> <span className="pill info">you</span></> : null}</td><td>{u.role === 'admin' ? 'Admin' : 'Staff'}</td><td>{u.merchant ? u.merchant : <span className="sub">all merchants</span>}</td>
-              <td style={{ textAlign: 'right', whiteSpace: 'nowrap' }}><IconBtn tip="Reset password" onClick={() => setDlg({ kind: 'reset', user: u.username })}><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2 21 2" /><path d="M17 6l3 3" /><path d="M14 9l2 2" /></IconBtn>{u.username === p.me.username ? null : <> <IconBtn tip="Remove login" danger onClick={() => remove(u.username)}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></IconBtn></>}</td></tr>))}</tbody></table></div>
+            <tr key={u.username}><td><b>{u.username}</b>{u.username === p.me.username ? <> <span className="pill info">you</span></> : null}</td><td><span className={'pill' + (u.role === 'admin' ? ' info' : '')}>{u.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
+              <td>{u.merchant ? (P.merchants.find((m) => m.code === u.merchant)?.name ?? u.merchant) : <span className="sub">All merchants</span>}</td>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}><button className="btn sm ghost" type="button" onClick={() => setDlg({ kind: 'reset', user: u.username })}>Change password</button>{u.username === p.me.username ? null : <> <button className="btn sm danger" type="button" onClick={() => remove(u.username)}>Delete</button></>}</td></tr>))}</tbody></table></div>
       {dlg?.kind === 'merchant' && <MerchantDialog onClose={() => setDlg(null)} onDone={async () => { await load(); await p.reloadAll(); }} />}
       {dlg?.kind === 'user' && <UserDialog merchants={P.merchants} onClose={() => setDlg(null)} onDone={load} />}
       {dlg?.kind === 'reset' && <ResetDialog user={dlg.user} onClose={() => setDlg(null)} />}

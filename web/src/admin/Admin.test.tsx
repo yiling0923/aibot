@@ -119,18 +119,17 @@ describe('Control panel', () => {
   });
   it('shows the login actions as icon buttons with the words available on hover', async () => {
     open('admin', '/admin/users');
-    const reset = await screen.findAllByRole('button', { name: 'Reset password' });
-    expect(reset).toHaveLength(2);                                                       // one per login
-    expect(reset[0].textContent).toBe('');                                               // an icon, no words on the button
-    expect(reset[0].getAttribute('data-tip')).toBe('Reset password');                    // the words shown on hover
-    expect(screen.getAllByRole('button', { name: 'Remove login' })).toHaveLength(1);     // you cannot remove yourself
+    const reset = await screen.findAllByRole('button', { name: 'Change password' });
+    expect(reset).toHaveLength(2);                                                       // one per login, with words on the button
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);           // you cannot delete yourself
   });
 
   it('opens a merchant page with the LiveChat address, makes a key that is shown once, and keeps AI keys masked', async () => {
     open('admin', '/admin/merchants/A');
     expect(await screen.findByText('LiveChat connection')).toBeTruthy();
     expect((screen.getByDisplayValue('http://localhost:3000') as HTMLInputElement).readOnly).toBe(true);
-    expect(screen.getByText('4 real chats in the last 7 days')).toBeTruthy();
+    expect(screen.getByText('Real chats, 7 days')).toBeTruthy();
+    expect(screen.getByText('Real chats, 7 days').parentElement?.textContent).toContain('4');
     expect(screen.getByText('No key yet. LiveChat cannot use the bot until you make one.')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Make key' }));
     expect(await screen.findByText('Copy this key now. It is shown only once.')).toBeTruthy();
@@ -175,7 +174,7 @@ describe('Control panel', () => {
   });
   it('lets a new merchant use Vietnamese, Thai or Filipino as its main language', async () => {
     open('admin', '/admin/users');
-    await userEvent.click(await screen.findByRole('button', { name: 'Add merchant' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Add merchant/ }));
     const main = (await screen.findByLabelText('Main language')) as HTMLSelectElement;
     expect([...main.options].map((o) => o.value)).toEqual(['en', 'ms', 'zh', 'vi', 'th', 'tl']);
   });
@@ -209,7 +208,7 @@ describe('Control panel', () => {
   });
   it('shows the handoff number copied from LiveChat on the merchant page, with a button to send a change to LiveChat', async () => {
     open('admin', '/admin/merchants/A');
-    expect(await screen.findByText('Handoff number (synced with LiveChat)')).toBeTruthy();
+    expect(await screen.findByText('Handoff number')).toBeTruthy();
     const box = await screen.findByLabelText('Ask for a person after N replies') as HTMLInputElement;
     expect(box.value).toBe('4');
     expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(true);       // nothing to send until the number differs

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
@@ -45,63 +45,72 @@ export default function MerchantPage() {
   });
   const runTest = () => run('test', async () => setTest(await api<LinkTest>(`/api/admin/merchants/${m.code}/test-link`, { question: 'Can you help?' })));
 
+  const aiOwn = Object.values(c.ai).some((r) => r.using === 'merchant'), aiShared = Object.values(c.ai).some((r) => r.using === 'shared');
   return (
     <>
-      <div className="card"><div className="head"><div><h2>{m.name} <span className="mono sub">{m.code}</span></h2>
-        <div className="sub">The details LiveChat needs to reach this merchant's bot, and this merchant's own AI keys.</div></div>
+      <div className="card"><div className="head"><div><h2>{m.name} <span className="mcodepill">{m.code}</span></h2>
+        <div className="sub">Everything LiveChat needs to reach this merchant's bot.</div></div>
         <button className="btn" type="button" onClick={() => nav('/admin/users')}>← All merchants</button></div>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 10 }}>
-          <Pill>{m.entries} knowledge base entries</Pill><Pill>Tone: {m.tone}</Pill><Pill>Default language: {LANG[m.language] ?? m.language}</Pill>
-          <Pill c={m.logins.length ? '' : 'warn'}>{m.logins.length ? 'Staff: ' + m.logins.join(', ') : 'No staff login yet'}</Pill>
-          <Pill c={lc.liveChats7d ? 'ok' : ''}>{lc.liveChats7d} real chats in the last 7 days</Pill>
-        </div>
-        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+        <div className="mstats">
+          <div className="mst"><small>Answers</small><b>{m.entries}</b></div><div className="mst"><small>Main language</small><b>{LANG[m.language] ?? m.language}</b></div>
+          <div className="mst"><small>Tone</small><b>{m.tone[0].toUpperCase() + m.tone.slice(1)}</b></div><div className="mst"><small>Real chats, 7 days</small><b>{lc.liveChats7d}</b></div></div>
+        <div className="mlinks">
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/set'); }}>Merchant settings</button>
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/kb'); }}>Knowledge base</button>
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/chat'); }}>Test chat</button>
+          <span className="sub">{m.logins.length ? 'Staff login: ' + m.logins.join(', ') : 'No staff login yet'}</span>
         </div></div>
 
-      <div className="card"><h3>LiveChat connection</h3>
-        <div className="sub">In LiveChat, open this merchant's <b>Chat → AI Bot</b> page, switch the bot on, and paste the two values below.</div>
-        <div className="form" style={{ marginTop: 10 }}>
-          <label className="fld full"><span>1. Bot address (LiveChat → "API URL")</span>
-            <div style={{ display: 'flex', gap: 8 }}><input readOnly value={lc.baseUrl} onFocus={(e) => e.target.select()} style={{ flexGrow: 1 }} /><button className="btn" type="button" onClick={() => void copy(lc.baseUrl)}>Copy</button></div>
-            <span className="sub" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>LiveChat adds <span className="mono">/api/v1/ai/ask</span> itself. If LiveChat runs on another computer or in Docker, <span className="mono">localhost</span> will not work from there: use the address that computer uses to reach this bot, or set <span className="mono">PUBLIC_URL</span> in .env.</span></label>
-          <div className="full"><div className="fld"><span>2. Bot key (LiveChat → "API Key")</span></div>
-            {fresh ? (
-              <div className="note" style={{ background: 'var(--okbg)', marginTop: 4 }}>
-                <b>Copy this key now. It is shown only once.</b>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}><input readOnly className="mono" value={fresh} onFocus={(e) => e.target.select()} style={{ flexGrow: 1 }} /><button className="btn pri" type="button" onClick={() => void copy(fresh)}>Copy key</button></div>
-                <div className="sub" style={{ marginTop: 6 }}>Paste it into LiveChat's API Key box and save. The bot cannot show it again, only make a new one.</div>
-              </div>
-            ) : key ? (
-              <div style={{ marginTop: 4 }}><span className="mono">{key.prefix}…</span> <Pill c="ok">Active</Pill>
-                <div className="sub">Made {when(key.createdAt)}{key.createdBy ? ' by ' + key.createdBy : ''} · last used by LiveChat: {when(key.lastUsedAt)}{lc.stoppedKeys ? ` · ${lc.stoppedKeys} older key${lc.stoppedKeys > 1 ? 's' : ''} stopped` : ''}</div></div>
-            ) : <div className="sub" style={{ marginTop: 4 }}>No key yet. LiveChat cannot use the bot until you make one.</div>}
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <button className={'btn' + (key ? '' : ' pri')} type="button" disabled={busy === 'key'} onClick={makeKey}>{key ? 'Replace key' : 'Make key'}</button>
-              {key && <button className="btn" type="button" disabled={busy === 'stop'} onClick={stopKey}>Stop key</button>}
-            </div></div>
-        </div></div>
+      <Step n={1} done={!!key} title="LiveChat connection" badge={key ? 'Bot key active' : 'No bot key yet'} tone={key ? 'ok' : 'warn'}
+        sub={<>In LiveChat, open this merchant's <b>Chat → AI Bot</b> page, switch the bot on, and paste the two values below.</>}>
+        <div className="mlbl">1 · Bot address (LiveChat → "API URL")</div>
+        <div className="mrow"><input readOnly value={lc.baseUrl} onFocus={(e) => e.target.select()} style={{ flexGrow: 1 }} aria-label="Bot address" /><button className="btn" type="button" onClick={() => void copy(lc.baseUrl)}>Copy</button></div>
+        <div className="sub" style={{ margin: '6px 0 14px' }}>LiveChat adds <span className="mono">/api/v1/ai/ask</span> itself. If LiveChat runs on another computer or in Docker, <span className="mono">localhost</span> will not work from there: use the address that computer uses to reach this bot, or set <span className="mono">PUBLIC_URL</span> in .env.</div>
+        <div className="mlbl">2 · Bot key (LiveChat → "API Key")</div>
+        {fresh ? (
+          <div className="note" style={{ background: 'var(--okbg)' }}>
+            <b>Copy this key now. It is shown only once.</b>
+            <div className="mrow" style={{ marginTop: 8 }}><input readOnly className="mono" value={fresh} onFocus={(e) => e.target.select()} style={{ flexGrow: 1 }} /><button className="btn pri" type="button" onClick={() => void copy(fresh)}>Copy key</button></div>
+            <div className="sub" style={{ marginTop: 6 }}>Paste it into LiveChat's API Key box and save. The bot cannot show it again, only make a new one.</div>
+          </div>
+        ) : key ? (
+          <div className="keyline"><span className="mono">{key.prefix}…</span><Pill c="ok">Active</Pill>
+            <span className="sub">Made {when(key.createdAt)}{key.createdBy ? ' by ' + key.createdBy : ''} · last used by LiveChat: {when(key.lastUsedAt)}{lc.stoppedKeys ? ` · ${lc.stoppedKeys} older key${lc.stoppedKeys > 1 ? 's' : ''} stopped` : ''}</span></div>
+        ) : <div className="sub">No key yet. LiveChat cannot use the bot until you make one.</div>}
+        <div className="mrow" style={{ marginTop: 10 }}>
+          <button className={'btn' + (key ? '' : ' pri')} type="button" disabled={busy === 'key'} onClick={makeKey}>{key ? 'Replace key' : 'Make key'}</button>
+          {key && <button className="btn danger" type="button" disabled={busy === 'stop'} onClick={stopKey}>Stop key</button>}
+        </div>
+      </Step>
 
-      <div className="card"><h3>Test the link</h3>
-        <div className="sub">Sends "Can you help?" to the bot the way LiveChat does, using this merchant's knowledge base. It shows the bot's side only; it cannot see whether LiveChat can reach this address. Saved as a test chat.</div>
-        <div style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={busy === 'test'} onClick={runTest}>{busy === 'test' ? 'Testing…' : 'Test the link'}</button></div>
+      <Step n={2} done={!!test?.ok} title="Test the link" badge={test ? (test.ok ? `Last test: OK · ${test.ms} ms` : 'Last test failed') : 'Not tested yet'} tone={test ? (test.ok ? 'ok' : 'bad') : ''}
+        sub="Sends “Can you help?” to the bot the way LiveChat does, using this merchant's answers. It shows the bot's side only; it cannot see whether LiveChat can reach this address. Saved as a test chat.">
+        <div className="mrow"><button className="btn pri" type="button" disabled={busy === 'test'} onClick={runTest}>{busy === 'test' ? 'Testing…' : 'Test the link'}</button></div>
         {test && (
           <div className="note" style={{ marginTop: 10, background: test.hasKey ? 'var(--okbg)' : 'var(--warnbg)' }}>
             <b>The bot answered in {test.ms} ms</b> ({test.decision}).{!test.hasKey && ' Warning: there is no active key yet, so LiveChat cannot get this answer.'}
             <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{test.answer}</div>
           </div>
-        )}</div>
+        )}
+      </Step>
 
       <HandoffSync code={m.code} />
 
-      <div className="card"><h3>AI keys for this merchant</h3>
-        <div className="sub">Optional. With its own key, this merchant's AI use is billed to its own account. Without one, the bot uses the shared key from <span className="mono">.env</span>, or runs without AI. Keys are saved encrypted and only the last 4 characters are ever shown.</div>
+      <Step n={4} done={aiOwn || aiShared} title="AI keys" badge={aiOwn ? 'Own key' : aiShared ? 'Using shared key' : 'AI off'} tone={aiOwn ? 'ok' : aiShared ? 'info' : ''}
+        sub={<>Optional. With its own key, this merchant's AI use is billed to its own account. Without one, the bot uses the shared key from <span className="mono">.env</span>, or runs without AI. Keys are saved encrypted and only the last 4 characters are ever shown.</>}>
         <AiKeyRow code={m.code} provider="anthropic" title="Claude (Anthropic)" help="Picks the right answer when no keyword matches, describes new keywords, and translates answers." row={c.ai.anthropic} onChange={load} />
         <AiKeyRow code={m.code} provider="openai" title="ChatGPT (OpenAI)" help="Only used to reword replies, and only if OPENAI_MODEL is set in .env." row={c.ai.openai} onChange={load} />
-      </div>
+      </Step>
     </>
+  );
+}
+
+/** One numbered step of the merchant setup: a dot (a tick when done), a title with a short note, a status tag on the right, and the content. */
+function Step({ n, done, title, badge, tone, sub, children }: { n: number; done: boolean; title: string; badge: string; tone: string; sub: ReactNode; children: ReactNode }) {
+  return (
+    <div className="card mstep"><div className={'mdot' + (done ? '' : ' todo')} aria-hidden="true">{done ? '✓' : n}</div>
+      <div className="mbody"><h3 style={{ margin: 0 }}>{title}</h3><div className="sub" style={{ marginTop: 2 }}>{sub}</div><div style={{ marginTop: 14 }}>{children}</div></div>
+      <Pill c={tone}>{badge}</Pill></div>
   );
 }
 
@@ -137,24 +146,25 @@ function HandoffSync({ code }: { code: string }) {
   const apply = (x: LcLink) => { setL(x); setN(x.handoffAfterReplies === null ? '' : String(x.handoffAfterReplies)); };
   const run = async (what: string, fn: () => Promise<LcLink>, ok: string) => { setBusy(what); setMsg(''); try { apply(await fn()); p.toast(ok); } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); } };
   useEffect(() => { api<LcLink>(base).then(apply).catch((e) => setMsg((e as Error).message)); }, [base]);
-  if (!l) return <div className="card"><h3>Handoff number (synced with LiveChat)</h3><div className="sub">{msg || 'Loading…'}</div></div>;
+  const sub = <>After this many bot replies, LiveChat asks the customer if they want a person (0 = never). It is one number: change it in LiveChat or here and the other follows. LiveChat is the source of truth: the bot copies it every minute and whenever this page opens. A change made here is sent to LiveChat first and saved only if LiveChat accepts it.</>;
+  if (!l) return <Step n={3} done={false} title="Handoff number" badge="Loading…" tone="" sub={sub}><div className="sub">{msg || 'Loading…'}</div></Step>;
+  const badge = !l.configured ? 'Not connected' : l.error ? 'Last sync failed' : 'In sync · ' + (l.handoffAfterReplies ?? '?') + ' replies';
   return (
-    <div className="card"><h3>Handoff number (synced with LiveChat)</h3>
-      <div className="sub">After this many bot replies, LiveChat asks the customer if they want a person (0 = never). It is one number: change it in LiveChat or here and the other follows. LiveChat is the source of truth: the bot copies it every minute and whenever this page opens. A change made here is sent to LiveChat first and saved only if LiveChat accepts it.</div>
+    <Step n={3} done={l.configured && !l.error} title="Handoff number" badge={badge} tone={!l.configured ? '' : l.error ? 'bad' : 'ok'} sub={sub}>
       {l.configured ? <>
-        <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <label className="fld"><span>Ask for a person after N replies</span><input type="number" min={0} max={100} value={n} onChange={(e) => setN(e.target.value)} style={{ width: 110 }} /></label>
+        <div className="mrow" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
+          <label className="fld"><span>Ask for a person after N replies</span><input type="number" min={0} max={100} value={n} onChange={(e) => setN(e.target.value)} style={{ width: 120 }} /></label>
           <button className="btn pri" type="button" disabled={!!busy || n === '' || Number(n) === l.handoffAfterReplies} onClick={() => run('push', () => api<LcLink>(base + '/handoff', { value: Number(n) }), 'Saved in LiveChat and here')}>Save to LiveChat</button>
           <button className="btn" type="button" disabled={!!busy} onClick={() => run('sync', () => api<LcLink>(base + '/sync', {}), 'Copied from LiveChat')}>Sync now</button>
-          <button className="btn" type="button" disabled={!!busy} onClick={() => run('rm', async () => { await api(base + '/remove', {}); return { configured: false, baseUrl: null, email: null, handoffAfterReplies: null, syncedAt: null, error: null }; }, 'Disconnected')}>Disconnect</button></div>
-        <div className="sub" style={{ marginTop: 6 }}>Connected to <span className="mono">{l.baseUrl}</span> as {l.email}. {l.syncedAt ? 'Last copied ' + when(l.syncedAt) + '.' : ''} {l.error ? <Pill c="bad">Last sync failed: {l.error}</Pill> : <Pill c="ok">In sync</Pill>}</div>
+          <button className="btn ghost" type="button" disabled={!!busy} onClick={() => run('rm', async () => { await api(base + '/remove', {}); return { configured: false, baseUrl: null, email: null, handoffAfterReplies: null, syncedAt: null, error: null }; }, 'Disconnected')}>Disconnect</button></div>
+        <div className="sub" style={{ marginTop: 8 }}>Connected to <span className="mono">{l.baseUrl}</span> as {l.email}.{l.syncedAt ? ' Last copied ' + when(l.syncedAt) + '.' : ''}{l.error ? <> <Pill c="bad">{l.error}</Pill></> : null}</div>
       </> : <>
-        <div className="form" style={{ marginTop: 10 }}>
-          <label className="fld"><span>LiveChat address</span><input value={f.baseUrl} placeholder="http://localhost:8080" onChange={(e) => setF({ ...f, baseUrl: e.target.value })} /></label>
+        <div className="form">
+          <label className="fld"><span>LiveChat address</span><input value={l.baseUrl ?? f.baseUrl} placeholder="http://localhost:8080" onChange={(e) => setF({ ...f, baseUrl: e.target.value })} /></label>
           <label className="fld"><span>This merchant's LiveChat email</span><input value={f.email} autoComplete="off" onChange={(e) => setF({ ...f, email: e.target.value })} /></label>
           <label className="fld"><span>Password (saved encrypted)</span><input type="password" value={f.password} autoComplete="off" onChange={(e) => setF({ ...f, password: e.target.value })} /></label></div>
-        <div style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!!busy} onClick={() => run('connect', () => api<LcLink>(base, f), 'Connected to LiveChat')}>{busy === 'connect' ? 'Checking…' : 'Connect and copy the number'}</button></div></>}
+        <div className="mrow" style={{ marginTop: 10 }}><button className="btn pri" type="button" disabled={!!busy} onClick={() => run('connect', () => api<LcLink>(base, f), 'Connected to LiveChat')}>{busy === 'connect' ? 'Checking…' : 'Connect and copy the number'}</button></div></>}
       {msg && <div className="note" style={{ marginTop: 8, background: 'var(--badbg)' }}>{msg}</div>}
-    </div>
+    </Step>
   );
 }

@@ -403,3 +403,19 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .kwglbl{color:var(--muted);font-weight:700;font-size:12px;letter-spacing:.05em;text-transform:uppercase;padding-top:5px;display:flex;gap:8px;align-items:center}.kwglbl em{font-style:normal;background:var(--surface2);border-radius:99px;padding:0 8px}
 .kwpill{display:inline-block;background:var(--surface2);border-radius:99px;padding:4px 12px;margin:0 6px 6px 0;font-weight:600;cursor:pointer}.kwpill small{color:var(--muted);font-weight:500;margin-left:7px}.kwpill:hover{background:color-mix(in srgb,var(--accent) 14%,var(--surface2))}
 @media (max-width:760px){.kwgrow{grid-template-columns:1fr}.kwtable td.kwbc{display:none}}
+
+/* Merchants & logins, and the merchant page */
+.ptable{margin-top:6px;min-width:0}.ptable td{padding:12px 8px;vertical-align:middle}
+.mname{display:block;font-weight:700;font-size:15px;color:var(--accent);text-decoration:none}.mname:hover{text-decoration:underline}
+.mcode{display:block;color:var(--muted);font-size:12px;font-family:var(--mono,ui-monospace,Consolas,monospace)}
+.btn.danger{color:var(--bad)}.btn.danger:hover{border-color:var(--bad)}
+.mcodepill{display:inline-block;vertical-align:middle;margin-left:6px;background:var(--surface2);border-radius:99px;padding:1px 10px;font-size:12px;font-weight:600;font-family:var(--mono,ui-monospace,Consolas,monospace)}
+.mstats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-top:14px}
+.mst{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px 14px}.mst small{display:block;color:var(--muted);font-size:11px;letter-spacing:.05em;text-transform:uppercase;font-weight:700}.mst b{font-size:18px}
+.mlinks{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:14px}.mlinks .sub{margin-left:auto}
+.mstep{display:grid;grid-template-columns:42px minmax(0,1fr) auto;gap:14px;align-items:start}
+.mdot{width:34px;height:34px;border-radius:50%;display:grid;place-items:center;font-weight:800;background:color-mix(in srgb,var(--accent) 16%,transparent);color:var(--accent)}.mdot.todo{background:var(--surface2);color:var(--muted)}
+.mlbl{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:4px}
+.mrow{display:flex;gap:8px;align-items:center}
+.keyline{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+@media (max-width:760px){.mstats{grid-template-columns:1fr 1fr}.mstep{grid-template-columns:34px 1fr}.mstep>.pill{grid-column:2;justify-self:start}}
