@@ -34,6 +34,7 @@ export default function Topics() {
 
   useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 60); } });
 
+  const [adding, setAdding] = useState(false);
   const done = (msg: string, chip: string, word?: string) => {
     if (word) setFresh((s) => new Set(s).add(word.toLowerCase()));
     scroll.current = true; setJust((j) => [chip, ...j].slice(0, 8)); setQ(''); setLang('all'); p.toast(msg);
@@ -95,12 +96,12 @@ export default function Topics() {
   };
 
   return (
-    <div className="card"><div className="head"><div><h2>Topics</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div></div>
+    <div className="card"><div className="head"><div><h2>Topics</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>＋ Add a topic or keyword</button></div>
       <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}</button>)}</div>
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
       {cur === 'short' && <div className="segs" role="group" aria-label="View" style={{ marginTop: 8 }}>{([['list', 'List'], ['flow', 'Flowchart']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
       {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        <details className="fold"><summary>＋ Add a topic or keyword</summary><div className="addbox"><AddBox tab={cur} dup={dup} done={done} /></div></details>
+        {adding && <div className="addbox"><AddBox tab={cur} dup={dup} done={done} /></div>}
         {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 220 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
