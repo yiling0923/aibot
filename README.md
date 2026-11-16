@@ -239,3 +239,7 @@ On **Merchant settings**, under *Handoff rules*, every on/off setting is a switc
 - **Custom trigger phrases** (staff may edit): comma separated, any language. A message containing one of them (as a whole word) goes straight to a person.
 
 *Cleaning up* (admin only): **Keep conversations for (days)**. Chats older than this are deleted by a sweep every 6 hours (`RETENTION_SWEEP_MS`, 0 = never), together with their messages, the connector's chat memory and request log. Empty or 0 keeps everything, which is the default. The Report counts only chats that are kept; the keyword counts and the words list are separate and are not changed.
+
+## Merchant settings in tabs
+
+The Merchant settings page is grouped in tabs under the four tiles: **General** (name, domain, monthly AI token limit, keep conversations for N days, languages; saved at once with *Save basics*, which turns green when something changed), **Replies** (tone, match levels, the choices the bot offers, rude customers), **Handoff** (handoff rules, trigger phrases, human group, and a link to the handoff number), **AI help** (bot instructions and presets), **Messages** (fixed messages per language) and **Account tools**. The page remembers the last tab. Everything except the General tab goes to the draft; when you change something a dark bar at the bottom shows how many unsaved changes there are and which groups (for example "Complaint or dispute · Trigger phrases") with **Discard** and **Save to draft**.

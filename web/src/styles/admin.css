@@ -432,3 +432,8 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .stag{margin-left:8px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--muted);border-radius:99px;padding:1px 9px;vertical-align:1px}
 .srow-last{padding-top:12px;border-top:1px solid var(--line)}
 .switch input:disabled+.track{opacity:.55}.switch input:disabled{cursor:not-allowed}
+
+/* Merchant settings: the bar that shows unsaved changes */
+.ubar{position:sticky;bottom:14px;z-index:5;margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#1d2733;color:#fff;border-radius:14px;padding:11px 16px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
+.ubar .ulist{color:#aab4bf;font-size:13px;min-width:0}.ubar .uact{margin-left:auto;display:flex;gap:8px}
+.ubar .btn{background:transparent;color:#fff;border-color:#4a5663}.ubar .btn:hover{border-color:#fff}.ubar .btn.pri{background:var(--accent);border-color:var(--accent)}

@@ -266,8 +266,12 @@ describe('Control panel', () => {
     expect(screen.getByText('81%')).toBeTruthy();                                                   // average confidence
     expect((await screen.findByLabelText(/^Monthly AI token limit/) as HTMLInputElement).value).toBe('500000');
     expect(screen.getByText(/Used this month: 12,400/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(true);          // nothing changed yet
+    await userEvent.type(screen.getByLabelText(/^Monthly AI token limit/), '0');
     expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
     expect((screen.getByRole('button', { name: 'English' }) as HTMLButtonElement).disabled).toBe(true);   // the main language stays on
+    expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).value).toBe('90');   // on the General tab
+    await userEvent.click(screen.getByRole('tab', { name: 'AI help' }));
     const box = screen.getByLabelText('Bot instructions') as HTMLTextAreaElement;
     await userEvent.click(screen.getByRole('button', { name: /Formal tone/ }));
     await userEvent.click(screen.getByRole('button', { name: /Max 2 sentences/ }));
@@ -276,12 +280,15 @@ describe('Control panel', () => {
     expect(screen.getByText('110 / 5000')).toBeTruthy();
     unmount();
     open('staff', '/admin/set');
+    await userEvent.click(await screen.findByRole('tab', { name: 'General' }));
     expect(await screen.findByText('Only an admin can change these')).toBeTruthy();
     expect((await screen.findByLabelText(/^Monthly AI token limit/) as HTMLInputElement).disabled).toBe(true);
+    await userEvent.click(screen.getByRole('tab', { name: 'AI help' }));
     expect((screen.getByLabelText('Bot instructions') as HTMLTextAreaElement).disabled).toBe(false);   // staff may write the style rules
   });
   it('shows the handoff rules as switches (two locked on, one not available), trigger phrases and the retention days', async () => {
     const { unmount } = open('admin', '/admin/set');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Handoff' }));
     const complaint = await screen.findByRole('switch', { name: 'Complaint or dispute' }) as HTMLInputElement;
     expect(complaint.checked).toBe(true); expect(complaint.disabled).toBe(false);
     await userEvent.click(complaint); expect(complaint.checked).toBe(false);                      // an admin may switch the rule off
@@ -290,11 +297,31 @@ describe('Control panel', () => {
     const file = screen.getByRole('switch', { name: 'Picture or file sent' }) as HTMLInputElement; expect(file.checked).toBe(false); expect(file.disabled).toBe(true);
     await userEvent.type(screen.getByLabelText('Custom trigger phrases'), 'vip, urgent');
     expect((screen.getByLabelText('Custom trigger phrases') as HTMLInputElement).value).toBe('vip, urgent');
-    expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).value).toBe('90');
+    expect(screen.getByLabelText('Human group for handoff')).toBeTruthy();                           // moved here from Replies
     unmount();
     open('staff', '/admin/set');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Handoff' }));
     expect(((await screen.findByRole('switch', { name: 'Complaint or dispute' })) as HTMLInputElement).disabled).toBe(true);       // staff cannot switch the rules
     expect((screen.getByLabelText('Custom trigger phrases') as HTMLInputElement).disabled).toBe(false);                            // but may add phrases
+    await userEvent.click(screen.getByRole('tab', { name: 'General' }));
     expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).disabled).toBe(true);
+  });
+  it('groups the settings in tabs, and shows the unsaved changes in a bar with Discard and Save to draft', async () => {
+    open('admin', '/admin/set');
+    expect(await screen.findByRole('tab', { name: 'General' })).toBeTruthy();
+    for (const t of ['Replies', 'Handoff', 'AI help', 'Messages', 'Account tools']) expect(screen.getByRole('tab', { name: t })).toBeTruthy();
+    expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();                                                 // nothing changed: no bar
+    await userEvent.click(screen.getByRole('tab', { name: 'Handoff' }));
+    const complaint = await screen.findByRole('switch', { name: 'Complaint or dispute' }) as HTMLInputElement;
+    await userEvent.click(complaint);
+    const bar = await screen.findByRole('region', { name: 'Unsaved changes' }); expect(bar.textContent).toContain('1 unsaved change'); expect(bar.textContent).toContain('Complaint or dispute');
+    await userEvent.type(screen.getByLabelText('Custom trigger phrases'), 'vip');
+    expect(screen.getByRole('region', { name: 'Unsaved changes' }).textContent).toContain('2 unsaved changes');
+    await userEvent.click(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Discard' }));
+    expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull(); expect((screen.getByRole('switch', { name: 'Complaint or dispute' }) as HTMLInputElement).checked).toBe(true);   // back as it was
+    await userEvent.click(screen.getByRole('switch', { name: 'Complaint or dispute' }));
+    await userEvent.click(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save to draft' }));
+    expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();                                                 // saved to the draft: the bar goes away
+    expect(await screen.findByText(/Draft/)).toBeTruthy();
   });
 });
