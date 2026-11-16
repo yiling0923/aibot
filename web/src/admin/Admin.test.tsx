@@ -26,6 +26,8 @@ const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
   totals: { chats: 52, calls: 123, inputTokens: 901000, outputTokens: 60100, totalTokens: 961100, cost: 0.12, charge: 0.144, ownKeyCalls: 5, ownKeyTokens: 3000, unpricedCalls: 3 },
   byKind: [{ kind: 'pick', calls: 120, totalTokens: 960000, cost: 0.12 }], unpricedModels: [{ provider: 'openai', model: 'gpt-new', calls: 3, tokens: 1100 }],
   prices: [{ provider: 'anthropic', model: 'claude-haiku-5-5', inputPerMTok: 0.1, outputPerMTok: 0.5, updatedBy: 'system', updatedAt: '2026-11-01T00:00:00Z' }] });
+let peopleBig = false;                                                                               // many merchants and logins, for the search and the role filter
+const BIG_PEOPLE = { merchants: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot'].map((n, i) => ({ code: 'M' + i, name: n, tone: 'friendly', entries: 5 + i, logins: [n.toLowerCase()], link: i ? { hasKey: true, lastUsedAt: null } : { hasKey: false, lastUsedAt: null } })), users: [{ username: 'admin', role: 'admin', merchant: null }, { username: 'boss', role: 'admin', merchant: null }, ...['alpha', 'bravo', 'charlie'].map((u, i) => ({ username: u, role: 'staff', merchant: 'M' + i }))] };
 let lcRefuse = false;                                                                                // the LiveChat stand-in refuses a file
 let lcLines: { from: string; sender: string; text: string }[] = [];
 const lcReply = (init?: RequestInit) => {                                                          // a stand-in for the LiveChat test route
@@ -41,7 +43,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
-    : url.startsWith('/api/admin/people') ? { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
+    : url.startsWith('/api/admin/people') ? (peopleBig ? BIG_PEOPLE : { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] })
     : url.startsWith('/api/admin/report') ? REPORT
     : url.startsWith('/api/admin/ranking') ? RANKING
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
@@ -49,7 +51,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { localStorage.clear(); lcLines = []; lcRefuse = false; });
+beforeEach(() => { localStorage.clear(); lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -353,6 +355,18 @@ describe('Control panel', () => {
     expect(screen.getByLabelText('Filter keywords').closest('.rkcard')).toBeTruthy();                                // the filter sits in the table card
     await userEvent.type(screen.getByLabelText('Filter keywords'), 'zzzz');
     expect(await screen.findByText('No keyword matches this filter.')).toBeTruthy();
+  });
+  it('Merchants and logins: avatars, counts in the titles, a clickable row, a merchant search and a role filter when the lists are long', async () => {
+    peopleBig = true; open('admin', '/admin/users');
+    expect(await screen.findByRole('heading', { name: /Merchants\s*6/ })).toBeTruthy(); expect(screen.getByRole('heading', { name: /Logins\s*5/ })).toBeTruthy();
+    expect(document.querySelectorAll('.ptable .av').length).toBe(11);                                              // a round badge on every merchant and every login
+    await userEvent.type(screen.getByLabelText('Find a merchant'), 'zzz');
+    expect(await screen.findByText(/No merchant matches “zzz”/)).toBeTruthy();
+    await userEvent.clear(screen.getByLabelText('Find a merchant')); await userEvent.type(screen.getByLabelText('Find a merchant'), 'brav');
+    expect(screen.getAllByText('Bravo').length).toBeGreaterThan(0); expect(screen.queryByText('Echo')).toBeNull();
+    const roles = screen.getByRole('group', { name: 'Show logins' });
+    await userEvent.click(within(roles).getByRole('button', { name: /Admins/ }));
+    expect(screen.queryByText('alpha')).toBeNull(); expect(screen.getByText('boss')).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

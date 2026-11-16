@@ -9,31 +9,48 @@ interface PeopleData { merchants: { code: string; name: string; tone: string; en
 const ago = (iso: string | null) => { if (!iso) return ''; const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 1 ? 'just now' : m < 60 ? m + ' min ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; };
 type Dlg = { kind: 'merchant' } | { kind: 'user' } | { kind: 'reset'; user: string } | null;
 
+const TINTS: [string, string][] = [['#e3f1f3', '#0f6f78'], ['#efe9fb', '#6d3fc0'], ['#fdecdc', '#b45309'], ['#e2f3ea', '#177a4b'], ['#e8f1fb', '#2563a8'], ['#fbe6ee', '#be185d']];
+/** A round badge with the first letters of a name, in a soft colour that stays the same for the same name. */
+function Av({ name, seed }: { name: string; seed: string }) {
+  let h = 0; for (const c of seed) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  const [bg, fg] = TINTS[h % TINTS.length]; const ini = name.replace(/[^A-Za-z0-9 ]/g, '').split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || '?';
+  return <span className="av" style={{ background: bg, color: fg }} aria-hidden="true">{ini}</span>;
+}
+
 export default function People() {
   const p = usePanel(); const nav = useNavigate();
   const [P, setP] = useState<PeopleData>({ merchants: [], users: [] }); const [dlg, setDlg] = useState<Dlg>(null);
+  const [mq, setMq] = useState(''); const [role, setRole] = useState<'all' | 'admin' | 'staff'>('all');
   const load = useCallback(async () => setP(await api<PeopleData>('/api/admin/people')), []);
   useEffect(() => { load().catch((e: Error) => p.toast('Could not load: ' + e.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
   const remove = async (u: string) => {
     if (!confirm('Remove the login "' + u + '"?')) return;
     try { await api('/api/admin/users/delete', { username: u }); p.toast('Login removed'); await load(); } catch (e) { p.toast((e as Error).message); }
   };
+  const Q = mq.trim().toLowerCase();
+  const merchants = P.merchants.filter((m) => !Q || (m.name + ' ' + m.code).toLowerCase().includes(Q));
+  const users = P.users.filter((u) => role === 'all' || u.role === role);
+  const admins = P.users.filter((u) => u.role === 'admin').length;
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Merchants</h2><div className="sub">Each merchant has its own answers, words and settings. Open a merchant to connect it to LiveChat and set its AI keys.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>＋ Add merchant</button></div>
+      <div className="card"><div className="head"><div><h2>Merchants <span className="cnt2">{P.merchants.length}</span></h2><div className="sub">Each merchant has its own answers, words and settings. Open a merchant to connect it to LiveChat and set its AI keys.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>＋ Add merchant</button></div>
+        {P.merchants.length > 5 && <div className="pbar"><input type="search" aria-label="Find a merchant" placeholder="Find a merchant" value={mq} onChange={(e) => setMq(e.target.value)} /></div>}
         <table className="ptable"><thead><tr><th>Merchant</th><th>Tone</th><th className="num">Answers</th><th>Staff login</th><th>LiveChat link</th><th></th></tr></thead><tbody>
-          {P.merchants.map((m) => <tr key={m.code}>
-            <td><a className="mname" href={'/admin/merchants/' + m.code} onClick={(e) => { e.preventDefault(); nav('/admin/merchants/' + m.code); }}>{m.name}</a><span className="mcode">{m.code}</span></td>
+          {merchants.map((m) => <tr key={m.code} className="row" onClick={() => nav('/admin/merchants/' + m.code)}>
+            <td><div className="mcell"><Av name={m.name} seed={m.code} /><div><a className="mname" href={'/admin/merchants/' + m.code} onClick={(e) => { e.preventDefault(); e.stopPropagation(); nav('/admin/merchants/' + m.code); }}>{m.name}</a><span className="mcode">{m.code}</span></div></div></td>
             <td><span className="pill">{m.tone}</span></td><td className="num">{m.entries}</td>
             <td>{m.logins.length ? m.logins.join(', ') : <span className="sub">none</span>}</td>
             <td>{m.link?.hasKey ? <span className="pill ok">Connected{m.link.lastUsedAt ? ' · used ' + ago(m.link.lastUsedAt) : ' · not used yet'}</span> : <span className="pill warn">No bot key yet</span>}</td>
-            <td className="num"><IconBtn tip="Open" onClick={() => nav('/admin/merchants/' + m.code)}><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></IconBtn></td></tr>)}</tbody></table></div>
-      <div className="card"><div className="head"><div><h2>Logins</h2><div className="sub">Staff can only see their own merchant. Admins see every merchant.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'user' })}>＋ Add login</button></div>
+            <td className="num" onClick={(e) => e.stopPropagation()}><IconBtn tip="Open" onClick={() => nav('/admin/merchants/' + m.code)}><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></IconBtn></td></tr>)}
+          {!merchants.length && <tr><td colSpan={6}><div className="kwempty"><b>{P.merchants.length ? 'No merchant matches “' + mq.trim() + '”.' : 'No merchants yet.'}</b><span>{P.merchants.length ? 'Check the spelling, or clear the search.' : 'Press “Add merchant” to create the first one.'}</span></div></td></tr>}</tbody></table></div>
+      <div className="card"><div className="head"><div><h2>Logins <span className="cnt2">{P.users.length}</span></h2><div className="sub">Staff can only see their own merchant. Admins see every merchant.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'user' })}>＋ Add login</button></div>
+        {P.users.length > 4 && <div className="pbar"><div className="segs" role="group" aria-label="Show logins">{([['all', 'All', P.users.length], ['admin', 'Admins', admins], ['staff', 'Staff', P.users.length - admins]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={role === k} onClick={() => setRole(k)}>{l} <span className="n">{n}</span></button>)}</div></div>}
         <table className="ptable"><thead><tr><th>Username</th><th>Role</th><th>Merchant</th><th></th></tr></thead><tbody>
-          {P.users.map((u) => (
-            <tr key={u.username}><td><b>{u.username}</b>{u.username === p.me.username ? <> <span className="pill info">you</span></> : null}</td><td><span className={'pill' + (u.role === 'admin' ? ' info' : '')}>{u.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
+          {users.map((u) => (
+            <tr key={u.username}><td><div className="mcell"><Av name={u.username} seed={u.username} /><div><b>{u.username}</b>{u.username === p.me.username ? <> <span className="pill info">you</span></> : null}</div></div></td><td><span className={'pill' + (u.role === 'admin' ? ' info' : '')}>{u.role === 'admin' ? 'Admin' : 'Staff'}</span></td>
               <td>{u.merchant ? (P.merchants.find((m) => m.code === u.merchant)?.name ?? u.merchant) : <span className="sub">All merchants</span>}</td>
-              <td className="num" style={{ whiteSpace: 'nowrap' }}><IconBtn tip="Change password" onClick={() => setDlg({ kind: 'reset', user: u.username })}><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2 21 2" /><path d="M17 6l3 3" /><path d="M14 9l2 2" /></IconBtn>{u.username === p.me.username ? null : <> <IconBtn tip="Delete" danger onClick={() => remove(u.username)}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></IconBtn></>}</td></tr>))}</tbody></table></div>
+              <td className="num" style={{ whiteSpace: 'nowrap' }}><IconBtn tip="Change password" onClick={() => setDlg({ kind: 'reset', user: u.username })}><circle cx="8" cy="15" r="4" /><path d="M10.8 12.2 21 2" /><path d="M17 6l3 3" /><path d="M14 9l2 2" /></IconBtn>{u.username === p.me.username ? null : <> <IconBtn tip="Delete" danger onClick={() => remove(u.username)}><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></IconBtn></>}</td></tr>))}
+          {!users.length && <tr><td colSpan={4}><div className="kwempty"><b>No {role === 'admin' ? 'admin' : 'staff'} logins yet.</b><span>Press “Add login” to make one.</span></div></td></tr>}</tbody></table></div>
       {dlg?.kind === 'merchant' && <MerchantDialog onClose={() => setDlg(null)} onDone={async () => { await load(); await p.reloadAll(); }} />}
       {dlg?.kind === 'user' && <UserDialog merchants={P.merchants} onClose={() => setDlg(null)} onDone={load} />}
       {dlg?.kind === 'reset' && <ResetDialog user={dlg.user} onClose={() => setDlg(null)} />}
