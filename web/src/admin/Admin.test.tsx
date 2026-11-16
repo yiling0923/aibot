@@ -220,6 +220,7 @@ describe('Control panel', () => {
     await userEvent.selectOptions(screen.getByLabelText('Topic for the answer'), 'deposit');
     await userEvent.click(screen.getByRole('button', { name: 'Add answer' }));
     expect(await screen.findByText('daily_limit')).toBeTruthy();
+    expect(screen.queryByText('draft: bot ignores it')).toBeNull();                               // a canvas answer is live, so the bot uses it after Publish
     expect(document.querySelector('.fc.ho')).toBeNull();                                         // hidden at first
     await userEvent.click(screen.getByRole('button', { name: /If not clear/ }));
     expect(document.querySelector('.fc.ho')).not.toBeNull();
