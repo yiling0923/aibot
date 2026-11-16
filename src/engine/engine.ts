@@ -43,7 +43,8 @@ const CNUM: Record<string, number> = { 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, �
 const AMT_WORDS = new Set(['cash', 'duit', 'wang', 'money', 'rm', 'myr', 'ringgit', 'pls', 'please', 'mau', 'ok', 'tien', 'pera', 'salapi', 'php', 'piso', 'vnd', 'dong', 'thb', 'baht', 'po']);
 const PAST_RE = /(deposited|withdrew|withdrawn|transferred|paid|sent|dah|sudah|tadi|semalam|yesterday|already|已经|昨天|刚才|刚刚|hom qua|vua nap|vua rut|da nap|da rut|da chuyen|เมื่อวาน|เมื่อกี้|เพิ่งฝาก|เพิ่งถอน|ฝากแล้ว|ถอนแล้ว|โอนแล้ว|kahapon|kanina|nag-deposit na|nag-withdraw na|nagdeposit na|nagwithdraw na)/i;
 const PERSONAL_RE = /(^|[^a-z])(my|mine|saya|aku|sy|belum|not|still|pending|yet|stuck|lambat|lewat|slow|delayed|late|dah|sudah|already|cua toi|cua minh|chua|van|ko|akin|wala|hindi|pa rin|pa)($|[^a-z])|我|还没|没到|没收到|未到|怎么还|ของฉัน|ของผม|ของดิฉัน|ยังไม่/i;   // ownership, not just "I": in Vietnamese, Thai and Filipino "I / me" is also how a customer politely starts any question
-const MS_WORDS = new Set(('abang kakak bang orang okey faham selamat pagi petang malam terima kasih tq tqvm jumpa salam helo hai khabar sama macam mana nak berapa lama tak belum cara saya ada pukul buka lupa tarik duit sila boleh tukar salah nombor sahkan akaun lambat sangat masuk bonus promosi korang betul ni lah ke').split(' '));
+const MS_WORDS = new Set(('abang kakak bang orang okey faham selamat pagi petang malam terima kasih tq tqvm jumpa salam helo hai khabar sama macam mana nak berapa lama tak belum cara saya ada pukul buka lupa tarik duit sila boleh tukar salah nombor sahkan akaun lambat sangat masuk promosi korang betul ni lah ke').split(' '));
+const EN_WORDS = new Set('i want to the how is can my you do what when where why for with and of in it not have need get me are this that will would should could please'.split(' '));
 const VI_WORDS = new Set('khong nap rut tien lau nao lam sao cach toi minh xin chao khau quen khoan ngan chua roi duoc muon giup dich khuyen mai thuong ky nhe nha vay gio phut ngay hom nay oi alo cam on'.split(' '));
 const TL_WORDS = new Set("po opo paano magkano kailan gaano katagal ilang gusto ko mo ba naman salamat pwede puwede hindi wala bakit saan nasaan ang ng mga ako ikaw kayo namin natin pera hulog kuha pasok dumating sino ano anong yung nung lang din rin sige ayos kuya ate paki magandang umaga hapon gabi kumusta kamusta walang anuman tulong tulungan nakalimutan nakalimutang magdeposit magwithdraw mag nag tangina putangina gago tanga ulol bobo pota".split(' '));
 const BASE_FILLER = 'pls please plz tolong help nak nk mahu mau ingin want wanna gonna need would like can could may boleh to i im me my we saya sy aku kami ask tanya check about info any a the lah ke la ok yes ya';
@@ -166,6 +167,8 @@ export class Engine {
     const n = (set: Set<string>) => words.filter((x) => set.has(x)).length;
     const hits: [Lang, number][] = [['ms', n(MS_WORDS)], ['tl', n(TL_WORDS)], ['vi', n(VI_WORDS)]];    // a tie keeps the earlier one: Malay, then Filipino, then Vietnamese
     const best = hits.reduce((a, b) => (b[1] > a[1] ? b : a));
+    // one word that Malay, Filipino or Vietnamese share with English must not turn a clearly English sentence into another language
+    if (best[1] === 1 && n(EN_WORDS) >= 3) return 'en';
     return best[1] > 0 ? best[0] : 'en';
   }
   private exampleTokens(m: MerchantCfg, e: KbEntry, lg: string, ex: string) {

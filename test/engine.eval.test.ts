@@ -31,6 +31,12 @@ describe('engine: asking for the deposit account goes to a person, but questions
   it('is a hand-over that says why', () => { const r = engine.analyze('send me paynow scan', 'MERCH_A', 0); expect(r.guard?.kind).toBe('pay-details'); });
 });
 
+describe('engine: the language follows the customer', () => {
+  it.each([['i want to claim welcome bonus?', 'en'], ['bonus', 'en'], ['how to claim the bonus', 'en'], ['nak claim bonus macam mana', 'ms'], ['dep dah 2 jam belum masuk', 'ms']])('"%s" is %s', (text, lang) => {
+    expect(engine.detectLang(text)).toBe(lang);
+  });
+});
+
 describe('engine: behaviour that does not fit one message', () => {
   it('asks for confirmation using the earlier topic', () => {
     const r = engine.analyze('500', 'MERCH_A', 0, { lastTopic: 'deposit' });
