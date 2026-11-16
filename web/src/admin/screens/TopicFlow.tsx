@@ -18,7 +18,7 @@ type Pos = Record<string, { x: number; y: number }>;
 type Kind = 'kw' | 'topic' | 'ans' | 'ho';
 type Node = { key: string; kind: Kind; topic: string; x: number; y: number; w: number; h: number };
 const MIME = 'application/x-aibot-flow';
-const COL = { kw: 30, topic: 360, ans: 640, ho: 960 }, W = { kw: 270, topic: 200, ans: 270, ho: 170 }, H = { topic: 100, ans: 116, ho: 88 };
+const COL = { kw: 30, topic: 430, ans: 760, ho: 1180 }, W = { kw: 340, topic: 230, ans: 350, ho: 190 }, H = { topic: 100, ans: 116, ho: 88 };
 const KWSCROLL = 200;                                                         // the most height the keywords inside a card take before they scroll
 const GAP = 124;                                                             // distance between answer cards
 const TYPE_LABEL: Record<string, string> = { needs_staff: 'Needs staff', promotion: 'Promotion' };
@@ -128,7 +128,7 @@ export default function TopicFlow() {
     const x1 = Math.min(...ns.map((n) => n.x)) - 22, y1 = Math.min(...ns.map((n) => n.y)) - 34, x2 = Math.max(...ns.map((n) => n.x + n.w)) + 22, y2 = Math.max(...ns.map((n) => n.y + n.h)) + 22;
     lanes.push({ topic: t, x: x1, y: y1, w: x2 - x1, h: y2 - y1 });
   });
-  const width = Math.max(1200, ...nodes.map((n) => n.x + n.w + 60), ...pend.map((b) => b.x + 260)), height = Math.max(520, cursor + 20, ...nodes.map((n) => n.y + n.h + 60), ...pend.map((b) => b.y + 130));
+  const width = Math.max(900, ...nodes.map((n) => n.x + n.w + 60), ...pend.map((b) => b.x + 260)), height = Math.max(520, cursor + 20, ...nodes.map((n) => n.y + n.h + 60), ...pend.map((b) => b.y + 130));
   const curve = (x1: number, y1: number, x2: number, y2: number) => { const dx = Math.max(40, Math.abs(x2 - x1) / 2); return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`; };
 
   /* ---------- pointer work: moving cards, and drawing a line from a chip or a dot ---------- */
@@ -177,7 +177,7 @@ export default function TopicFlow() {
   const moveMenu = (label: string, from: string, src: Src) => <select className="mv" aria-label={label} value="" onChange={(e) => e.target.value && move(src, e.target.value)}>
     <option value="">⇄</option>{topics.filter((t) => t !== from).map((t) => <option key={t} value={t}>{t}</option>)}</select>;
   useEffect(() => { const t = setTimeout(() => fit(), 0); return () => clearTimeout(t); }, [p.merchant]); // eslint-disable-line react-hooks/exhaustive-deps
-  const fit = () => { const w = canvas.current?.clientWidth ?? 0; if (w) setScale(Math.max(0.5, Math.min(1, (w - 8) / width))); };
+  const fit = () => { const w = canvas.current?.clientWidth ?? 0; if (w) setScale(Math.max(0.5, Math.min(1.4, (w - 8) / width))); };
   const box = (n: { x: number; y: number; w: number; h: number }) => ({ left: n.x, top: n.y, width: n.w, minHeight: n.h });
 
   return <div className="flow" data-testid="flow">
