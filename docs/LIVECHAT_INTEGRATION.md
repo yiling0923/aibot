@@ -80,7 +80,7 @@ Press **Test AI Chat**. A reply with numbered choices means the link works.
 
 ## How the bot decides (the flow of the plan)
 
-Every message goes through three steps, and the bot reports each one in the reply (`keywords`, `topic`, `answer_id`) and in the panel's Test chat:
+Every message goes through three steps, and the bot reports each one in the reply (`keywords`, `topic`, `answer_id`) and on the stand-alone chat page (`/chat`):
 
 1. **Keywords:** the words the customer typed that the bot recognises, such as `depo`, `not in`, `充值`, `nạp tiền`. They are counted in the reports.
 2. **Topic:** what the customer wants (Deposit, Withdraw, Bonus, Account, Bank...). It comes from the keywords. Each merchant has its own topic list.

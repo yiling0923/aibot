@@ -103,16 +103,10 @@ describe('Control panel', () => {
     expect(screen.getByText('deposit_how')).toBeTruthy();
     expect(screen.getByText(/Include test chat \(3\)/)).toBeTruthy();
   });
-  it('lists the messages the bot did not understand and lets staff add one to an answer or ignore it', async () => {
-    const calls: string[] = [];
+  it('has no Not understood page any more: it is not in the menu and the old address goes to the Knowledge base', async () => {
     open('admin', '/admin/unm');
-    const orig = globalThis.fetch as unknown as (u: string, i?: RequestInit) => Promise<Response>;
-    vi.stubGlobal('fetch', vi.fn((u: string, i?: RequestInit) => { if (i?.method === 'POST') calls.push(u + ' ' + i.body); return orig(u, i); }));
-    expect(await screen.findByText('tarik duit lambat')).toBeTruthy();
-    expect(screen.queryByText('abc xyz')).toBeNull();                              // dealt-with ones are on the other tab
-    expect(screen.getByRole('button', { name: 'Add to an answer' })).toBeTruthy(); expect(screen.getByRole('button', { name: 'New answer' })).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Ignore' }));
-    await vi.waitFor(() => expect(calls.some((c) => c.includes('/api/admin/unmatched/resolve') && c.includes('ignored') && c.includes('tarik duit lambat'))).toBe(true));
+    expect(await screen.findByRole('heading', { name: /Knowledge base/ })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Not understood/ })).toBeNull();
   });
   it('has no Tests screen in the menu, but publishing still runs the tests and lists the ones that fail', async () => {
     open('admin', '/admin/kw');

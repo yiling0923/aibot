@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 
@@ -29,8 +28,7 @@ const pct = (n: number, t: number) => (t ? Math.round((n / t) * 100) : 0) + '%';
 
 /** How the bot is doing for this merchant: what it handled, what it did not understand, what went to a person. */
 export default function Report() {
-  const p = usePanel(); const nav = useNavigate();
-  const [days, setDays] = useState<7 | 30>(7); const [withTest, setWithTest] = useState(true);
+  const p = usePanel(); const [days, setDays] = useState<7 | 30>(7); const [withTest, setWithTest] = useState(true);
   const [r, setR] = useState<Report | null>(null); const [err, setErr] = useState('');
   useEffect(() => {
     let alive = true; setErr('');
@@ -89,7 +87,7 @@ export default function Report() {
             <div className="sub" style={{ whiteSpace: 'pre-wrap' }}>{x.answer}</div>
             <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>{(['right', 'wrong'] as const).map((v) => <button key={v} type="button" className={'btn sm' + (x.verdict === v ? ' pri' : '')} aria-pressed={x.verdict === v} onClick={() => void mark(x.id, x.verdict === v ? null : v)}>{v === 'right' ? 'Right' : 'Wrong'}</button>)}</div></div>)
             : <div className="sub">No answers in this period.</div>}</div>
-        <div className="card"><div className="head"><h3>Not understood most</h3><button className="btn sm" type="button" onClick={() => nav('/admin/unm')}>Open the full list</button></div>
+        <div className="card"><h3>Not understood most</h3><div className="sub" style={{ marginBottom: 6 }}>Messages the bot could not answer in this period. Add a keyword or an answer for the frequent ones.</div>
           {r.topMissing.length ? r.topMissing.map((m) => <div className="q" key={m.text}><div className="t">“{m.text}”</div><span className="sub">{m.hits} time{m.hits === 1 ? '' : 's'}</span></div>) : <div className="sub">Nothing is waiting. Every message was understood or already dealt with.</div>}</div>
       </>}
     </>

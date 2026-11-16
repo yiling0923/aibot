@@ -233,8 +233,6 @@ The control panel is a web page at `/admin`. Staff change the bot here without t
 | | Keywords | Every word customers typed, saved automatically, newest first. Make a word a topic, add it to a topic, or ignore it. A short AI note appears when AI is on. |
 | | Keyword ranking | The words customers wrote most in a week: top 3 as medal cards, then a table with trend and change |
 | **Check** | Report | How the bot is doing for this merchant over the last 7 or 30 days: the share of messages answered by the bot, not understood and handed to a person, messages per day, the answers used most, and what was not understood most |
-| | Not understood | The messages the bot could not answer, most frequent first. For each one: add it as an example to an existing answer, make a new answer from it (the editor opens with the message filled in), or ignore it |
-| | Test chat | Chat with the bot using your **unpublished** changes. Shows every step the bot took. |
 | **Setup** | Merchant settings | Tone, handoff group, answer limits, account tools, how many rude messages before closing, fixed messages |
 | | Merchants and logins (admin) | Add a merchant (starts empty), add or remove logins, reset passwords |
 | | History | Every published version of the merchant that is open (an admin also sees the versions of the shared word lists), with roll back |
@@ -242,7 +240,7 @@ The control panel is a web page at `/admin`. Staff change the bot here without t
 **Draft, test, publish**
 
 1. Edits stay a **draft in the browser** (saved there, so a refresh does not lose them).
-2. **Test chat** uses a temporary copy of the bot built from the draft. The live bot is not touched.
+2. The temporary copy of the bot built from the draft is used by the publish tests; the live bot is not touched.
 3. **Publish** runs all sample customer messages on the draft first and shows the result in the confirmation window (how many passed, and the ones that failed). There is no separate Tests screen; you can still publish if some fail. Then it saves everything in **one database transaction**, writes a **new version for each merchant whose data really changed** (a full copy of that merchant's knowledge, kept in the merchant's own database, plus one for the shared word lists if those changed) and reloads the live bot in memory.
 4. **Roll back** restores an older version of **one merchant**. Other merchants are not touched. Staff can roll back their own merchant; the shared word lists can only be rolled back by an admin.
 
@@ -791,9 +789,6 @@ Other design rules:
 
 ![Report](img/panel-report.png)
 
-**Not understood**: a to-do list. Each row is a message the bot could not answer, with how many times it was written. **Add to an answer** adds it as an example question of the answer you choose (as a draft change); **New answer** opens the entry editor with the message already filled in; **Ignore** puts it away. Dealt-with messages move to a second tab and can be opened again. The count shows in the menu.
-
-![Not understood](img/panel-unmatched.png)
 
 **Keyword ranking**: the top 3 as gold, silver and bronze cards, then a table with trend and change. The week can be changed with the arrows. Click a keyword to see the chats it was in. This screen is for looking; to decide what a word is (topic, short form, filler, rude word), use the Keywords screen.
 
@@ -811,11 +806,6 @@ Other design rules:
 
 ![History](img/panel-history.png)
 
-### Test chat
-
-The Test chat tab shows the real chat page inside the panel, running on the draft. It has the same layout as the stand-alone chat page.
-
-![Test chat](img/panel-testchat.png)
 
 ### The chat page (`/chat`)
 

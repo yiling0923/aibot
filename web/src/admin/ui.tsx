@@ -41,7 +41,6 @@ const ICONS: Record<string, ReactNode> = {
   kw: <><path d="M20 12 12 20 4 12V4h8z" /><circle cx="8.5" cy="8.5" r="1" /></>,
   store: <path d="M4 6h16M4 12h16M4 18h10" />,
   rank: <path d="M6 20V10M12 20V4M18 20v-7" />,
-  chat: <path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" />,
   lchat: <><path d="M4 5h11a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2H9l-4 3v-3H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" /><path d="M20 9v6a2 2 0 0 1-2 2h-1" /></>,
   test: <path d="m5 12 4 4 10-10" />,
   rev: <><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></>,

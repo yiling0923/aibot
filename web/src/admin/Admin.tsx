@@ -10,7 +10,6 @@ import Import from './screens/Import';
 import Topics from './screens/Topics';
 import Keywords from './screens/Keywords';
 import Ranking from './screens/Ranking';
-import TestChat from './screens/TestChat';
 import LiveChatTest from './screens/LiveChatTest';
 import Settings from './screens/Settings';
 import People from './screens/People';
@@ -18,12 +17,11 @@ import MerchantPage from './screens/MerchantPage';
 import Billing from './screens/Billing';
 import History from './screens/History';
 import Report from './screens/Report';
-import Unmatched from './screens/Unmatched';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
-  ['Check', [['report', 'Report'], ['unm', 'Not understood'], ['chat', 'Test chat'], ['lchat', 'LiveChat test']]],
+  ['Check', [['report', 'Report'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
 ];
 
@@ -46,7 +44,6 @@ function Shell() {
   const view = useLocation().pathname.split('/')[2] || 'kb';
   const [dialog, setDialog] = useState<'publish' | null>(null);
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
-  const openUnmatched = p.unmatched.filter((r) => !r.resolved).length;
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
   const n = p.changes.length;
 
@@ -64,7 +61,7 @@ function Shell() {
             <div className="grp" key={g}><div className="gl">{g}</div>
               {items.filter(([k]) => (k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin).map(([k, l]) => (
                 <button key={k} type="button" aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
-                  <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}{k === 'unm' && openUnmatched ? <span className="cnt">{openUnmatched}</span> : null}
+                  <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
                 </button>
               ))}
             </div>
@@ -91,8 +88,6 @@ function Shell() {
             <Route path="store" element={<Keywords />} />
             <Route path="rank" element={<Ranking />} />
             <Route path="report" element={<Report />} />
-            <Route path="unm" element={<Unmatched />} />
-            <Route path="chat" element={<TestChat />} />
             <Route path="lchat" element={p.isAdmin ? <LiveChatTest /> : <div className="card"><h2>LiveChat test</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="set" element={<Settings />} />
             <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />

@@ -57,7 +57,7 @@ export default function MerchantPage() {
         <div className="mlinks">
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/set'); }}>Merchant settings</button>
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/kb'); }}>Knowledge base</button>
-          <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/chat'); }}>Test chat</button>
+          <button className="btn sm" type="button" onClick={() => nav('/admin/lchat')}>LiveChat test</button>
           <span className="sub">{m.logins.length ? 'Staff login: ' + m.logins.join(', ') : 'No staff login yet'}</span>
         </div></div>
 

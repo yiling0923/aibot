@@ -38,7 +38,7 @@ The front end (React + TypeScript + Vite) lives in `web/`. `npm run build` build
 If Windows does not allow writing to `web/dist` (for example it was once built from an Administrator window), the build picks a new folder by itself (`web/dist-<number>`, remembered in `web/.outdir`) and the server uses it. Nothing to fix by hand. Run `npm run dev` from a normal PowerShell opened in the project folder.
 While you work on the screens, run `npm run dev:web` in a second terminal for instant reloads on http://localhost:5173 (it passes API calls to the bot on port 3000).
 
-Open **http://localhost:3000** and sign in. The control panel is at `/admin`; the test chat page is `/chat` (and the **Test chat** screen inside the panel): pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right.
+Open **http://localhost:3000** and sign in. The control panel is at `/admin`; the stand-alone chat page is `/chat` (pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right). Inside the panel, **Check → LiveChat test** chats through a LiveChat.
 Every word you type is saved to that merchant's keyword store, and messages the bot did not understand are saved too. Demo logins (loaded by `npm run db:seed`):
 
 | Username | Password | Can do |
@@ -59,7 +59,7 @@ npm run user:add -- <username> <password> admin
 
 Before real use, change the demo passwords and set `SESSION_SECRET` in `.env` to a long random value.
 
-The control panel is at **http://localhost:3000/admin**. Edit entries, topics, keywords and settings, try them in the Test chat tab,
+The control panel is at **http://localhost:3000/admin**. Edit entries, topics, keywords and settings, try them with **Check → LiveChat test** after you publish,
 run the tests, and press **Publish**: the bot uses the new version straight away. Every publish is saved in History and can be rolled back.
 Your edits stay a draft in the browser until you publish.
 
@@ -139,12 +139,9 @@ In the entry editor, **Translate to Malay and Chinese** writes a draft translati
 It needs the Anthropic key in `.env` (`ANTHROPIC_API_KEY`); without it the button is greyed out. The numbers, links and menu paths such as `Wallet > Deposit` must come back exactly as written, otherwise the translation is refused.
 It is only a draft: check it, then **Save to draft** and publish as usual.
 
-## Report and Not understood
+## Report
 
-Two screens under **Check** help to improve the bot:
-
-* **Report** shows, for the open merchant and the last 7 or 30 days, how many messages the bot answered, did not understand or handed to a person, messages per day, and the answers used most. Messages typed in the Test chat are marked as test and can be left out.
-* **Not understood** lists the messages the bot could not answer, most frequent first. Add one to an existing answer as an example question, make a new answer from it, or ignore it. Everything is a draft change until you publish.
+**Check → Report** shows, for the open merchant and the last 7 or 30 days, how many messages the bot answered, did not understand or handed to a person, messages per day, the answers used most, the top topics and keywords, and the wrong-answer rate. Its **Not understood most** list shows the messages the bot could not answer, most frequent first; to fix one, add a keyword or an answer for it. (The separate *Not understood* and *Test chat* screens were removed: use **LiveChat test** to try the bot, and publish first, because it reaches the published bot.)
 
 After pulling, run `npm run db:migrate` once (it adds one column, `chat_sessions.source`, to every merchant database).
 
@@ -181,7 +178,7 @@ The bot understands and answers in **English (en), Malay (ms), Chinese (zh), Vie
 
 ## How the bot decides
 
-This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every message goes through three steps, and the bot reports each one (in the reply as `keywords`, `topic`, `answer_id`, and in the panel's Test chat under "what the bot did"):
+This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every message goes through three steps, and the bot reports each one (in the reply as `keywords`, `topic`, `answer_id`, and on the stand-alone chat page `/chat` under "what the bot did"):
 
 1. **Keywords:** the words the customer typed that the bot recognises (`depo`, `not in`, `充值`, `nạp tiền`). They are counted in the keyword reports. A keyword points to a topic (`depo` → deposit) or to a kind of question (`how long` → time).
 2. **Topic:** what the customer wants (Deposit, Withdraw, Bonus, Account, Bank...). Each merchant owns its topic list: it starts from the shared template, and the merchant can add its own topics and keywords (staff too). Another merchant never sees them.
@@ -246,4 +243,4 @@ The Merchant settings page is grouped in tabs under the four tiles: **General** 
 
 ## LiveChat test (a chat window through LiveChat)
 
-**Check → LiveChat test** (admin only) is a chat window whose messages go through a LiveChat, the way its website widget sends them: the bot server starts (or continues) a chat in LiveChat with the same calls as `deploy/local-livechat/chat.ps1`, waits until the bot has answered, and shows the whole chat as bubbles. It tests the real link, unlike **Test chat**, which talks to the bot directly. *Settings* holds the LiveChat address (default `http://localhost:8080`, the local setup) and the tenant id (default `1`); they are remembered in the browser. *New chat* starts a fresh visitor. If LiveChat does not answer within about 15 seconds the page says so; press Send with an empty box to look again. The bot server makes the calls, so the address must be reachable from the computer that runs the bot.
+**Check → LiveChat test** (admin only) is a chat window whose messages go through a LiveChat, the way its website widget sends them: the bot server starts (or continues) a chat in LiveChat with the same calls as `deploy/local-livechat/chat.ps1`, waits until the bot has answered, and shows the whole chat as bubbles. It tests the real link, with the bot as published. *Settings* holds the LiveChat address (default `http://localhost:8080`, the local setup) and the tenant id (default `1`); they are remembered in the browser. *New chat* starts a fresh visitor. If LiveChat does not answer within about 15 seconds the page says so; press Send with an empty box to look again. The bot server makes the calls, so the address must be reachable from the computer that runs the bot.
