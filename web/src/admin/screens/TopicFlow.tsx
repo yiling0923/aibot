@@ -41,6 +41,8 @@ export default function TopicFlow() {
   const persist = (n: Pos) => { try { localStorage.setItem(storeKey, JSON.stringify(n)); } catch { /* ignore */ } };
   const [pend, setPend] = useState<Pending[]>([]); const nextId = useRef(1);
   const [over, setOver] = useState<string | null>(null);
+  const [showHo, setShowHoState] = useState(() => { try { return localStorage.getItem('flowho') === '1'; } catch { return false; } });   // the "If not clear" cards are the same for every topic, so they start hidden
+  const setShowHo = (v: boolean) => { setShowHoState(v); try { localStorage.setItem('flowho', v ? '1' : '0'); } catch { /* ignore */ } };
   const [kwq, setKwq] = useState<Record<string, string>>({});                // the filter typed on each keywords card
   const [scale, setScale] = useState(1);
   const [link, setLink] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
@@ -104,8 +106,8 @@ export default function TopicFlow() {
     const laneH = Math.max(ans.length * GAP, kwH, H.topic) + 60; const cy = cursor + laneH / 2;
     add(t, 'kw:' + t, 'kw', COL.kw, cy - kwH / 2, W.kw, kwH); edges.push({ a: 'kw:' + t, b: 'topic:' + t, kind: 'kw' });
     add(t, 'topic:' + t, 'topic', COL.topic, cy - H.topic / 2, W.topic, H.topic);
-    ans.forEach((e, k) => { add(t, 'ans:' + e.id, 'ans', COL.ans, cy - H.ans / 2 + (k - (ans.length - 1) / 2) * GAP, W.ans, H.ans); edges.push({ a: 'topic:' + t, b: 'ans:' + e.id, kind: 'ans' }); edges.push({ a: 'ans:' + e.id, b: 'ho:' + t, kind: 'ho' }); });
-    add(t, 'ho:' + t, 'ho', COL.ho, cy - H.ho / 2, W.ho, H.ho); if (!ans.length) edges.push({ a: 'topic:' + t, b: 'ho:' + t, kind: 'ho' });
+    ans.forEach((e, k) => { add(t, 'ans:' + e.id, 'ans', COL.ans, cy - H.ans / 2 + (k - (ans.length - 1) / 2) * GAP, W.ans, H.ans); edges.push({ a: 'topic:' + t, b: 'ans:' + e.id, kind: 'ans' }); if (showHo) edges.push({ a: 'ans:' + e.id, b: 'ho:' + t, kind: 'ho' }); });
+    if (showHo) add(t, 'ho:' + t, 'ho', COL.ho, cy - H.ho / 2, W.ho, H.ho); if (showHo && !ans.length) edges.push({ a: 'topic:' + t, b: 'ho:' + t, kind: 'ho' });
     cursor += laneH + 34;
   });
   const by = new Map(nodes.map((n) => [n.key, n] as const));
@@ -129,7 +131,14 @@ export default function TopicFlow() {
       last = {}; for (const [k, m] of lane ?? [[key, n!] as const]) last[k] = { x: Math.max(0, m.x + dx), y: Math.max(0, m.y + dy) };
       setPos((o) => ({ ...o, ...last }));
     };
-    const up = () => { window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up); if (!set) setPos((o) => { persist(o); return o; }); };
+    const up = (ev: PointerEvent) => {
+      window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
+      if (n?.kind === 'ans' && !set) {                               // an answer dropped inside another topic's box moves to that topic and takes its place there
+        const to = laneAt(ev.clientX, ev.clientY);
+        if (to && to !== n.topic && Math.hypot(ev.clientX - start.cx, ev.clientY - start.cy) > 6) { move({ t: 'entry', id: Number(key.slice(4)) }, to); setPos((o) => { const x = { ...o }; delete x[key]; persist(x); return x; }); return; }
+      }
+      if (!set) setPos((o) => { persist(o); return o; });
+    };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
   const startLink = (from: { x: number; y: number }, e: RPointerEvent, drop: (topic: string) => void) => {
@@ -160,7 +169,7 @@ export default function TopicFlow() {
   return <div className="flow" data-testid="flow">
     <div className="flowbar">
       <span className="sub">Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.</span>
-      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button>
+      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button><label className="tog" style={{ padding: 0 }} title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" checked={showHo} onChange={(e) => setShowHo(e.target.checked)} /> Show “If not clear”</label>
         <button type="button" className="btn sm" aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(2)))}>−</button><span className="zoomv">{Math.round(scale * 100)}%</span>
         <button type="button" className="btn sm" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(1.5, +(s + 0.1).toFixed(2)))}>＋</button></span>
     </div>
