@@ -247,7 +247,7 @@ The Merchant settings page is grouped in tabs under the four tiles: **General** 
 
 ## Flows (a drawn conversation for a topic)
 
-Open **Flows** in the panel. A flow belongs to one topic (for example `deposit`). When a customer's message is about that topic and the flow is **Live**, the bot runs the flow instead of the plain answer or the topic's buttons.
+Open **Flows** in the panel (it is hidden until "Advanced options" is switched on, or the merchant already has a flow). A flow belongs to one topic (for example `deposit`). When a customer's message is about that topic and the flow is **Live**, the bot runs the flow instead of the plain answer or the topic's buttons.
 
 Steps you can add: **Message** (the bot says it), **Question** (the customer taps a choice; each choice can go to a different step), **Ask for a detail** (the customer types something, for example a username; write `{detail}` in a later text to use it), **Answer** (says a Knowledge base answer), **Hand to a person**, **End**. Each step says what comes next: the step below (the default), another step, or stop. Texts are written per language and fall back to English.
 

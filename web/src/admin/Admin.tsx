@@ -46,6 +46,7 @@ function Shell() {
   const [dialog, setDialog] = useState<'publish' | null>(null);
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
+  const showFlows = p.adv || (p.draft.flows ?? []).some((f) => f.merchant === p.merchant);        // Flows are optional: hidden until "Advanced options" is on, or this merchant already has one
   const n = p.changes.length;
 
   return (
@@ -60,7 +61,7 @@ function Shell() {
         <nav className="nav" aria-label="Sections">
           {NAV_GROUPS.map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
-              {items.filter(([k]) => (k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin).map(([k, l]) => (
+              {items.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin) && (k !== 'flows' || showFlows)).map(([k, l]) => (
                 <button key={k} type="button" aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
                   <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
                 </button>

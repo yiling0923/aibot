@@ -259,6 +259,14 @@ describe('Control panel', () => {
     expect(screen.queryByText('temp_one')).toBeNull();
     yes.mockRestore();
   });
+  it('hides the Flows menu item until Advanced options is on', async () => {
+    open('staff', '/admin/kb');
+    await screen.findByText('Knowledge base');
+    const nav = screen.getByRole('navigation', { name: 'Sections' });
+    expect(within(nav).queryByText('Flows')).toBeNull();
+    await userEvent.click(screen.getByLabelText(/Advanced options/));
+    expect(within(nav).getByText('Flows')).toBeTruthy();
+  });
   it('draws a flow: steps, choices, readiness check, and it goes into the draft', async () => {
     open('staff', '/admin/flows');
     await userEvent.click(await screen.findByRole('button', { name: /New flow/ }));
