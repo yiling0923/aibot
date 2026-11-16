@@ -79,7 +79,7 @@ export default function LiveChatTest() {
       const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
       if (!r.replied) setErr('LiveChat has not answered yet. Press Send with an empty box to look again.');
-    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+    } catch (e) { const m = (e as Error).message; setErr(m); if (/refused this file/.test(m)) void checkFiles(true); } finally { setBusy(false); }      // refused: ask LiveChat at once which kinds it takes
   };
   const send = () => {
     if (pick) { void sendFile(); return; }
@@ -87,8 +87,8 @@ export default function LiveChatTest() {
     keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: t }]); setText(''); void call(t);
   };
-  const checkFiles = async () => {
-    setProbing(true); setProbe(null); setErr('');
+  const checkFiles = async (keepErr = false) => {
+    setProbing(true); setProbe(null); if (!keepErr) setErr('');
     try { setProbe((await api<{ rows: { label: string; ok: boolean; answer: string }[] }>('/api/admin/livechat-chat/probe', { baseUrl: base, tenant })).rows); } catch (e) { setErr((e as Error).message); } finally { setProbing(false); }
   };
   const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); p.toast('New chat started'); };
@@ -102,7 +102,7 @@ export default function LiveChatTest() {
         {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /></label>
           <label className="fld"><span>Name</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
           <label className="fld"><span>Rank</span><input value={mrank} onChange={(e) => { setMrank(e.target.value); keep('lcMrank', e.target.value); }} style={{ width: 110 }} /></label></>}
-        <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={checkFiles}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
+        <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={() => void checkFiles()}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
           <span className="sub"> Sends one tiny sample of each kind into a new test chat in LiveChat.</span>
           {probe && <ul className="plain" aria-label="Files LiveChat accepts" style={{ marginTop: 6 }}>{probe.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused, “{r.answer}”</span>}</li>)}</ul>}</div>
         <div className="sub full">Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. The bot never shows account data in a LiveChat reply, so “check my balance” goes to a person for both.</div>
@@ -114,6 +114,9 @@ export default function LiveChatTest() {
         <div ref={end} />
       </div>
       {err && <div className="note" style={{ background: 'var(--badbg)', marginTop: 8 }}>{err}</div>}
+      {(probing || probe) && !showSet && <div className="note" style={{ marginTop: 8 }} aria-label="Files LiveChat accepts, checked now">{probing ? 'Asking LiveChat which kinds of file it takes…' : <><b>What LiveChat takes from a customer:</b>
+        <ul className="plain">{probe!.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused</span>}</li>)}</ul>
+        <div className="sub">Send one of the accepted kinds. A test chat was made in LiveChat for this check.</div></>}</div>}
       <div className="lcstat sub">{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/*,application/pdf,.txt,.csv,.doc,.docx,.xls,.xlsx" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />

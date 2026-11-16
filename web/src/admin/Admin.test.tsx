@@ -25,6 +25,7 @@ const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
   totals: { chats: 52, calls: 123, inputTokens: 901000, outputTokens: 60100, totalTokens: 961100, cost: 0.12, charge: 0.144, ownKeyCalls: 5, ownKeyTokens: 3000, unpricedCalls: 3 },
   byKind: [{ kind: 'pick', calls: 120, totalTokens: 960000, cost: 0.12 }], unpricedModels: [{ provider: 'openai', model: 'gpt-new', calls: 3, tokens: 1100 }],
   prices: [{ provider: 'anthropic', model: 'claude-haiku-5-5', inputPerMTok: 0.1, outputPerMTok: 0.5, updatedBy: 'system', updatedAt: '2026-11-01T00:00:00Z' }] });
+let lcRefuse = false;                                                                                // the LiveChat stand-in refuses a file
 let lcLines: { from: string; sender: string; text: string }[] = [];
 const lcReply = (init?: RequestInit) => {                                                          // a stand-in for the LiveChat test route
   const text = String(JSON.parse(String(init?.body ?? '{}')).text ?? '');
@@ -33,7 +34,8 @@ const lcReply = (init?: RequestInit) => {                                       
 };
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
-  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (lcRefuse && url === '/api/admin/livechat-chat' && String(init?.body).includes('"file"')
+    ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -42,11 +44,11 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/report') ? REPORT
     : url.startsWith('/api/admin/flows/try') ? { messages: ['Hello from the flow'], buttons: null, state: null, handed: false, done: true }
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
-    : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : [])));
+    : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : []))));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { localStorage.clear(); lcLines = []; });
+beforeEach(() => { localStorage.clear(); lcLines = []; lcRefuse = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -327,6 +329,14 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: /Check which files LiveChat accepts/ }));
     expect(await screen.findByLabelText('Files LiveChat accepts')).toBeTruthy();
     expect(screen.getByText(/WebP picture/)).toBeTruthy(); expect(screen.getByText(/refused, “Unsupported attachment type\.”/)).toBeTruthy();
+  });
+  it('LiveChat test: when a file is refused, it asks LiveChat which kinds it takes and shows the list', async () => {
+    lcRefuse = true; open('admin', '/admin/lchat');
+    await userEvent.upload(await screen.findByLabelText('Choose a picture or file'), new File(['x'.repeat(100)], 'a.png', { type: 'image/png' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText(/LiveChat refused this file/)).toBeTruthy();
+    const list = await screen.findByLabelText('Files LiveChat accepts, checked now');
+    expect(within(list).getByText(/WebP picture/)).toBeTruthy(); expect(within(list).getByText(/Send one of the accepted kinds/)).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

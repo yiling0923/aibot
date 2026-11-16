@@ -78,7 +78,7 @@ describe('chatting through a LiveChat', () => {
   it('stops at once when LiveChat looks at the file and refuses its type, and says which file it was', async () => {
     const lc = await fakeLiveChat({ refuseType: 'image/png' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-type', pollMs: 40, waitMs: 500 };
     const err = await chatThroughLiveChat({ ...o, file: { name: 'slip.png', type: 'image/png', data: new Uint8Array([1, 2, 3]) } }).catch((e: Error) => e.message);
-    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*Check which files LiveChat accepts/s);
+    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*does not take this kind of file from a customer/s);
     expect(lc.uploads).toHaveLength(0);                                                                                           // nothing was stored, and no other field names were tried
     const ok = await chatThroughLiveChat({ ...o, visitor: 'vis-type2', file: { name: 'slip.jpg', type: 'image/jpeg', data: new Uint8Array([1, 2, 3]) } });
     expect(ok.messages.some((m) => m.attachment?.name === 'slip.jpg')).toBe(true);                                                // another type goes through

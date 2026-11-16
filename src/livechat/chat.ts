@@ -89,7 +89,7 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
         tried.push(`POST ${path} (field "${field}") -> ${r.status} ${body}`.trim());
         let code = '', said = ''; try { const e = JSON.parse(full); code = String(e.error ?? ''); said = String(e.message ?? ''); } catch { /* not JSON */ }
         if (code === 'attachment_invalid') {                                                          // the address and the field are right: LiveChat looked at the file and refused it
-          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}${real && real.type !== o.file!.type ? `, really ${real.ext.toUpperCase()} inside although it was named ${o.file!.name}` : ''}, ${file.data.length} bytes) at ${path}. The upload itself works. In Settings, the button "Check which files LiveChat accepts" shows which kinds it takes.`);
+          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}${real && real.type !== o.file!.type ? `, really ${real.ext.toUpperCase()} inside although it was named ${o.file!.name}` : ''}, ${file.data.length} bytes) at ${path}. LiveChat's upload works, but it does not take this kind of file from a customer.`);
         }
         if (r.ok) {
           let j: Record<string, any> | null = null; try { j = JSON.parse(full); } catch { /* an answer that is not JSON: the message is assumed to be made */ }   // eslint-disable-line @typescript-eslint/no-explicit-any
