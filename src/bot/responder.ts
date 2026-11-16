@@ -30,6 +30,8 @@ export interface Session {
   /** Where the customer is inside a flow (a drawn conversation), when one is running. */
   flow?: FlowState | null;
 }
+/** A message that is only the name of a file (what LiveChat sends for a picture, a document or a video). */
+const FILE_NAME = /^[^\s\\/]{1,120}\.(jpe?g|png|gif|webp|heic|bmp|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp4|mov|avi|mp3|wav|m4a)$/i;
 export const newSession = (id: string, merchant: string, token: string | null, draft: string | null = null): Session =>
   ({ id, merchant, token, draft, misses: 0, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
 
@@ -232,6 +234,12 @@ export class Bot {
       trace: { kind: 'skipped', note: 'Skipped: this chat is already with a human agent.' },
       log: { text, lang: this.engine.analyze(text, s.merchant, 0).lang, decision: 'HANDED', notUnderstood: false },
     };
+    // A picture or a file (LiveChat sends only its name, like MMU.JPG): the bot cannot open it, so a person takes over.
+    if (FILE_NAME.test(text)) {
+      const lang = (s.lang ?? c.defaultLanguage) as Lang; const h = this.handoff(s, lang); s.flow = null; s.pending = null;
+      return { messages: [{ kind: 'bot', text: T.FILE_SENT[lang] }, h.messages[1]], buttons: null, locked: false, status: h.status, cacheable: false,
+        trace: { kind: 'file', decision: 'HANDOFF', lang, conf: 1, why: 'The customer sent a picture or a file. The bot cannot open it, so a person takes over.' }, log: { text, lang, decision: 'HANDOFF', notUnderstood: false } };
+    }
     // A new message that is already clear on its own is NOT glued to the earlier unclear one.
     let query = text;
     if (s.pending) { const alone = this.engine.analyze(text, s.merchant, s.clarifyCount); if (['CHOICE', 'CLARIFY', 'HANDOFF'].includes(alone.decision)) query = s.pending + ' ' + text; }

@@ -2,7 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 
-interface Line { from: 'customer' | 'bot' | 'agent' | 'system'; sender: string; text: string }
+interface Attachment { kind: string; name: string; url: string; mimeType: string; size: number | null }
+interface Line { from: 'customer' | 'bot' | 'agent' | 'system'; sender: string; text: string; attachment?: Attachment }
+const kb = (n: number | null) => (n === null ? '' : n < 1024 ? n + ' B' : n < 1048576 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
+/** A file in a message: a picture is shown (click to open it big), anything else is a link with its name. */
+function Attached({ a }: { a: Attachment }) {
+  const [bad, setBad] = useState(false);
+  const isImg = (a.kind === 'image' || a.mimeType.startsWith('image/')) && !bad;
+  return isImg
+    ? <a className="lcpic" href={a.url} target="_blank" rel="noreferrer" title={'Open ' + a.name}><img src={a.url} alt={a.name} loading="lazy" onError={() => setBad(true)} /><span className="sub">{a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span></a>
+    : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer">📎 {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' (the picture could not be loaded here)' : ''}</a>;
+}
 interface Result { conversationId: string | null; status: string | null; handoff: string | null; messages: Line[]; replied: boolean }
 const store = (k: string, dflt: string) => { try { return localStorage.getItem(k) || dflt; } catch { return dflt; } };
 const keep = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
@@ -40,7 +50,7 @@ export default function LiveChatTest() {
       const c = live.current; if (c.busy || (typeof document !== 'undefined' && document.hidden)) return;
       try {
         const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: c.base, tenant: c.tenant, visitor: c.visitor, text: '' });
-        setLines((old) => (old.length === r.messages.length && old.every((m, i) => m.text === r.messages[i].text) ? old : r.messages)); setInfo({ status: r.status, handoff: r.handoff });
+        setLines((old) => (old.length === r.messages.length && old.every((m, i) => m.text === r.messages[i].text && m.attachment?.url === r.messages[i].attachment?.url) ? old : r.messages)); setInfo({ status: r.status, handoff: r.handoff });
       } catch { /* the next look tries again */ }
     }, POLL_MS);
     return () => clearInterval(t);
@@ -66,7 +76,7 @@ export default function LiveChatTest() {
         <div className="sub full">The local setup uses <span className="mono">http://localhost:8080</span> and tenant <span className="mono">1</span>. This is the address the bot server uses, so it must be reachable from the computer that runs the bot.</div></div>}
       <div className="lcbox" aria-live="polite">
         {!lines.length && !busy && <div className="sub lcempty">No messages yet. Write something a customer would ask, for example “how to deposit”.</div>}
-        {lines.map((m, i) => <div key={i} className={'lcmsg ' + m.from}>{m.from !== 'customer' && <small>{m.from === 'bot' ? 'Bot' : m.from === 'agent' ? 'Agent' : 'System'}</small>}<div className="lcbub">{m.text}</div></div>)}
+        {lines.map((m, i) => <div key={i} className={'lcmsg ' + m.from}>{m.from !== 'customer' && <small>{m.from === 'bot' ? 'Bot' : m.from === 'agent' ? 'Agent' : 'System'}</small>}<div className="lcbub">{m.attachment ? <Attached a={m.attachment} /> : m.text}</div></div>)}
         {busy && <div className="lcmsg bot"><small>Bot</small><div className="lcbub lcwait">…</div></div>}
         <div ref={end} />
       </div>

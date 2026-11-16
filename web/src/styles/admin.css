@@ -543,3 +543,6 @@ tr.row{cursor:pointer}
 .tl{max-width:88%;border-radius:12px;padding:7px 11px;font-size:13px;white-space:pre-wrap}
 .tl.bot{background:var(--surface);border:1px solid var(--line);align-self:flex-start}.tl.you{background:var(--accent);color:#fff;align-self:flex-end}.tl.sys{align-self:center;color:var(--muted);font-size:12px;font-style:italic}
 .tbtns{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}.tryin{display:flex;gap:6px}.tryin input{flex:1;min-width:0}
+
+.lcpic{display:flex;flex-direction:column;gap:4px;text-decoration:none;color:inherit}.lcpic img{max-width:260px;max-height:220px;border-radius:10px;display:block;background:var(--surface2)}
+.lcfile{color:var(--accent);font-weight:600;text-decoration:none}.lcfile:hover{text-decoration:underline}

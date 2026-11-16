@@ -99,6 +99,16 @@ export const REASK_TXT = {
             zh: '抱歉，我们没有完全理解您的消息。请您再详细说明一下，或从下方选项中选择。' },
 };
 
+/** Said when the customer sends a picture or a file: the bot cannot open it, so a person takes over. */
+export const FILE_SENT: Record<Lang, string> = {
+  en: "Thanks for sending that. I can't open pictures or files, so let me connect you to an agent who can. 🙏",
+  ms: 'Terima kasih. Saya tidak dapat membuka gambar atau fail, jadi saya sambungkan anda kepada ejen yang boleh. 🙏',
+  zh: '谢谢您发送。我无法打开图片或文件，我马上为您转接人工客服。🙏',
+  vi: 'Cảm ơn bạn đã gửi. Mình không mở được ảnh hay tệp, nên mình kết nối bạn với nhân viên nhé. 🙏',
+  th: 'ขอบคุณที่ส่งมานะคะ ระบบไม่สามารถเปิดรูปภาพหรือไฟล์ได้ ขอโอนไปยังเจ้าหน้าที่นะคะ 🙏',
+  tl: 'Salamat sa pagpadala. Hindi ko mabuksan ang mga larawan o file, kaya ikokonekta ko kayo sa agent. 🙏',
+};
+
 /** Said when the merchant's system could not be asked (it is down or slow): never "no account found", which would be wrong. */
 export const API_DOWN: Record<Lang, string> = {
   en: "Sorry, I can't reach your account details right now. Let me connect you to an agent who can check it. 🙏",

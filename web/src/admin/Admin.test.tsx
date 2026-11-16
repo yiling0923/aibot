@@ -303,6 +303,13 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByLabelText(/^API key/), 'secret-key-123');
     expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(false);
   });
+  it('LiveChat test: shows a picture an agent sent, and a plain link when it is not a picture', async () => {
+    open('admin', '/admin/lchat');
+    lcLines = [{ from: 'agent', sender: 'operator', text: 'MMU.JPG', attachment: { kind: 'image', name: 'MMU.JPG', url: 'http://lc.test/uploads/a.jpg', mimeType: 'image/jpeg', size: 92571 } },
+      { from: 'agent', sender: 'operator', text: 'terms.pdf', attachment: { kind: 'file', name: 'terms.pdf', url: 'http://lc.test/uploads/t.pdf', mimeType: 'application/pdf', size: 2048 } }] as never;
+    const img = await screen.findByAltText('MMU.JPG'); expect((img as HTMLImageElement).src).toBe('http://lc.test/uploads/a.jpg');
+    expect((screen.getByText(/terms\.pdf/).closest('a') as HTMLAnchorElement).href).toBe('http://lc.test/uploads/t.pdf');
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

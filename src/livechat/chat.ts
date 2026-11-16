@@ -1,5 +1,7 @@
 type Fetch = typeof fetch;
-export interface ChatLine { from: 'customer' | 'bot' | 'agent' | 'system'; sender: string; text: string }
+/** A file in a message (a picture an agent sent). The link is complete: LiveChat sends a path like /uploads/abc.jpg and the address of LiveChat is put in front. */
+export interface ChatAttachment { kind: string; name: string; url: string; mimeType: string; size: number | null }
+export interface ChatLine { from: 'customer' | 'bot' | 'agent' | 'system'; sender: string; text: string; attachment?: ChatAttachment }
 export interface ChatResult { conversationId: string | null; status: string | null; handoff: string | null; messages: ChatLine[]; replied: boolean }
 export interface ChatOpts {
   /** The LiveChat address, for example http://localhost:8080 */
@@ -29,7 +31,12 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
   };
   const q = `visitor_session_id=${encodeURIComponent(o.visitor)}`;
   const read = async (id: string) => (await call(`/widget/conversations/${encodeURIComponent(id)}?${q}`, 'GET'))?.conversation ?? null;
-  const lines = (c: any): ChatLine[] => (Array.isArray(c?.messages) ? c.messages : []).map((m: any) => ({ from: kindOf(String(m.senderType ?? '')), sender: String(m.senderType ?? ''), text: String(m.body ?? '') }));   // eslint-disable-line @typescript-eslint/no-explicit-any
+  const attach = (m: any): ChatAttachment | undefined => {                                                          // eslint-disable-line @typescript-eslint/no-explicit-any
+    const a = m?.attachment; const u = typeof a?.url === 'string' ? a.url.trim() : ''; if (!u) return undefined;
+    const url = /^https?:\/\//i.test(u) ? u : u.startsWith('/') ? base + u : '';                                       // only an http(s) link or a path on LiveChat, never anything else
+    return url ? { kind: String(a.kind ?? m.messageType ?? 'file'), name: String(a.name ?? m.body ?? 'file'), url, mimeType: String(a.mimeType ?? ''), size: Number.isFinite(Number(a.size)) ? Number(a.size) : null } : undefined;
+  };
+  const lines = (c: any): ChatLine[] => (Array.isArray(c?.messages) ? c.messages : []).map((m: any) => ({ from: kindOf(String(m.senderType ?? '')), sender: String(m.senderType ?? ''), text: String(m.body ?? ''), ...(attach(m) ? { attachment: attach(m) } : {}) }));   // eslint-disable-line   // eslint-disable-line @typescript-eslint/no-explicit-any
   const result = (id: string | null, c: any, replied: boolean): ChatResult => ({ conversationId: id, status: c?.status ?? null, handoff: c?.aiHandoffStatus ?? null, messages: lines(c), replied });   // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const cur = (await call(`/widget/conversations/current?${q}`, 'GET', undefined, true))?.conversation;

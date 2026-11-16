@@ -48,6 +48,17 @@ describe('chatting through a LiveChat', () => {
     lc.close();
   });
 
+  it('reads a picture an agent sent: the link is completed with the LiveChat address, and only safe links are kept', async () => {
+    const lc = await fakeLiveChat(); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-pic', pollMs: 40, waitMs: 3000 };
+    await chatThroughLiveChat({ ...o, text: 'hi' });
+    const chat = [...lc.chats.values()][0];
+    chat.messages.push({ senderType: 'operator', body: 'MMU.JPG', messageType: 'image', attachment: { kind: 'image', name: 'MMU.JPG', url: '/uploads/abc.jpg', mimeType: 'image/jpeg', size: 92571 } } as never);
+    chat.messages.push({ senderType: 'operator', body: 'evil', messageType: 'image', attachment: { kind: 'image', name: 'x', url: 'javascript:alert(1)', mimeType: 'image/png', size: 1 } } as never);
+    const r = await chatThroughLiveChat({ ...o });
+    expect(r.messages.find((m) => m.text === 'MMU.JPG')?.attachment).toEqual({ kind: 'image', name: 'MMU.JPG', url: lc.base + '/uploads/abc.jpg', mimeType: 'image/jpeg', size: 92571 });
+    expect(r.messages.find((m) => m.text === 'evil')).not.toHaveProperty('attachment');
+    lc.close();
+  });
   it('sends the member the website would send, or nothing at all for a customer who is not logged in', async () => {
     const lc = await fakeLiveChat(); const o = { baseUrl: lc.base, tenant: '1', pollMs: 40, waitMs: 3000 };
     await chatThroughLiveChat({ ...o, visitor: 'vis-g1', text: 'check my balance', member: null });

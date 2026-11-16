@@ -20,6 +20,17 @@ describe('customer token', () => {
   });
 });
 
+describe('pictures and files from a customer', () => {
+  it.each(['MMU.JPG', 'IMG_2031.png', 'bank slip.pdf'.replace(' ', '_'), 'receipt.heic'])('"%s" goes to a person, with a clear line', async (name) => {
+    const s = newSession('file-' + name, 'MERCH_A', null); const t = (await bot.message(s, name))!;
+    expect(s.handed).toBe(true); expect(text(t)).toMatch(/can't open pictures or files/); expect(t.trace.decision).toBe('HANDOFF');
+  });
+  it('a normal sentence that mentions a picture, or a word with a dot, is not taken for a file', async () => {
+    for (const m of ['I sent a picture.jpg of my slip please check', 'how to deposit', 'version 2.0']) { const s = newSession('nf-' + m, 'MERCH_A', null); await bot.message(s, m); expect(s.handed && /can't open/.test(m)).toBe(false); }
+    const s = newSession('nf2', 'MERCH_A', null); const t = (await bot.message(s, 'how to deposit'))!; expect(t.trace.decision).toBe('ANSWER');
+  });
+});
+
 describe('merchant currency', () => {
   const sayWith = async (currency: string | undefined, msg: string) => {
     const k = knowledgeFromSeed(seedJson, accountsJson); if (currency) k.merchants.find((m) => m.code === 'MERCH_A')!.currency = currency;
