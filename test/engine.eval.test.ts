@@ -16,6 +16,13 @@ describe('engine: acceptance cases from the seed JSON', () => {
   }
 });
 
+describe('engine: words learned from real customer chats', () => {
+  it.each([['maybank', 'CHOICE'], ['send me paynow scan', 'CHOICE'], ['cdm', 'CHOICE'], ['claim', 'ANSWER'], ['tng free spin', 'ANSWER'], ['done', 'SMALLTALK'], ['halo', 'SMALLTALK'],
+    ['pls check', 'HANDOFF'], ['hurry', 'HANDOFF'], ['leave message', 'HANDOFF'], ['help to approve', 'HANDOFF']])('"%s" -> %s', (text, decision) => {
+    expect(engine.analyze(text, 'MERCH_A', 0).decision).toBe(decision);
+  });
+});
+
 describe('engine: behaviour that does not fit one message', () => {
   it('asks for confirmation using the earlier topic', () => {
     const r = engine.analyze('500', 'MERCH_A', 0, { lastTopic: 'deposit' });

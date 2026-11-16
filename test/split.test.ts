@@ -76,9 +76,11 @@ d('upgrading an old single-database installation (needs TEST_DATABASE_URL)', () 
 
   it('keeps the shared words and the logins in the main database, and removes the old shared tables', async () => {
     const OLD = "language NOT IN ('vi','th','tl')";                                                       // the upgrade also adds Vietnamese, Thai and Filipino words (see languages.test.ts)
-    expect((await q(`SELECT variant FROM shared_aliases WHERE ${OLD}`)).map((r) => r.variant)).toEqual(['depo']);
-    expect((await q(`SELECT phrase FROM shared_guard WHERE ${OLD}`)).map((r) => r.phrase)).toEqual(['idiot']);
-    expect((await q(`SELECT phrase FROM shared_smalltalk WHERE ${OLD}`)).map((r) => r.phrase)).toEqual(['thanks']);
+    const NEW = "(variant IN ('maybank','paynow','claim'))";                                                // the upgrade also adds words found in real chats (see 014_real_chat_words)
+    expect((await q(`SELECT variant FROM shared_aliases WHERE ${OLD} AND NOT ${NEW} AND id <= 1000`)).map((r) => r.variant)).toContain('depo');
+    expect((await q(`SELECT 1 FROM shared_aliases WHERE variant = 'maybank' AND canonical = 'deposit'`)).length).toBe(1);
+    expect((await q(`SELECT phrase FROM shared_guard WHERE ${OLD} AND kind <> 'human_request'`)).map((r) => r.phrase)).toEqual(['idiot']);
+    expect((await q(`SELECT phrase FROM shared_smalltalk WHERE ${OLD} AND phrase <> 'done' AND kind <> 'greeting'`)).map((r) => r.phrase)).toEqual(['thanks']);
     expect((await q("SELECT 1 FROM shared_aliases WHERE language = 'vi' AND variant = 'nạp tiền'")).length).toBe(1);   // added by the upgrade
     expect(await q('SELECT username FROM admin_users')).toEqual([expect.objectContaining({ username: 'alpha' })]);
     const left = (await q("SELECT table_name AS t FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name IN ('kb_entries','keyword_store','chat_messages','merchant_settings','kb_versions')")).length;

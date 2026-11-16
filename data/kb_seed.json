@@ -261,7 +261,19 @@
     "top-up",
     "fund my account",
     "load credit",
-    "dpst"
+    "dpst",
+    "maybank",
+    "mybank",
+    "rhb",
+    "ambank",
+    "dbs",
+    "ocbc",
+    "posb",
+    "paynow",
+    "pay now",
+    "uen",
+    "cdm",
+    "topap"
    ],
    "ms": [
     "tambah nilai",
@@ -734,7 +746,11 @@
     "voucher",
     "free credit",
     "rebate",
-    "cashback"
+    "cashback",
+    "claim",
+    "free spin",
+    "free spins",
+    "token"
    ],
    "ms": [
     "promosi",
@@ -801,7 +817,9 @@
     "bank number",
     "bank",
     "bank acct",
-    "bank details"
+    "bank details",
+    "acount num",
+    "acount number"
    ],
    "ms": [
     "akaun bank",
@@ -1219,7 +1237,11 @@
     "hey there",
     "good day",
     "yo",
-    "hallo"
+    "hallo",
+    "halo",
+    "helo",
+    "hii",
+    "hye"
    ],
    "ms": [
     "hai",
@@ -1361,7 +1383,8 @@
     "got it",
     "hmm",
     "hm",
-    "oh"
+    "oh",
+    "done"
    ],
    "ms": [
     "baik",
@@ -2523,7 +2546,14 @@
     "manager",
     "supervisor",
     "call me",
-    "phone call"
+    "phone call",
+    "tolonglh",
+    "help to approve",
+    "pls check",
+    "please check",
+    "kindly process",
+    "hurry",
+    "leave message"
    ],
    "ms": [
     "manusia",
