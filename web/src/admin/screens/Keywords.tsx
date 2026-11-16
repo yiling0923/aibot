@@ -2,7 +2,7 @@ import { useState, type ReactNode } from 'react';
 import { api } from '../../lib/api';
 import { KW_KINDS, KW_LABEL, LANG_NAMES, LN, groupKeywords, topicNames, wordTopic, type KwKind } from '../model';
 import { usePanel } from '../store';
-import { Pill } from '../ui';
+import { IconBtn, Pill } from '../ui';
 import { KeywordDrawer, SetKeywordModal } from './KeywordModals';
 import { useAssign } from './assign';
 
@@ -55,8 +55,8 @@ export default function Keywords() {
                 <td>{r.isNew ? <><Pill c="info">New</Pill> </> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span>{r.h && !r.isNew ? <div className="sub">{r.h}</div> : null}</td>
                 <td className="num">{r.n}</td><td><Pill c={stt.c}>{stt.t}</Pill></td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{r.ignored ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button>
-                  : todo ? <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>Make a topic</button> <button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add to a topic</button> <button className="btn sm ghost" type="button" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}>Ignore</button></>
-                  : <><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w })}>Change…</button> <button className="btn sm ghost" type="button" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}>Ignore</button></>}</td></tr>); })}
+                  : todo ? <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>Make a topic</button> <button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add to a topic</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>
+                  : <><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w })}>Change…</button> <IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>}</td></tr>); })}
           {!rows.length && <tr><td colSpan={5} className="sub">No keywords match. Words customers type are saved here automatically.</td></tr>}</tbody></table>
   );
   /** The words customers typed, under their main keyword: short forms, slang, same meaning, other languages. Words with no topic stay in a table below. */
@@ -99,7 +99,7 @@ export default function Keywords() {
           <td className="kwbc"><div className="kwbar"><i style={{ width: Math.max(6, Math.round((r.n * 100) / Math.max(1, ...rest.map((x) => x.n)))) + '%' }} /></div></td>
           <td className="num">{r.n}</td>
           <td className="act">{r.ignored ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>Restore</button>
-            : <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>Make a main keyword</button><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add under one</button><button className="btn sm ghost" type="button" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}>Ignore</button></>}</td></tr>)}</tbody></table></div>}
+            : <><button className="btn sm pri" type="button" disabled={lock} onClick={() => setSetFor({ w: r.w, preset: 'newtopic' })}>Make a main keyword</button><button className="btn sm" type="button" onClick={() => setSetFor({ w: r.w, preset: 'alias' })}>Add under one</button><IconBtn tip="Ignore" onClick={() => { p.ignoreWord(r.w); p.toast('Ignored “' + r.w + '”'); }}><path d="M3 3l18 18" /><path d="M10.6 6.1A10.9 10.9 0 0 1 12 6c6 0 9.5 6 9.5 6a17 17 0 0 1-3.2 3.9M6.4 6.9C3.8 8.6 2.5 12 2.5 12s3.5 6 9.5 6c1.5 0 2.8-.4 4-.9" /></IconBtn></>}</td></tr>)}</tbody></table></div>}
       {other.length > 0 && <div className="card kwother"><div className="head"><div><h3 style={{ margin: 0 }}>Words with another job · {other.length}</h3><div className="sub">Not main keywords, so they are not shown above. Click a word to change what it is.</div></div></div>
         {OTHER_GROUPS.map((g) => { const ws = other.filter((r) => g.test(r.st.t)); return ws.length ? <div className="kwgrow" key={g.label}><div className="kwglbl">{g.label}<em>{ws.length}</em></div><div>{ws.map((r) => <span key={r.w} className="kwpill" role="button" tabIndex={0} onClick={() => setDrawer(r.w)} onKeyDown={(e) => { if (e.key === 'Enter') setDrawer(r.w); }}>{r.w}<small>{r.n}</small></span>)}</div></div> : null; })}</div>}
       {!byTopic.length && !rest.length && !other.length && <div className="card sub">No keywords match. Words customers type are saved here automatically.</div>}
@@ -109,9 +109,9 @@ export default function Keywords() {
   return (
     <>
       <div className="card"><div className="head"><div><h2>Keywords</h2><div className="sub">Every word customers type is saved here automatically. Make a keyword a topic, or add it to a topic.</div></div>
-        {p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}</div>
-        <div className="segs" role="group" aria-label="View" style={{ margin: '8px 0' }}>{([['list', 'List'], ['main', 'By main keyword']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div>
-        <div className="quiet"><b>{all.length}</b> keywords saved · <b>{counts.unassigned}</b> not assigned yet · newest first{p.ai.describe ? '' : <> · <span title="Add the Anthropic key to .env">AI descriptions are off</span></>}</div></div>
+        <div className="tools">{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
+          <div className="segs" role="group" aria-label="View">{([['list', 'List'], ['main', 'By main keyword']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} onClick={() => setView(k)}>{l}</button>)}</div></div></div>
+        <div className="kwstats"><span className="st"><b>{all.length}</b> saved</span><span className={'st' + (counts.unassigned ? ' warn' : '')}><b>{counts.unassigned}</b> not assigned yet</span><span className="st"><b>{counts.assigned}</b> assigned</span>{p.ai.describe ? null : <span className="st dim" title="Add the Anthropic key to .env">AI descriptions are off</span>}</div></div>
       <div className="card rkfilter"><div className="head"><div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
         <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>

@@ -473,3 +473,12 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .kwscroll{overflow-y:auto;overscroll-behavior:contain;padding:2px 2px 0 0;scrollbar-width:thin}
 .kc.sh.adm{cursor:grab}.kc.sh .x{margin-left:2px}
 .kadd{display:block;width:100%;border:1px dashed var(--line);border-radius:99px;padding:5px 12px;font:inherit;font-size:13px;background:var(--surface)}.kadd.find{border-style:solid}
+
+/* Topics / Keywords / Ranking polish */
+.group .lbl .wc{display:inline-block;margin:3px 0 2px;background:var(--surface2);border-radius:99px;padding:0 9px;font-size:11.5px;font-weight:600;color:var(--muted)}
+.group .lbl .lock{display:block}
+.chip.more{border:0;font:inherit;font-size:12.5px;font-weight:600;padding:2px 11px;color:var(--accent);cursor:pointer;background:var(--surface)}.chip.more:hover{background:var(--surface2)}
+.kwstats{display:flex;flex-wrap:wrap;gap:8px;margin:2px 0 2px}
+.kwstats .st{background:var(--surface);border:1px solid var(--line);border-radius:99px;padding:4px 13px;font-size:13px;color:var(--muted)}.kwstats .st b{color:var(--fg);font-size:14px}
+.kwstats .st.warn{background:#fdf3e1;border-color:#f0d9a8;color:#8a5a00}.kwstats .st.warn b{color:#8a5a00}.kwstats .st.dim{border-style:dashed;cursor:help}
+.card>.kwstats{margin-top:10px}

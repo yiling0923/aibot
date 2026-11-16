@@ -3,6 +3,7 @@ import { usePanel } from '../store';
 import TopicFlow from './TopicFlow';
 import { KW_PICK, LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, groupKeywords, guessLang, slug, topicNames } from '../model';
 
+const FOLD = 12;                                                              // words shown per group before "+N more"
 const TABS: [string, string][] = [['short', 'Topics'], ['aspect', 'Question words'], ['small', 'Greetings'], ['filler', 'Fillers'], ['block', 'Block lists']];
 const SMALL_NAMES: Record<string, string> = { morning: 'Morning greetings', greeting: 'Other greetings', callout: 'Calling for attention', thanks: 'Thanks', bye: 'Goodbye', ack: 'Short acknowledgements' };
 const ASPECT_NAMES: Record<string, string> = { time: 'Time (how long, pending, late)', limit: 'Limit (minimum, maximum)', change: 'Change (update, wrong)', hours: 'Opening hours', how: 'How to', problem: 'Problem: rejected, failed, complaint (a human takes over)', help: 'Help: "what to do" (ignored)' };
@@ -39,6 +40,8 @@ export default function Topics() {
   useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 60); } });
 
   const [adding, setAdding] = useState(false);
+  const [exp, setExp] = useState<Set<string>>(new Set());                       // word groups opened to show every word
+  const toggleExp = (k: string) => setExp((x) => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const done = (msg: string, chip: string, word?: string) => {
     if (word) setFresh((s) => new Set(s).add(word.toLowerCase()));
     scroll.current = true; setJust((j) => [chip, ...j].slice(0, 8)); setQ(''); setLang('all'); p.toast(msg);
@@ -54,7 +57,7 @@ export default function Topics() {
       return <div style={{ marginBottom: 6 }} key={l}><span className="lang">{LN[l]}</span><div className="chips" style={{ display: 'inline-flex' }}>
         {items.map(([w, i]) => <span key={i} className={'chip ' + (ro ? 'ro ' : '') + (fresh.has(w.toLowerCase()) ? 'new' : '')}>{w}{!ro && <button type="button" aria-label="Remove" onClick={() => remove(kind, k, l, i)}>×</button>}</span>)}</div></div>;
     })}</>;
-  const Group = ({ title, sub, children }: { title: string; sub: string; children: ReactNode }) => children ? <div className="group"><div className="lbl"><b>{title}</b><span className="lock">{sub}</span></div><div>{children}</div></div> : null;
+  const Group = ({ title, sub, n, children }: { title: string; sub: string; n?: number; children: ReactNode }) => children ? <div className="group"><div className="lbl"><b>{title}</b>{n ? <span className="wc">{n} words</span> : null}<span className="lock">{sub}</span></div><div>{children}</div></div> : null;
 
   const remove = (kind: string, k: string, l: string, i: number) => p.edit((x, note) => {
     if (kind === 'alias') note('Removed short form "' + x.aliases[k][l].splice(i, 1)[0] + '" → ' + k);
@@ -78,11 +81,12 @@ export default function Topics() {
         const groups = groupKeywords(k, [...own, ...sh].filter((w) => langOk(w.language) && matchQ(w.variant, k)));
         if (!groups.length) return null;
         return <div className="kgroups">{groups.map((g) => <div className="kgroup" key={g.kind}><span className="klabel">{g.label}</span>
-          <div className="chips">{g.items.map((w) => <span key={(w.own ? 'o' : 's') + w.l + w.i} className={'chip ' + (w.own ? 'mine ' : '') + (!w.own && lock ? 'ro ' : '') + (fresh.has(w.variant.toLowerCase()) ? 'new' : '')} title={w.own ? p.M.name + ' only' : 'Shared by all merchants'}>
+          <div className="chips">{(q.trim() || exp.has(k + g.kind) ? g.items : g.items.slice(0, FOLD)).map((w) => <span key={(w.own ? 'o' : 's') + w.l + w.i} className={'chip ' + (w.own ? 'mine ' : '') + (!w.own && lock ? 'ro ' : '') + (fresh.has(w.variant.toLowerCase()) ? 'new' : '')} title={w.own ? p.M.name + ' only' : 'Shared by all merchants'}>
             {w.variant}{g.kind === 'lang' && <span className="lang" style={{ marginLeft: 6 }}>{LN[w.language] ?? w.language}</span>}
-            {(w.own || !lock) && <button type="button" aria-label="Remove" onClick={() => (w.own ? remove('malias', '', '', w.i) : remove('alias', k, w.l, w.i))}>×</button>}</span>)}</div></div>)}</div>;
+            {(w.own || !lock) && <button type="button" aria-label="Remove" onClick={() => (w.own ? remove('malias', '', '', w.i) : remove('alias', k, w.l, w.i))}>×</button>}</span>)}
+            {!q.trim() && g.items.length > FOLD && <button type="button" className="chip more" onClick={() => toggleExp(k + g.kind)}>{exp.has(k + g.kind) ? 'show fewer' : '+' + (g.items.length - FOLD) + ' more'}</button>}</div></div>)}</div>;
       };
-      Object.entries(d.aliases).forEach(([k, byl]) => { const inner = under(k, byl); if (inner) out.push(<Group key={k} title={k} sub={'main keyword · ' + (lock ? 'global · admin only' : 'global · all merchants')}>{inner}</Group>); });
+      Object.entries(d.aliases).forEach(([k, byl]) => { const inner = under(k, byl); if (inner) out.push(<Group key={k} title={k} n={Object.values(byl).flat().length + mine.filter(([a]) => a.canonical === k).length} sub={'main keyword · ' + (lock ? 'global · admin only' : 'global · all merchants')}>{inner}</Group>); });
       // the topics this merchant made itself: its own keywords under a topic name that is not in the shared template
       [...new Set(mine.filter(([a]) => !known.includes(a.canonical)).map(([a]) => a.canonical))].forEach((topic) => {
         const inner = under(topic, {}); if (inner) out.push(<Group key={'own-' + topic} title={topic} sub={'main keyword · this merchant only · ' + p.M.name + "'s own topic"}>{inner}</Group>);
