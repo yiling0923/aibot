@@ -9,7 +9,6 @@ export function scopeSnapshot(user: SessionUser, snap: Snapshot): Snapshot {
   const m = user.merchant!;
   const out = clone(snap);
   out.kb = out.kb.filter((e) => e.merchant === m);
-  out.flows = (out.flows ?? []).filter((f) => f.merchant === m);
   out.mAliases = { [m]: out.mAliases[m] ?? [] };
   out.settings = { [m]: out.settings[m] };
   return out;
@@ -33,7 +32,6 @@ export function effectiveSnapshot(user: SessionUser, current: Snapshot, incoming
     ...current.kb.filter((e) => e.merchant !== m),
     ...mine.map((e) => ({ ...clone(e), merchant: m, id: owned.get(e.intent_key) ?? (used.has(e.id) ? next++ : e.id) })),
   ];
-  if (Array.isArray(incoming.flows)) out.flows = [...(current.flows ?? []).filter((f) => f.merchant !== m), ...incoming.flows.filter((f) => f.merchant === m).map((f) => clone(f))];   // staff draw flows for their own merchant only
   if (Array.isArray(incoming.mAliases?.[m])) out.mAliases[m] = clone(incoming.mAliases[m]).map((a) => ({ ...a }));
   const inc = incoming.settings?.[m], cur = out.settings[m];
   if (inc && cur) {

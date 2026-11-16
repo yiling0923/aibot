@@ -34,8 +34,6 @@ export interface MerchantCfg {
   tools: string[];                                                      // enabled account tools
   /** The languages the bot answers in (empty or missing: all). A customer writing in another language gets the main language. */
   languages?: Lang[];
-  /** Flows drawn for topics: a live flow runs when the customer's message is about its topic. */
-  flows?: import('./flowTypes').Flow[];
   /** The money sign in this merchant's messages (default RM). */
   currency?: string;
   /** Handoff rules of this merchant. Set only when they differ from the default (both on, no phrases). */

@@ -3,11 +3,10 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import '../styles/admin.css';
 import { api } from '../lib/api';
 import { PanelProvider, usePanel } from './store';
-import { entryProblems, flowProblems, snapshotOf } from './model';
+import { entryProblems, snapshotOf } from './model';
 import { Modal, NavIcon } from './ui';
 import Kb from './screens/Kb';
 import Import from './screens/Import';
-import Flows from './screens/Flows';
 import Topics from './screens/Topics';
 import Keywords from './screens/Keywords';
 import Ranking from './screens/Ranking';
@@ -20,7 +19,7 @@ import History from './screens/History';
 import Report from './screens/Report';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
-  ['Answers', [['kb', 'Knowledge base'], ['flows', 'Flows'], ['imp', 'Import']]],
+  ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
   ['Check', [['report', 'Report'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
@@ -46,7 +45,6 @@ function Shell() {
   const [dialog, setDialog] = useState<'publish' | null>(null);
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
-  const showFlows = p.adv || (p.draft.flows ?? []).some((f) => f.merchant === p.merchant);        // Flows are optional: hidden until "Advanced options" is on, or this merchant already has one
   const n = p.changes.length;
 
   return (
@@ -61,7 +59,7 @@ function Shell() {
         <nav className="nav" aria-label="Sections">
           {NAV_GROUPS.map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
-              {items.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin) && (k !== 'flows' || showFlows)).map(([k, l]) => (
+              {items.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin)).map(([k, l]) => (
                 <button key={k} type="button" aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
                   <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
                 </button>
@@ -86,7 +84,6 @@ function Shell() {
             <Route index element={<Navigate to="kb" replace />} />
             <Route path="kb" element={<Kb />} />
             <Route path="imp" element={<Import />} />
-            <Route path="flows" element={<Flows />} />
             <Route path="kw" element={<Topics />} />
             <Route path="store" element={<Keywords />} />
             <Route path="rank" element={<Ranking />} />
@@ -130,14 +127,10 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
   if (!res) return <Modal small label="Publish" onClose={onClose}><h2>Checking your changes…</h2><div className="note">Running the sample customer messages on your draft.</div></Modal>;
   const fails = res.total - res.pass; const n = p.changes.length;
   const risky = p.draft.kb.filter((e) => e.dirty).map((e) => ({ e, why: entryProblems(e) })).filter((x) => x.why.length);   // answers changed in this draft that the bot cannot use yet
-  const intentsOf = (m: string) => p.draft.kb.filter((e) => e.merchant === m).map((e) => e.intent_key);
-  const riskyFlows = (p.draft.flows ?? []).filter((f) => f.status === 'live').map((f) => ({ f, why: flowProblems(f, intentsOf(f.merchant)) })).filter((x) => x.why.length);   // live flows that are not finished
   return (
     <Modal small label="Publish" onClose={onClose}>
       <h2>Publish {n} change{n > 1 ? 's' : ''}?</h2>
       <ul className="plain">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-      {riskyFlows.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>Check these flows first:</b>
-        <ul className="plain">{riskyFlows.map(({ f, why }) => <li key={f.merchant + f.id}><b>{f.name}</b> ({p.merchants.find((m) => m.code === f.merchant)?.name ?? f.merchant}): {why[0]}</li>)}</ul></div>}
       {risky.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>Check these answers first:</b>
         <ul className="plain">{risky.map(({ e, why }) => <li key={e.merchant + e.id}><b>{e.intent_key}</b> ({p.merchants.find((m) => m.code === e.merchant)?.name ?? e.merchant}): {why[0]}</li>)}</ul>
         <div className="sub">You can still publish, but the bot will not use these answers well yet. Choose Cancel, then open Knowledge base to fix them.</div></div>}

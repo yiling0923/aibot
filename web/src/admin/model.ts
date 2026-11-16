@@ -43,42 +43,8 @@ export function agoISO(iso?: string): string {
 
 /** What the server stores: the draft without the display-only fields. */
 export function snapshotOf(d: Draft): Snapshot {
-  return { kb: d.kb.map(({ dirty: _d, updated: _u, ...e }) => e), aliases: d.aliases, mAliases: d.mAliases, aspects: d.aspects, smalltalk: d.smalltalk, guard: d.guard, fillers: d.fillers, settings: d.settings, flows: d.flows ?? [] };
+  return { kb: d.kb.map(({ dirty: _d, updated: _u, ...e }) => e), aliases: d.aliases, mAliases: d.mAliases, aspects: d.aspects, smalltalk: d.smalltalk, guard: d.guard, fillers: d.fillers, settings: d.settings };
 }
-
-/* ---------- flows: a drawn conversation for a topic ---------- */
-export type Flow = import('../../../src/engine/flowTypes').Flow & { merchant: string };
-export type FlowBlock = import('../../../src/engine/flowTypes').FlowBlock;
-/** The value of a block's "next" that means: stop here. */
-export const FLOW_STOP = '__end';
-export const FLOW_TYPES: [FlowBlock['type'], string, string][] = [
-  ['message', 'Message', 'The bot says something.'], ['question', 'Question', 'The bot asks and the customer taps a choice.'], ['ask', 'Ask for a detail', 'The bot asks for something the customer types, such as a username.'],
-  ['answer', 'Answer', 'The bot says an answer from the Knowledge base.'], ['handoff', 'Hand to a person', 'A person takes over the chat.'], ['end', 'End', 'The flow is finished.'],
-];
-export const newFlowId = (d: { flows?: Flow[] }) => Math.max(0, ...(d.flows ?? []).map((f) => f.id)) + 1;
-export const newBlockId = (blocks: { id: string }[], p = 'b') => { let n = blocks.length + 1; while (blocks.some((b) => b.id === p + n)) n++; return p + n; };
-export const blankBlock = (type: FlowBlock['type'], blocks: { id: string }[]): FlowBlock => {
-  const id = newBlockId(blocks);
-  if (type === 'question') return { id, type, text: { en: '' }, options: [{ id: 'o1', label: { en: '' } }, { id: 'o2', label: { en: '' } }] };
-  if (type === 'ask') return { id, type, text: { en: '' }, field: 'detail' };
-  if (type === 'answer') return { id, type, intent: '' };
-  if (type === 'handoff' || type === 'end') return { id, type, text: { en: '' } };
-  return { id, type: 'message', text: { en: '' } };
-};
-/** What is wrong with a flow, in plain words (empty when it is ready to go live). */
-export const flowProblems = (f: Flow, intents: string[] = []): string[] => {
-  const out: string[] = []; const txt = (t?: Record<string, string>) => !!(t?.en ?? '').trim();
-  if (!f.topic) out.push('Choose the topic this flow is for.');
-  if (!f.blocks.length) out.push('The flow has no steps yet.');
-  f.blocks.forEach((b, i) => {
-    const n = 'Step ' + (i + 1);
-    if ((b.type === 'message' || b.type === 'question' || b.type === 'ask') && !txt(b.text)) out.push(n + ' has no English text.');
-    if (b.type === 'question' && (b.options.length < 2 || b.options.some((o) => !txt(o.label)))) out.push(n + ' needs at least two choices, each with a name.');
-    if (b.type === 'ask' && !/^\w+$/.test(b.field)) out.push(n + ' needs a name for what it asks, using letters and digits only.');
-    if (b.type === 'answer' && (!b.intent || (intents.length && !intents.includes(b.intent)))) out.push(n + ' needs a Knowledge base answer that exists.');
-  });
-  return out;
-};
 
 export const langState = (e: { translations: Entry['translations'] }, l: string): 'on' | 'part' | '' => {
   const t = e.translations[l as L] || { answer_text: '', question_examples: [] };

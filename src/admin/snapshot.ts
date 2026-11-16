@@ -44,7 +44,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
   const handoff = new Map(merchants.map((m) => [m.code as string, m.handoff_group_id as number | null]));
   const snap: Snapshot = {
     kb: [], aliases: {}, mAliases: {}, aspects: group(aspects, 'kind', 'keyword'), smalltalk: group(small, 'kind', 'phrase'), guard: group(guard, 'kind', 'phrase'),
-    fillers: {}, settings: {}, flows: [],
+    fillers: {}, settings: {},
   };
   for (const a of aliases) ((snap.aliases[a.canonical] ??= {})[a.language] ??= []).push(a.variant);
   for (const f of fillers) (snap.fillers[f.language] ??= []).push(f.word);
@@ -57,10 +57,6 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
       rows(pool, `SELECT * FROM ${D('settings')} WHERE id = 1`),
       rows(pool, `SELECT tool, enabled FROM ${D('tools')}`),
     ]);
-    try {
-      for (const f of await rows(pool, `SELECT id, name, topic, status, blocks FROM ${D('flows')} ORDER BY id`))
-        (snap.flows ??= []).push({ id: Number(f.id), merchant: t.code, name: f.name, topic: f.topic, status: f.status === 'live' ? 'live' : 'draft', blocks: asJson(f.blocks, []) });
-    } catch { /* a merchant database from before flows existed: no flows */ }
     snap.mAliases[t.code] = own.map((a) => ({ language: a.language, variant: a.variant, canonical: a.canonical, ...(a.kind ? { kind: a.kind as string } : {}) }));
     const byKb = new Map<number, SnapEntry['translations']>();
     for (const x of trans) {
@@ -126,15 +122,6 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScop
       for (const [tool, enabled] of Object.entries(s.tools))
         await c.query(`INSERT INTO ${D('tools')}(tool,enabled) VALUES(?,?) ON DUPLICATE KEY UPDATE enabled=VALUES(enabled)`, [tool, enabled]);
 
-      if (Array.isArray(snap.flows)) {                                 // flows: rewritten as the panel has them (a snapshot without the list leaves them alone)
-        await c.query(`DELETE FROM ${D('flows')}`);
-        const seen = new Set<number>();
-        for (const f of snap.flows.filter((x) => x.merchant === t.code)) {
-          let id = Math.round(Number(f.id)) || 0; while (!id || seen.has(id)) id = Math.max(0, ...seen) + 1; seen.add(id);
-          await c.query(`INSERT INTO ${D('flows')}(id,name,topic,status,blocks) VALUES(?,?,?,?,?)`, [id, String(f.name || 'Flow').slice(0, 120), String(f.topic || '').slice(0, 100), f.status === 'live' ? 'live' : 'draft', JSON.stringify(Array.isArray(f.blocks) ? f.blocks : [])]);
-        }
-      }
-
       // knowledge base entries: update the ones that exist, add new ones, delete removed ones
       const keep = new Set<string>();
       for (const e of snap.kb.filter((x) => x.merchant === t.code)) {
@@ -173,7 +160,6 @@ export function knowledgeFromSnapshot(snap: Snapshot, merchants: MerchantMeta[],
       closing: s.closing, handoff: s.handoff, maxChoices: s.max_choices, moreHelpOn: s.more_help_on, moreHelp: s.more_help, abuseCloseAfter: s.abuse_close_after, answerThreshold: s.answer, clarifyThreshold: s.clarify, kindReply: s.kind,
       ...(s.handoff_complaint === false ? { handoffComplaint: false } : {}), ...(s.handoff_account === false ? { handoffAccount: false } : {}), ...(cleanPhrases(s.trigger_phrases).length ? { triggerPhrases: cleanPhrases(s.trigger_phrases) } : {}),
       ...((s.ai_instructions ?? '').trim() ? { aiInstructions: s.ai_instructions } : {}), ...(parseLangs(m.languages) ? { languages: parseLangs(m.languages) } : {}),
-      ...((snap.flows ?? []).some((f) => f.merchant === m.code && (includeDrafts || f.status === 'live')) ? { flows: (snap.flows ?? []).filter((f) => f.merchant === m.code && (includeDrafts || f.status === 'live')).map(({ merchant: _m, ...f }) => f) } : {}),
       aliases: snap.mAliases[m.code] ?? [], tools: Object.entries(s.tools).filter(([, on]) => on).map(([k]) => k).sort(), limits: limits[m.code] ?? {},
     };
   });

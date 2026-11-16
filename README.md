@@ -245,17 +245,6 @@ The Merchant settings page is grouped in tabs under the four tiles: **General** 
 
 **Check → LiveChat test** (admin only) is a chat window whose messages go through a LiveChat, the way its website widget sends them: the bot server starts (or continues) a chat in LiveChat with the same calls as `deploy/local-livechat/chat.ps1`, waits until the bot has answered, and shows the whole chat as bubbles. It tests the real link, with the bot as published. *Settings* holds the LiveChat address (default `http://localhost:8080`, the local setup) and the tenant id (default `1`); they are remembered in the browser. *New chat* starts a fresh visitor. If LiveChat does not answer within about 15 seconds the page says so; press Send with an empty box to look again. The bot server makes the calls, so the address must be reachable from the computer that runs the bot.
 
-## Flows (a drawn conversation for a topic)
-
-Open **Flows** in the panel (it is hidden until "Advanced options" is switched on, or the merchant already has a flow). A flow belongs to one topic (for example `deposit`). When a customer's message is about that topic and the flow is **Live**, the bot runs the flow instead of the plain answer or the topic's buttons.
-
-Steps you can add: **Message** (the bot says it), **Question** (the customer taps a choice; each choice can go to a different step), **Ask for a detail** (the customer types something, for example a username; write `{detail}` in a later text to use it), **Answer** (says a Knowledge base answer), **Hand to a person**, **End**. Each step says what comes next: the step below (the default), another step, or stop. Texts are written per language and fall back to English.
-
-- **Try it** (the box beside the editor) chats with the flow as drawn, also while it is a draft. Nothing is saved.
-- Flows follow the same rules as answers: they are part of the draft, are listed in the Publish window (a live flow that is not finished is flagged there), keep a version history per merchant and can be rolled back. Staff can draw flows for their own merchant.
-- A customer who writes rude words, asks for a person, or writes an account number leaves the flow and is handled as usual. A question that is not understood twice in a row hands over to a person. A flow that loops by mistake stops after 40 steps.
-- Where it lives: table `flows` in each merchant's database (`db/merchant/010_flows.sql`), the runner is `src/engine/flow.ts`, the bot hooks are in `src/bot/responder.ts`.
-
 ## Merchant API (a customer's balance, points, deposits and withdrawals)
 
 When a **logged-in** customer asks "check my balance", "where is my deposit" and similar, the bot reads the account from the merchant's own system. Connect it on the merchant page, **Account data** card (admin only): the API address, the API key, and a customer id to try. **Try it** shows what the API sent without saving anything; **Connect** saves it (the key is stored encrypted, only its last 4 characters are shown again). A merchant with nothing connected uses the built-in sample customers (`data/fake_accounts.json`), which is only for the demo.

@@ -1,7 +1,5 @@
 // The shapes the control panel and the server share. Pure types, no imports of server code, so the front end can use them too.
 import type { Lang } from '../engine/types';
-import type { Flow } from '../engine/flowTypes';
-export type { Flow, FlowBlock, FlowText } from '../engine/flowTypes';
 
 export type Words = Record<string, Record<string, string[]>>;
 export interface SnapEntry {
@@ -24,8 +22,6 @@ export interface SnapSettings {
 }
 /** Everything the control panel edits. The panel works on a copy of this and sends it back on Publish. */
 export interface Snapshot {
-  /** Flows (a drawn conversation per topic) of every merchant. Missing in snapshots saved before flows existed: then flows are left as they are. */
-  flows?: (Flow & { merchant: string })[];
   kb: SnapEntry[]; aliases: Words; mAliases: Record<string, { language: string; variant: string; canonical: string; kind?: string | null }[]>;
   aspects: Words; smalltalk: Words; guard: Words; fillers: Record<string, string[]>; settings: Record<string, SnapSettings>;
 }

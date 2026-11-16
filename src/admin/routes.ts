@@ -4,8 +4,6 @@ import type { RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
 import { Engine } from '../engine/engine';
 import { Bot } from '../bot/responder';
-import { startFlow, continueFlow } from '../engine/flow';
-import type { Flow, FlowState } from '../engine/flowTypes';
 import { loadKnowledge } from '../db/loadKnowledge';
 import '../auth/types';
 import { effectiveSnapshot, scopeSnapshot } from './scope';
@@ -82,16 +80,6 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
 
   /** Publishes the draft. Only the merchants whose data really changed get a new version (each has its own history),
    *  and the shared word lists get one only if they changed. */
-  /** The "try it" box in the Flows screen: runs one step of a flow the person is drawing (it does not need to be saved), with the same runner the bot uses. */
-  app.post<{ Body: { flow?: Flow; state?: FlowState | null; input?: { text?: string; pick?: string }; lang?: string; answers?: Record<string, string> } }>(`${A}/flows/try`, async (req, reply) => {
-    const b = req.body ?? {}; const flow = b.flow;
-    if (!flow || !Array.isArray(flow.blocks) || flow.blocks.length > 60 || JSON.stringify(flow).length > 200_000) return reply.code(400).send({ error: 'Send the flow to try.' });
-    const lang = typeof b.lang === 'string' ? b.lang.slice(0, 5) : 'en'; const answers = b.answers ?? {};
-    const say = (k: string) => String(answers[k] ?? '');
-    const out = b.state ? continueFlow(flow, b.state, { text: typeof b.input?.text === 'string' ? b.input.text.slice(0, 500) : undefined, pick: typeof b.input?.pick === 'string' ? b.input.pick : undefined }, lang, say) : startFlow(flow, lang, say);
-    return out;
-  });
-
   app.post<{ Body: { snapshot: Snapshot; changes: string[] } }>(`${A}/publish`, async (req, reply) => {
     const user = req.user!;
     const { snapshot, changes = [] } = req.body ?? ({} as never);

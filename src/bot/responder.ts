@@ -6,8 +6,6 @@ import * as Texts from './texts';
 import { PICK_MIN_CONFIDENCE, type AiService } from '../ai/types';
 import { checkReply } from '../ai/validator';
 import { matchChoice } from './choices';
-import { startFlow, continueFlow, type FlowOut } from '../engine/flow';
-import type { Flow, FlowState } from '../engine/flowTypes';
 
 /** The texts are looked up by language, tone and key at run time, so they are used untyped here. */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -27,8 +25,6 @@ export interface Session {
   askKind?: 'reask' | 'clarify' | 'topics' | 'menu' | null;
   /** A channel that remembers replies by the words of the question (LiveChat) must never carry one customer's personal data to another: no account answers in a reply. */
   noPersonal?: boolean;
-  /** Where the customer is inside a flow (a drawn conversation), when one is running. */
-  flow?: FlowState | null;
 }
 /** A message that is only the name of a file (what LiveChat sends for a picture, a document or a video). */
 const FILE_NAME = /^[^\s\\/]{1,120}\.(jpe?g|png|gif|webp|heic|bmp|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp4|mov|avi|mp3|wav|m4a)$/i;
@@ -36,7 +32,7 @@ export const newSession = (id: string, merchant: string, token: string | null, d
   ({ id, merchant, token, draft, misses: 0, abuseCount: 0, lastTopic: null, clarifyCount: 0, pending: null, closed: false, handed: false });
 
 export interface BotMsg { kind: 'bot' | 'sys' | 'sys warn' | 'sys bad'; text: string }
-export interface Button { kind: 'intent' | 'topic' | 'status' | 'amt' | 'agent' | 'flow'; key: string; label: string; amt?: number }
+export interface Button { kind: 'intent' | 'topic' | 'status' | 'amt' | 'agent'; key: string; label: string; amt?: number }
 export interface AccountInfo { chk: TokenCheck; verified: boolean; kind: string; agent: boolean; text: string; call?: string; json?: string; rows: Tx[] }
 
 /** Everything the chat page needs: what to show the customer, and the steps for the "what the bot did" panel. */
@@ -168,12 +164,6 @@ export class Bot {
       const hit = matchChoice(typed, s.choices);
       if (hit) { const picked = this.pick(s, { kind: hit.kind, key: hit.key, amt: hit.amt, label: hit.label, lang: s.lang ?? this.cfg(s).defaultLanguage }); if (picked) { picked.trace = { ...picked.trace, typedReply: typed }; return picked; } }
     }
-    // Inside a flow, the customer's words answer the flow's question. Rude words, a request for a person, secrets or account numbers leave the flow and are handled as usual.
-    if (!s.handed && s.flow) {
-      const probe = this.engine.analyze(typed, s.merchant, 0);
-      if (probe.decision === 'ABUSE' || probe.guard) s.flow = null;
-      else { const t = this.flowReply(s, { text: typed }, s.lang ?? this.cfg(s).defaultLanguage); if (t) return this.finish(s, t, (t.log?.lang ?? this.cfg(s).defaultLanguage) as Lang); }
-    }
     const turn = await this.messageCore(s, rawText);
     return turn && this.finish(s, turn, (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? this.cfg(s).defaultLanguage) as Lang);
   }
@@ -183,8 +173,7 @@ export class Bot {
     s.lang = lang; s.choices = null;
     if (turn.buttons?.length && s.noPersonal) turn.buttons = turn.buttons.filter((b) => b.kind !== 'status' && !(b.kind === 'amt' && b.key === 'check'));     // no account checks in a channel that remembers replies
     if (!turn.buttons?.length) { turn.buttons = null; return turn; }
-    const isFlow = turn.trace.kind === 'flow';                  // a flow's own choices are never cut: its author decided how many there are
-    const c = this.cfg(s), max = isFlow ? 20 : Math.max(1, Math.min(3, Math.round(c.maxChoices || 3)));
+    const c = this.cfg(s), max = Math.max(1, Math.min(3, Math.round(c.maxChoices || 3)));
     const agent = turn.buttons.filter((b) => b.kind === 'agent'), opts = turn.buttons.filter((b) => b.kind !== 'agent');
     let kept = opts;
     if (opts.length > max) {                                  // an account check ("where is my deposit") keeps its place; the rest are cut from the end
@@ -194,36 +183,10 @@ export class Bot {
       kept = opts.filter((b) => set.has(b));
     }
     turn.buttons = [...kept, ...agent];
-    turn.hint = !isFlow && c.moreHelpOn && kept.length ? (c.moreHelp[lang]?.trim() || T.MORE_HELP[lang]) : null;
+    turn.hint = c.moreHelpOn && kept.length ? (c.moreHelp[lang]?.trim() || T.MORE_HELP[lang]) : null;
     if (kept.length < opts.length) turn.trace = { ...turn.trace, choicesCut: { shown: kept.length, had: opts.length, max } };
     s.choices = turn.buttons;                                  // what the customer may answer in their own words next
     return turn;
-  }
-
-  /* ---------- flows: a drawn conversation for a topic ---------- */
-  private flowText(s: Session, lang: Lang) { return (intent: string) => this.ans(s.merchant, intent, lang); }
-  /** The live flow drawn for the topic the customer is asking about, if there is one. */
-  private flowFor(s: Session, r: AnalyzeResult) {
-    if (!['ANSWER', 'CHOICE'].includes(r.decision)) return null;
-    const topic = r.topic ?? (r.decision === 'ANSWER' ? this.engine.entry(s.merchant, r.top.intent)?.topic ?? null : null);
-    return topic ? this.cfg(s).flows?.find((f) => f.topic === topic && f.blocks.length) ?? null : null;
-  }
-  private flowTurn(s: Session, flow: Flow, out: FlowOut, lang: Lang, text: string, extra: Record<string, unknown> = {}): Turn {
-    s.flow = out.state; s.pending = null; s.clarifyCount = 0; s.misses = 0; s.askKind = null;
-    const messages: BotMsg[] = out.messages.map((t) => ({ kind: 'bot', text: t }));
-    let status: string | null = null; let buttons: Button[] | null = null;
-    if (out.handed) { const h = this.handoff(s, lang); if (!messages.length) messages.push(h.messages[0]); messages.push(h.messages[1]); status = h.status; s.flow = null; }
-    else if (out.buttons?.length) buttons = [...out.buttons.map((b) => ({ kind: 'flow' as const, key: b.key, label: b.label })), { kind: 'agent' as const, key: 'agent', label: T.AGENT[lang] }];
-    const decision = out.handed ? 'HANDOFF' : 'ANSWER';
-    return { messages, buttons, locked: false, status, cacheable: false,
-      trace: { kind: 'flow', decision, flow: flow.id, name: flow.name, topic: flow.topic, lang, conf: 1, why: 'A flow drawn for the topic "' + flow.topic + '" runs: ' + flow.name + '.', ...extra },
-      log: { text, lang, decision, notUnderstood: false } };
-  }
-  /** The customer answers a flow: they tapped a choice or typed a reply. */
-  private flowReply(s: Session, input: { text?: string; pick?: string }, lang: Lang): Turn | null {
-    const st = s.flow; const flow = st ? this.cfg(s).flows?.find((f) => f.id === st.flow) : undefined;
-    if (!st || !flow) { s.flow = null; return null; }
-    return this.flowTurn(s, flow, continueFlow(flow, st, input, lang, this.flowText(s, lang)), lang, input.text ?? input.pick ?? '', { step: st.at });
   }
 
   private async messageCore(s: Session, rawText: string): Promise<Turn | null> {
@@ -236,7 +199,7 @@ export class Bot {
     };
     // A picture or a file (LiveChat sends only its name, like MMU.JPG): the bot cannot open it, so a person takes over.
     if (FILE_NAME.test(text)) {
-      const lang = (s.lang ?? c.defaultLanguage) as Lang; const h = this.handoff(s, lang); s.flow = null; s.pending = null;
+      const lang = (s.lang ?? c.defaultLanguage) as Lang; const h = this.handoff(s, lang); s.pending = null;
       return { messages: [{ kind: 'bot', text: T.FILE_SENT[lang] }, h.messages[1]], buttons: null, locked: false, status: h.status, cacheable: false,
         trace: { kind: 'file', decision: 'HANDOFF', lang, conf: 1, why: 'The customer sent a picture or a file. The bot cannot open it, so a person takes over.' }, log: { text, lang, decision: 'HANDOFF', notUnderstood: false } };
     }
@@ -246,7 +209,6 @@ export class Bot {
     s.pending = null;
     let r = this.engine.analyze(query, s.merchant, s.clarifyCount, { lastTopic: s.lastTopic }); r.raw = text;
     { const cfgL = this.cfg(s); if (cfgL.languages?.length && !cfgL.languages.includes(r.lang)) r.lang = cfgL.defaultLanguage; }      // a language switched off for this merchant: reply in its main language
-    { const ft = this.flowFor(s, r); if (ft) { s.lastTopic = ft.topic; return this.flowTurn(s, ft, startFlow(ft, r.lang, this.flowText(s, r.lang)), r.lang, text, { startedBy: r.decision }); } }
     // A second chance for a message no keyword matched: Claude may know which entry it is about. Its pick is checked
     // against the real entry list, and a low confidence is ignored, so the bot then asks again or hands off as before.
     let aiInfo: Record<string, unknown> | null = null;
@@ -387,7 +349,6 @@ export class Bot {
   private pickCore(s: Session, p: { kind: string; key: string; amt?: number; label: string; lang: Lang }): Turn | null {
     if (s.closed || s.handed) return null;
     const { kind, key, lang, label } = p; const c = this.cfg(s);
-    if (kind === 'flow') return this.flowReply(s, { pick: key }, lang);
     const pending = s.pending; s.pending = null; s.clarifyCount = 0; s.misses = 0; s.askKind = null;                       // the customer answered the question
     const turn: Turn = { messages: [], buttons: null, locked: false, status: null, log: null, cacheable: false, trace: { kind: 'pick', pickKind: kind, key, label, lang, merchant: { name: c.name, tone: c.tone, handoffGroupId: c.handoffGroupId }, agentLabel: T.AGENT[lang] } };
     const say = (t: string) => turn.messages.push({ kind: 'bot', text: t });
