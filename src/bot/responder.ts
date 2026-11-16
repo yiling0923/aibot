@@ -283,7 +283,7 @@ export class Bot {
           break;
         }
         const h = this.handoff(s, lang);
-        if (r.guard?.kind === 'pay-details') h.messages[0] = { kind: 'bot', text: T.PAYINFO[lang](r.amt ? ` (${r.amt.n})` : '') };   // says what the person will do, with the amount the customer wrote
+        if (r.guard?.kind === 'pay-details') h.messages[0] = { kind: 'bot', text: T.PAYINFO[lang](r.amt ? ` (${T.fmtAmt(r.amt.n, c.currency)})` : '') };   // says what the person will do, with the amount the customer wrote
         turn.messages.push(...h.messages); turn.status = h.status; break; }
       case 'ABUSE':
         if (out.close) {

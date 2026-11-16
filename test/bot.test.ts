@@ -38,7 +38,7 @@ describe('deposit account requests', () => {
     const s = newSession('pay1', 'MERCH_A', null);
     const t = (await bot.message(s, 'bos send me paynow scan deposit 500'))!;
     expect(s.handed).toBe(true);
-    expect(text(t)).toContain('deposit account'); expect(text(t)).toContain('(500)');
+    expect(text(t)).toContain('deposit account'); expect(text(t)).toContain('(RM500)');
   });
   it('says the same without an amount, and in Malay', async () => {
     const s = newSession('pay2', 'MERCH_A', null);
