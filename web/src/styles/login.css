@@ -1,6 +1,27 @@
-.login{min-height:100vh;display:grid;place-items:center;padding:24px}
-.login .card{width:min(380px,100%);display:flex;flex-direction:column;gap:16px;padding:28px}
-.login h1{margin:0;font-size:20px;letter-spacing:-.01em}
-.login input{width:100%}
-.login .err{color:var(--bad);background:var(--badbg);border-radius:8px;padding:8px 10px;font-size:13px}
+.login{position:fixed;inset:0;overflow-y:auto;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+/* the brand side */
+.lg-brand{display:flex;flex-direction:column;justify-content:center;gap:14px;padding:56px clamp(28px,6vw,88px);color:#fff;background:linear-gradient(155deg,#0b6a73 0%,#0E7C86 55%,#17939c 100%)}
+.lg-brand h2{margin:6px 0 0;font-size:30px;letter-spacing:-.02em;line-height:1.15}
+.lg-tag{margin:0;font-size:16px;line-height:1.5;color:rgba(255,255,255,.88);max-width:430px}
+.lg-logo{display:grid;place-items:center;width:52px;height:52px;border-radius:14px;background:rgba(255,255,255,.16);color:#fff}
+.lg-logo svg{width:26px;height:26px}.lg-logo.sm{width:34px;height:34px;border-radius:10px;background:var(--accent);color:var(--accentfg)}.lg-logo.sm svg{width:18px;height:18px}
+.lg-brand ul{list-style:none;margin:18px 0 0;padding:0;display:flex;flex-direction:column;gap:16px;max-width:460px}
+.lg-brand li{display:flex;gap:12px;align-items:flex-start}
+.lg-brand li b{display:block;font-size:14.5px}.lg-brand li span:not(.lg-tick){display:block;font-size:13.5px;line-height:1.5;color:rgba(255,255,255,.8);margin-top:2px}
+.lg-tick{flex:none;display:grid;place-items:center;width:26px;height:26px;border-radius:50%;background:rgba(255,255,255,.18)}.lg-tick svg{width:15px;height:15px}
+/* the form side */
+.lg-form{display:grid;place-items:center;padding:32px 24px;background:var(--bg)}
+.lg-card{width:min(400px,100%);display:flex;flex-direction:column;gap:6px}
+.lg-mini{display:none;align-items:center;gap:10px;margin-bottom:18px}
+.login h1{margin:0;font-size:26px;letter-spacing:-.02em}
+.lg-sub{margin:0 0 14px;color:var(--muted);font-size:14px}
 .login form{display:flex;flex-direction:column;gap:14px}
+.login input{width:100%;box-sizing:border-box;padding:11px 12px;font-size:15px}
+.lg-pw{position:relative}.lg-pw input{padding-right:46px}
+.lg-eye{position:absolute;right:6px;bottom:6px;width:34px;height:34px;display:grid;place-items:center;border:0;border-radius:8px;background:none;color:var(--muted);cursor:pointer}
+.lg-eye:hover{background:var(--surface2);color:var(--fg)}
+.lg-caps{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--warn);background:var(--warnbg);border-radius:8px;padding:6px 10px;margin-top:-6px}
+.login .err{display:flex;align-items:flex-start;gap:8px;color:var(--bad);background:var(--badbg);border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.4}.login .err svg{flex:none;margin-top:1px}
+.login .btn.pri{padding:12px 14px;font-size:15px;border-radius:10px;margin-top:2px}
+.lg-help{margin:12px 0 0;text-align:center;color:var(--muted);font-size:12.5px}
+@media (max-width:860px){.login{grid-template-columns:1fr}.lg-brand{display:none}.lg-mini{display:flex}.lg-form{align-items:start;padding-top:12vh}}

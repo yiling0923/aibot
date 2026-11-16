@@ -17,4 +17,15 @@ describe('Login page', () => {
     expect((await screen.findByRole('alert')).textContent).toBe('Wrong username or password.');
     await waitFor(() => expect((screen.getByRole('button', { name: 'Sign in' }) as HTMLButtonElement).disabled).toBe(false));
   });
+
+  it('shows or hides the password, and warns when Caps Lock is on', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => json(401, {})));
+    render(<Login />);
+    const pw = screen.getByLabelText('Password') as HTMLInputElement; expect(pw.type).toBe('password');
+    await userEvent.click(screen.getByRole('button', { name: 'Show the password' })); expect(pw.type).toBe('text');
+    await userEvent.click(screen.getByRole('button', { name: 'Hide the password' })); expect(pw.type).toBe('password');
+    expect(screen.queryByText('Caps Lock is on')).toBeNull();
+    const ev = new KeyboardEvent('keyup', { key: 'a', bubbles: true, modifierCapsLock: true } as KeyboardEventInit);
+    pw.dispatchEvent(ev); expect(await screen.findByText('Caps Lock is on')).toBeTruthy();
+  });
 });
