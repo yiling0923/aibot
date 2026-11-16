@@ -73,7 +73,8 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
     if (!draft || !srv) return;
     const next = clone(draft); const notes: string[] = [];
     fn(next, (t) => notes.push(t));
-    const nc = [...changes, ...notes]; setDraft(next); setChanges(nc); setTestsRun(false); save(next, nc, srv.stamp);
+    const nc = [...changes, ...notes.filter((n, i) => !changes.includes(n) && notes.indexOf(n) === i)];   // the same line is listed once (typing in a box must not add a line for every letter)
+    setDraft(next); setChanges(nc); setTestsRun(false); save(next, nc, srv.stamp);
   }, [draft, changes, srv]);
 
   const setMerchant = (code: string) => {

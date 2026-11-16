@@ -26,7 +26,9 @@ export interface PickTrace {
   amt?: number; acct?: Acct; extra?: string;
 }
 export interface SkippedTrace { kind: 'skipped'; note: string }
-export type Trace = MessageTrace | PickTrace | SkippedTrace;
+/** A reply from a flow (a conversation drawn for a topic): there is no matched answer to show. */
+export interface FlowTrace { kind: 'flow'; flow: number; name: string; topic: string; why: string; step?: string; decision: string }
+export type Trace = MessageTrace | PickTrace | SkippedTrace | FlowTrace;
 
 export interface Button { kind: string; key: string; label: string; amt?: number }
 export interface Turn {

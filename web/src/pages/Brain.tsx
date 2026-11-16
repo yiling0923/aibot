@@ -162,5 +162,6 @@ function MessageBrain({ t }: { t: MessageTrace }) {
 export default function Brain({ trace }: { trace: Trace | null }) {
   if (!trace) return <p className="note">Send a message to see the steps here.</p>;
   if (trace.kind === 'skipped') return <p className="note">{trace.note}</p>;
+  if (trace.kind === 'flow') return <p className="note">Flow “{trace.name}” (topic {trace.topic}){trace.step ? ', waiting at step ' + trace.step : ''}. {trace.why}</p>;
   return trace.kind === 'pick' ? <PickBrain t={trace} /> : <MessageBrain t={trace} />;
 }

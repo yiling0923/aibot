@@ -6,14 +6,14 @@ import { readSnapshot, type Snapshot, type SnapEntry, type SnapSettings, type Wo
 
 /** Publish history is kept per merchant, so every merchant publishes and rolls back on its own.
  *  The word lists shared by all merchants have a history of their own ("shared"). */
-export interface MerchantSlice { kb: SnapEntry[]; mAliases: Snapshot['mAliases'][string]; settings: SnapSettings }
+export interface MerchantSlice { kb: SnapEntry[]; mAliases: Snapshot['mAliases'][string]; settings: SnapSettings; flows?: NonNullable<Snapshot['flows']> }
 export interface SharedSlice { aliases: Words; aspects: Words; smalltalk: Words; guard: Words; fillers: Snapshot['fillers'] }
 export type Scope = { kind: 'merchant'; code: string } | { kind: 'shared' };
 
 const q = async <T extends RowDataPacket = RowDataPacket>(pool: Pool, sql: string, p: unknown[] = []) => (await pool.query<T[]>(sql, p))[0];
 const clone = <T>(o: T): T => JSON.parse(JSON.stringify(o));
 
-export const merchantSlice = (s: Snapshot, code: string): MerchantSlice => ({ kb: s.kb.filter((e) => e.merchant === code), mAliases: s.mAliases[code] ?? [], settings: s.settings[code] });
+export const merchantSlice = (s: Snapshot, code: string): MerchantSlice => ({ kb: s.kb.filter((e) => e.merchant === code), mAliases: s.mAliases[code] ?? [], settings: s.settings[code], flows: (s.flows ?? []).filter((f) => f.merchant === code) });
 export const sharedSlice = (s: Snapshot): SharedSlice => ({ aliases: s.aliases, aspects: s.aspects, smalltalk: s.smalltalk, guard: s.guard, fillers: s.fillers });
 
 /** Puts a saved merchant slice into a snapshot (a copy is returned). */
@@ -21,6 +21,7 @@ export function withMerchantSlice(s: Snapshot, code: string, slice: MerchantSlic
   const out = clone(s);
   out.kb = [...out.kb.filter((e) => e.merchant !== code), ...slice.kb.map((e) => ({ ...e, merchant: code }))];
   out.mAliases[code] = slice.mAliases; out.settings[code] = slice.settings;
+  if (slice.flows) out.flows = [...(out.flows ?? []).filter((f) => f.merchant !== code), ...slice.flows.map((f) => ({ ...f, merchant: code }))];   // a version saved before flows existed leaves the flows as they are
   return out;
 }
 export function withSharedSlice(s: Snapshot, slice: SharedSlice): Snapshot {
@@ -37,6 +38,7 @@ export const merchantSig = (sl: MerchantSlice) => sig({
   kb: sl.kb.map((e) => ({ k: e.intent_key, c: e.category, t: e.topic, a: e.aspect || null, o: !!e.topic_optional, s: e.status,
     tr: Object.fromEntries(Object.entries(e.translations).filter(([, t]) => t && ((t.answer_text || '').trim() || (t.question_examples || []).length))) })).sort((a, b) => (a.k < b.k ? -1 : 1)),
   m: sl.mAliases.map((a) => `${a.language}|${a.variant}|${a.canonical}`).sort(),
+  fl: (sl.flows ?? []).map((f) => ({ n: f.name, t: f.topic, s: f.status, b: f.blocks })).sort((a, b) => (a.n < b.n ? -1 : 1)),
   s: { ...sl.settings, kind: texts(sl.settings?.kind), closing: texts(sl.settings?.closing), handoff: texts(sl.settings?.handoff), more_help: texts(sl.settings?.more_help) },
 });
 export const sharedSig = (sl: SharedSlice) => sig({ a: words(sl.aliases), s: words(sl.aspects), t: words(sl.smalltalk), g: words(sl.guard), f: words(sl.fillers) });

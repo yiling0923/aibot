@@ -40,6 +40,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
     : url.startsWith('/api/admin/report') ? REPORT
+    : url.startsWith('/api/admin/flows/try') ? { messages: ['Hello from the flow'], buttons: null, state: null, handed: false, done: true }
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
     : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : [])));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
@@ -255,6 +256,32 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByLabelText('Delete answer temp_one'));
     expect(screen.queryByText('temp_one')).toBeNull();
     yes.mockRestore();
+  });
+  it('draws a flow: steps, choices, readiness check, and it goes into the draft', async () => {
+    open('staff', '/admin/flows');
+    await userEvent.click(await screen.findByRole('button', { name: /New flow/ }));
+    expect(await screen.findByLabelText('Flow editor')).toBeTruthy();
+    expect(screen.getByText(/The flow has no steps yet/)).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('Topic it is for'), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: /＋ Question/ }));
+    await userEvent.type(screen.getByLabelText('Text of step 1'), 'What do you need?');
+    await userEvent.type(screen.getByLabelText('Choice 1 of step 1'), 'Limits');
+    await userEvent.type(screen.getByLabelText('Choice 2 of step 1'), 'Late deposit');
+    await userEvent.click(screen.getByRole('button', { name: /＋ Hand to a person/ }));
+    await userEvent.selectOptions(screen.getByLabelText('Status'), 'live');
+    expect(screen.getByText(/✓ Ready/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Publish/ })).toBeTruthy();
+    await userEvent.click(screen.getByLabelText('Delete step 2'));
+    expect(screen.queryByLabelText('Text of step 2')).toBeNull();
+  });
+  it('tries a flow in the box beside the editor', async () => {
+    open('staff', '/admin/flows');
+    await userEvent.click(await screen.findByRole('button', { name: /New flow/ }));
+    await userEvent.selectOptions(screen.getByLabelText('Topic it is for'), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: /＋ Message/ }));
+    await userEvent.type(screen.getByLabelText('Text of step 1'), 'Hello from the flow');
+    await userEvent.click(within(screen.getByLabelText('Try the flow')).getByRole('button', { name: /Start/ }));
+    expect(await within(screen.getByLabelText('Flow chat')).findByText('Hello from the flow')).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

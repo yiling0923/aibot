@@ -37,6 +37,7 @@ export const ChgPill = ({ c }: { c: number }) => <span className={'pill ' + (c >
 const ICONS: Record<string, ReactNode> = {
   users: <><circle cx="9" cy="8" r="3.5" /><path d="M2.5 20c.6-3.5 3.2-5.5 6.5-5.5s5.9 2 6.5 5.5" /><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.7c2 .7 3.2 2.6 3.5 5.3" /></>,
   kb: <><path d="M4 5a2 2 0 0 1 2-2h12v16H6a2 2 0 0 0-2 2z" /><path d="M4 21V5" /><path d="M9 8h6" /></>,
+  flows: <><circle cx="5" cy="6" r="2.2" /><circle cx="19" cy="6" r="2.2" /><circle cx="12" cy="18" r="2.2" /><path d="M7 6h10M6.2 8l4.6 8M17.8 8l-4.6 8" /></>,
   imp: <><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></>,
   kw: <><path d="M20 12 12 20 4 12V4h8z" /><circle cx="8.5" cy="8.5" r="1" /></>,
   store: <path d="M4 6h16M4 12h16M4 18h10" />,
