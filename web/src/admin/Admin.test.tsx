@@ -232,6 +232,15 @@ describe('Control panel', () => {
     expect(screen.getByText(/Before the bot can use this answer/)).toBeTruthy();                // the checklist shows what is missing
     expect(screen.getByText(/no example questions/i)).toBeTruthy();
   });
+  it('folds the blocks panel away and brings it back', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    expect(screen.getByLabelText('Blocks')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /Hide blocks/ }));
+    expect(screen.queryByLabelText('Blocks')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Show blocks/ }));
+    expect(screen.getByLabelText('Blocks')).toBeTruthy();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

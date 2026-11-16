@@ -44,6 +44,8 @@ export default function TopicFlow() {
   const [hoTopics, setHoTopicsState] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem('flowho2') || '[]')); } catch { return new Set<string>(); } });   // topics that show their "If not clear" card (it is the same for every topic, so they start hidden)
   const setHoTopics = (n: Set<string>) => { setHoTopicsState(n); try { localStorage.setItem('flowho2', JSON.stringify([...n])); } catch { /* ignore */ } };
   const showHoFor = (t: string) => hoTopics.has(t);
+  const [pal, setPalState] = useState(() => { try { return localStorage.getItem('flowpal') !== '0'; } catch { return true; } });   // the Add-a-block panel on the left can be folded away
+  const setPal = (v: boolean) => { setPalState(v); try { localStorage.setItem('flowpal', v ? '1' : '0'); } catch { /* ignore */ } setTimeout(() => fit(), 50); };
   const [kwq, setKwq] = useState<Record<string, string>>({});                // the filter typed on each keywords card
   const [scale, setScale] = useState(1);
   const [link, setLink] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
@@ -183,12 +185,12 @@ export default function TopicFlow() {
   return <div className="flow" data-testid="flow">
     <div className="flowbar">
       <span className="sub">Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.</span>
-      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button><label className="tog" style={{ padding: 0 }} title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" checked={topics.length > 0 && topics.every(showHoFor)} onChange={(e) => setHoTopics(e.target.checked ? new Set(topics) : new Set())} /> Show “If not clear” on all</label>
+      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button><button type="button" className="btn sm" aria-pressed={!pal} onClick={() => setPal(!pal)} title="Fold the blocks panel away to give the chart the full width">{pal ? '◀ Hide blocks' : '▶ Show blocks'}</button><label className="tog" style={{ padding: 0 }} title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" checked={topics.length > 0 && topics.every(showHoFor)} onChange={(e) => setHoTopics(e.target.checked ? new Set(topics) : new Set())} /> Show “If not clear” on all</label>
         <button type="button" className="btn sm" aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(2)))}>−</button><span className="zoomv">{Math.round(scale * 100)}%</span>
         <button type="button" className="btn sm" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(1.5, +(s + 0.1).toFixed(2)))}>＋</button></span>
     </div>
-    <div className="flowwrap">
-      <aside className="flowpal" aria-label="Blocks">
+    <div className={'flowwrap' + (pal ? '' : ' nopal')}>
+      {pal && <aside className="flowpal" aria-label="Blocks">
         <h4>Add a block</h4>
         <button type="button" className="ftile t-tp" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'topic')} onClick={() => addBlock('topic')}><i>◆</i><span><b>Topic</b><small>what the customer wants</small></span></button>
         <button type="button" className="ftile t-kw" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'keyword')} onClick={() => addBlock('keyword')}><i>#</i><span><b>Keyword</b><small>a word that means a topic</small></span></button>
@@ -197,7 +199,7 @@ export default function TopicFlow() {
         <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => nav('/admin/kb')}>Open Knowledge base →</button>
         {unset.length > 0 && <><h4 style={{ marginTop: 14 }}>Words not set yet</h4><div className="sub" style={{ marginBottom: 6 }}>Drag onto a topic</div>
           <div className="chips">{unset.map((r) => <span key={r.w} className="chip ro" draggable onDragStart={(e) => { e.dataTransfer.setData(MIME, JSON.stringify({ t: 'word', w: r.w } as Src)); }}>{r.w}<span className="n">{r.n}</span></span>)}</div></>}
-      </aside>
+      </aside>}
       <div className="flowcanvas" ref={canvas} onDragOver={onCanvasOver} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(null); }} onDrop={onCanvasDrop}>
         <div style={{ width: width * scale, height: height * scale }}>
           <div className="flowinner" style={{ position: 'relative', width, height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>

@@ -484,3 +484,5 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .card>.kwstats{margin-top:10px}
 
 .lane.over{background:color-mix(in srgb,var(--accent) 9%,transparent);outline:2px dashed var(--accent);outline-offset:-2px}
+
+.flowwrap.nopal{grid-template-columns:minmax(0,1fr)}
