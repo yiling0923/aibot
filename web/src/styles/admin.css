@@ -550,3 +550,5 @@ tr.row{cursor:pointer}
 .lcpick{display:flex;align-items:center;gap:8px;margin-top:6px;font-size:12.5px;background:var(--surface2);border-radius:10px;padding:5px 10px;width:fit-content}.lcpick .x{border:0;background:none;cursor:pointer;color:var(--muted);font-size:16px}.lcpick .x:hover{color:var(--bad)}
 
 .lcin{align-items:center}.lcin .ibtn{flex:none;width:40px;height:40px}
+
+.kwall2{margin:2px 2px 8px}.kwn.zero{color:var(--muted);font-weight:500}

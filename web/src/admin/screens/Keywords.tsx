@@ -6,6 +6,7 @@ import { IconBtn, Pill } from '../ui';
 import { KeywordDrawer, SetKeywordModal } from './KeywordModals';
 import { useAssign } from './assign';
 
+const FOLDK = 12;                                                             // words shown in a column before "+N more"
 const OTHER_GROUPS: { label: string; test: (t: string) => boolean }[] = [
   { label: 'Rude words', test: (t) => t.startsWith('Rude') }, { label: 'Question words', test: (t) => t.startsWith('Question word') },
   { label: 'Fillers', test: (t) => t === 'Filler' }, { label: 'Greetings', test: (t) => t.startsWith('Greeting') },
@@ -19,14 +20,25 @@ export default function Keywords() {
   const [topic, setTopic] = useState(''); const [busy, setBusy] = useState(false);
   const [setFor, setSetFor] = useState<{ w: string; preset?: string } | null>(null); const [drawer, setDrawer] = useState<string | null>(null);
 
+  const [view, setViewState] = useState<'list' | 'main'>(() => { try { return localStorage.getItem('keywordsView') === 'main' ? 'main' : 'list'; } catch { return 'list'; } });
+  const setView = (v: 'list' | 'main') => { setViewState(v); try { localStorage.setItem('keywordsView', v); } catch { /* ignore */ } };
+  const [showAll, setShowAllState] = useState(() => { try { return localStorage.getItem('kwShowAll') === '1'; } catch { return false; } });   // also show the words of each main keyword that nobody has typed yet
+  const setShowAll = (v: boolean) => { setShowAllState(v); try { localStorage.setItem('kwShowAll', v ? '1' : '0'); } catch { /* ignore */ } };
+  const [more, setMore] = useState<Set<string>>(new Set());                          // columns opened to show every word
   const all = p.kw.map((k) => ({ ...k, st: p.status(k.w), ignored: p.ignored.has(k.w) }));
   const inTab = (r: (typeof all)[number], t: string) => t === 'all' || (t === 'ignored' ? r.ignored : t === 'unassigned' ? !r.ignored && r.st.t === 'Not set yet' : !r.ignored && r.st.t !== 'Not set yet');
   const counts = Object.fromEntries(TABS.map(([k]) => [k, all.filter((r) => inTab(r, k)).length]));
   const Q = q.trim().toLowerCase();
-  const list = all.filter((r) => inTab(r, tab) && (!Q || r.w.toLowerCase().includes(Q) || r.h.toLowerCase().includes(Q)) && (lang === 'all' || r.lg === lang))
+  // the words each main keyword knows but no customer has typed: shown with 0 when asked (in the "by main keyword" view only)
+  const heard = new Set(all.map((r) => r.w.toLowerCase())); const seen = new Set<string>();
+  const topicsAll = topicNames(p.draft, p.merchant);
+  const synth = (showAll && view === 'main' ? topicsAll.flatMap((tp) => [
+    ...Object.entries(p.draft.aliases[tp] ?? {}).flatMap(([l, ws]) => ws.map((w) => [w, l] as const)),
+    ...(p.draft.mAliases[p.merchant] ?? []).filter((a) => a.canonical === tp).map((a) => [a.variant, a.language] as const),
+  ]) : []).filter(([w]) => { const k = w.toLowerCase(); if (heard.has(k) || seen.has(k)) return false; seen.add(k); return true; })
+    .map(([w, l]) => ({ w, lg: l, n: 0, ignored: false, h: '', isNew: false, lastTs: 0, st: p.status(w) }) as unknown as (typeof all)[number]);
+  const list = [...all, ...synth].filter((r) => inTab(r, tab) && (!Q || r.w.toLowerCase().includes(Q) || r.h.toLowerCase().includes(Q)) && (lang === 'all' || r.lg === lang))
     .sort((a, b) => (b.lastTs || 0) - (a.lastTs || 0) || b.n - a.n || a.w.localeCompare(b.w));
-  const [view, setViewState] = useState<'list' | 'main'>(() => { try { return localStorage.getItem('keywordsView') === 'main' ? 'main' : 'list'; } catch { return 'list'; } });
-  const setView = (v: 'list' | 'main') => { setViewState(v); try { localStorage.setItem('keywordsView', v); } catch { /* ignore */ } };
   const allSel = list.length > 0 && list.every((r) => sel.has(r.w));
   const topics = topicNames(p.draft, p.merchant); const topicNow = topics.includes(topic) ? topic : topics[0];
   const toggle = (w: string, on: boolean) => setSel((s) => { const n = new Set(s); if (on) n.add(w); else n.delete(w); return n; });
@@ -69,9 +81,10 @@ export default function Keywords() {
   const wordRow = (r: Row, mx: number, tag?: string): ReactNode => <div className="kwrow" key={r.w}>
     <label><input type="checkbox" checked={sel.has(r.w)} aria-label={'Select ' + r.w} onChange={(e) => toggle(r.w, e.target.checked)} />
       {r.isNew ? <Pill c="info">New</Pill> : null}<span className="kwlink" onClick={() => setDrawer(r.w)}>{r.w}</span>{tag && <span className="lang">{tag}</span>}</label>
-    <div className="kwbar"><i style={{ width: Math.max(8, Math.round((r.n * 100) / mx)) + '%' }} /></div><b className="kwn" title="times heard">{r.n}</b></div>;
+    <div className="kwbar">{r.n > 0 && <i style={{ width: Math.max(8, Math.round((r.n * 100) / mx)) + '%' }} />}</div><b className={'kwn' + (r.n ? '' : ' zero')} title={r.n ? 'times heard' : 'nobody has typed this yet'}>{r.n}</b></div>;
   const mainView = (
     <>
+      <label className="switch kwall2"><input type="checkbox" role="switch" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /><span className="track"><span className="thumb" /></span> Also show the words nobody has typed yet</label>
       <div className="kwlegend">{KW_KINDS.map((k) => <span key={k}><i className={KSHADE[k]} />{KW_LABEL[k]}</span>)}<span className="sub">The bar on each main keyword shows how much of the typing came from each group.</span></div>
       {sel.size > 0 && <div className="card">{bulkBar}</div>}
       {byTopic.map(({ tp, rows }) => {
@@ -85,7 +98,8 @@ export default function Keywords() {
               <span className="kwtotal"><b>{total}</b> times heard</span></div>
             <div className="kwcols">{KW_KINDS.map((k) => { const g = groups.find((x) => x.kind === k); const mx = Math.max(1, ...(g?.items.map((x) => x.row.n) ?? [1]));
               return <div className={'kwcol ' + KSHADE[k]} key={k}><div className="kwcolh"><span>{KW_LABEL[k]}</span><em>{g?.items.length ?? 0}</em></div>
-                {g ? g.items.map((x) => wordRow(x.row, mx, k === 'lang' ? (LN[x.row.lg] ?? x.row.lg) : undefined)) : <div className="sub">none heard</div>}</div>; })}</div>
+                {g ? (more.has(tp + k) || g.items.length <= FOLDK + 2 ? g.items : g.items.slice(0, FOLDK)).map((x) => wordRow(x.row, mx, k === 'lang' ? (LN[x.row.lg] ?? x.row.lg) : undefined)) : <div className="sub">none heard</div>}
+                {g && g.items.length > FOLDK + 2 && <button type="button" className="btn sm ghost" onClick={() => setMore((o) => { const n = new Set(o); if (n.has(tp + k)) n.delete(tp + k); else n.add(tp + k); return n; })}>{more.has(tp + k) ? 'show fewer' : '+' + (g.items.length - FOLDK) + ' more'}</button>}</div>; })}</div>
             {main && <div className="sub kwmainw">The main word “{tp}” itself was heard {main.r.n} times.</div>}
           </div>
         );

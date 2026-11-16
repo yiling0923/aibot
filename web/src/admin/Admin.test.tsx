@@ -338,6 +338,16 @@ describe('Control panel', () => {
     const list = await screen.findByLabelText('Files LiveChat accepts, checked now');
     expect(within(list).getByText(/WebP picture/)).toBeTruthy(); expect(within(list).getByText(/Send one of the accepted kinds/)).toBeTruthy();
   });
+  it('Keywords by main keyword: can also show the words of a topic that nobody has typed yet', async () => {
+    open('staff', '/admin/store');
+    await userEvent.click(await screen.findByText('By main keyword'));
+    expect(screen.queryByText('dps')).toBeNull();                                               // nobody typed "dps"
+    await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
+    expect(await screen.findByText('dps')).toBeTruthy();
+    expect(screen.getAllByTitle('nobody has typed this yet').length).toBeGreaterThan(0);
+    await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
+    expect(screen.queryByText('dps')).toBeNull();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
