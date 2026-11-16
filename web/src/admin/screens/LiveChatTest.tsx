@@ -11,6 +11,7 @@ function Attached({ a }: { a: Attachment }) {
   const isImg = (a.kind === 'image' || a.mimeType.startsWith('image/')) && !bad;
   return isImg
     ? <a className="lcpic" href={a.url} target="_blank" rel="noreferrer" title={'Open ' + a.name}><img src={a.url} alt={a.name} loading="lazy" onError={() => setBad(true)} /><span className="sub">{a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span></a>
+    : !a.url ? <span className="lcfile">📎 {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span>
     : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer">📎 {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' (the picture could not be loaded here)' : ''}</a>;
 }
 interface Result { conversationId: string | null; status: string | null; handoff: string | null; messages: Line[]; replied: boolean }
@@ -30,6 +31,7 @@ export default function LiveChatTest() {
   const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => store('lcMid', 'tom8841'));
   const [mname, setMname] = useState(() => store('lcMname', 'Tom')); const [mrank, setMrank] = useState(() => store('lcMrank', 'GOLD'));
   const [lines, setLines] = useState<Line[]>([]); const [info, setInfo] = useState<{ status: string | null; handoff: string | null }>({ status: null, handoff: null });
+  const [pick, setPick] = useState<File | null>(null); const fileIn = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [showSet, setShowSet] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView?.({ block: 'end' }); }, [lines, busy]);
@@ -56,7 +58,27 @@ export default function LiveChatTest() {
     return () => clearInterval(t);
   }, []);
 
+  const MAX_FILE = 10 * 1024 * 1024; const OK_TYPE = /^(image\/(jpeg|png|gif|webp|heic|bmp)|application\/pdf|text\/plain|text\/csv|application\/(msword|vnd\.ms-excel|vnd\.openxmlformats-officedocument\..+))$/;
+  const choose = (f: File | null | undefined) => {
+    if (!f) return;
+    if (f.size > MAX_FILE) { setErr('That file is too big (the most is 10 MB).'); return; }
+    if (!OK_TYPE.test(f.type)) { setErr('This kind of file is not allowed here. Use a picture, a PDF, a text file or an Office document.'); return; }
+    setErr(''); setPick(f);
+  };
+  const toBase64 = (f: File) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error('Could not read the file.')); r.readAsDataURL(f); });
+  const sendFile = async () => {
+    const f = pick; if (busy || !f) return; const caption = text.trim();
+    keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
+    setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: caption || f.name, attachment: f.type.startsWith('image/') ? { kind: 'image', name: f.name, url: URL.createObjectURL(f), mimeType: f.type, size: f.size } : { kind: 'file', name: f.name, url: '', mimeType: f.type, size: f.size } }]);
+    setPick(null); setText(''); setBusy(true); setErr('');
+    try {
+      const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
+      setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
+      if (!r.replied) setErr('LiveChat has not answered yet. Press Send with an empty box to look again.');
+    } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
+  };
   const send = () => {
+    if (pick) { void sendFile(); return; }
     const t = text.trim(); if (busy || !t) return;
     keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: t }]); setText(''); void call(t);
@@ -83,8 +105,11 @@ export default function LiveChatTest() {
       {err && <div className="note" style={{ background: 'var(--badbg)', marginTop: 8 }}>{err}</div>}
       <div className="lcstat sub">{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input aria-label="Message" value={text} placeholder="Type a customer message" onChange={(e) => setText(e.target.value)} disabled={busy} />
-        <button className="btn pri" type="submit" disabled={busy || !text.trim()}>{busy ? 'Waiting…' : 'Send'}</button></form>
+        <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/*,application/pdf,.txt,.csv,.doc,.docx,.xls,.xlsx" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
+        <button className="btn" type="button" aria-label="Attach a picture or file" title="Attach a picture or file" disabled={busy} onClick={() => fileIn.current?.click()}>📎</button>
+        <input aria-label="Message" value={text} placeholder={pick ? 'Add a line to go with it (optional)' : 'Type a customer message'} onChange={(e) => setText(e.target.value)} disabled={busy} />
+        <button className="btn pri" type="submit" disabled={busy || (!text.trim() && !pick)}>{busy ? 'Waiting…' : 'Send'}</button></form>
+      {pick && <div className="lcpick"><span>📎 {pick.name} · {kb(pick.size)}</span><button type="button" className="x" aria-label="Remove the file" onClick={() => setPick(null)}>×</button></div>}
     </div>
   );
 }

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
@@ -309,6 +309,17 @@ describe('Control panel', () => {
       { from: 'agent', sender: 'operator', text: 'terms.pdf', attachment: { kind: 'file', name: 'terms.pdf', url: 'http://lc.test/uploads/t.pdf', mimeType: 'application/pdf', size: 2048 } }] as never;
     const img = await screen.findByAltText('MMU.JPG'); expect((img as HTMLImageElement).src).toBe('http://lc.test/uploads/a.jpg');
     expect((screen.getByText(/terms\.pdf/).closest('a') as HTMLAnchorElement).href).toBe('http://lc.test/uploads/t.pdf');
+  });
+  it('LiveChat test: attaches a picture (shown before sending), refuses a wrong kind, and sends it with Send', async () => {
+    open('admin', '/admin/lchat');
+    const input = await screen.findByLabelText('Choose a picture or file');
+    await userEvent.upload(input, new File(['x'.repeat(2048)], 'slip.png', { type: 'image/png' }));
+    expect(screen.getByText(/slip\.png · 2 KB/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(false);                 // a file alone is enough
+    await userEvent.click(screen.getByRole('button', { name: 'Remove the file' }));
+    expect(screen.queryByText(/slip\.png · 2 KB/)).toBeNull();
+    fireEvent.change(input, { target: { files: [new File(['x'], 'run.exe', { type: 'application/x-msdownload' })] } });
+    expect(await screen.findByText(/This kind of file is not allowed here/)).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

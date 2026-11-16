@@ -10,7 +10,12 @@ export interface ChatOpts {
   /** How long to wait for the bot's reply, in milliseconds. */ waitMs?: number; pollMs?: number;
   /** Who the customer is: a logged-in member (as the website would send it), or null for a customer who is not logged in. Missing: a sample member. */
   member?: { id: string; name: string; rank?: string } | null;
+  /** A picture or a file the customer attaches (sent like the website widget sends one). */
+  file?: { name: string; type: string; data: Uint8Array };
 }
+
+/** The field names tried, in this order, for the file in the upload (LiveChat answers 400, 415 or 422 when the name is not the one it reads). */
+export const FILE_FIELDS = ['file', 'attachment', 'image'];
 
 const kindOf = (sender: string): ChatLine['from'] => (/visitor|customer|member|user/i.test(sender) ? 'customer' : /agent|staff|human|operator/i.test(sender) ? 'agent' : /system|event/i.test(sender) ? 'system' : 'bot');
 
@@ -42,12 +47,30 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
   const cur = (await call(`/widget/conversations/current?${q}`, 'GET', undefined, true))?.conversation;
   let id: string | null = cur?.publicId ?? null;
   const text = (o.text ?? '').trim();
-  if (!text) return id ? result(id, await read(id), false) : { conversationId: null, status: null, handoff: null, messages: [], replied: false };
+  if (!text && !o.file) return id ? result(id, await read(id), false) : { conversationId: null, status: null, handoff: null, messages: [], replied: false };
 
   const before = id ? lines(await read(id)).filter((m) => m.from !== 'customer').length : 0;
   const who = o.member === undefined ? { id: 'm-100', name: 'Tester', rank: 'GOLD' } : o.member;       // null: not logged in, so no member fields are sent
   const msg = { visitor_session_id: o.visitor, visitor_name: who?.name ?? 'Guest', body: text, ...(who ? { member_external_id: who.id, member_name: who.name, ...(who.rank ? { member_rank: who.rank } : {}) } : {}) };
-  if (id) await call(`/widget/conversations/${encodeURIComponent(id)}/messages`, 'POST', msg);
+  // A file goes as a form (multipart), the way a browser uploads it. If LiveChat does not read the field name, the next name is tried (only after a 400, 415 or 422, so nothing is sent twice).
+  const upload = async (path: string): Promise<Record<string, any> | null> => {                                      // eslint-disable-line @typescript-eslint/no-explicit-any
+    const file = o.file!; let last = '';
+    for (const field of FILE_FIELDS) {
+      const form = new FormData();
+      for (const [k, v] of Object.entries(msg)) if (k !== 'body' || text) form.append(k, String(v));
+      if (!text) form.append('body', file.name);
+      form.append(field, new Blob([file.data as unknown as ArrayBuffer], { type: file.type }), file.name);
+      let r: Response;
+      try { r = await f(base + path, { method: 'POST', headers: { 'X-Tenant-ID': o.tenant }, body: form, signal: AbortSignal.timeout(30_000) }); }
+      catch { throw new Error(`Could not reach LiveChat at ${base}. Is it running?`); }
+      if (r.ok) return (await r.json().catch(() => null)) as Record<string, any> | null;                            // eslint-disable-line @typescript-eslint/no-explicit-any
+      last = `${r.status} ${(await r.text().catch(() => '')).slice(0, 300)}`.trim();
+      if (![400, 415, 422].includes(r.status)) break;
+    }
+    throw new Error(`LiveChat did not accept the file (${last}). Tried the form fields: ${FILE_FIELDS.join(', ')}. Tell the developer this message so the upload can be matched to LiveChat.`);
+  };
+  if (o.file) { if (id) await upload(`/widget/conversations/${encodeURIComponent(id)}/messages`); else id = (await upload('/widget/conversations'))?.conversation?.publicId ?? null; }
+  else if (id) await call(`/widget/conversations/${encodeURIComponent(id)}/messages`, 'POST', msg);
   else id = (await call('/widget/conversations', 'POST', msg))?.conversation?.publicId ?? null;
   if (!id) throw new Error('LiveChat did not start a chat. Check the tenant id.');
 

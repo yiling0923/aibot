@@ -10,16 +10,27 @@ import { buildApp } from '../src/server/app';
 import { chatThroughLiveChat } from '../src/livechat/chat';
 
 /** A small stand-in for LiveChat's website widget API: it starts chats, takes visitor messages and answers like the bot does after a moment. */
-function fakeLiveChat(opts: { replyAfterMs?: number | null } = {}) {
+function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string } = {}) {
   const chats = new Map<string, { visitor: string; status: string; messages: { senderType: string; body: string }[] }>(); let n = 0;
-  const calls: string[] = []; const posts: Record<string, unknown>[] = [];
+  const calls: string[] = []; const posts: Record<string, unknown>[] = []; const uploads: { field: string; name: string; fields: string[] }[] = [];
   const srv = http.createServer((req, res) => {
     let raw = ''; req.on('data', (c) => (raw += c)); req.on('end', () => {
       const url = new URL(req.url!, 'http://x'); calls.push(req.method + ' ' + url.pathname);
       const send = (code: number, j: unknown) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(j)); };
       if (req.headers['x-tenant-id'] !== '1') return send(404, { error: 'unknown tenant' });
-      const body = raw ? JSON.parse(raw) : {}; if (req.method === 'POST') posts.push(body); const view = (id: string) => { const c = chats.get(id)!; return { publicId: id, status: c.status, aiHandoffStatus: 'none', messages: c.messages }; };
+      const isForm = String(req.headers['content-type']).startsWith('multipart/form-data');
+      const body = raw && !isForm ? JSON.parse(raw) : {}; if (req.method === 'POST' && !isForm) posts.push(body); const view = (id: string) => { const c = chats.get(id)!; return { publicId: id, status: c.status, aiHandoffStatus: 'none', messages: c.messages }; };
       const reply = (id: string, q: string) => { if (opts.replyAfterMs === null) return; setTimeout(() => chats.get(id)?.messages.push({ senderType: 'ai', body: 'Bot says: ' + q }), opts.replyAfterMs ?? 150); };
+      if (req.method === 'POST' && String(req.headers['content-type']).startsWith('multipart/form-data')) {          // an upload: read the form
+        const part = /name="([^"]+)"; filename="([^"]+)"/.exec(raw); const fields = [...raw.matchAll(/name="([^"]+)"(?!; filename)/g)].map((x) => x[1]);
+        if (!part || part[1] !== (opts.fileField ?? 'file')) return send(422, { error: 'the file field must be called ' + (opts.fileField ?? 'file') });
+        uploads.push({ field: part[1], name: part[2], fields });
+        const form = (n: string) => new RegExp('name="' + n + '"\\r\\n\\r\\n([^\\r]*)').exec(raw)?.[1] ?? '';
+        const vis = form('visitor_session_id'); let id = [...chats].find(([, c]) => c.visitor === vis)?.[0];
+        if (!id) { id = 'conv-' + ++n; chats.set(id, { visitor: vis, status: 'open', messages: [] }); }
+        chats.get(id)!.messages.push({ senderType: 'visitor', body: form('body'), messageType: 'image', attachment: { kind: 'image', name: part[2], url: '/uploads/x.png', mimeType: 'image/png', size: 4 } } as never);
+        reply(id, form('body')); return send(200, { conversation: view(id) });
+      }
       if (url.pathname === '/widget/conversations/current') { const v = url.searchParams.get('visitor_session_id'); const id = [...chats].find(([, c]) => c.visitor === v)?.[0]; return id ? send(200, { conversation: view(id) }) : send(404, { error: 'none' }); }
       if (url.pathname === '/widget/conversations' && req.method === 'POST') { const id = 'conv-' + ++n; chats.set(id, { visitor: body.visitor_session_id, status: 'open', messages: [{ senderType: 'visitor', body: body.body }] }); reply(id, body.body); return send(200, { conversation: view(id) }); }
       const m = /^\/widget\/conversations\/([^/]+)(\/messages)?$/.exec(url.pathname);
@@ -30,7 +41,7 @@ function fakeLiveChat(opts: { replyAfterMs?: number | null } = {}) {
       send(404, {});
     });
   });
-  return new Promise<{ base: string; calls: string[]; posts: Record<string, unknown>[]; chats: typeof chats; close: () => void }>((ok) => srv.listen(0, '127.0.0.1', () => ok({ base: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, calls, posts, chats, close: () => srv.close() })));
+  return new Promise<{ base: string; calls: string[]; uploads: typeof uploads; posts: Record<string, unknown>[]; chats: typeof chats; close: () => void }>((ok) => srv.listen(0, '127.0.0.1', () => ok({ base: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, calls, uploads, posts, chats, close: () => srv.close() })));
 }
 
 describe('chatting through a LiveChat', () => {
@@ -48,6 +59,21 @@ describe('chatting through a LiveChat', () => {
     lc.close();
   });
 
+  it('sends a picture as a form, tries the next field name when LiveChat does not read the first, and the bot answers', async () => {
+    const lc = await fakeLiveChat({ fileField: 'attachment' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-up', pollMs: 40, waitMs: 3000 };
+    const r = await chatThroughLiveChat({ ...o, file: { name: 'slip.png', type: 'image/png', data: new Uint8Array([137, 80, 78, 71]) } });
+    expect(lc.uploads).toHaveLength(1); expect(lc.uploads[0]).toMatchObject({ field: 'attachment', name: 'slip.png' });        // 'file' was refused with 422, 'attachment' was accepted
+    expect(lc.uploads[0].fields).toEqual(expect.arrayContaining(['visitor_session_id', 'body', 'member_external_id']));
+    expect(r.replied).toBe(true); expect(r.messages[0]).toMatchObject({ from: 'customer', text: 'slip.png', attachment: { name: 'slip.png', url: lc.base + '/uploads/x.png' } });
+    lc.close();
+  });
+  it('says what LiveChat answered when no field name works, and does not retry on other errors', async () => {
+    const lc = await fakeLiveChat({ fileField: 'nothing-we-try' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-up2', pollMs: 40, waitMs: 500 };
+    await expect(chatThroughLiveChat({ ...o, file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } })).rejects.toThrow(/did not accept the file \(422.*Tried the form fields: file, attachment, image/s);
+    const wrongTenant = await chatThroughLiveChat({ ...o, tenant: '9', file: { name: 'a.png', type: 'image/png', data: new Uint8Array([1]) } }).catch((e: Error) => e.message);
+    expect(String(wrongTenant)).toMatch(/404/);                                                                                  // a 404 is not retried with another field name
+    lc.close();
+  });
   it('reads a picture an agent sent: the link is completed with the LiveChat address, and only safe links are kept', async () => {
     const lc = await fakeLiveChat(); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-pic', pollMs: 40, waitMs: 3000 };
     await chatThroughLiveChat({ ...o, text: 'hi' });
@@ -104,6 +130,19 @@ describe.skipIf(!reachable)('the LiveChat test route (needs TEST_DATABASE_URL)',
     expect(ok.statusCode).toBe(200); expect(ok.json().replied).toBe(true); expect(ok.json().messages.map((m: { from: string }) => m.from)).toEqual(['customer', 'bot']);
     const down = await post(admin, { baseUrl: 'http://127.0.0.1:1', visitor: 'vis-route-1', text: 'hi' });
     expect(down.statusCode).toBe(502); expect(down.json().error).toMatch(/Could not reach LiveChat/);
+    lc.close();
+  });
+
+  it('takes a picture as text (base64), refuses a wrong kind or a too big file, and passes a good one to LiveChat', async () => {
+    const lc = await fakeLiveChat(); const png = Buffer.from([137, 80, 78, 71, 1, 2, 3]).toString('base64');
+    const f = (file: object) => post(admin, { baseUrl: lc.base, visitor: 'vis-route-up', text: '', file });
+    expect((await f({ name: 'run.exe', type: 'application/x-msdownload', data: png })).statusCode).toBe(400);
+    expect((await f({ name: 'a.png', type: 'image/png', data: '' })).statusCode).toBe(400);
+    expect((await f({ name: 'big.png', type: 'image/png', data: Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64') })).statusCode).toBe(400);
+    expect((await post(staff, { baseUrl: lc.base, visitor: 'vis-route-up', file: { name: 'a.png', type: 'image/png', data: png } })).statusCode).toBe(403);
+    const ok = await f({ name: '../../evil slip.png', type: 'image/png', data: png });
+    expect(ok.statusCode).toBe(200); expect(lc.uploads[0].name).toBe('.._.._evil slip.png');                              // a path in the name is made harmless
+    expect(ok.json().messages[0].attachment).toMatchObject({ name: '.._.._evil slip.png', mimeType: 'image/png' });
     lc.close();
   });
 });
