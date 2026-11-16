@@ -499,3 +499,16 @@ tr.row{cursor:pointer}
 .fc .bd{font-size:12.5px;padding:8px 11px 10px}.fc .hd{font-size:10.5px;padding:6px 11px}.fc .nm{font-size:13px}.fc .pv{font-size:11.5px}.fc.tp .big{font-size:18px}
 .kc{font-size:12.5px;padding:3px 5px 3px 10px;margin:0 5px 5px 0}.kc .x{font-size:14px}.kadd{font-size:12px;padding:4px 11px}
 .fc .badge{font-size:10px}.fc .btn.sm{font-size:12px}
+
+/* flowchart toolbar */
+.flowbar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:8px 10px 8px 16px;gap:10px 16px}
+.flowbar .hint{color:var(--muted);font-size:12.5px;flex:1 1 260px;min-width:0}
+.flowtools{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.tbtn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:6px 11px;font:inherit;font-size:12.5px;font-weight:600;color:var(--fg);cursor:pointer}
+.tbtn svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;color:var(--muted)}
+.tbtn:hover{background:var(--surface2)}.tbtn.on{border-color:var(--accent);color:var(--accent)}.tbtn.on svg{color:var(--accent)}
+.tdiv{width:1px;height:22px;background:var(--line);margin:0 6px}
+.flowtools .switch{font-size:12.5px}
+.zoom{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.zoom button{border:0;background:var(--surface);width:30px;height:30px;font-size:16px;cursor:pointer;color:var(--fg)}.zoom button:hover{background:var(--surface2)}
+.zoom .zoomv{min-width:50px;text-align:center;font-weight:600;font-size:12.5px;border-left:1px solid var(--line);border-right:1px solid var(--line);line-height:30px}

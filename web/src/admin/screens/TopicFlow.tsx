@@ -184,10 +184,16 @@ export default function TopicFlow() {
 
   return <div className="flow" data-testid="flow">
     <div className="flowbar">
-      <span className="sub">Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.</span>
-      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button><button type="button" className="btn sm" aria-pressed={!pal} onClick={() => setPal(!pal)} title="Fold the blocks panel away to give the chart the full width">{pal ? '◀ Hide blocks' : '▶ Show blocks'}</button><label className="tog" style={{ padding: 0 }} title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" checked={topics.length > 0 && topics.every(showHoFor)} onChange={(e) => setHoTopics(e.target.checked ? new Set(topics) : new Set())} /> Show “If not clear” on all</label>
-        <button type="button" className="btn sm" aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(2)))}>−</button><span className="zoomv">{Math.round(scale * 100)}%</span>
-        <button type="button" className="btn sm" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(1.5, +(s + 0.1).toFixed(2)))}>＋</button></span>
+      <span className="hint" title="Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.">Drag a keyword or an answer onto a topic to move it.</span>
+      <div className="flowtools" role="toolbar" aria-label="Flowchart tools">
+        <button type="button" className="tbtn" onClick={() => { setPos({}); persist({}); }} title="Put every card back in its place"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>Auto-arrange</button>
+        <button type="button" className="tbtn" onClick={fit} title="Fit the whole chart in the window"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>Fit to screen</button>
+        <button type="button" className={'tbtn' + (pal ? '' : ' on')} aria-pressed={!pal} onClick={() => setPal(!pal)} title="Fold the blocks panel away to give the chart the full width"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>{pal ? 'Hide blocks' : 'Show blocks'}</button>
+        <span className="tdiv" aria-hidden="true" />
+        <label className="switch" title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" role="switch" checked={topics.length > 0 && topics.every(showHoFor)} onChange={(e) => setHoTopics(e.target.checked ? new Set(topics) : new Set())} /><span className="track"><span className="thumb" /></span> Show “If not clear”</label>
+        <span className="tdiv" aria-hidden="true" />
+        <span className="zoom"><button type="button" aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(2)))}>−</button><span className="zoomv">{Math.round(scale * 100)}%</span><button type="button" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(1.5, +(s + 0.1).toFixed(2)))}>＋</button></span>
+      </div>
     </div>
     <div className={'flowwrap' + (pal ? '' : ' nopal')}>
       {pal && <aside className="flowpal" aria-label="Blocks">
