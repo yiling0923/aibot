@@ -13,7 +13,7 @@ import { useAssign } from './assign';
  * - Every keyword and answer also has a "⇄" menu to move it, for keyboard and touch.
  */
 type Src = { t: 'kw'; i: number } | { t: 'sh'; topic: string; l: string; w: string } | { t: 'entry'; id: number } | { t: 'word'; w: string };
-type Pending = { id: number; kind: 'topic' | 'keyword'; x: number; y: number; text: string };
+type Pending = { id: number; kind: 'topic' | 'keyword' | 'answer'; x: number; y: number; text: string; body?: string; topic?: string };
 type Pos = Record<string, { x: number; y: number }>;
 type Kind = 'kw' | 'topic' | 'ans' | 'ho';
 type Node = { key: string; kind: Kind; topic: string; x: number; y: number; w: number; h: number };
@@ -41,8 +41,9 @@ export default function TopicFlow() {
   const persist = (n: Pos) => { try { localStorage.setItem(storeKey, JSON.stringify(n)); } catch { /* ignore */ } };
   const [pend, setPend] = useState<Pending[]>([]); const nextId = useRef(1);
   const [over, setOver] = useState<string | null>(null);
-  const [showHo, setShowHoState] = useState(() => { try { return localStorage.getItem('flowho') === '1'; } catch { return false; } });   // the "If not clear" cards are the same for every topic, so they start hidden
-  const setShowHo = (v: boolean) => { setShowHoState(v); try { localStorage.setItem('flowho', v ? '1' : '0'); } catch { /* ignore */ } };
+  const [hoTopics, setHoTopicsState] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem('flowho2') || '[]')); } catch { return new Set<string>(); } });   // topics that show their "If not clear" card (it is the same for every topic, so they start hidden)
+  const setHoTopics = (n: Set<string>) => { setHoTopicsState(n); try { localStorage.setItem('flowho2', JSON.stringify([...n])); } catch { /* ignore */ } };
+  const showHoFor = (t: string) => hoTopics.has(t);
   const [kwq, setKwq] = useState<Record<string, string>>({});                // the filter typed on each keywords card
   const [scale, setScale] = useState(1);
   const [link, setLink] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
@@ -90,8 +91,17 @@ export default function TopicFlow() {
     p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: guessLang(w), variant: w, canonical: topic }); note('Added keyword "' + w + '" to topic "' + topic + '" (' + p.M.name + ')'); });
     setPend((l) => l.filter((x) => x.id !== b.id)); p.toast('"' + w + '" now means ' + topic);
   };
-  const addBlock = (kind: 'topic' | 'keyword', x?: number, y?: number) => {
-    const n = pend.length; setPend((l) => [...l, { id: nextId.current++, kind, x: x ?? 40 + n * 20, y: y ?? 30 + n * 70, text: '' }]);
+  const createAnswer = (b: Pending) => {
+    const name = slug(b.text); const topic = b.topic || '';
+    if (!name) return p.toast('Give the answer a name first');
+    if (!(b.body || '').trim()) return p.toast('Type the English answer first');
+    if (!topic) return p.toast('Choose a topic for this answer');
+    if (entries.some((e) => e.intent_key === name)) return p.toast('There is already an answer called "' + name + '"');
+    p.edit((x, note) => { x.kb.push({ id: Math.max(0, ...x.kb.map((e) => e.id)) + 1, merchant: p.merchant, intent_key: name, topic, aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: { en: { question_examples: [], answer_text: (b.body || '').trim() } }, dirty: true } as Entry); note('Added answer "' + name + '" to topic "' + topic + '" (' + p.M.name + ')'); });
+    setPend((l) => l.filter((z) => z.id !== b.id)); p.toast('Answer "' + name + '" added to the draft. Open Knowledge base to add example questions or other languages.');
+  };
+  const addBlock = (kind: 'topic' | 'keyword' | 'answer', x?: number, y?: number, topic?: string) => {
+    const n = pend.length; setPend((l) => [...l, { id: nextId.current++, kind, x: x ?? 40 + n * 20, y: y ?? 30 + n * 70, text: '', body: '', topic }]);
   };
 
   /* ---------- layout: every card has a default place in its lane; a dragged card keeps the place you gave it ---------- */
@@ -106,8 +116,8 @@ export default function TopicFlow() {
     const laneH = Math.max(ans.length * GAP, kwH, H.topic) + 60; const cy = cursor + laneH / 2;
     add(t, 'kw:' + t, 'kw', COL.kw, cy - kwH / 2, W.kw, kwH); edges.push({ a: 'kw:' + t, b: 'topic:' + t, kind: 'kw' });
     add(t, 'topic:' + t, 'topic', COL.topic, cy - H.topic / 2, W.topic, H.topic);
-    ans.forEach((e, k) => { add(t, 'ans:' + e.id, 'ans', COL.ans, cy - H.ans / 2 + (k - (ans.length - 1) / 2) * GAP, W.ans, H.ans); edges.push({ a: 'topic:' + t, b: 'ans:' + e.id, kind: 'ans' }); if (showHo) edges.push({ a: 'ans:' + e.id, b: 'ho:' + t, kind: 'ho' }); });
-    if (showHo) add(t, 'ho:' + t, 'ho', COL.ho, cy - H.ho / 2, W.ho, H.ho); if (showHo && !ans.length) edges.push({ a: 'topic:' + t, b: 'ho:' + t, kind: 'ho' });
+    ans.forEach((e, k) => { add(t, 'ans:' + e.id, 'ans', COL.ans, cy - H.ans / 2 + (k - (ans.length - 1) / 2) * GAP, W.ans, H.ans); edges.push({ a: 'topic:' + t, b: 'ans:' + e.id, kind: 'ans' }); if (showHoFor(t)) edges.push({ a: 'ans:' + e.id, b: 'ho:' + t, kind: 'ho' }); });
+    if (showHoFor(t)) add(t, 'ho:' + t, 'ho', COL.ho, cy - H.ho / 2, W.ho, H.ho); if (showHoFor(t) && !ans.length) edges.push({ a: 'topic:' + t, b: 'ho:' + t, kind: 'ho' });
     cursor += laneH + 34;
   });
   const by = new Map(nodes.map((n) => [n.key, n] as const));
@@ -150,7 +160,7 @@ export default function TopicFlow() {
     };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
-  const html5Drop = (topic: string) => (e: DragEvent) => { e.preventDefault(); e.stopPropagation(); setOver(null); try { move(JSON.parse(e.dataTransfer.getData(MIME)) as Src, topic); } catch { /* not ours */ } };
+  const html5Drop = (topic: string) => (e: DragEvent) => { let src: Src | null = null; try { src = JSON.parse(e.dataTransfer.getData(MIME)) as Src; } catch { /* a block from the palette: the canvas handles it */ } if (!src) return; e.preventDefault(); e.stopPropagation(); setOver(null); move(src, topic); };
   /** The topic lane under the pointer: dropping a word anywhere in a lane (on its keywords, answers or the empty space) puts it in that topic. */
   const laneAt = (cx: number, cy: number) => { const c = toCanvas(cx, cy); return lanes.find((l) => c.x >= l.x && c.x <= l.x + l.w && c.y >= l.y && c.y <= l.y + l.h)?.topic ?? null; };
   const onCanvasOver = (e: DragEvent) => { e.preventDefault(); const t = laneAt(e.clientX, e.clientY); if (t !== over) setOver(t); };
@@ -158,6 +168,8 @@ export default function TopicFlow() {
     e.preventDefault(); let k = ''; try { k = e.dataTransfer.getData('application/x-aibot-block'); } catch { /* none */ }
     const t = laneAt(e.clientX, e.clientY); setOver(null);
     if (t) { try { const src = JSON.parse(e.dataTransfer.getData(MIME)) as Src; move(src, t); return; } catch { /* not a word or keyword */ } }
+    if (k === 'ifnotclear') { if (t) setHoTopics(new Set([...hoTopics, t])); else p.toast('Drop it inside a topic'); return; }
+    if (k === 'answer') { const c = toCanvas(e.clientX, e.clientY); addBlock('answer', Math.max(0, c.x - 120), Math.max(0, c.y - 30), t ?? undefined); return; }
     if (k === 'topic' || k === 'keyword') { const c = toCanvas(e.clientX, e.clientY); addBlock(k, Math.max(0, c.x - 100), Math.max(0, c.y - 30)); }
   };
   const moveMenu = (label: string, from: string, src: Src) => <select className="mv" aria-label={label} value="" onChange={(e) => e.target.value && move(src, e.target.value)}>
@@ -169,7 +181,7 @@ export default function TopicFlow() {
   return <div className="flow" data-testid="flow">
     <div className="flowbar">
       <span className="sub">Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.</span>
-      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button><label className="tog" style={{ padding: 0 }} title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" checked={showHo} onChange={(e) => setShowHo(e.target.checked)} /> Show “If not clear”</label>
+      <span className="flowtools"><button type="button" className="btn sm" onClick={() => { setPos({}); persist({}); }}>Auto-arrange</button><button type="button" className="btn sm" onClick={fit}>Fit to screen</button><label className="tog" style={{ padding: 0 }} title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" checked={topics.length > 0 && topics.every(showHoFor)} onChange={(e) => setHoTopics(e.target.checked ? new Set(topics) : new Set())} /> Show “If not clear” on all</label>
         <button type="button" className="btn sm" aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(2)))}>−</button><span className="zoomv">{Math.round(scale * 100)}%</span>
         <button type="button" className="btn sm" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(1.5, +(s + 0.1).toFixed(2)))}>＋</button></span>
     </div>
@@ -178,8 +190,9 @@ export default function TopicFlow() {
         <h4>Add a block</h4>
         <button type="button" className="ftile t-tp" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'topic')} onClick={() => addBlock('topic')}><i>◆</i><span><b>Topic</b><small>what the customer wants</small></span></button>
         <button type="button" className="ftile t-kw" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'keyword')} onClick={() => addBlock('keyword')}><i>#</i><span><b>Keyword</b><small>a word that means a topic</small></span></button>
-        <button type="button" className="ftile t-an" onClick={() => nav('/admin/kb')}><i>▤</i><span><b>Answer</b><small>written in Knowledge base</small></span></button>
-        <div className="ftile t-ho static"><i>⚑</i><span><b>If not clear</b><small>comes with every topic</small></span></div>
+        <button type="button" className="ftile t-an" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'answer')} onClick={() => addBlock('answer')}><i>▤</i><span><b>Answer</b><small>drag into a topic to write one</small></span></button>
+        <button type="button" className="ftile t-ho" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'ifnotclear')} onClick={() => setHoTopics(topics.every(showHoFor) ? new Set() : new Set(topics))} title="Drag into a topic to show what happens there when the bot is not sure. Click to show or hide it on every topic."><i>⚑</i><span><b>If not clear</b><small>drag into a topic to show it</small></span></button>
+        <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => nav('/admin/kb')}>Open Knowledge base →</button>
         {unset.length > 0 && <><h4 style={{ marginTop: 14 }}>Words not set yet</h4><div className="sub" style={{ marginBottom: 6 }}>Drag onto a topic</div>
           <div className="chips">{unset.map((r) => <span key={r.w} className="chip ro" draggable onDragStart={(e) => { e.dataTransfer.setData(MIME, JSON.stringify({ t: 'word', w: r.w } as Src)); }}>{r.w}<span className="n">{r.n}</span></span>)}</div></>}
       </aside>
@@ -213,10 +226,14 @@ export default function TopicFlow() {
               const has = entries.some((x) => x.topic === t);
               return <div key={n.key} className={'fc ho' + (has ? '' : ' warn')} style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd">⚑ If not clear</div><div className="bd"><b>{has ? 'Ask once,' : 'A person'}</b><div className="pv">{has ? 'then a person' : 'no answer yet'}</div></div><span className="port l" /></div>;
             })}
-            {pend.map((b) => <div key={b.id} className={'fc pend ' + (b.kind === 'topic' ? 'tp' : 'kw')} style={{ left: b.x, top: b.y, width: 240 }} onPointerDown={(e) => dragNode('p' + b.id, e, (x, y) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, x, y } : z))))}>
-              <div className="hd">{b.kind === 'topic' ? '◆ New topic' : '# New keyword'}<button type="button" className="x" aria-label="Cancel" onClick={() => setPend((l) => l.filter((z) => z.id !== b.id))}>×</button></div>
-              <div className="bd"><input type="text" aria-label={b.kind === 'topic' ? 'New topic name' : 'New keyword'} placeholder={b.kind === 'topic' ? 'e.g. refund' : 'e.g. depoo'} value={b.text} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, text: e.target.value } : z)))} onKeyDown={(e) => { if (e.key === 'Enter' && b.kind === 'topic') { e.preventDefault(); createTopic(b.id); } }} />
+            {pend.map((b) => <div key={b.id} className={'fc pend ' + (b.kind === 'topic' ? 'tp' : b.kind === 'answer' ? 'an' : 'kw')} style={{ left: b.x, top: b.y, width: 240 }} onPointerDown={(e) => dragNode('p' + b.id, e, (x, y) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, x, y } : z))))}>
+              <div className="hd">{b.kind === 'topic' ? '◆ New topic' : b.kind === 'answer' ? '▤ New answer' : '# New keyword'}<button type="button" className="x" aria-label="Cancel" onClick={() => setPend((l) => l.filter((z) => z.id !== b.id))}>×</button></div>
+              <div className="bd"><input type="text" aria-label={b.kind === 'topic' ? 'New topic name' : b.kind === 'answer' ? 'New answer name' : 'New keyword'} placeholder={b.kind === 'topic' ? 'e.g. refund' : b.kind === 'answer' ? 'name, e.g. daily_limit' : 'e.g. depoo'} value={b.text} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, text: e.target.value } : z)))} onKeyDown={(e) => { if (e.key === 'Enter' && b.kind === 'topic') { e.preventDefault(); createTopic(b.id); } }} />
+                {b.kind === 'answer' && <><textarea aria-label="New answer text" rows={3} placeholder="The answer the bot says (English)" value={b.body || ''} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, body: e.target.value } : z)))} />
+                  <select className="mv wide" aria-label="Topic for the answer" value={b.topic || ''} onChange={(e) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, topic: e.target.value } : z)))}><option value="">Choose a topic…</option>{topics.map((t) => <option key={t} value={t}>{t}</option>)}</select>
+                  <button type="button" className="btn sm pri" onClick={() => createAnswer(b)}>Add answer</button></>}
                 {b.kind === 'topic' ? <button type="button" className="btn sm pri" onClick={() => createTopic(b.id)}>Create topic</button>
+                  : b.kind === 'answer' ? null
                   : <select className="mv wide" aria-label="Connect keyword to topic" value="" onChange={(e) => e.target.value && connectPending(b, e.target.value)}><option value="">Connect to topic…</option>{topics.map((t) => <option key={t} value={t}>{t}</option>)}</select>}</div>
               {b.kind === 'keyword' && <span className="port r" title="Drag onto a topic" onPointerDown={(e) => startLink({ x: b.x + 240, y: b.y + 48 }, e, (t) => connectPending(b, t))} />}
             </div>)}

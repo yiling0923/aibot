@@ -210,6 +210,19 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByText('＋ Add a topic or keyword'));
     expect(document.querySelector('.addbox')).not.toBeNull();
   });
+  it('adds an answer from the Answer block and shows the If not clear card for a topic', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    await userEvent.click(screen.getByRole('button', { name: /Answer/ }));                        // an Answer block (it no longer jumps to Knowledge base)
+    await userEvent.type(screen.getByLabelText('New answer name'), 'daily limit');
+    await userEvent.type(screen.getByLabelText('New answer text'), 'The limit is 5000.');
+    await userEvent.selectOptions(screen.getByLabelText('Topic for the answer'), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: 'Add answer' }));
+    expect(await screen.findByText('daily_limit')).toBeTruthy();
+    expect(document.querySelector('.fc.ho')).toBeNull();                                         // hidden at first
+    await userEvent.click(screen.getByRole('button', { name: /If not clear/ }));
+    expect(document.querySelector('.fc.ho')).not.toBeNull();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
