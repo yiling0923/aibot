@@ -352,18 +352,18 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
     expect(screen.queryByText('dps')).toBeNull();
   });
-  it('Keyword ranking: top three, a compact week picker, filters and the table in one card, a bar behind each count', async () => {
+  it('Keyword ranking: top three, a compact week picker, filters in the heading card, a bar behind each count', async () => {
     open('staff', '/admin/rank');
-    expect(await screen.findByRole('heading', { name: 'Keyword ranking' })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /^Keyword ranking/ })).toBeTruthy();
     const week = screen.getByRole('group', { name: 'Week' });
     expect(within(week).getByText('This week')).toBeTruthy(); expect(await within(week).findByText('Nov 10 – Nov 16')).toBeTruthy();
     expect((within(week).getByRole('button', { name: 'Next week' }) as HTMLButtonElement).disabled).toBe(true);      // nothing after this week
     expect((within(week).getByRole('button', { name: 'Previous week' }) as HTMLButtonElement).disabled).toBe(false);
     await screen.findByText('wd');
-    const rows = document.querySelectorAll('.rkcard tbody tr');
+    const rows = document.querySelectorAll('.card.scroll tbody tr');
     expect(rows.length).toBe(2);                                                                                       // the top three are in the cards above, the table starts at rank 4
-    expect(document.querySelectorAll('.rkcard td.num .mbar').length).toBe(2);
-    expect(screen.getByLabelText('Filter keywords').closest('.rkcard')).toBeTruthy();                                // the filter sits in the table card
+    expect(document.querySelectorAll('.card.scroll td.num .mbar').length).toBe(2);
+    expect(screen.getByLabelText('Filter keywords').closest('.kwtop')).toBeTruthy();                                 // the filter sits in the heading card, as on Knowledge base and Keywords
     await userEvent.type(screen.getByLabelText('Filter keywords'), 'zzzz');
     expect(await screen.findByText('No keyword matches this filter.')).toBeTruthy();
   });

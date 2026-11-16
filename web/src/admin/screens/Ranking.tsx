@@ -52,10 +52,15 @@ export default function Ranking() {
 
   return (
     <>
-      <div className="card"><div className="head"><div style={{ maxWidth: 560 }}><h2>Keyword ranking</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Click a word to see its chats.</div></div>
+      <div className="card kwtop"><div className="head"><div style={{ maxWidth: 560 }}><h2>Keyword ranking · {p.M.name}</h2><div className="sub">The words customers wrote most in {p.M.name} chats. Click a word to see its chats.</div></div>
         <div className="wk" role="group" aria-label="Week"><button type="button" aria-label="Previous week" disabled={week <= -4} onClick={() => setWeek(week - 1)}>‹</button>
           <span className="wkl"><small>{week === 0 ? 'This week' : week === -1 ? 'Last week' : Math.abs(week) + ' weeks ago'}</small><b>{label}</b></span>
-          <button type="button" aria-label="Next week" disabled={week >= 0} onClick={() => setWeek(week + 1)}>›</button></div></div></div>
+          <button type="button" aria-label="Next week" disabled={week >= 0} onClick={() => setWeek(week + 1)}>›</button></div></div>
+        <div className="kwfilter">
+          <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
+          <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
+            <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+            <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> Show excluded{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} shown</span></div></div></div>
       <div className="kwstats"><span className="st"><b>{total.toLocaleString()}</b> words written this week</span><span className="st"><b>{vis.length}</b> different keywords</span>
         <span className="st dim info" tabIndex={0} title="Count: how many times customers wrote it (repeats count). Share: its part of all keywords. Change: compared with the 7 days before. To decide what a word is, use the Keywords screen.">ⓘ How to read this</span></div>
       {top.length > 0 && <>
@@ -63,12 +68,7 @@ export default function Ranking() {
           <div key={r.w} className={'pod p' + (i + 1)}><div className="pod-head"><Medal n={i + 1} /><div className="pod-main"><span className="kwlink pod-nm" onClick={() => setDrawer(r.w)}>{r.w}</span><div className="sub">{r.n} time{r.n === 1 ? '' : 's'} · {r.share.toFixed(2)}%</div></div><ChgPill c={r.c} /></div>
             <div className="pod-trend"><Spark v={r.series} w={260} h={38} /></div>
             <div className="pod-foot"><span className="pods">{r.isNew ? <Pill c="info">New</Pill> : null}<Pill c={r.st.c}>{r.st.t}</Pill></span></div></div>))}</div></>}
-      <div className="card scroll rkcard">
-        <div className="kwfilter" style={{ borderTop: 0, paddingTop: 0 }}>
-          <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
-          <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
-            <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-            <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> Show excluded{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} shown</span></div></div>
+      <div className="card scroll">
         {sel.size > 0 && <div className="bulk"><b>{sel.size} selected</b><span className="tools">{[['filler', 'Mark as filler'], ['rude', 'Mark as rude word'], ['mild', 'Mark as mild rude word']].map(([k, l]) => <button key={k} className="btn sm" type="button" disabled={lock} onClick={() => bulk(k)}>{l}</button>)}<button className="btn sm" type="button" onClick={() => bulk('exclude')}>Exclude</button><button className="btn sm ghost" type="button" onClick={() => bulk('clear')}>Clear</button></span>{lock && <span className="lock">Only admins can change these lists.</span>}</div>}
         <table style={{ minWidth: 940 }}><thead><tr><th style={{ width: 34 }}><input type="checkbox" checked={allSel} aria-label="Select all shown" onChange={(e) => setSel((s) => { const n = new Set(s); list.forEach((r) => (e.target.checked ? n.add(r.w) : n.delete(r.w))); return n; })} /></th>
           {th('rank', 'Rank', 'Position by count', ' ')}{th('w', 'Keyword')}{th('type', 'Type')}<th>Trend</th>{th('n', 'Count', 'How many times customers wrote it. Repeating the same message counts.', 'num')}{th('c', 'Change', 'Compared with the previous 7 days.')}{th('st', 'Status', 'What the bot does with this word now.')}<th></th></tr></thead><tbody>

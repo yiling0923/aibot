@@ -108,7 +108,7 @@ export default function Keywords() {
   return (
     <>
       <div className="card kwtop">
-        <div className="head"><div><h2>Keywords</h2><div className="sub">Every word customers type is saved here automatically. Put each one under a topic, or ignore it.{p.ai.describe ? '' : <span className="dimnote" title="Add the Anthropic key to .env"> AI descriptions are off.</span>}</div></div>
+        <div className="head"><div><h2>Keywords · {p.M.name}</h2><div className="sub">Every word customers type is saved here automatically. Put each one under a topic, or ignore it.{p.ai.describe ? '' : <span className="dimnote" title="Add the Anthropic key to .env"> AI descriptions are off.</span>}</div></div>
           <div className="tools">{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
 </div></div>
         <div className="kwfilter">

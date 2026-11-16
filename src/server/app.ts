@@ -124,7 +124,7 @@ export async function buildApp(opts: AppOptions = {}) {
   // the old page addresses still work
   const query = (url: string) => (url.includes('?') ? url.slice(url.indexOf('?')) : '');
   app.get('/admin.html', async (req, reply) => reply.redirect('/admin' + query(req.url)));
-  app.get('/chat.html', async (req, reply) => reply.redirect('/chat' + query(req.url)));
+  app.get('/chat.html', async (req, reply) => reply.redirect('/admin' + query(req.url)));       // the old chat test page is gone: the LiveChat test in the panel replaces it
   app.get('/login.html', async (req, reply) => reply.redirect('/login' + query(req.url)));
 
   // Every other page address belongs to the front end (a single-page app), so it gets index.html and the app shows the right page.

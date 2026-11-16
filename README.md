@@ -38,7 +38,7 @@ The front end (React + TypeScript + Vite) lives in `web/`. `npm run build` build
 If Windows does not allow writing to `web/dist` (for example it was once built from an Administrator window), the build picks a new folder by itself (`web/dist-<number>`, remembered in `web/.outdir`) and the server uses it. Nothing to fix by hand. Run `npm run dev` from a normal PowerShell opened in the project folder.
 While you work on the screens, run `npm run dev:web` in a second terminal for instant reloads on http://localhost:5173 (it passes API calls to the bot on port 3000).
 
-Open **http://localhost:3000** and sign in. The control panel is at `/admin`; the stand-alone chat page is `/chat` (pick a merchant, choose who is chatting, type like a customer, and read what the bot did on the right). Inside the panel, **Check → LiveChat test** chats through a LiveChat.
+Open **http://localhost:3000** and sign in. The control panel is at `/admin`. To try the bot as a customer, use **Check → LiveChat test** in the panel: it chats through a LiveChat, the way the website widget does.
 Every word you type is saved to that merchant's keyword store, and messages the bot did not understand are saved too. Demo logins (loaded by `npm run db:seed`):
 
 | Username | Password | Can do |
@@ -178,7 +178,7 @@ The bot understands and answers in **English (en), Malay (ms), Chinese (zh), Vie
 
 ## How the bot decides
 
-This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every message goes through three steps, and the bot reports each one (in the reply as `keywords`, `topic`, `answer_id`, and on the stand-alone chat page `/chat` under "what the bot did"):
+This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every message goes through three steps, and the bot reports each one (in the reply as `keywords`, `topic`, `answer_id`):
 
 1. **Keywords:** the words the customer typed that the bot recognises (`depo`, `not in`, `充值`, `nạp tiền`). They are counted in the keyword reports. A keyword points to a topic (`depo` → deposit) or to a kind of question (`how long` → time).
 2. **Topic:** what the customer wants (Deposit, Withdraw, Bonus, Account, Bank...). Each merchant owns its topic list: it starts from the shared template, and the merchant can add its own topics and keywords (staff too). Another merchant never sees them.

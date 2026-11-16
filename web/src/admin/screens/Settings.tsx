@@ -69,8 +69,8 @@ function Form() {
   return (
     <>
       <div className="head"><div><h2 style={{ margin: 0 }}>Merchant settings · {p.M.name}</h2><div className="sub">How the bot behaves for this merchant. The instructions and replies go to the draft, then Publish. The basics are saved at once.</div></div><button className="btn pri" type="button" onClick={save}>Save to draft</button></div>
-      {b && <div className="mtiles"><div className="mtile"><small>Answers (knowledge base)</small><b>{b.entries}</b></div><div className="mtile"><small>Questions today</small><b>{b.questionsToday}</b></div>
-        <div className="mtile"><small>AI tokens today</small><b>{b.tokensToday.toLocaleString()}</b></div><div className="mtile"><small>Average confidence</small><b>{b.avgConfidence === null ? '—' : Math.round(b.avgConfidence * 100) + '%'}</b></div></div>}
+      {b && <div className="btiles"><div className="rptile"><i style={{ background: '#7fa8e8' }} /><small>Answers (knowledge base)</small><b>{b.entries}</b></div><div className="rptile"><i style={{ background: '#7fc4a8' }} /><small>Questions today</small><b>{b.questionsToday}</b></div>
+        <div className="rptile"><i style={{ background: '#9b8bd8' }} /><small>AI tokens today</small><b>{b.tokensToday.toLocaleString()}</b></div><div className="rptile"><i style={{ background: '#f0c27b' }} /><small>Average confidence</small><b>{b.avgConfidence === null ? '—' : Math.round(b.avgConfidence * 100) + '%'}</b></div></div>}
       <div className="tabs" role="tablist" style={{ margin: '6px 0 14px' }}>{TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => setTab(k)}>{l}</button>)}</div>
       {cur === 'general' && (b ? <>
       <div className="card"><div className="head"><h3 style={{ margin: 0 }}>Basics</h3>{lock ? <span className="lock">Only an admin can change these</span> : <button className={'btn' + (basicsDirty ? ' pri' : '')} type="button" disabled={busy || !basicsDirty} onClick={saveBasics}>{busy ? 'Saving…' : 'Save basics'}</button>}</div>

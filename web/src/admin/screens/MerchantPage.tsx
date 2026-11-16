@@ -51,9 +51,9 @@ export default function MerchantPage() {
       <div className="card"><div className="head"><div><h2>{m.name} <span className="mcodepill">{m.code}</span></h2>
         <div className="sub">Everything LiveChat needs to reach this merchant's bot.</div></div>
         <button className="btn" type="button" onClick={() => nav('/admin/users')}>← All merchants</button></div>
-        <div className="mstats">
-          <div className="mst"><small>Answers</small><b>{m.entries}</b></div><div className="mst"><small>Main language</small><b>{LANG[m.language] ?? m.language}</b></div>
-          <div className="mst"><small>Tone</small><b>{m.tone[0].toUpperCase() + m.tone.slice(1)}</b></div><div className="mst"><small>Real chats, 7 days</small><b>{lc.liveChats7d}</b></div></div>
+        <div className="btiles" style={{ margin: '14px 0 4px' }}>
+          <div className="rptile"><i style={{ background: '#7fa8e8' }} /><small>Answers</small><b>{m.entries}</b></div><div className="rptile"><i style={{ background: '#9b8bd8' }} /><small>Main language</small><b>{LANG[m.language] ?? m.language}</b></div>
+          <div className="rptile"><i style={{ background: '#f0c27b' }} /><small>Tone</small><b>{m.tone[0].toUpperCase() + m.tone.slice(1)}</b></div><div className="rptile"><i style={{ background: '#7fc4a8' }} /><small>Real chats, 7 days</small><b>{lc.liveChats7d}</b></div></div>
         <div className="mlinks">
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/set'); }}>Merchant settings</button>
           <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/kb'); }}>Knowledge base</button>
