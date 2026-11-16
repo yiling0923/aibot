@@ -104,8 +104,8 @@ export default function Topics() {
       <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}</button>)}</div>
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
       {cur === 'short' && <div className="segs" role="group" aria-label="View" style={{ marginTop: 8 }}>{([['list', 'List'], ['flow', 'Flowchart']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
+      {adding && <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={done} /></div>}
       {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {adding && <div className="addbox"><AddBox tab={cur} dup={dup} done={done} /></div>}
         {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 220 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>

@@ -204,6 +204,12 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByLabelText('Add a keyword to deposit'), 'topupz{enter}');
     expect(await screen.findByLabelText('Remove topupz')).toBeTruthy();
   });
+  it('opens the add form from the top button also in the flowchart view', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    await userEvent.click(screen.getByText('＋ Add a topic or keyword'));
+    expect(document.querySelector('.addbox')).not.toBeNull();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
