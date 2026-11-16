@@ -25,7 +25,7 @@ const TYPE_LABEL: Record<string, string> = { needs_staff: 'Needs staff', promoti
 
 /** About how tall a keywords card is: its chips wrap inside the card width. */
 const kwHeight = (words: string[]) => {
-  let rows = 1, used = 0; for (const w of words) { const c = w.length * 7.6 + 34; if (used + c > W.kw - 24) { rows++; used = 0; } used += c; }
+  let rows = 1, used = 0; for (const w of words) { const c = w.length * 6.9 + 30; if (used + c > W.kw - 24) { rows++; used = 0; } used += c; }
   return 40 + rows * 34 + 12;
 };
 const previewOf = (e: Entry) => { const t = e.translations as Record<string, { answer_text?: string }>; return (t.en?.answer_text || Object.values(t).find((x) => x?.answer_text)?.answer_text || '').replace(/\s+/g, ' ').trim(); };
@@ -179,7 +179,7 @@ export default function TopicFlow() {
   const moveMenu = (label: string, from: string, src: Src) => <select className="mv" aria-label={label} value="" onChange={(e) => e.target.value && move(src, e.target.value)}>
     <option value="">⇄</option>{topics.filter((t) => t !== from).map((t) => <option key={t} value={t}>{t}</option>)}</select>;
   useEffect(() => { const t = setTimeout(() => fit(), 0); return () => clearTimeout(t); }, [p.merchant]); // eslint-disable-line react-hooks/exhaustive-deps
-  const fit = () => { const w = canvas.current?.clientWidth ?? 0; if (w) setScale(Math.max(0.5, Math.min(1.4, (w - 8) / width))); };
+  const fit = () => { const w = canvas.current?.clientWidth ?? 0; if (w) setScale(Math.max(0.5, Math.min(1, (w - 8) / width))); };
   const box = (n: { x: number; y: number; w: number; h: number }) => ({ left: n.x, top: n.y, width: n.w, minHeight: n.h });
 
   return <div className="flow" data-testid="flow">
