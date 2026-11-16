@@ -55,9 +55,9 @@ export const NavIcon = ({ name }: { name: string }) => (
 );
 
 /** A small square button with an icon. The words show when the mouse is over it (and for screen readers). */
-export function IconBtn({ tip, onClick, danger, children }: { tip: string; onClick: () => void; danger?: boolean; children: ReactNode }) {
+export function IconBtn({ tip, onClick, danger, pressed, children }: { tip: string; onClick: () => void; danger?: boolean; pressed?: boolean; children: ReactNode }) {
   return (
-    <button type="button" className={'ibtn' + (danger ? ' danger' : '')} data-tip={tip} aria-label={tip} onClick={onClick}>
+    <button type="button" className={'ibtn' + (danger ? ' danger' : '') + (pressed ? ' on' : '')} data-tip={tip} aria-label={tip} aria-pressed={pressed} onClick={onClick}>
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{children}</svg>
     </button>
   );

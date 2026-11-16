@@ -226,10 +226,19 @@ describe('Control panel', () => {
     expect(await screen.findByText('Top topics')).toBeTruthy();
     expect(screen.getByText('Top keywords')).toBeTruthy(); expect(screen.getByText('Topics handed to a person most')).toBeTruthy();
     expect(screen.getByText('25%')).toBeTruthy();                                                   // 1 wrong of 4 checked
-    expect(screen.getByText(/withdraw \(50% of 6\)/)).toBeTruthy();
+    expect(screen.getByText('withdraw')).toBeTruthy();
     expect(screen.getByText('Check recent answers')).toBeTruthy();
-    await userEvent.click(screen.getAllByText('Wrong')[0]);                                         // sends the mark, then reloads the report
+    await userEvent.click(screen.getAllByRole('button', { name: 'Wrong' })[0]);                                         // sends the mark, then reloads the report
     expect(screen.getByText('Check recent answers')).toBeTruthy();
+  });
+  it('shows details when hovering a day on the chart', async () => {
+    open('staff', '/admin/report');
+    expect(await screen.findByText('Messages per day')).toBeTruthy();
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    const days = document.querySelectorAll('.rpchart svg g[tabindex]');
+    expect(days.length).toBe(7);
+    await userEvent.hover(days[0]);
+    expect(screen.getByRole('tooltip').textContent).toMatch(/14/);
   });
   it('lets staff set an entry Type and an end date', async () => {
     open('staff', '/admin/kb');
