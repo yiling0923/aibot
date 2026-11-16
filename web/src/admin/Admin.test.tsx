@@ -38,7 +38,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
-    : url.startsWith('/api/admin/people') ? { merchants: [], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
+    : url.startsWith('/api/admin/people') ? { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] }
     : url.startsWith('/api/admin/report') ? REPORT
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
     : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : [])));
@@ -129,8 +129,11 @@ describe('Control panel', () => {
   it('shows the login actions as icon buttons with the words available on hover', async () => {
     open('admin', '/admin/users');
     const reset = await screen.findAllByRole('button', { name: 'Change password' });
-    expect(reset).toHaveLength(2);                                                       // one per login, with words on the button
+    expect(reset).toHaveLength(2);                                                       // one per login
+    expect(reset[0].textContent).toBe('');                                               // an icon, no words on the button
+    expect(reset[0].getAttribute('data-tip')).toBe('Change password');                   // the words show when the mouse is over it
     expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);           // you cannot delete yourself
+    expect(screen.getAllByRole('button', { name: 'Open' }).every((b) => b.textContent === '' && b.getAttribute('data-tip') === 'Open')).toBe(true);
   });
 
   it('opens a merchant page with the LiveChat address, makes a key that is shown once, and keeps AI keys masked', async () => {

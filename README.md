@@ -220,7 +220,7 @@ On the Topics screen the topic name is the **main keyword** (for example `deposi
 
 ## Merchants & logins, and the merchant page
 
-**Merchants & logins** lists each merchant with its tone, number of answers, staff login and a **LiveChat link** tag: *Connected · used 2h ago* when the merchant has an active bot key (and when LiveChat last used it), or *No bot key yet*. Logins show their role as a tag and have the buttons *Change password* and *Delete*. The **merchant page** is four numbered steps, each with a status tag and a tick when done: 1 LiveChat connection (bot address and key), 2 Test the link, 3 Handoff number (synced with LiveChat), 4 AI keys.
+**Merchants & logins** lists each merchant with its tone, number of answers, staff login and a **LiveChat link** tag: *Connected · used 2h ago* when the merchant has an active bot key (and when LiveChat last used it), or *No bot key yet*. Logins show their role as a tag. The actions on both tables are small icon buttons (open, key = change password, bin = delete); the words show when you hover. The **merchant page** is four numbered steps, each with a status tag and a tick when done: 1 LiveChat connection (bot address and key), 2 Test the link, 3 Handoff number (synced with LiveChat), 4 AI keys.
 
 ## Merchant settings: basics, token limit, languages, bot instructions
 
