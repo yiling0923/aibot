@@ -283,6 +283,16 @@ describe('Control panel', () => {
     await userEvent.click(within(screen.getByLabelText('Try the flow')).getByRole('button', { name: /Start/ }));
     expect(await within(screen.getByLabelText('Flow chat')).findByText('Hello from the flow')).toBeTruthy();
   });
+  it('LiveChat test: shows what an agent writes in LiveChat without a refresh, and can chat as a guest', async () => {
+    open('admin', '/admin/lchat');
+    await userEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    expect(screen.getByLabelText('The customer is')).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('The customer is'), 'guest');
+    expect(screen.queryByLabelText(/Member id/)).toBeNull();
+    expect(screen.getByText(/Customer: not logged in/)).toBeTruthy();
+    lcLines = [{ from: 'agent', sender: 'operator', text: 'Hello, this is an agent.' }];            // written in LiveChat, not in this page
+    expect(await screen.findByText('Hello, this is an agent.', {}, { timeout: 5000 })).toBeTruthy();   // the page looks again by itself
+  }, 10000);
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

@@ -12,13 +12,13 @@ import { chatThroughLiveChat } from '../src/livechat/chat';
 /** A small stand-in for LiveChat's website widget API: it starts chats, takes visitor messages and answers like the bot does after a moment. */
 function fakeLiveChat(opts: { replyAfterMs?: number | null } = {}) {
   const chats = new Map<string, { visitor: string; status: string; messages: { senderType: string; body: string }[] }>(); let n = 0;
-  const calls: string[] = [];
+  const calls: string[] = []; const posts: Record<string, unknown>[] = [];
   const srv = http.createServer((req, res) => {
     let raw = ''; req.on('data', (c) => (raw += c)); req.on('end', () => {
       const url = new URL(req.url!, 'http://x'); calls.push(req.method + ' ' + url.pathname);
       const send = (code: number, j: unknown) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(j)); };
       if (req.headers['x-tenant-id'] !== '1') return send(404, { error: 'unknown tenant' });
-      const body = raw ? JSON.parse(raw) : {}; const view = (id: string) => { const c = chats.get(id)!; return { publicId: id, status: c.status, aiHandoffStatus: 'none', messages: c.messages }; };
+      const body = raw ? JSON.parse(raw) : {}; if (req.method === 'POST') posts.push(body); const view = (id: string) => { const c = chats.get(id)!; return { publicId: id, status: c.status, aiHandoffStatus: 'none', messages: c.messages }; };
       const reply = (id: string, q: string) => { if (opts.replyAfterMs === null) return; setTimeout(() => chats.get(id)?.messages.push({ senderType: 'ai', body: 'Bot says: ' + q }), opts.replyAfterMs ?? 150); };
       if (url.pathname === '/widget/conversations/current') { const v = url.searchParams.get('visitor_session_id'); const id = [...chats].find(([, c]) => c.visitor === v)?.[0]; return id ? send(200, { conversation: view(id) }) : send(404, { error: 'none' }); }
       if (url.pathname === '/widget/conversations' && req.method === 'POST') { const id = 'conv-' + ++n; chats.set(id, { visitor: body.visitor_session_id, status: 'open', messages: [{ senderType: 'visitor', body: body.body }] }); reply(id, body.body); return send(200, { conversation: view(id) }); }
@@ -30,7 +30,7 @@ function fakeLiveChat(opts: { replyAfterMs?: number | null } = {}) {
       send(404, {});
     });
   });
-  return new Promise<{ base: string; calls: string[]; chats: typeof chats; close: () => void }>((ok) => srv.listen(0, '127.0.0.1', () => ok({ base: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, calls, chats, close: () => srv.close() })));
+  return new Promise<{ base: string; calls: string[]; posts: Record<string, unknown>[]; chats: typeof chats; close: () => void }>((ok) => srv.listen(0, '127.0.0.1', () => ok({ base: `http://127.0.0.1:${(srv.address() as AddressInfo).port}`, calls, posts, chats, close: () => srv.close() })));
 }
 
 describe('chatting through a LiveChat', () => {
@@ -48,6 +48,17 @@ describe('chatting through a LiveChat', () => {
     lc.close();
   });
 
+  it('sends the member the website would send, or nothing at all for a customer who is not logged in', async () => {
+    const lc = await fakeLiveChat(); const o = { baseUrl: lc.base, tenant: '1', pollMs: 40, waitMs: 3000 };
+    await chatThroughLiveChat({ ...o, visitor: 'vis-g1', text: 'check my balance', member: null });
+    await chatThroughLiveChat({ ...o, visitor: 'vis-m1', text: 'check my balance', member: { id: 'tom8841', name: 'Tom', rank: 'VIP' } });
+    await chatThroughLiveChat({ ...o, visitor: 'vis-d1', text: 'hello' });
+    const [guest, member, dflt] = lc.posts;
+    expect(guest).not.toHaveProperty('member_external_id'); expect(guest).toMatchObject({ visitor_name: 'Guest' });
+    expect(member).toMatchObject({ member_external_id: 'tom8841', member_name: 'Tom', member_rank: 'VIP' });
+    expect(dflt).toMatchObject({ member_external_id: 'm-100', member_rank: 'GOLD' });          // not told: the sample member, as before
+    lc.close();
+  });
   it('says so when LiveChat is not reachable, when the tenant is wrong, and when the bot does not answer in time', async () => {
     await expect(chatThroughLiveChat({ baseUrl: 'http://127.0.0.1:1', tenant: '1', visitor: 'vis-test-2', text: 'hi', waitMs: 200 })).rejects.toThrow(/Could not reach LiveChat/);
     const lc = await fakeLiveChat({ replyAfterMs: null });

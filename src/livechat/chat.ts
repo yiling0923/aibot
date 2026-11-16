@@ -6,6 +6,8 @@ export interface ChatOpts {
   baseUrl: string; /** LiveChat's tenant id (the local setup uses 1). */ tenant: string; /** One browser session of a visitor: the same id continues the same chat. */ visitor: string;
   /** What the customer writes. Empty: only read the chat as it is. */ text?: string;
   /** How long to wait for the bot's reply, in milliseconds. */ waitMs?: number; pollMs?: number;
+  /** Who the customer is: a logged-in member (as the website would send it), or null for a customer who is not logged in. Missing: a sample member. */
+  member?: { id: string; name: string; rank?: string } | null;
 }
 
 const kindOf = (sender: string): ChatLine['from'] => (/visitor|customer|member|user/i.test(sender) ? 'customer' : /agent|staff|human|operator/i.test(sender) ? 'agent' : /system|event/i.test(sender) ? 'system' : 'bot');
@@ -36,7 +38,8 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
   if (!text) return id ? result(id, await read(id), false) : { conversationId: null, status: null, handoff: null, messages: [], replied: false };
 
   const before = id ? lines(await read(id)).filter((m) => m.from !== 'customer').length : 0;
-  const msg = { visitor_session_id: o.visitor, visitor_name: 'Tester', body: text, member_external_id: 'm-100', member_name: 'Tester', member_rank: 'GOLD' };
+  const who = o.member === undefined ? { id: 'm-100', name: 'Tester', rank: 'GOLD' } : o.member;       // null: not logged in, so no member fields are sent
+  const msg = { visitor_session_id: o.visitor, visitor_name: who?.name ?? 'Guest', body: text, ...(who ? { member_external_id: who.id, member_name: who.name, ...(who.rank ? { member_rank: who.rank } : {}) } : {}) };
   if (id) await call(`/widget/conversations/${encodeURIComponent(id)}/messages`, 'POST', msg);
   else id = (await call('/widget/conversations', 'POST', msg))?.conversation?.publicId ?? null;
   if (!id) throw new Error('LiveChat did not start a chat. Check the tenant id.');
