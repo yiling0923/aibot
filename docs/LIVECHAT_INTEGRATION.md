@@ -109,6 +109,8 @@ Every message goes through three steps, and the bot reports each one in the repl
 
 Nothing from the original plan is left on the bot side. Open items depend on the LiveChat team (see `REQUEST_TO_LIVECHAT_TEAM.md`).
 
+You can also try a chat in the browser: **Check → LiveChat test** in the panel does the same as `chat.ps1` and shows the replies as chat bubbles.
+
 ## Handoff number sync
 
 `ai_handoff_prompt_after_replies` ("ask for a person after N bot replies") is one number kept the same in LiveChat and the bot. **LiveChat is the source of truth.** On the merchant page (admin), save the merchant's LiveChat address, email and password (stored encrypted). Then:

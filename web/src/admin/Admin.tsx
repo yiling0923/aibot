@@ -11,6 +11,7 @@ import Topics from './screens/Topics';
 import Keywords from './screens/Keywords';
 import Ranking from './screens/Ranking';
 import TestChat from './screens/TestChat';
+import LiveChatTest from './screens/LiveChatTest';
 import Settings from './screens/Settings';
 import People from './screens/People';
 import MerchantPage from './screens/MerchantPage';
@@ -22,7 +23,7 @@ import Unmatched from './screens/Unmatched';
 const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
-  ['Check', [['report', 'Report'], ['unm', 'Not understood'], ['chat', 'Test chat']]],
+  ['Check', [['report', 'Report'], ['unm', 'Not understood'], ['chat', 'Test chat'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
 ];
 
@@ -61,7 +62,7 @@ function Shell() {
         <nav className="nav" aria-label="Sections">
           {NAV_GROUPS.map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
-              {items.filter(([k]) => (k !== 'users' && k !== 'billing') || p.isAdmin).map(([k, l]) => (
+              {items.filter(([k]) => (k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin).map(([k, l]) => (
                 <button key={k} type="button" aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
                   <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}{k === 'unm' && openUnmatched ? <span className="cnt">{openUnmatched}</span> : null}
                 </button>
@@ -92,6 +93,7 @@ function Shell() {
             <Route path="report" element={<Report />} />
             <Route path="unm" element={<Unmatched />} />
             <Route path="chat" element={<TestChat />} />
+            <Route path="lchat" element={p.isAdmin ? <LiveChatTest /> : <div className="card"><h2>LiveChat test</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="set" element={<Settings />} />
             <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="merchants/:code" element={p.isAdmin ? <MerchantPage /> : <div className="card"><h2>Merchant</h2><div className="sub">Only an admin can use this screen.</div></div>} />

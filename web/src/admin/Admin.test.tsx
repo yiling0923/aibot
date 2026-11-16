@@ -25,9 +25,15 @@ const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
   totals: { chats: 52, calls: 123, inputTokens: 901000, outputTokens: 60100, totalTokens: 961100, cost: 0.12, charge: 0.144, ownKeyCalls: 5, ownKeyTokens: 3000, unpricedCalls: 3 },
   byKind: [{ kind: 'pick', calls: 120, totalTokens: 960000, cost: 0.12 }], unpricedModels: [{ provider: 'openai', model: 'gpt-new', calls: 3, tokens: 1100 }],
   prices: [{ provider: 'anthropic', model: 'claude-haiku-5-5', inputPerMTok: 0.1, outputPerMTok: 0.5, updatedBy: 'system', updatedAt: '2026-11-01T00:00:00Z' }] });
+let lcLines: { from: string; sender: string; text: string }[] = [];
+const lcReply = (init?: RequestInit) => {                                                          // a stand-in for the LiveChat test route
+  const text = String(JSON.parse(String(init?.body ?? '{}')).text ?? '');
+  if (text) lcLines = [...lcLines, { from: 'customer', sender: 'visitor', text }, { from: 'bot', sender: 'ai', text: 'Go to Wallet > Deposit.' }];
+  return { conversationId: lcLines.length ? 'c1' : null, status: lcLines.length ? 'open' : null, handoff: lcLines.length ? 'none' : null, messages: lcLines, replied: !!text };
+};
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
-  vi.stubGlobal('fetch', vi.fn((url: string) => json(url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => json(url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -39,7 +45,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => localStorage.clear());
+beforeEach(() => { localStorage.clear(); lcLines = []; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -323,5 +329,25 @@ describe('Control panel', () => {
     await userEvent.click(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save to draft' }));
     expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();                                                 // saved to the draft: the bar goes away
     expect(await screen.findByText(/Draft/)).toBeTruthy();
+  });
+  it('has a LiveChat test chat for admins: send a message, see it and the bot reply as bubbles, and start a new chat; staff do not see it', async () => {
+    const { unmount } = open('admin', '/admin/lchat');
+    expect(await screen.findByRole('heading', { name: 'LiveChat test' })).toBeTruthy();
+    expect(await screen.findByText(/No messages yet/)).toBeTruthy();
+    const box = screen.getByLabelText('Message') as HTMLInputElement;
+    expect((screen.getByRole('button', { name: 'Send' }) as HTMLButtonElement).disabled).toBe(true);   // nothing typed
+    await userEvent.type(box, 'how to deposit'); await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    expect(await screen.findByText('Go to Wallet > Deposit.')).toBeTruthy();                           // the bot's reply, through LiveChat
+    expect(screen.getByText('how to deposit')).toBeTruthy(); expect(screen.getByText(/Chat status: open/)).toBeTruthy();
+    expect(box.value).toBe('');
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    expect((screen.getByLabelText('LiveChat address') as HTMLInputElement).value).toBe('http://localhost:8080');
+    expect((screen.getByLabelText('Tenant id') as HTMLInputElement).value).toBe('1');
+    lcLines = []; await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
+    expect(await screen.findByText(/No messages yet/)).toBeTruthy();
+    unmount();
+    open('staff', '/admin/lchat');
+    expect(await screen.findByText('Only an admin can use this screen.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'LiveChat test' })).toBeNull();                        // not in the staff menu
   });
 });

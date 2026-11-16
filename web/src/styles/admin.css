@@ -437,3 +437,14 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .ubar{position:sticky;bottom:14px;z-index:5;margin-top:16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#1d2733;color:#fff;border-radius:14px;padding:11px 16px;box-shadow:0 8px 24px rgba(0,0,0,.25)}
 .ubar .ulist{color:#aab4bf;font-size:13px;min-width:0}.ubar .uact{margin-left:auto;display:flex;gap:8px}
 .ubar .btn{background:transparent;color:#fff;border-color:#4a5663}.ubar .btn:hover{border-color:#fff}.ubar .btn.pri{background:var(--accent);border-color:var(--accent)}
+
+/* LiveChat test: a chat window that goes through LiveChat */
+.lcbtns{display:flex;gap:8px}.lcset{margin:6px 0 10px}
+.lcbox{height:420px;overflow:auto;border:1px solid var(--line);border-radius:14px;background:var(--surface2);padding:14px;display:flex;flex-direction:column;gap:10px;margin-top:8px}
+.lcempty{margin:auto;text-align:center;max-width:320px}
+.lcmsg{display:flex;flex-direction:column;max-width:78%;align-items:flex-start}.lcmsg small{color:var(--muted);font-size:11px;font-weight:600;margin:0 6px 2px}
+.lcmsg.customer{align-self:flex-end;align-items:flex-end}.lcbub{white-space:pre-wrap;padding:9px 13px;border-radius:16px;background:var(--surface);border:1px solid var(--line)}
+.lcmsg.customer .lcbub{background:var(--accent);color:#fff;border-color:var(--accent);border-bottom-right-radius:5px}.lcmsg.bot .lcbub,.lcmsg.agent .lcbub{border-bottom-left-radius:5px}
+.lcmsg.system{align-self:center;align-items:center;max-width:90%}.lcmsg.system .lcbub{background:none;border:0;color:var(--muted);font-size:12.5px;padding:2px}
+.lcwait{color:var(--muted);letter-spacing:3px}
+.lcstat{margin:8px 2px 0;font-size:12.5px}.lcin{display:flex;gap:8px;margin-top:8px}.lcin input{flex:1}
