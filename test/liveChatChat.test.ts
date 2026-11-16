@@ -7,7 +7,7 @@ import { createPool, type Pool } from '../src/db/pool';
 import { migrate } from '../src/db/migrate';
 import { seed, DEMO_ADMIN, DEMO_STAFF_PASSWORD } from '../src/db/seed';
 import { buildApp } from '../src/server/app';
-import { chatThroughLiveChat } from '../src/livechat/chat';
+import { chatThroughLiveChat, probeUploads, sniffType } from '../src/livechat/chat';
 
 /** A small stand-in for LiveChat's website widget API: it starts chats, takes visitor messages and answers like the bot does after a moment. */
 function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string; refuseType?: string } = {}) {
@@ -78,10 +78,30 @@ describe('chatting through a LiveChat', () => {
   it('stops at once when LiveChat looks at the file and refuses its type, and says which file it was', async () => {
     const lc = await fakeLiveChat({ refuseType: 'image/png' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-type', pollMs: 40, waitMs: 500 };
     const err = await chatThroughLiveChat({ ...o, file: { name: 'slip.png', type: 'image/png', data: new Uint8Array([1, 2, 3]) } }).catch((e: Error) => e.message);
-    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*a \.jpg picture/s);
+    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*Check which files LiveChat accepts/s);
     expect(lc.uploads).toHaveLength(0);                                                                                           // nothing was stored, and no other field names were tried
     const ok = await chatThroughLiveChat({ ...o, visitor: 'vis-type2', file: { name: 'slip.jpg', type: 'image/jpeg', data: new Uint8Array([1, 2, 3]) } });
     expect(ok.messages.some((m) => m.attachment?.name === 'slip.jpg')).toBe(true);                                                // another type goes through
+    lc.close();
+  });
+  it('knows what a file really is from its first bytes', () => {
+    expect(sniffType(new Uint8Array([0xff, 0xd8, 0xff, 0xe0]))).toEqual({ type: 'image/jpeg', ext: 'jpg' });
+    expect(sniffType(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))).toEqual({ type: 'image/png', ext: 'png' });
+    expect(sniffType(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50]))).toEqual({ type: 'image/webp', ext: 'webp' });
+    expect(sniffType(new Uint8Array([0x25, 0x50, 0x44, 0x46]))?.type).toBe('application/pdf'); expect(sniffType(new Uint8Array([1, 2, 3]))).toBeNull();
+  });
+  it('sends a picture named .jpg that is really WebP as a WebP, and says so when LiveChat refuses it', async () => {
+    const webp = new Uint8Array([0x52, 0x49, 0x46, 0x46, 9, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 1, 2]);
+    const lc = await fakeLiveChat({ refuseType: 'image/webp' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-real', pollMs: 40, waitMs: 500 };
+    const err = await chatThroughLiveChat({ ...o, file: { name: 'MMU (3).jpg', type: 'image/jpeg', data: webp } }).catch((e: Error) => e.message);
+    expect(String(err)).toMatch(/MMU \(3\)\.webp \(image\/webp, really WEBP inside although it was named MMU \(3\)\.jpg/);
+    lc.close();
+  });
+  it('asks LiveChat which kinds of file it takes, one sample of each', async () => {
+    const lc = await fakeLiveChat({ refuseType: 'image/webp' });
+    const rows = await probeUploads({ baseUrl: lc.base, tenant: '1' });
+    expect(rows.map((r) => [r.label, r.ok])).toEqual([['JPG picture', true], ['PNG picture', true], ['GIF picture', true], ['WebP picture', false], ['PDF document', true], ['Text file', true]]);
+    expect(rows.find((r) => r.label === 'WebP picture')?.answer).toBe('Unsupported attachment type.');
     lc.close();
   });
   it('reads a picture an agent sent: the link is completed with the LiveChat address, and only safe links are kept', async () => {
@@ -153,6 +173,16 @@ describe.skipIf(!reachable)('the LiveChat test route (needs TEST_DATABASE_URL)',
     const ok = await f({ name: '../../evil slip.png', type: 'image/png', data: png });
     expect(ok.statusCode).toBe(200); expect(lc.uploads[0].name).toBe('.._.._evil slip.png');                              // a path in the name is made harmless
     expect(ok.json().messages.find((m: { attachment?: unknown }) => m.attachment).attachment).toMatchObject({ name: '.._.._evil slip.png', mimeType: 'image/png' });
+    lc.close();
+  });
+
+  it('the file check is for admins only, checks the address, and reports what LiveChat said', async () => {
+    const lc = await fakeLiveChat({ refuseType: 'application/pdf' });
+    const probe = (cookie: string, payload: object) => app.inject({ method: 'POST', url: '/api/admin/livechat-chat/probe', payload, headers: { cookie } });
+    expect((await probe(staff, { baseUrl: lc.base })).statusCode).toBe(403);
+    expect((await probe(admin, { baseUrl: 'ftp://x' })).statusCode).toBe(400);
+    const ok = await probe(admin, { baseUrl: lc.base });
+    expect(ok.statusCode).toBe(200); expect(ok.json().rows.find((r: { label: string }) => r.label === 'PDF document')).toMatchObject({ ok: false, answer: 'Unsupported attachment type.' });
     lc.close();
   });
 });

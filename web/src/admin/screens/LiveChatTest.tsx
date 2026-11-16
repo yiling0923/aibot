@@ -34,6 +34,7 @@ export default function LiveChatTest() {
   const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => store('lcMid', 'tom8841'));
   const [mname, setMname] = useState(() => store('lcMname', 'Tom')); const [mrank, setMrank] = useState(() => store('lcMrank', 'GOLD'));
   const [lines, setLines] = useState<Line[]>([]); const [info, setInfo] = useState<{ status: string | null; handoff: string | null }>({ status: null, handoff: null });
+  const [probe, setProbe] = useState<{ label: string; ok: boolean; answer: string }[] | null>(null); const [probing, setProbing] = useState(false);
   const [pick, setPick] = useState<File | null>(null); const fileIn = useRef<HTMLInputElement>(null);
   const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [showSet, setShowSet] = useState(false);
   const end = useRef<HTMLDivElement>(null);
@@ -86,6 +87,10 @@ export default function LiveChatTest() {
     keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: t }]); setText(''); void call(t);
   };
+  const checkFiles = async () => {
+    setProbing(true); setProbe(null); setErr('');
+    try { setProbe((await api<{ rows: { label: string; ok: boolean; answer: string }[] }>('/api/admin/livechat-chat/probe', { baseUrl: base, tenant })).rows); } catch (e) { setErr((e as Error).message); } finally { setProbing(false); }
+  };
   const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); p.toast('New chat started'); };
 
   return (
@@ -97,6 +102,9 @@ export default function LiveChatTest() {
         {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /></label>
           <label className="fld"><span>Name</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
           <label className="fld"><span>Rank</span><input value={mrank} onChange={(e) => { setMrank(e.target.value); keep('lcMrank', e.target.value); }} style={{ width: 110 }} /></label></>}
+        <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={checkFiles}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
+          <span className="sub"> Sends one tiny sample of each kind into a new test chat in LiveChat.</span>
+          {probe && <ul className="plain" aria-label="Files LiveChat accepts" style={{ marginTop: 6 }}>{probe.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused, “{r.answer}”</span>}</li>)}</ul>}</div>
         <div className="sub full">Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. The bot never shows account data in a LiveChat reply, so “check my balance” goes to a person for both.</div>
         <div className="sub full">The local setup uses <span className="mono">http://localhost:8080</span> and tenant <span className="mono">1</span>. This is the address the bot server uses, so it must be reachable from the computer that runs the bot.</div></div>}
       <div className="lcbox" aria-live="polite">

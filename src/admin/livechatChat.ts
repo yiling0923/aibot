@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import '../auth/types';
-import { chatThroughLiveChat } from '../livechat/chat';
+import { chatThroughLiveChat, probeUploads } from '../livechat/chat';
 
 /** The LiveChat test page: a chat in the panel whose messages go through a LiveChat (an admin tool). */
 const MAX_FILE = 10 * 1024 * 1024;
@@ -32,5 +32,14 @@ export function livechatChatRoutes(app: FastifyInstance, ctx: { fetch?: typeof f
     }
     try { return await chatThroughLiveChat({ baseUrl, tenant, visitor, text, member, file, waitMs: ctx.waitMs, pollMs: ctx.pollMs }, ctx.fetch); }
     catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
+  });
+
+  /** Asks LiveChat which kinds of file it takes, with one tiny sample of each (admin only). */
+  app.post<{ Body: { baseUrl?: string; tenant?: string } }>('/api/admin/livechat-chat/probe', async (req, reply) => {
+    if (req.user?.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can use the LiveChat test.' });
+    const baseUrl = String(req.body?.baseUrl ?? '').trim(), tenant = String(req.body?.tenant ?? '1').trim() || '1';
+    if (!/^https?:\/\/[^\s/]+(:\d+)?(\/[^\s]*)?$/.test(baseUrl) || baseUrl.length > 200) return reply.code(400).send({ error: 'Enter the LiveChat address, like http://localhost:8080.' });
+    if (!/^[A-Za-z0-9_-]{1,40}$/.test(tenant)) return reply.code(400).send({ error: 'The tenant id may use letters, digits, - and _.' });
+    try { return { rows: await probeUploads({ baseUrl, tenant }, ctx.fetch) }; } catch (e) { return reply.code(502).send({ error: (e as Error).message }); }
   });
 }

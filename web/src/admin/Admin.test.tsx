@@ -33,7 +33,7 @@ const lcReply = (init?: RequestInit) => {                                       
 };
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
-  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => json(url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+  vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -320,6 +320,13 @@ describe('Control panel', () => {
     expect(screen.queryByText(/slip\.png · 2 KB/)).toBeNull();
     fireEvent.change(input, { target: { files: [new File(['x'], 'run.exe', { type: 'application/x-msdownload' })] } });
     expect(await screen.findByText(/This kind of file is not allowed here/)).toBeTruthy();
+  });
+  it('LiveChat test: the file check lists which kinds LiveChat accepts', async () => {
+    open('admin', '/admin/lchat');
+    await userEvent.click(await screen.findByRole('button', { name: 'Settings' }));
+    await userEvent.click(screen.getByRole('button', { name: /Check which files LiveChat accepts/ }));
+    expect(await screen.findByLabelText('Files LiveChat accepts')).toBeTruthy();
+    expect(screen.getByText(/WebP picture/)).toBeTruthy(); expect(screen.getByText(/refused, “Unsupported attachment type\.”/)).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

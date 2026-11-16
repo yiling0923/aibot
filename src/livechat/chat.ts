@@ -14,6 +14,21 @@ export interface ChatOpts {
   file?: { name: string; type: string; data: Uint8Array };
 }
 
+/** What a file really is, from its first bytes (a name or a browser can say .jpg for a picture that is really WebP). */
+export function sniffType(d: Uint8Array): { type: string; ext: string } | null {
+  const h = (i: number, ...b: number[]) => b.every((x, k) => d[i + k] === x);
+  const brand = String.fromCharCode(...Array.from(d.subarray(8, 12)));
+  if (h(0, 0xff, 0xd8, 0xff)) return { type: 'image/jpeg', ext: 'jpg' };
+  if (h(0, 0x89, 0x50, 0x4e, 0x47)) return { type: 'image/png', ext: 'png' };
+  if (h(0, 0x47, 0x49, 0x46, 0x38)) return { type: 'image/gif', ext: 'gif' };
+  if (h(0, 0x52, 0x49, 0x46, 0x46) && h(8, 0x57, 0x45, 0x42, 0x50)) return { type: 'image/webp', ext: 'webp' };
+  if (h(0, 0x25, 0x50, 0x44, 0x46)) return { type: 'application/pdf', ext: 'pdf' };
+  if (h(4, 0x66, 0x74, 0x79, 0x70) && /avi/.test(brand)) return { type: 'image/avif', ext: 'avif' };
+  if (h(4, 0x66, 0x74, 0x79, 0x70) && /heic|heix|mif1/.test(brand)) return { type: 'image/heic', ext: 'heic' };
+  if (h(0, 0x42, 0x4d)) return { type: 'image/bmp', ext: 'bmp' };
+  return null;
+}
+
 /** The field names tried, in this order, for the file in the upload (LiveChat answers 400, 415 or 422 when the name is not the one it reads). */
 export const FILE_FIELDS = ['file', 'attachment', 'image'];
 /** The upload addresses tried in turn ({id} is the chat). */
@@ -59,7 +74,9 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
   // The address was not known when this was written: the likely ones are tried in turn (404 or 405: not this one, try the next; 400, 415 or 422: the address is right but
   // the form field is not, try the next field name) and every answer is kept, so a failure shows exactly what LiveChat said.
   const upload = async (convId: string): Promise<void> => {
-    const file = o.file!; const tried: string[] = []; const cid = encodeURIComponent(convId);
+    const file = { ...o.file! }; const tried: string[] = []; const cid = encodeURIComponent(convId);
+    const real = sniffType(file.data);                                                               // LiveChat looks inside the file: send what it really is
+    if (real && real.type !== file.type) { file.type = real.type; file.name = file.name.replace(/\.[A-Za-z0-9]{1,5}$/, '') + '.' + real.ext; }
     for (const path of UPLOAD_PATHS.map((p) => p.replace('{id}', cid))) {
       for (const field of FILE_FIELDS) {
         const form = new FormData();
@@ -72,7 +89,7 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
         tried.push(`POST ${path} (field "${field}") -> ${r.status} ${body}`.trim());
         let code = '', said = ''; try { const e = JSON.parse(full); code = String(e.error ?? ''); said = String(e.message ?? ''); } catch { /* not JSON */ }
         if (code === 'attachment_invalid') {                                                          // the address and the field are right: LiveChat looked at the file and refused it
-          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}, ${file.data.length} bytes) at ${path}. The upload itself works, so try another kind of file, a .jpg picture for example. If a .jpg is refused too, tell the developer.`);
+          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}${real && real.type !== o.file!.type ? `, really ${real.ext.toUpperCase()} inside although it was named ${o.file!.name}` : ''}, ${file.data.length} bytes) at ${path}. The upload itself works. In Settings, the button "Check which files LiveChat accepts" shows which kinds it takes.`);
         }
         if (r.ok) {
           let j: Record<string, any> | null = null; try { j = JSON.parse(full); } catch { /* an answer that is not JSON: the message is assumed to be made */ }   // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -103,4 +120,25 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
     await new Promise((r) => setTimeout(r, o.pollMs ?? 800)); c = await read(id);
   }
   return result(id, c, lines(c).filter((m) => m.from !== 'customer').length > before);
+}
+
+/** One tiny sample of each kind of file, to ask LiveChat which ones it takes. */
+const SAMPLES: { label: string; name: string; type: string; b64: string }[] = [
+  { label: 'JPG picture', name: 'probe.jpg', type: 'image/jpeg', b64: '/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////wgALCAABAAEBAREA/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxA=' },
+  { label: 'PNG picture', name: 'probe.png', type: 'image/png', b64: 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==' },
+  { label: 'GIF picture', name: 'probe.gif', type: 'image/gif', b64: 'R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7' },
+  { label: 'WebP picture', name: 'probe.webp', type: 'image/webp', b64: 'UklGRhoAAABXRUJQVlA4TA0AAAAvAAAAEAcQERGIiP4HAA==' },
+  { label: 'PDF document', name: 'probe.pdf', type: 'application/pdf', b64: Buffer.from('%PDF-1.1\n1 0 obj<</Type/Catalog>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n').toString('base64') },
+  { label: 'Text file', name: 'probe.txt', type: 'text/plain', b64: Buffer.from('probe').toString('base64') },
+];
+export interface ProbeRow { label: string; ok: boolean; answer: string }
+
+/** Sends one tiny sample of each kind of file in one new chat and reports what LiveChat answered for each (the chat stays in LiveChat as a test chat). */
+export async function probeUploads(o: { baseUrl: string; tenant: string }, f: Fetch = fetch): Promise<ProbeRow[]> {
+  const visitor = 'vis-probe-' + Math.random().toString(36).slice(2, 10); const rows: ProbeRow[] = [];
+  for (const s of SAMPLES) {
+    try { await chatThroughLiveChat({ ...o, visitor, waitMs: 1, pollMs: 1, file: { name: s.name, type: s.type, data: new Uint8Array(Buffer.from(s.b64, 'base64')) } }, f); rows.push({ label: s.label, ok: true, answer: 'accepted' }); }
+    catch (e) { const m = (e as Error).message; rows.push({ label: s.label, ok: false, answer: (/refused this file: "([^"]+)"/.exec(m)?.[1] ?? m).slice(0, 160) }); }
+  }
+  return rows;
 }
