@@ -12,11 +12,13 @@ const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)
 
 export default function Kb() {
   const p = usePanel();
-  const [q, setQ] = useState(''); const [status, setStatus] = useState('all');
+  const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [topicF, setTopicF] = useState('all');
   const [ed, setEd] = useState<Ed | null>(null);
   
   const all = p.draft.kb.filter((e) => e.merchant === p.merchant);
-  const list = all.filter((e) => (status === 'all' || e.status === status) && (!q || (e.intent_key + ' ' + LANGS.map((l) => trOf(e, l).answer_text).join(' ')).toLowerCase().includes(q.toLowerCase())));
+  const needs = all.filter((e) => entryProblems(e).length).length; const drafts = all.length - all.filter((e) => e.status === 'live').length;
+  const topicsIn = [...new Set(all.map((e) => e.topic).filter(Boolean))].sort();
+  const list = all.filter((e) => (status === 'all' || (status === 'needs' ? entryProblems(e).length > 0 : e.status === status)) && (topicF === 'all' || e.topic === topicF) && (!q || (e.intent_key + ' ' + LANGS.map((l) => trOf(e, l).answer_text).join(' ')).toLowerCase().includes(q.toLowerCase())));
   const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => CORE_LANGS.some((l) => langState(e, l) !== 'on')).length;
 
   const open = (e: Entry | null) => {
@@ -28,21 +30,24 @@ export default function Kb() {
     <>
       <div className="card"><div className="head"><div><h2>Knowledge base · {p.M.name}</h2><div className="sub">What the bot may answer for this merchant. Only live entries are used.</div></div>
         <button className="btn pri" type="button" onClick={() => open(null)}>Add entry</button></div>
-        <div className="quiet"><b>{live}</b> live{all.length - live ? <> · <b>{all.length - live}</b> draft</> : null}{miss ? <> · <b>{miss}</b> missing a language or examples</> : null}</div>
-        <div className="filt-row" style={{ marginTop: 10 }}>
+        {miss ? <div className="kwstats"><span className="st dim" title="Entries missing an answer or 3+ examples in a main language">{miss} missing a language or examples</span></div> : null}
+        <div className="filt-row" style={{ marginTop: 12 }}>
+          <div className="segs" role="group" aria-label="Show">{([['all', 'All', all.length], ['live', 'Live', live], ['draft', 'Draft', drafts], ['needs', 'Needs work', needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
           <input type="search" placeholder="Search entries or answers" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" style={{ minWidth: 220 }} />
-          <select aria-label="Status" value={status} onChange={(e) => setStatus(e.target.value)}><option value="all">All</option><option value="live">Live</option><option value="draft">Draft</option></select></div></div>
-      <div className="card scroll"><table><thead><tr><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
+          <select aria-label="Topic" value={topicF} onChange={(e) => setTopicF(e.target.value)}><option value="all">All topics</option>{topicsIn.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+          <span className="sub">{list.length} shown</span></div></div>
+      <div className="card scroll"><table><thead><tr><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Questions</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
             <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).join(' ')}>needs work</span> : null}</td>
             <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">missing</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' (alone)' : ''}</Pill></> : null}</td>
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
-            <td>{trOf(e, 'en').answer_text.slice(0, 110)}</td>
+            <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={n < 3 ? 'Add at least 3 example questions' : 'Example questions in English'}>{n}</span>; })()}</td>
+            <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
             <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
           </tr>
         ))}
-        {!list.length && <tr><td colSpan={5} className="sub">No entries match.</td></tr>}
+        {!list.length && <tr><td colSpan={6} className="sub">No entries match.</td></tr>}
       </tbody></table></div>
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
     </>
@@ -112,12 +117,14 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   return (
     <Modal label="Edit entry" onClose={onClose}>
       <div className="head"><h2>{ed.id ? 'Edit entry' : 'New entry'}</h2><button className="btn sm" type="button" onClick={onClose}>Close</button></div>
+      <div className="kbsec"><b>1</b> About this entry</div>
       <div className="form">
         <label className="fld"><span>Entry name</span><input type="text" value={ed.intent_key} onChange={(e) => set({ intent_key: e.target.value })} placeholder="e.g. daily_withdraw_limit" /></label>
         <label className="fld"><span>Status</span><select value={ed.status} onChange={(e) => set({ status: e.target.value as Entry['status'] })}><option value="live">Live</option><option value="draft">Draft (bot ignores it)</option></select></label>
         <label className="fld"><span>Type</span><select value={ed.entry_type || 'answer'} onChange={(e) => set({ entry_type: e.target.value as Entry['entry_type'] })}><option value="answer">Answer</option><option value="needs_staff">Needs staff</option><option value="promotion">Promotion</option></select></label>
         <label className="fld"><span>End date (optional)</span><input type="date" value={ed.ends_on || ''} onChange={(e) => set({ ends_on: e.target.value || null })} /></label>
         <div className="sub full" style={{ marginTop: -4 }}>{TYPE_NOTE[ed.entry_type || 'answer']}{ed.ends_on ? ' The entry is used until the end of ' + ed.ends_on + ', then it hides itself.' : ''}</div>
+        <div className="kbsec full"><b>2</b> When the bot uses it</div>
         <label className="fld"><span>Topic (required)</span><select value={ed.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">Choose a topic word…</option>{topicList(p.draft, p.merchant).map((x) => <option key={x}>{x}</option>)}<option value="__new">+ New topic…</option></select></label>
         {ed.topic === '__new' && <>
           <label className="fld"><span>Name of the new topic</span><input type="text" placeholder="e.g. refund" value={ed.newTopic} onChange={(e) => set({ newTopic: e.target.value })} /></label>
@@ -128,6 +135,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
           {p.adv && <label className="tog full"><input type="checkbox" checked={ed.topic_optional} onChange={(e) => set({ topic_optional: e.target.checked })} /> The question type alone is enough (no topic word needed), for example opening hours</label>}</>}
       </div>
       <div className="note">The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.</div>
+      <div className="kbsec"><b>3</b> What the bot says, in each language</div>
       <div className="tabs" role="tablist">{LANGS.map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
       <label className="fld"><span>Answer in {LN[ed.tab]} (facts only; the bot adds the tone)</span><textarea lang={ed.tab} value={t.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
       <div className="tools" style={{ marginTop: -4 }}>
@@ -137,7 +145,8 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
         {ed.tab === 'en' && <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['vi', 'th', 'tl'])}>{busy ? 'Translating…' : 'Translate to Vietnamese, Thai and Filipino'}</button>}
         <span className="sub">{p.ai.translate ? 'The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.' : 'Translating needs the AI. Add the Anthropic key to .env.'}</span>
       </div>
-      <div><h3>Example questions ({t.question_examples.length}) <span className="sub">at least 3, include slang</span></h3>
+      <div className="kbsec"><b>4</b> How customers ask for it</div>
+      <div><h3>Example questions ({t.question_examples.length}) <span className={'pill ' + (t.question_examples.length >= 3 ? 'ok' : 'warn')}>{t.question_examples.length >= 3 ? 'enough' : 'add ' + (3 - t.question_examples.length) + ' more'}</span> <span className="sub">at least 3, include slang</span></h3>
         <div className="chips">{t.question_examples.map((x, i) => <span className="chip" key={i}>{x}<button type="button" aria-label="Remove" onClick={() => setTr({ question_examples: t.question_examples.filter((_, j) => j !== i) })}>×</button></span>)}{!t.question_examples.length && <span className="sub">None yet</span>}</div>
         <div className="addrow"><input type="text" placeholder="Add an example, then press Enter" style={{ flex: 1, minWidth: 180 }} value={ed.newEx} onChange={(e) => set({ newEx: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEx(); } }} /><button className="btn sm" type="button" onClick={addEx}>Add</button><button className="btn sm" type="button" onClick={suggest}>Suggest with AI</button></div></div>
       {sug.length > 0 && <div className="sug"><b style={{ fontSize: 12.5 }}>AI suggestions · need your approval</b>{sug.map((x, i) => (

@@ -486,3 +486,11 @@ tbody tr:hover td{background:color-mix(in srgb,var(--surface2) 55%,transparent)}
 .lane.over{background:color-mix(in srgb,var(--accent) 9%,transparent);outline:2px dashed var(--accent);outline-offset:-2px}
 
 .flowwrap.nopal{grid-template-columns:minmax(0,1fr)}
+
+/* Knowledge base polish */
+.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:520px}
+tr.row{cursor:pointer}
+
+.kbsec{display:flex;align-items:center;gap:8px;margin:10px 0 2px;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.kbsec b{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--accent);color:#fff;font-size:11px;letter-spacing:0}
+.form .kbsec.full{grid-column:1/-1;border-top:1px solid var(--line);padding-top:12px;margin-top:6px}
