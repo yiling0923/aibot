@@ -17,10 +17,18 @@ describe('engine: acceptance cases from the seed JSON', () => {
 });
 
 describe('engine: words learned from real customer chats', () => {
-  it.each([['maybank', 'CHOICE'], ['send me paynow scan', 'CHOICE'], ['cdm', 'CHOICE'], ['claim', 'ANSWER'], ['tng free spin', 'ANSWER'], ['done', 'SMALLTALK'], ['halo', 'SMALLTALK'],
+  it.each([['maybank', 'HANDOFF'], ['send me paynow scan', 'HANDOFF'], ['cdm', 'HANDOFF'], ['provide me bank acc for deposit', 'HANDOFF'], ['account for deposit 50', 'HANDOFF'], ['hi bro topup dbs bank acc', 'HANDOFF'], ['claim', 'ANSWER'], ['tng free spin', 'ANSWER'], ['done', 'SMALLTALK'], ['halo', 'SMALLTALK'],
     ['pls check', 'HANDOFF'], ['hurry', 'HANDOFF'], ['leave message', 'HANDOFF'], ['help to approve', 'HANDOFF']])('"%s" -> %s', (text, decision) => {
     expect(engine.analyze(text, 'MERCH_A', 0).decision).toBe(decision);
   });
+});
+
+describe('engine: asking for the deposit account goes to a person, but questions about it do not', () => {
+  it.each([['how to deposit', 'ANSWER'], ['how to deposit with paynow', 'ANSWER'], ['can i change my bank account', 'HANDOFF'], ['account number', 'CLARIFY'], ['withdraw to maybank', 'HANDOFF'], ['deposit', 'CHOICE']])('"%s" is not a plain account request (%s)', (text) => {
+    const r = engine.analyze(text, 'MERCH_A', 0);
+    expect(r.guard?.kind).not.toBe('pay-details');
+  });
+  it('is a hand-over that says why', () => { const r = engine.analyze('send me paynow scan', 'MERCH_A', 0); expect(r.guard?.kind).toBe('pay-details'); });
 });
 
 describe('engine: behaviour that does not fit one message', () => {

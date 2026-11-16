@@ -8,12 +8,13 @@ import { splitIntoMerchantDatabases } from './steps/008_merchant_databases';
 import { addLanguages } from './steps/012_languages';
 import { addMoneyWords } from './steps/013_money_words';
 import { addRealChatWords } from './steps/014_real_chat_words';
+import { addPayInfoWords } from './steps/015_pay_info_words';
 import { allowWipe } from './guard';
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../db/migrations');
 
 /** Steps written in code (they move data, which plain SQL cannot do). They run in name order together with the .sql files. */
-const STEPS: Record<string, (pool: Pool) => Promise<void>> = { '008_merchant_databases': splitIntoMerchantDatabases, '012_languages': addLanguages, '013_money_words': addMoneyWords, '014_real_chat_words': addRealChatWords };
+const STEPS: Record<string, (pool: Pool) => Promise<void>> = { '008_merchant_databases': splitIntoMerchantDatabases, '012_languages': addLanguages, '013_money_words': addMoneyWords, '014_real_chat_words': addRealChatWords, '015_pay_info_words': addPayInfoWords };
 
 /** Brings the main database and every merchant database up to date.
  *  Main database: the files in db/migrations (and the code steps), each once, in name order.

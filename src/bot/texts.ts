@@ -98,6 +98,16 @@ export const REASK_TXT = {
             zh: '抱歉，我们没有完全理解您的消息。请您再详细说明一下，或从下方选项中选择。' },
 };
 
+/** Said when a customer asks for the deposit bank account or PayNow QR. These change often, so a person gives them. The amount (if written) is repeated so the agent sees it. */
+export const PAYINFO: Record<Lang, (amt: string) => string> = {
+  en: (a) => `I'll bring in a team member now to give you the latest deposit account${a}. Please wait a moment 🙏`,
+  ms: (a) => `Saya akan panggil pasukan kami untuk beri akaun deposit terkini${a}. Mohon tunggu sebentar 🙏`,
+  zh: (a) => `我马上请同事为您提供最新的存款账户${a}，请稍等 🙏`,
+  vi: (a) => `Mình sẽ nhờ nhân viên gửi bạn tài khoản nạp tiền mới nhất${a}. Vui lòng chờ một chút 🙏`,
+  th: (a) => `ขอเรียกทีมงานมาให้บัญชีฝากล่าสุด${a} กรุณารอสักครู่ 🙏`,
+  tl: (a) => `Tatawagin ko ang aming team para ibigay ang pinakabagong deposit account${a}. Sandali lang po 🙏`,
+};
+
 /* Vietnamese, Thai and Filipino sentences (texts_extra.ts) join the tables above, keeping their shapes. */
 import { EXTRA } from './texts_extra';
 const TABLES = { LABEL, TONE, CLARIFY_TXT, GREET, TOPIC_LABEL, CHOICE_TXT, PICK_TXT, MORE_HELP, AGENT, SMALL_REPLY, AMT_LABEL, AMT_ASK, AMT_ASK2, LIM_OK, LIM_LOW, LIM_HIGH, GUIDE_ONLY, FOUND_TX, NOTFOUND_TX,

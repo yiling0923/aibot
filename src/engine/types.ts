@@ -62,7 +62,7 @@ export interface KeywordRow { id: number; intent: string; topic: string; aspect:
 /** A word the customer typed that the bot recognised: a topic word (depo, 充值, nạp tiền) or a question word (how long, 'not in'). `to` is what it points to (the topic, or the question type). */
 export interface KeywordHit { word: string; kind: 'topic' | 'question' | 'money'; to: string }
 export interface KeywordScan { T: string[]; A: string[]; rest: string; strong: KeywordRow[]; partial: KeywordRow[]; words: KeywordHit[]; money: string[] }
-export interface Guard { kind: 'injection' | 'other-merchant' | 'sensitive' | 'human' | 'trigger' | 'account-details'; hit: string[]; why: string }
+export interface Guard { kind: 'injection' | 'other-merchant' | 'sensitive' | 'human' | 'trigger' | 'account-details' | 'pay-details'; hit: string[]; why: string }
 
 export interface AnalyzeResult {
   raw: string; lang: Lang; normalized: string; hits: [string, string][];

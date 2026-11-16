@@ -2625,6 +2625,80 @@
     "tawag sa akin",
     "makausap ang manager"
    ]
+  },
+  "pay_method": {
+   "en": [
+    "paynow",
+    "pay now",
+    "uen",
+    "cdm",
+    "maybank",
+    "mybank",
+    "rhb",
+    "ambank",
+    "dbs",
+    "ocbc",
+    "posb",
+    "cimb",
+    "bank in",
+    "scan qr",
+    "qr code",
+    "qr"
+   ]
+  },
+  "pay_ask": {
+   "en": [
+    "bank acc",
+    "bank account",
+    "account number",
+    "acc no",
+    "acount num",
+    "acount number",
+    "account for",
+    "acc pls",
+    "account pls",
+    "nak acc",
+    "akaun bank",
+    "no akaun"
+   ]
+  },
+  "pay_deposit": {
+   "en": [
+    "deposit",
+    "depo",
+    "dp",
+    "top up",
+    "topup",
+    "topap",
+    "transfer",
+    "bank in",
+    "pay",
+    "bayar",
+    "top-up"
+   ]
+  },
+  "pay_except": {
+   "en": [
+    "withdraw",
+    "wd",
+    "withdrawal",
+    "tarik",
+    "cash out",
+    "change",
+    "update",
+    "bind",
+    "forgot",
+    "how to",
+    "how do",
+    "how can",
+    "cara",
+    "macam mana",
+    "bagaimana",
+    "failed",
+    "rejected",
+    "not received",
+    "belum masuk"
+   ]
   }
  },
  "kb_entries": [

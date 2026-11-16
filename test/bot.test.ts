@@ -20,6 +20,20 @@ describe('customer token', () => {
   });
 });
 
+describe('deposit account requests', () => {
+  it('hands the chat to a person and repeats the amount the customer wrote', async () => {
+    const s = newSession('pay1', 'MERCH_A', null);
+    const t = (await bot.message(s, 'bos send me paynow scan deposit 500'))!;
+    expect(s.handed).toBe(true);
+    expect(text(t)).toContain('deposit account'); expect(text(t)).toContain('(500)');
+  });
+  it('says the same without an amount, and in Malay', async () => {
+    const s = newSession('pay2', 'MERCH_A', null);
+    const t = (await bot.message(s, 'bos nak acc maybank'))!;
+    expect(s.handed).toBe(true); expect(text(t)).not.toContain('(');
+  });
+});
+
 describe('replies', () => {
   it('answers from the merchant knowledge base in the customer language, with the merchant tone', async () => {
     const t = (await bot.message(newSession('1', 'MERCH_A', null), 'depo how lah boss'))!;

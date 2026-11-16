@@ -245,6 +245,10 @@ export class Engine {
     // asking for a person: hand over straight away instead of showing buttons
     const hr = g('human_request').filter(hasP);
     if (hr.length) return { kind: 'human', hit: hr, why: 'The customer asks for a human agent, so the chat is handed over.' };
+    // asking for the deposit bank account / PayNow QR: these change often, so a person gives them (not "how to ...", not withdrawals or account changes)
+    const pm = g('pay_method').filter(hasP), pa = g('pay_ask').filter(hasP);
+    if ((pm.length || (pa.length && g('pay_deposit').some(hasP))) && !g('pay_except').some(hasP))
+      return { kind: 'pay-details', hit: [...pm, ...pa], why: 'The customer asks for the deposit bank account or PayNow QR. These change often, so a person gives them (the amount, if written, is repeated for the agent).' };
     // this merchant's own trigger phrases
     const tp = (m.triggerPhrases ?? []).map((p) => fold(p).toLowerCase()).filter(hasP);
     if (tp.length) return { kind: 'trigger', hit: tp, why: 'The message contains a trigger phrase set by ' + m.name + ' ("' + tp[0] + '"), so a human takes over.' };

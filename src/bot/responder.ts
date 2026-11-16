@@ -282,7 +282,9 @@ export class Bot {
             options: this.engine.topicButtons(s.merchant).map((o) => ({ ...o, label: this.label(o, lang) })) };
           break;
         }
-        const h = this.handoff(s, lang); turn.messages.push(...h.messages); turn.status = h.status; break; }
+        const h = this.handoff(s, lang);
+        if (r.guard?.kind === 'pay-details') h.messages[0] = { kind: 'bot', text: T.PAYINFO[lang](r.amt ? ` (${r.amt.n})` : '') };   // says what the person will do, with the amount the customer wrote
+        turn.messages.push(...h.messages); turn.status = h.status; break; }
       case 'ABUSE':
         if (out.close) {
           s.closed = true; say(c.closing[lang] ?? c.closing.en ?? ''); turn.messages.push({ kind: 'sys bad', text: `Chat closed after ${out.strike} rude messages` });
