@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Bot for LiveChat</title>
+<style>
+  :root { --bg:#f5f7f6; --card:#ffffff; --ink:#15211e; --muted:#5a6a65; --line:#dbe4e0; --accent:#0e6f65; --soft:#e4f1ee; --warn:#fff3d6; --warnink:#7a4b07; --bad:#fbe3e0; --ok:#e1f3e8; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1816; --card:#16231f; --ink:#e8f0ee; --muted:#9fb2ac; --line:#26373a; --accent:#4fc2b3; --soft:#1b2b27; --warn:#3a2d10; --warnink:#f1cd8a; --bad:#3d1d1a; --ok:#173326; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,"Noto Sans",sans-serif; padding:28px 16px 60px; }
+  main { max-width: 880px; margin: 0 auto; display:flex; flex-direction:column; gap: 22px; }
+  h1 { font-size: 34px; line-height:1.15; margin:0; }
+  h2 { font-size: 22px; margin:0 0 6px; }
+  h3 { font-size: 17px; margin:0 0 4px; }
+  p { margin: 6px 0; }
+  .lead { font-size: 18px; color: var(--muted); max-width: 60ch; }
+  section { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:22px 24px; }
+  .num { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; font-size:15px; margin-right:8px; vertical-align:middle; }
+  .muted { color: var(--muted); }
+  .flow { display:flex; flex-wrap:wrap; align-items:stretch; gap:8px; margin:14px 0 4px; }
+  .box { flex:1 1 130px; background:var(--soft); border:1px solid var(--line); border-radius:12px; padding:10px 12px; text-align:center; }
+  .box b { display:block; }
+  .arrow { align-self:center; font-size:22px; color:var(--accent); }
+  .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-top:12px; }
+  .item { border:1px solid var(--line); border-radius:12px; padding:12px 14px; background:var(--bg); }
+  .item.ok { background:var(--ok); } .item.ask { background:var(--warn); } .item.go { background:var(--soft); } .item.bad { background:var(--bad); }
+  table { width:100%; border-collapse:collapse; margin-top:10px; }
+  th, td { text-align:left; padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  th { font-size:13px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); }
+  .tablewrap { overflow-x:auto; }
+  ol.steps { list-style:none; counter-reset:s; padding:0; margin:12px 0 0; display:flex; flex-direction:column; gap:10px; }
+  ol.steps li { counter-increment:s; display:grid; grid-template-columns:34px 1fr; gap:12px; align-items:start; }
+  ol.steps li::before { content:counter(s); display:grid; place-items:center; width:30px; height:30px; border-radius:50%; background:var(--accent); color:#fff; font-weight:700; }
+  .note { background:var(--warn); color:var(--warnink); border-radius:10px; padding:10px 14px; margin-top:12px; }
+  ul { margin:6px 0; padding-left:22px; } li { margin:3px 0; }
+  .two { display:grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap:14px; margin-top:10px; }
+  .tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:13px; font-weight:600; background:var(--soft); }
+  footer { color:var(--muted); font-size:14px; text-align:center; }
+  @media print { body { background:#fff; color:#000; padding:0; } section { break-inside:avoid; border:1px solid #ccc; } }
+</style>
+</head>
+<body>
+<main>
+
+<header>
+  <h1>AI Bot for LiveChat</h1>
+  <p class="lead">The bot answers customers' common questions, instantly and in their own language, using only the answers the merchant wrote. When it is not sure, a person takes over.</p>
+</header>
+
+<section>
+  <h2><span class="num">1</span>The idea in four rules</h2>
+  <ul>
+    <li><b>It only uses the merchant's own answers.</b> Nothing from the internet, nothing made up.</li>
+    <li><b>It never guesses.</b> No written answer means a person answers.</li>
+    <li><b>It asks once.</b> If it does not understand, it asks the customer to say more, one time. Then a person takes over.</li>
+    <li><b>Each merchant is separate.</b> Its own answers, its own settings, its own chats.</li>
+  </ul>
+  <p class="muted">Why: agents answer the same questions all day (deposit time, bonus, password). The bot takes those, so agents keep the hard ones.</p>
+</section>
+
+<section>
+  <h2><span class="num">2</span>How it fits with LiveChat</h2>
+  <div class="flow" aria-label="The path of a message">
+    <div class="box"><b>Customer</b>writes in the chat</div><div class="arrow">→</div>
+    <div class="box"><b>LiveChat</b>unchanged</div><div class="arrow">→</div>
+    <div class="box"><b>AI bot</b>a separate program</div><div class="arrow">→</div>
+    <div class="box"><b>Answer</b>comes back through LiveChat</div>
+  </div>
+  <p>LiveChat asks the bot through the connection it already has. Agents keep working in LiveChat: a hand-over simply arrives in their inbox.</p>
+  <p>The <b>control panel</b> is where each merchant writes and publishes its answers.</p>
+</section>
+
+<section>
+  <h2><span class="num">3</span>What happens to one message</h2>
+  <div class="flow" aria-label="The three steps">
+    <div class="box"><b>1. Keywords</b>the words typed<br><span class="muted">"depo", "not in"</span></div><div class="arrow">→</div>
+    <div class="box"><b>2. Topic</b>what the customer wants<br><span class="muted">deposit</span></div><div class="arrow">→</div>
+    <div class="box"><b>3. Answer</b>the merchant's written answer<br><span class="muted">"Deposits arrive in 5 minutes"</span></div>
+  </div>
+  <div class="grid">
+    <div class="item ok"><h3>Clear question</h3>The bot answers at once.</div>
+    <div class="item ask"><h3>Unclear question</h3>The bot asks <b>once</b>, with up to 3 choices. The customer taps one or types "2".</div>
+    <div class="item go"><h3>Still unclear, or wants a person</h3>The chat goes to an agent. After that, the bot stays silent.</div>
+    <div class="item bad"><h3>Rude customer</h3>The bot replies kindly first. It closes the chat only if it continues.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="num">4</span>When a person takes over</h2>
+  <ul>
+    <li>The customer asks for an agent.</li>
+    <li>A complaint or dispute ("money not received", "scam").</li>
+    <li>An account or phone number is typed in the chat.</li>
+    <li>The bot did not understand, after the number of tries the merchant chose (0 to 3, normally 1).</li>
+    <li>The answer is marked <b>needs staff</b> (a person must answer it).</li>
+    <li>The bot is too slow (more than 8 seconds).</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">5</span>Each merchant is separate</h2>
+  <ul>
+    <li>Its own database: answers, settings and chat history are never mixed with another merchant.</li>
+    <li>Its own <b>bot key</b>. The key tells the bot which merchant is asking.</li>
+    <li>The bot is <b>off</b> for a merchant until its key is put into that merchant's LiveChat settings. Adding one merchant never changes the others.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">6</span>How the answers are written</h2>
+  <div class="grid">
+    <div class="item"><h3>Topic and example questions</h3>Each answer has a topic and at least 3 example questions, so the bot can find it.</div>
+    <div class="item"><h3>Six languages</h3>English, Malay, Chinese, Vietnamese, Thai, Filipino.</div>
+    <div class="item"><h3>Three types</h3>Answer. Needs staff. Promotion, with an end date so it hides itself.</div>
+    <div class="item"><h3>Guided answers</h3>After an answer, ask for an amount, username or phone, then pass the chat to a person with the details as a note.</div>
+  </div>
+  <p><b>Draft, then publish.</b> Nothing is live until the merchant presses Publish. Each merchant keeps its own versions and can go back to an earlier one.</p>
+</section>
+
+<section>
+  <h2><span class="num">7</span>The control panel</h2>
+  <div class="tablewrap"><table>
+    <thead><tr><th>Screen</th><th>What it is for</th></tr></thead>
+    <tbody>
+      <tr><td><b>Knowledge base</b></td><td>The answers. A list, a table you edit in place, and bulk "set live".</td></tr>
+      <tr><td><b>Import</b></td><td>Load a starter pack or a file. "Import and publish" in two clicks.</td></tr>
+      <tr><td><b>Topics and Keywords</b></td><td>The words the bot knows. New words customers type arrive by themselves.</td></tr>
+      <tr><td><b>Report</b></td><td>How many messages were answered, not understood or handed over. Wrong answers.</td></tr>
+      <tr><td><b>LiveChat test</b></td><td>Chat as a visitor or a member to try the bot.</td></tr>
+      <tr><td><b>Merchant settings</b></td><td>Tone, languages, hand-over rules, instructions.</td></tr>
+      <tr><td><b>History</b></td><td>Go back to an earlier version of the answers.</td></tr>
+      <tr><td><b>Merchants &amp; logins, Usage &amp; billing</b></td><td>For admins only: add merchants and logins, see the AI cost.</td></tr>
+    </tbody></table></div>
+</section>
+
+<section>
+  <h2><span class="num">8</span>Starting a new merchant</h2>
+  <ol class="steps">
+    <li><div><b>Create the merchant in LiveChat.</b><br><span class="muted">LiveChat and the bot keep separate lists of merchants.</span></div></li>
+    <li><div><b>Add it in the bot panel.</b><br><span class="muted">Name, main language, tone, and a staff login. It starts with no answers.</span></div></li>
+    <li><div><b>Make the bot key</b> and put it, with the bot address, into that merchant's AI Bot page in LiveChat.</div></li>
+    <li><div><b>Check the settings.</b> The defaults already work.</div></li>
+    <li><div><b>Write the answers.</b> Load the starter pack, then replace every <span class="tag">TO WRITE:</span> text with the real answer. The bot ignores an entry until it is written.</div></li>
+    <li><div><b>Test as a customer</b>, as a visitor and as a member.</div></li>
+    <li><div><b>Go live.</b> Switch the AI bot on for that merchant in LiveChat.</div></li>
+    <li><div><b>Improve every week</b> from the Report: write the missing answers, then publish.</div></li>
+  </ol>
+  <p class="muted">A <b>Setup checklist</b> on the merchant's page turns each line green as it is done.</p>
+</section>
+
+<section>
+  <h2><span class="num">9</span>Safety and control</h2>
+  <ul>
+    <li>No written answer means a hand-over, never a guess.</li>
+    <li>Staff can edit their own merchant only. Some settings are for admins only.</li>
+    <li>Nothing goes live without Publish, and a merchant can always go back.</li>
+    <li>The AI is optional. The bot works with its rules alone. When on, the AI only picks among approved answers or helps staff translate. It never writes facts.</li>
+    <li>Phone numbers and names typed into a guided answer are not kept in the bot's logs. The merchant sets how long chats are kept.</li>
+  </ul>
+</section>
+
+<section>
+  <h2><span class="num">10</span>Measuring and improving</h2>
+  <ul>
+    <li>The <b>Report</b> shows what share of messages the bot answered, did not understand, or handed to a person.</li>
+    <li>Staff mark answers <b>right or wrong</b>. This gives the <b>wrong-answer rate</b>.</li>
+    <li>Words customers type that the bot does not know yet are collected for the merchant to sort.</li>
+    <li>The weekly loop: read the Report, write the missing answers, publish.</li>
+  </ul>
+  <p class="muted">Starting targets from the plan, to adjust after the pilot: most questions answered by the bot, about 85% accuracy, wrong answers at most 3%, asking back at most 15%.</p>
+</section>
+
+<section>
+  <h2><span class="num">11</span>What works today, honestly</h2>
+  <div class="two">
+    <div class="item ok"><h3>Works with LiveChat as it is</h3><ul>
+      <li>Answers, choices and hand-over</li>
+      <li>Guided answers (amount, username, phone, short reply)</li>
+      <li>The whole panel, many merchants, six languages</li></ul></div>
+    <div class="item ask"><h3>Needs other people</h3><ul>
+      <li>A public <b>https address</b> for the bot</li>
+      <li>The LiveChat team to confirm how LiveChat keeps replies by the question words (it can show one customer another's reply for short words like "2")</li>
+      <li>A first test with a real AI key</li></ul></div>
+  </div>
+  <div class="item bad" style="margin-top:12px"><h3>Not in this phase</h3><ul>
+    <li><b>Account answers (balance, deposits).</b> LiveChat does not tell the bot who the customer is, and the account data in the test setup is demo data. These questions go to a person. They need the merchant's real API and a way to check the customer is who they say.</li>
+    <li><b>Pictures.</b> LiveChat sends them straight to the agents.</li>
+    <li><b>Alerts when the bot is down.</b> If the bot server is down, customers get no bot reply, and agents still see the chat.</li></ul></div>
+</section>
+
+<section>
+  <h2><span class="num">12</span>Pilot plan and decisions needed</h2>
+  <ol class="steps">
+    <li><div>Pick <b>one merchant</b> for the pilot.</div></li>
+    <li><div>Give it a bot key, load the starter pack, write the real answers, test, and go live.</div></li>
+    <li><div>Watch the first chats. Review the Report every week.</div></li>
+    <li><div>Add the next merchants the same way, using the setup checklist.</div></li>
+  </ol>
+  <h3 style="margin-top:14px">We need a decision on</h3>
+  <ul>
+    <li>Which merchant goes first.</li>
+    <li>Who writes and approves the answers.</li>
+    <li>A public address for the bot.</li>
+    <li>Asking the LiveChat team about the answer memory.</li>
+    <li>Whether to ask for each merchant's real API, for account answers in a later phase.</li>
+  </ul>
+</section>
+
+<section>
+  <h2>Questions you may be asked</h2>
+  <p><b>Will it make mistakes?</b> It can pick the wrong answer. Wrong answers are marked in the Report and fixed. When it is unsure, it hands over.</p>
+  <p><b>Does it replace agents?</b> No. It takes the repeated questions. Anything unclear goes to a person.</p>
+  <p><b>Is the data safe?</b> Each merchant's data is in its own database. Account data, when connected later, is read live and never saved.</p>
+  <p><b>What does it cost?</b> The rules cost nothing. Only the optional AI costs money. The panel shows the cost per merchant, with a limit you can set.</p>
+  <p><b>What if a merchant wants a different answer?</b> They edit it in the panel and press Publish. It is live within seconds.</p>
+</section>
+
+<footer>AI Bot for LiveChat · keywords, topic, answer, and a person whenever the bot is unsure</footer>
+</main>
+</body>
+</html>
