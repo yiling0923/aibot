@@ -582,3 +582,5 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .pmenu-list{position:absolute;z-index:20;top:calc(100% + 4px);left:0;min-width:240px;background:var(--surface);border:1px solid var(--line,#dde3e8);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.12);padding:4px;display:flex;flex-direction:column}
 .pmenu-list button{background:none;border:0;text-align:left;padding:8px 10px;border-radius:7px;font:inherit;font-size:13px;cursor:pointer;color:inherit}
 .pmenu-list button:hover,.pmenu-list button:focus-visible{background:var(--surface2)}
+
+.lcmsg.customer .lcpic .sub,.lcmsg.customer .lcfile{color:#fff;opacity:.92}

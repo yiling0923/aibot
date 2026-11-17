@@ -119,7 +119,8 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
   else id = (await call('/widget/conversations', 'POST', msg))?.conversation?.publicId ?? null;
   if (!id) throw new Error('LiveChat did not start a chat. Check the tenant id.');
 
-  const until = Date.now() + (o.waitMs ?? 15_000); let c = await read(id);
+  // LiveChat does not ask the bot about a picture or file (it goes to the team): do not wait long for a reply
+  const until = Date.now() + (o.file ? Math.min(o.waitMs ?? 15_000, 2_000) : (o.waitMs ?? 15_000)); let c = await read(id);
   while (lines(c).filter((m) => m.from !== 'customer').length <= before && Date.now() < until) {
     await new Promise((r) => setTimeout(r, o.pollMs ?? 800)); c = await read(id);
   }

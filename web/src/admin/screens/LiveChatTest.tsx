@@ -36,7 +36,7 @@ export default function LiveChatTest() {
   const [lines, setLines] = useState<Line[]>([]); const [info, setInfo] = useState<{ status: string | null; handoff: string | null }>({ status: null, handoff: null });
   const [probe, setProbe] = useState<{ label: string; ok: boolean; answer: string }[] | null>(null); const [probing, setProbing] = useState(false);
   const [pick, setPick] = useState<File | null>(null); const fileIn = useRef<HTMLInputElement>(null);
-  const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [showSet, setShowSet] = useState(false);
+  const [text, setText] = useState(''); const [busy, setBusy] = useState(false); const [err, setErr] = useState(''); const [note, setNote] = useState(''); const [showSet, setShowSet] = useState(false);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => { end.current?.scrollIntoView?.({ block: 'end' }); }, [lines, busy]);
 
@@ -74,11 +74,11 @@ export default function LiveChatTest() {
     const f = pick; if (busy || !f) return; const caption = text.trim();
     keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: caption || f.name, attachment: f.type.startsWith('image/') ? { kind: 'image', name: f.name, url: URL.createObjectURL(f), mimeType: f.type, size: f.size } : { kind: 'file', name: f.name, url: '', mimeType: f.type, size: f.size } }]);
-    setPick(null); setText(''); setBusy(true); setErr('');
+    setPick(null); setText(''); setBusy(true); setErr(''); setNote('');
     try {
       const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
-      if (!r.replied) setErr('LiveChat has not answered yet. Press Send with an empty box to look again.');
+      if (!r.replied) setNote('The picture or file went to your team in LiveChat. LiveChat does not ask the bot about a picture, so no bot reply is expected. Type a message to carry on with the bot.');
     } catch (e) { const m = (e as Error).message; setErr(m); if (/refused this file/.test(m)) void checkFiles(true); } finally { setBusy(false); }      // refused: ask LiveChat at once which kinds it takes
   };
   const send = () => {
@@ -91,7 +91,7 @@ export default function LiveChatTest() {
     setProbing(true); setProbe(null); if (!keepErr) setErr('');
     try { setProbe((await api<{ rows: { label: string; ok: boolean; answer: string }[] }>('/api/admin/livechat-chat/probe', { baseUrl: base, tenant })).rows); } catch (e) { setErr((e as Error).message); } finally { setProbing(false); }
   };
-  const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); p.toast('New chat started'); };
+  const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); setNote(''); p.toast('New chat started'); };
 
   return (
     <div className="card lcpage"><div className="head"><div><h2>LiveChat test</h2><div className="sub">Chat as a customer through a LiveChat. Your message goes to LiveChat, LiveChat asks your bot, and the reply comes back the same way. It tests the real link.</div></div>
@@ -114,6 +114,7 @@ export default function LiveChatTest() {
         <div ref={end} />
       </div>
       {err && <div className="note" style={{ background: 'var(--badbg)', marginTop: 8 }}>{err}</div>}
+      {note && !err && <div className="note" style={{ marginTop: 8 }} aria-label="About the file">{note}</div>}
       {(probing || probe) && !showSet && <div className="note" style={{ marginTop: 8 }} aria-label="Files LiveChat accepts, checked now">{probing ? 'Asking LiveChat which kinds of file it takes…' : <><b>What LiveChat takes from a customer:</b>
         <ul className="plain">{probe!.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused</span>}</li>)}</ul>
         <div className="sub">Send one of the accepted kinds. A test chat was made in LiveChat for this check.</div></>}</div>}
