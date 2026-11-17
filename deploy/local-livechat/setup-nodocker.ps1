@@ -134,6 +134,17 @@ if (-not $up) {
 Run { & $mysql --user=root --host=127.0.0.1 "--port=$MySqlPort" -e "CREATE DATABASE IF NOT EXISTS livechat CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci; CREATE USER IF NOT EXISTS 'livechat'@'%' IDENTIFIED BY 'livechat'; GRANT ALL ON livechat.* TO 'livechat'@'%';" }
 if ($LASTEXITCODE -ne 0) { throw 'Could not create the LiveChat database.' }
 
+# LiveChat's web pages (the sign-in page and the agent screens) are built by npm and are not in GitHub: a fresh clone has none ("inertia_assets_unavailable").
+if (-not (Test-Path (Join-Path $LiveChatDir 'public\build'))) {
+  if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { Write-Host '   npm not found: the LiveChat web pages cannot be built (the chat API still works). Install Node.js and run this again.' -ForegroundColor Yellow }
+  else {
+    Write-Host '   Building the LiveChat web pages (npm install, npm run build; a few minutes the first time)...'
+    Push-Location $LiveChatDir
+    try { Run { npm install --no-audit --no-fund 2>&1 | Out-Null }; Run { npm run build 2>&1 | Out-Null }; if (-not (Test-Path 'public\build')) { Write-Host '   The web pages did not build. Run npm install and npm run build in the LiveChat folder to see why.' -ForegroundColor Yellow } }
+    finally { Pop-Location }
+  }
+}
+
 Write-Host '4/7 Building LiveChat (first time takes a few minutes)...'
 $apiExe = Join-Path $bin 'lc-api.exe'; $workerExe = Join-Path $bin 'lc-worker.exe'
 Stop-Process -Name lc-api, lc-worker -Force -ErrorAction SilentlyContinue
