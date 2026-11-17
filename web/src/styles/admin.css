@@ -586,3 +586,5 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .lcmsg.customer .lcpic .sub,.lcmsg.customer .lcfile{color:#fff;opacity:.92}
 .stepbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--surface)}
 .stepbox .head{margin-bottom:6px}
+.hbanner{display:flex;align-items:center;justify-content:space-between;gap:12px;border-radius:12px;padding:10px 14px;margin-bottom:12px;border:1px solid var(--line);border-left-width:5px;font-size:13.5px}
+.hbanner.down,.hbanner.badkey{background:var(--badbg);border-left-color:var(--bad,#d96b6b)}.hbanner.slow{background:var(--warnbg);border-left-color:#e0a84a}

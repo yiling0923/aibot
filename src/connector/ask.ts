@@ -1,3 +1,4 @@
+import { SLOW_MS, type HealthMonitor } from '../monitor/health';
 import { createHash, randomUUID } from 'node:crypto';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
@@ -31,7 +32,7 @@ export interface AskResponse {
   reason?: string; metadata?: { collected: { kind: string; value: string }[] };
 }
 interface State { session: Session; choices: Button[] | null; lang: Lang | null }
-export interface AskDeps { pool: Pool; bot: Bot; store: Store; timeoutMs?: number; /** 'test' for the panel's "Test the link" button: saved as a test chat, not as live traffic. Default 'live'. */ source?: 'live' | 'test' }
+export interface AskDeps { pool: Pool; bot: Bot; store: Store; timeoutMs?: number; /** Told how each call went, to watch that the bot answers. */ monitor?: HealthMonitor; /** 'test' for the panel's "Test the link" button: saved as a test chat, not as live traffic. Default 'live'. */ source?: 'live' | 'test' }
 
 const SESSION_ID = /^[A-Za-z0-9._:-]{1,64}$/;
 const DUPLICATE_WINDOW_MS = 10 * 60 * 1000;
@@ -153,7 +154,8 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
 
   const limit = deps.timeoutMs ?? 8000; let timer: NodeJS.Timeout | undefined;
   const slow = new Promise<'slow'>((resolve) => { timer = setTimeout(() => resolve('slow'), limit); });
-  const safe = work().catch((e): AskResponse => { console.error('connector: the bot failed, handing over', e); return fallback(); });
+  const failed = { msg: '' };
+  const safe = work().catch((e): AskResponse => { console.error('connector: the bot failed, handing over', e); failed.msg = (e as Error)?.message || 'the bot failed'; return fallback(); });
   const outcome = await Promise.race([safe, slow]).finally(() => clearTimeout(timer));
   let response: AskResponse;
   if (outcome === 'slow') { abandoned = true; state.session.handed = true; response = fallback(); }
@@ -161,6 +163,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
 
   await pool.query(`INSERT INTO ${SESSIONS}(session_id, state, language) VALUES(?,?,?) ON DUPLICATE KEY UPDATE state = VALUES(state), language = VALUES(language)`, [id, JSON.stringify(state), state.lang]);
   await pool.query(`INSERT IGNORE INTO ${REQUESTS}(request_key, session_id, decision, latency_ms, response) VALUES(?,?,?,?,?)`, [requestKey, id, response.decision, Date.now() - started, JSON.stringify(response)]);
+  deps.monitor?.record(outcome === 'slow' ? 'timeout' : failed.msg ? 'error' : Date.now() - started > SLOW_MS ? 'slow' : 'ok', merchant, Date.now() - started, outcome === 'slow' ? `no answer within ${limit} ms` : failed.msg || undefined);
   if (Math.random() < 0.02) void pool.query(`DELETE FROM ${REQUESTS} WHERE created_at < DATE_SUB(NOW(), INTERVAL 1 DAY)`).catch(() => undefined);
   return response;
 }

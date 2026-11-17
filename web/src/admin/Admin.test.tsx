@@ -30,6 +30,9 @@ const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
 let peopleBig = false;                                                                               // many merchants and logins, for the search and the role filter
 const BIG_PEOPLE = { merchants: ['Alpha', 'Bravo', 'Charlie', 'Delta', 'Echo', 'Foxtrot'].map((n, i) => ({ code: 'M' + i, name: n, tone: 'friendly', entries: 5 + i, logins: [n.toLowerCase()], link: i ? { hasKey: true, lastUsedAt: null } : { hasKey: false, lastUsedAt: null } })), users: [{ username: 'admin', role: 'admin', merchant: null }, { username: 'boss', role: 'admin', merchant: null }, ...['alpha', 'bravo', 'charlie'].map((u, i) => ({ username: u, role: 'staff', merchant: 'M' + i }))] };
 let lcRefuse = false;                                                                                // the LiveChat stand-in refuses a file
+let healthState: 'ok' | 'down' | 'slow' | 'badkey' = 'ok';
+const HEALTH = (state: string) => ({ state, reason: state === 'ok' ? 'The bot is answering normally.' : '3 of 9 answers failed or took too long in the last 5 minutes. Customers are being handed to a person.', since: state === 'ok' ? null : '2026-11-17T10:15:00.000Z', windowMinutes: 5, total: 9,
+  counts: { ok: 6, slow: 0, timeout: 1, error: 2, badkey: 0 }, failed: 3, db: 'up', lastError: state === 'down' ? 'connection refused' : null, worst: state === 'ok' ? [] : [{ merchant: 'MERCH_A', failed: 3, total: 9 }], lastAlertAt: null, alerts: { webhook: false, telegram: false } });
 let lcLines: { from: string; sender: string; text: string }[] = [];
 const lcReply = (init?: RequestInit) => {                                                          // a stand-in for the LiveChat test route
   const text = String(JSON.parse(String(init?.body ?? '{}')).text ?? '');
@@ -40,6 +43,8 @@ const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (lcRefuse && url === '/api/admin/livechat-chat' && String(init?.body).includes('"file"')
     ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    : url.startsWith('/api/admin/health/test') ? { sent: { webhook: 'sent', telegram: 'off' }, alerts: { webhook: true, telegram: false } }
+    : url.startsWith('/api/admin/health') ? HEALTH(healthState)
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -52,7 +57,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { localStorage.clear(); lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { localStorage.clear(); healthState = 'ok'; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -396,6 +401,25 @@ describe('Control panel', () => {
     await userEvent.click(sw);
     expect(sw.checked).toBe(true);
     expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+  it('shows a red bar on every screen when the bot has a problem, and nothing when it is normal', async () => {
+    const { unmount } = open('staff', '/admin/kb');
+    expect(await screen.findByText(/What the bot may answer/)).toBeTruthy();
+    await new Promise((r) => setTimeout(r, 50)); expect(screen.queryByRole('alert', { name: 'Bot problem' })).toBeNull();
+    unmount(); healthState = 'down';
+    open('staff', '/admin/kb');
+    const bar = await screen.findByRole('alert', { name: 'Bot problem' });
+    expect(bar.textContent).toMatch(/The bot has a problem/); expect(bar.textContent).toMatch(/3 of 9 answers failed/); expect(bar.textContent).toMatch(/Last error: connection refused/);
+    expect(within(bar).queryByRole('button', { name: 'Details' })).toBeNull();                       // staff have no details page
+  });
+  it('shows the bot health card to the admin, with the numbers, the alert settings and a test alert', async () => {
+    healthState = 'down'; open('admin', '/admin/users');
+    const card = await screen.findByLabelText('Bot health');
+    expect(card.textContent).toMatch(/problem/); expect(card.textContent).toMatch(/Most failures: MERCH_A \(3 of 9\)/);
+    expect(card.textContent).toMatch(/No alert address is set/); expect(card.textContent).toMatch(/npm run watchdog/);
+    await userEvent.click(within(card).getByRole('button', { name: 'Send a test alert' }));
+    expect((await within(card).findByLabelText('Test alert result')).textContent).toMatch(/Webhook: sent\. Telegram: off\./);
+    expect(within(await screen.findByRole('alert', { name: 'Bot problem' })).getByRole('button', { name: 'Details' })).toBeTruthy();   // the admin can jump here from the bar
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

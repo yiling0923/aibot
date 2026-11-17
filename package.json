@@ -14,6 +14,7 @@
     "db:reset": "tsx src/db/reset.ts",
     "user:add": "tsx src/auth/addUser.ts",
     "key:create": "tsx src/connector/createKey.ts",
+    "watchdog": "tsx src/monitor/watchdog.ts",
     "eval:report": "tsx scripts/evalReport.ts",
     "build": "node scripts/cleanWeb.mjs && vite build",
     "dev:web": "vite"

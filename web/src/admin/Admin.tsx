@@ -5,6 +5,7 @@ import { api } from '../lib/api';
 import { PanelProvider, usePanel } from './store';
 import { entryProblems, snapshotOf } from './model';
 import { Modal, NavIcon } from './ui';
+import { HealthBanner } from './health';
 import Kb from './screens/Kb';
 import Import from './screens/Import';
 import Topics from './screens/Topics';
@@ -80,6 +81,7 @@ function Shell() {
           <button className="btn pri" id="publish" type="button" disabled={!n} onClick={() => setDialog('publish')}>Publish{n ? <span className="badge">{n}</span> : null}</button>
         </header>
         <main className="main">
+          <HealthBanner />
           <Routes>
             <Route index element={<Navigate to="kb" replace />} />
             <Route path="kb" element={<Kb />} />
