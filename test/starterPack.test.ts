@@ -46,10 +46,12 @@ describe.skipIf(!reachable)('the starter entries set live: what a customer gets 
     expect(keys).toEqual(expect.arrayContaining(['credit_missing', 'game_tips'])); expect(keys).not.toContain('free_credit_info');                    // the unwritten answer never reaches the bot
     const bot = new Bot(k); const say = async (m: string) => { const s = newSession('sp-' + Math.random(), 'MERCH_A', null); const t = (await bot.message(s, m))!; return { s, t, text: t.messages.map((x) => x.text).join(' '), handed: s.handed }; };
     const free = await say('is there free credit for new users'); expect(free.text).not.toMatch(/TO WRITE/i);
-    const missing = await say('my game credit is missing'); expect(missing.text).toMatch(/Which one/);                                                  // the topic has two entries: the customer picks
-    expect(missing.t.buttons?.map((b) => b.key)).toContain('credit_missing');
-    const picked = bot.pick(missing.s, { kind: 'intent', key: 'credit_missing', label: 'credit missing', lang: 'en' })!;                               // the one a person answers: the chat is handed over
-    expect(missing.s.handed).toBe(true); expect(picked.messages.map((x) => x.text).join(' ')).not.toMatch(/TO WRITE/i);
+    const missing = await say('my game credit is missing');                                                                                            // almost exactly an example of the entry a person answers: handed over at once
+    expect(missing.s.handed).toBe(true); expect(missing.text).toMatch(/connect you to our team/); expect(missing.text).not.toMatch(/TO WRITE/i);
+    const menu = await say('game');                                                                                                                    // only the topic word: the topic has two entries, the customer picks
+    expect(menu.text).toMatch(/Which one/); expect(menu.t.buttons?.map((b) => b.key)).toEqual(expect.arrayContaining(['credit_missing', 'game_tips']));
+    const picked = bot.pick(menu.s, { kind: 'intent', key: 'credit_missing', label: 'credit missing', lang: 'en' })!;                                  // the one a person answers: the chat is handed over
+    expect(menu.s.handed).toBe(true); expect(picked.messages.map((x) => x.text).join(' ')).not.toMatch(/TO WRITE/i);
     const tips = bot.pick((await say('game')).s, { kind: 'intent', key: 'game_tips', label: 'game tips', lang: 'en' })!;                               // a written answer is used
     expect(tips.messages.map((x) => x.text).join(' ')).toMatch(/do not give game tips/);
     const ms = await readMerchants(pool!); const draftBot = knowledgeFromSnapshot(await readSnapshot(pool!), ms, {}, true);

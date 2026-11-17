@@ -54,6 +54,13 @@ const flat = (m: Record<string, Record<string, string[]>> | undefined, key?: str
   (key ? Object.values(m?.[key] ?? {}).flat() : Object.values(m ?? {}).flatMap((x) => Object.values(x).flat())).map(fold);
 const compact = (s: string) => s.toLowerCase().replace(/[4@]/g, 'a').replace(/1/g, 'i').replace(/3/g, 'e').replace(/0/g, 'o').replace(/\$/g, 's').replace(/[^a-z]/g, '');
 const SIM_STOP = new Set('what is the a an to of do does i my me you your it its this that are can will be for and or if so at in on'.split(' '));
+/** The message and an example are the same words (every word counts, filler words too): at least 85% alike. */
+const sameWords = (a: string, b: string) => {
+  const w = (t: string) => new Set(t.match(/[a-z0-9_]+|[一-鿿]/g) || []);
+  const x = w(a), y = w(b); if (!x.size || !y.size) return false;
+  let i = 0; for (const t of x) if (y.has(t)) i++;
+  return (2 * i) / (x.size + y.size) >= 0.85;
+};
 const toks = (t: string): Set<string> => {
   const s = new Set<string>();
   const words = t.match(/[a-z0-9_]+/g) || [];
@@ -140,7 +147,10 @@ export class Engine {
   private aliasesFor(m: MerchantCfg): [string, string][] {
     const hit = this.aliasCache.get(m.code); if (hit) return hit;
     const out: [string, string][] = [];
-    for (const [canon, byLang] of Object.entries(this.k.globalAliases)) for (const vs of Object.values(byLang)) vs.forEach((v) => out.push([fold(v.toLowerCase()), canon]));
+    // A word the merchant gave to a topic of its own (for example "free credit" for its free_credit topic) means THAT for this merchant, even when the shared
+    // lists give the same word to another topic (promotion). Before, the shared meaning was applied first and always won, so the merchant's own topic was never found.
+    const own = new Map(m.aliases.map((a) => [fold(a.variant.toLowerCase()), a.canonical] as const));
+    for (const [canon, byLang] of Object.entries(this.k.globalAliases)) for (const vs of Object.values(byLang)) vs.forEach((v) => { const w = fold(v.toLowerCase()); if (!own.has(w) || own.get(w) === canon) out.push([w, canon]); });
     m.aliases.forEach((a) => out.push([fold(a.variant.toLowerCase()), a.canonical]));
     out.sort((a, b) => b[0].length - a[0].length);
     this.aliasCache.set(m.code, out); return out;
@@ -330,6 +340,12 @@ export class Engine {
     else if (ks.strong.length === 1) {
       const s = ks.strong[0]; decision = 'ANSWER'; via = 'keywords'; conf = 0.97; top = { id: s.id, intent: s.intent, score: 1, example: '(keywords)' }; topic = s.topic;
       why = 'Keywords found in the sentence: topic "' + s.topic + '"' + (s.aspect ? ' + "' + s.aspect + '"' : '') + '. Other words are ignored.';
+    }
+    else if (ks.strong.length > 1 && ks.strong.some((s) => s.id === top.id) && top.score - second.score >= 0.15 && sameWords(n.text, this.normalize(top.example, m).text)) {
+      // Several entries share the topic words, but the message is the same words as one example question (filler words counted) and clearly beats the next one:
+      // answer it, do not make the customer choose. "game" alone is NOT the same words as "credit missing in the game": that still asks.
+      const s = ks.strong.find((x) => x.id === top.id)!; decision = 'ANSWER'; via = 'similarity'; topic = s.topic;
+      why = `Several answers share the topic "${s.topic}", but the message has the same words as the example "${top.example}", so the bot answers it.`;
     }
     else if (ks.strong.length > 1) { decision = 'CHOICE'; via = 'keywords'; conf = 0.9; options = ks.strong.slice(0, 4).map((s): Option => ({ kind: 'intent', key: s.intent })); why = 'Several answers match the keywords in the sentence, so the customer picks one.'; }
     else if (amt && Tav.length === 1 && ['deposit', 'withdraw'].includes(Tav[0]) && !past) {

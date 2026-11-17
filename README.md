@@ -367,3 +367,10 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 - A cell is red when the English answer is empty or still says `TO WRITE`, or when there are fewer than 3 example questions. Example questions: empty lines and repeats are dropped.
 - Everything goes into the draft, as with the full editor; nothing is live until **Publish**. All the cells of one entry count as **one** change in the Publish count. The entry name opens the full editor (topic, question type, entry type, end date, guided questions).
 - Code: `web/src/admin/screens/KbGrid.tsx`.
+
+## How the bot picks between a shared word and a merchant's own word (fixes)
+
+- **A merchant's own word wins.** The shared word lists give "free credit" to the topic *promotion*. If a merchant gives the same word to a topic of its own (the starter pack's `free_credit` topic), the merchant's meaning now wins **for that merchant** (other merchants keep the shared one). Before, the shared meaning was applied first and the merchant's own topic was never found, so "free credit" went to the "needs staff" promotion entry and was handed over.
+- **A question that is the same words as one example is answered, not turned into a menu.** When several entries share a topic, the bot used to show a menu for every message with the topic word. Now, when the message is the same words as one example question (at least 85% alike, filler words counted) and clearly beats the next entry, the bot answers it (or hands over, when that entry is "needs staff"). A message with only the topic word ("free credit", "game") still asks which one.
+- **Another merchant's name.** The safety rule "the customer names another merchant, so a person answers" compares letters and digits, and ignores names shorter than 4 characters (3 when they mix letters and digits). Before, the code `77Y8` became the letter `y` and every message containing a "y" was handed over.
+- Tests: `test/ownTopicWords.test.ts`, `test/otherMerchantGuard.test.ts`.
