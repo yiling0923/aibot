@@ -73,6 +73,8 @@ describe.skipIf(!reachable)('the Study screen (needs TEST_DATABASE_URL)', () => 
     expect((await call(staff, 'GET', 'MERCH_B/study')).statusCode).toBe(403);
     expect((await call(admin, 'POST', 'MERCH_A/study/import', { text: '' })).statusCode).toBe(400);
     expect((await call(admin, 'POST', 'MERCH_A/study/import', { text: 'one column only' })).statusCode).toBe(400);
+    const empty = await call(admin, 'POST', 'MERCH_A/study/import', { text: 'question\treply\n' });                  // an export with a header and no chats
+    expect(empty.statusCode).toBe(400); expect(empty.json().error).toMatch(/PERSON \(an agent\) answered/);
   });
 
   it('cleans and saves, holds back about 1 in 5, and does not save the same pairs twice', async () => {

@@ -38,6 +38,7 @@ export function studyRoutes(app: FastifyInstance, ctx: { pool: Pool; getBot: () 
     if (!text.trim()) return reply.code(400).send({ error: 'Paste or choose the file first.' });
     if (text.length > MAX_TEXT) return reply.code(400).send({ error: 'The file is too big (the most is 30 MB). Export a shorter period.' });
     const parsed = parsePairs(text); if (parsed.error) return reply.code(400).send({ error: parsed.error });
+    if (!parsed.pairs.length) return reply.code(400).send({ error: 'The file has no chats below the header. The export keeps only customer messages that a PERSON (an agent) answered, not the ones the bot answered. If your LiveChat has no agent replies yet, there is nothing to study: use a copy of the staging chats, or answer some test chats as an agent first.' });
     if (parsed.pairs.length > MAX_PAIRS) return reply.code(400).send({ error: `Too many rows (the most is ${MAX_PAIRS.toLocaleString()}). Export a shorter period.` });
     const { kept, stats } = cleanPairs(parsed.pairs);
     if (req.body?.replace === true) await pool.query(`DELETE FROM ${tbl(t.db, 'study_pairs')}`);

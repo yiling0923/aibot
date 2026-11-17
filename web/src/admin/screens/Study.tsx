@@ -33,7 +33,8 @@ export default function Study() {
 
   const load = async () => {
     setBusy('load'); setErr('');
-    try { const r = await api<LoadResult>(base + '/import', { text, replace }); setRes(r); setText(''); setName(''); setM(null); await refresh(); p.toast('Saved ' + r.added + ' pairs'); }
+    try { const r = await api<LoadResult>(base + '/import', { text, replace }); setRes(r); setText(''); setName(''); setM(null); await refresh();
+      p.toast(r.added > 0 ? 'Saved ' + r.added + ' new pairs' : r.alreadySaved > 0 ? 'Nothing new: these chats were already saved' : 'Nothing was saved: every row was dropped (see the result below)'); }
     catch (e) { setErr((e as Error).message); } finally { setBusy(''); }
   };
   const measure = async (all = false) => {
