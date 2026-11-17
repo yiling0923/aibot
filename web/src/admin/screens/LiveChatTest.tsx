@@ -31,7 +31,7 @@ export default function LiveChatTest() {
   const p = usePanel();
   const [base, setBase] = useState(() => store('lcBase', 'http://localhost:8080')); const [tenant, setTenant] = useState(() => store('lcTenant', '1'));
   const [visitor, setVisitor] = useState(() => store('lcVisitor', newVisitor()));
-  const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => store('lcMid', 'tom8841'));
+  const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => { const v = store('lcMid', '8841'); return v === 'tom8841' ? '8841' : v; });
   const [mname, setMname] = useState(() => store('lcMname', 'Tom')); const [mrank, setMrank] = useState(() => store('lcMrank', 'GOLD'));
   const [lines, setLines] = useState<Line[]>([]); const [info, setInfo] = useState<{ status: string | null; handoff: string | null }>({ status: null, handoff: null });
   const [probe, setProbe] = useState<{ label: string; ok: boolean; answer: string }[] | null>(null); const [probing, setProbing] = useState(false);
@@ -99,7 +99,7 @@ export default function LiveChatTest() {
       {showSet && <div className="form lcset"><label className="fld"><span>LiveChat address</span><input value={base} onChange={(e) => setBase(e.target.value)} placeholder="http://localhost:8080" /></label>
         <label className="fld"><span>Tenant id</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ width: 110 }} /></label>
         <label className="fld"><span>The customer is</span><select aria-label="The customer is" value={who} onChange={(e) => { setWho(e.target.value); keep('lcWho', e.target.value); fresh(); }}><option value="member">Logged in (a member)</option><option value="guest">Not logged in (a guest)</option></select></label>
-        {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /></label>
+        {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /><span className="lock">Sample members: 8841 (Tom), 9120 (Mary)</span></label>
           <label className="fld"><span>Name</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
           <label className="fld"><span>Rank</span><input value={mrank} onChange={(e) => { setMrank(e.target.value); keep('lcMrank', e.target.value); }} style={{ width: 110 }} /></label></>}
         <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={() => void checkFiles()}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
