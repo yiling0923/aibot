@@ -17,12 +17,11 @@ import MerchantPage from './screens/MerchantPage';
 import Billing from './screens/Billing';
 import History from './screens/History';
 import Report from './screens/Report';
-import Study from './screens/Study';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
-  ['Check', [['report', 'Report'], ['study', 'Study real chats'], ['lchat', 'LiveChat test']]],
+  ['Check', [['report', 'Report'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
 ];
 
@@ -89,7 +88,6 @@ function Shell() {
             <Route path="store" element={<Keywords />} />
             <Route path="rank" element={<Ranking />} />
             <Route path="report" element={<Report />} />
-            <Route path="study" element={<Study />} />
             <Route path="lchat" element={p.isAdmin ? <LiveChatTest /> : <div className="card"><h2>LiveChat test</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="set" element={<Settings />} />
             <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />

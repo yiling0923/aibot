@@ -23,7 +23,6 @@ import { billingRoutes } from '../admin/billing';
 import { LiveChatLink } from '../livechat/link';
 import { MerchantLimits } from '../ai/limits';
 import { basicsRoutes } from '../admin/basics';
-import { studyRoutes } from '../admin/studyRoutes';
 import { livechatChatRoutes } from '../admin/livechatChat';
 import { purgeOldChats } from '../db/retention';
 import { merchantPageRoutes } from '../admin/merchantPage';
@@ -89,7 +88,6 @@ export async function buildApp(opts: AppOptions = {}) {
   billingRoutes(app, { pool, onPriceChange: () => usage.forgetPrices() });
   basicsRoutes(app, { pool, reloadBot: () => getBot(true), limits });
   livechatChatRoutes(app);
-  studyRoutes(app, { pool, getBot });
   const link = new LiveChatLink(pool);
   merchantPageRoutes(app, { pool, link, getBot, store, aiKeys, timeoutMs: config.askTimeoutMs, shared: { anthropic: !!config.anthropicKey, openai: !!config.openaiKey && !!config.openaiModel }, publicUrl: config.publicUrl });
   await new Tenants(pool).migrateAll().then((a) => { if (a.length) app.log.info(`updated merchant databases: ${a.join(', ')}`); }).catch((e) => app.log.warn({ err: e }, 'could not update the merchant databases (run npm run db:migrate)'));
