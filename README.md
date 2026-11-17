@@ -330,3 +330,13 @@ What the customer sees: the bot gives the answer and asks question 1; each reply
 | Account data (optional) | the merchant's own API is connected | Open Account data |
 
 Account data is not counted in the progress. It shows a warning when **Account answers in LiveChat** is on but no real API is connected (members would get the built-in demo balances). The checklist is part of the merchant page's data (`GET /api/admin/merchants/:code/connection`, field `setup`); the rules are in `src/admin/setup.ts` and the card is `SetupChecklist` in `web/src/admin/screens/MerchantPage.tsx`. Tests: `test/setup.test.ts`.
+
+## A local LiveChat with several merchants
+
+The local LiveChat (`setup-nodocker.ps1`) has one merchant, **Merchant A**, so its screen shows no merchant list. The real LiveChat has the **merchant switcher** (a box at the top and a list of merchants on the left) because the signed-in account belongs to many merchants or is a platform account. To get the same locally:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\local-livechat\add-merchants.ps1
+```
+
+It adds **SwiftWallet, MegaPlay, BetKing, CashPoint and GameHub** to the local LiveChat (`seed-merchants.sql`), makes `admin@a.test` a member of each, makes a bot key for each in the bot and sets it in that merchant's AI Bot settings. Sign in again and the merchants are at the top left. Each LiveChat merchant is answered from its own merchant's knowledge base (the key says which one asks), and its conversations stay in that merchant. LiveChat takes the merchant from `?tenant_id=N` in the address (A is 1, B is 2, C is 3 ...); the widget uses the `X-Tenant-ID` header. Run it again any time: merchants are never added twice (each run makes a new bot key, the older ones keep working).
