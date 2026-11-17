@@ -1,0 +1,115 @@
+diff -ruN a/internal/automation/ai_reply.go b/internal/automation/ai_reply.go
+--- a/internal/automation/ai_reply.go	2026-11-17 01:36:43.960775375 +0000
++++ b/internal/automation/ai_reply.go	2026-11-17 01:36:43.965205601 +0000
+@@ -40,6 +40,15 @@
+ 	History          []Message `json:"history"`
+ 	Source           string    `json:"source"`
+ 	TriggerMessageID *int64    `json:"trigger_message_id,omitempty"`
++	// Member is the signed-in customer of the chat (nil for a guest). It is sent to the AI bot so it can answer account questions.
++	Member *MemberInfo `json:"member,omitempty"`
++}
++
++// MemberInfo is who the customer is, as the website told LiveChat when the chat started.
++type MemberInfo struct {
++	ExternalID string `json:"id"`
++	Name       string `json:"name,omitempty"`
++	Rank       string `json:"rank,omitempty"`
+ }
+ 
+ type Message struct {
+@@ -84,6 +93,11 @@
+ 		"question": strings.TrimSpace(input.Question),
+ 		"history":  historyPayload(input.History),
+ 	}
++	// A reply that is written for one member must never be kept for the words of the question: it could reach another customer.
++	personal := input.Member != nil && strings.TrimSpace(input.Member.ExternalID) != ""
++	if personal {
++		payload["member"] = map[string]any{"id": strings.TrimSpace(input.Member.ExternalID), "name": strings.TrimSpace(input.Member.Name), "rank": strings.TrimSpace(input.Member.Rank)}
++	}
+ 	sessionID, err := service.BotWriter.AIChatSessionID(ctx, tenantID, conversationID)
+ 	if err != nil {
+ 		return err
+@@ -94,7 +108,7 @@
+ 
+ 	response := map[string]any(nil)
+ 	fromCache := false
+-	if service.Cache != nil {
++	if service.Cache != nil && !personal {
+ 		if cached, found, cacheErr := service.Cache.Get(ctx, tenantID, input.Question); cacheErr == nil && found {
+ 			response = cacheSafeAIResponse(cached)
+ 			fromCache = true
+@@ -124,7 +138,7 @@
+ 				return err
+ 			}
+ 		}
+-		if service.Cache != nil {
++		if service.Cache != nil && !personal {
+ 			_ = service.Cache.Put(ctx, tenantID, input.Question, cacheSafeAIResponse(response))
+ 		}
+ 	}
+diff -ruN a/internal/automation/ai_reply_member_test.go b/internal/automation/ai_reply_member_test.go
+--- a/internal/automation/ai_reply_member_test.go	1970-01-01 00:00:00.000000000 +0000
++++ b/internal/automation/ai_reply_member_test.go	2026-11-17 01:36:43.965259991 +0000
+@@ -0,0 +1,37 @@
++package automation
++
++import (
++	"context"
++	"testing"
++
++	merchantautomation "livechat/internal/merchant/automation"
++)
++
++func TestServiceSendsMemberToAIAndNeverUsesTheAnswerCacheForThem(t *testing.T) {
++	provider := &fakeConfigProvider{config: merchantautomation.AIChatConfig{Enabled: true, BaseURL: "https://ai.example", APIKey: "key"}}
++	client := &fakeAIReplyClient{response: map[string]any{"reply": "your balance is 100"}}
++	writer := &fakeBotWriter{}
++	service := NewService(provider, client, writer)
++	service.Cache = fakeAnswerCache{response: map[string]any{"reply": "someone else's balance", "confidence": 0.99}, found: true}
++	input := TriggerInput{ConversationID: 5, Question: "check my balance", Member: &MemberInfo{ExternalID: " 8841 ", Name: "Tom", Rank: "GOLD"}}
++	if err := service.DispatchAIReply(context.Background(), "9", input); err != nil {
++		t.Fatal(err)
++	}
++	if client.calls != 1 || len(writer.messages) != 1 || writer.messages[0].request.Body != "your balance is 100" {
++		t.Fatalf("a member's question must go to the AI, never to the cache: calls=%d messages=%+v", client.calls, writer.messages)
++	}
++	member, ok := client.payload["member"].(map[string]any)
++	if !ok || member["id"] != "8841" || member["name"] != "Tom" || member["rank"] != "GOLD" {
++		t.Fatalf("expected the member in the AI payload, got %+v", client.payload)
++	}
++	// a guest: no member in the payload, and the cache is used as before
++	client2 := &fakeAIReplyClient{response: map[string]any{"reply": "network"}}
++	service2 := NewService(provider, client2, &fakeBotWriter{})
++	service2.Cache = fakeAnswerCache{response: map[string]any{"reply": "cached", "confidence": 0.92}, found: true}
++	if err := service2.DispatchAIReply(context.Background(), "9", TriggerInput{ConversationID: 6, Question: "how to deposit"}); err != nil {
++		t.Fatal(err)
++	}
++	if client2.calls != 0 {
++		t.Fatalf("a guest question may use the cache, calls=%d", client2.calls)
++	}
++}
+diff -ruN a/internal/widget/conversation.go b/internal/widget/conversation.go
+--- a/internal/widget/conversation.go	2026-11-17 01:36:43.962273586 +0000
++++ b/internal/widget/conversation.go	2026-11-17 01:36:43.966885662 +0000
+@@ -629,6 +629,13 @@
+ 	}
+ 
+ 	triggerMessage := lastVisitorMessageID(response.Conversation.Messages)
++	var member *automation.MemberInfo
++	if response.Customer != nil && response.Customer.ExternalID != nil && strings.TrimSpace(*response.Customer.ExternalID) != "" {
++		member = &automation.MemberInfo{ExternalID: strings.TrimSpace(*response.Customer.ExternalID)}
++		if response.Customer.Name != nil {
++			member.Name = strings.TrimSpace(*response.Customer.Name)
++		}
++	}
+ 	_ = service.AIReplies.DispatchAIReply(ctx, tenantID, automation.TriggerInput{
+ 		ConversationID:   response.Conversation.ID,
+ 		AIHandoffStatus:  response.Conversation.AIHandoffStatus,
+@@ -636,6 +643,7 @@
+ 		History:          aiReplyHistory(response.Conversation.Messages),
+ 		Source:           source,
+ 		TriggerMessageID: triggerMessage,
++		Member:           member,
+ 	})
+ }
+ 
