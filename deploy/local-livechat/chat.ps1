@@ -1,7 +1,8 @@
 # Sends one visitor message into the LOCAL LiveChat and prints the bot's reply.
 # Usage:  powershell -File deploy\local-livechat\chat.ps1 "how to deposit"
-param([Parameter(Mandatory = $true)][string]$Text, [string]$Visitor = 'vis-local-0001')
-$h = @{ 'X-Tenant-ID' = '1' }
+#         powershell -File deploy\local-livechat\chat.ps1 "how to deposit" -Tenant 7     (the LiveChat merchant number: A is 1, B is 2 ...; add-merchant.ps1 prints it)
+param([Parameter(Mandatory = $true)][string]$Text, [string]$Visitor = 'vis-local-0001', [string]$Tenant = '1')
+$h = @{ 'X-Tenant-ID' = $Tenant }
 $base = 'http://localhost:8080/widget/conversations'
 $cur = $null
 try { $cur = Invoke-RestMethod "$base/current?visitor_session_id=$Visitor" -Headers $h } catch { }

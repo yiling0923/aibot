@@ -431,6 +431,19 @@ describe('Control panel', () => {
     expect(within(card).getByText('Staff login')).toBeTruthy();
     expect(within(card).getByText(/Not connected\. Without it the bot uses 2 built-in demo customers/)).toBeTruthy();   // optional: no tick needed
   });
+  it('LiveChat test: shows which LiveChat merchant it chats in, and remembers the Tenant id for each merchant', async () => {
+    localStorage.setItem('lcTenant:A', '7');                                                        // typed once for this merchant before
+    open('admin', '/admin/lchat');
+    expect(await screen.findByText(/LiveChat merchant #7/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
+    const t = screen.getByLabelText(/^Tenant id/) as HTMLInputElement; expect(t.value).toBe('7');
+    expect(screen.getByText(/LiveChat picks the bot's merchant by this number, not by the merchant chosen in the sidebar/)).toBeTruthy();
+    await userEvent.clear(t); await userEvent.type(t, '9');
+    expect(screen.getByText(/LiveChat merchant #9/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Message'), 'hi'); await userEvent.click(screen.getByRole('button', { name: 'Send' }));
+    await screen.findByText('Go to Wallet > Deposit.');
+    expect(localStorage.getItem('lcTenant:A')).toBe('9');                                           // kept for this merchant
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
@@ -603,7 +616,7 @@ describe('Control panel', () => {
     expect(box.value).toBe('');
     await userEvent.click(screen.getByRole('button', { name: 'Settings' }));
     expect((screen.getByLabelText('LiveChat address') as HTMLInputElement).value).toBe('http://localhost:8080');
-    expect((screen.getByLabelText('Tenant id') as HTMLInputElement).value).toBe('1');
+    expect((screen.getByLabelText(/^Tenant id/) as HTMLInputElement).value).toBe('1');
     lcLines = []; await userEvent.click(screen.getByRole('button', { name: 'New chat' }));
     expect(await screen.findByText(/No messages yet/)).toBeTruthy();
     unmount();

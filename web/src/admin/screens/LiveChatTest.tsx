@@ -18,6 +18,8 @@ function Attached({ a }: { a: Attachment }) {
     : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer"><Clip /> {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' (the picture could not be loaded here)' : ''}</a>;
 }
 interface Result { conversationId: string | null; status: string | null; handoff: string | null; messages: Line[]; replied: boolean }
+/** The LiveChat merchant number the demo merchants have in the local LiveChat (add-merchants.ps1): MERCH_A is 1, MERCH_B is 2 ... MERCH_F is 6. Others are typed once and remembered. */
+const demoTenant = (code: string) => { const m = /^MERCH_([A-F])$/.exec(code); return m ? String(m[1].charCodeAt(0) - 64) : null; };
 const store = (k: string, dflt: string) => { try { return localStorage.getItem(k) || dflt; } catch { return dflt; } };
 const keep = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } };
 const POLL_MS = 3000;
@@ -29,7 +31,7 @@ const newVisitor = () => 'vis-panel-' + Math.random().toString(36).slice(2, 10);
  */
 export default function LiveChatTest() {
   const p = usePanel();
-  const [base, setBase] = useState(() => store('lcBase', 'http://localhost:8080')); const [tenant, setTenant] = useState(() => store('lcTenant', '1'));
+  const [base, setBase] = useState(() => store('lcBase', 'http://localhost:8080')); const [tenant, setTenant] = useState(() => store('lcTenant:' + p.merchant, demoTenant(p.merchant) ?? store('lcTenant', '1')));   // LiveChat picks the bot's merchant by this number, so it is remembered for each merchant
   const [visitor, setVisitor] = useState(() => store('lcVisitor', newVisitor()));
   const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => { const v = store('lcMid', '8841'); return v === 'tom8841' ? '8841' : v; });
   const [mname, setMname] = useState(() => store('lcMname', 'Tom')); const [mrank, setMrank] = useState(() => store('lcMrank', 'GOLD'));
@@ -72,7 +74,7 @@ export default function LiveChatTest() {
   const toBase64 = (f: File) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error('Could not read the file.')); r.readAsDataURL(f); });
   const sendFile = async () => {
     const f = pick; if (busy || !f) return; const caption = text.trim();
-    keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
+    keep('lcBase', base); keep('lcTenant', tenant); keep('lcTenant:' + p.merchant, tenant); keep('lcVisitor', visitor);
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: caption || f.name, attachment: f.type.startsWith('image/') ? { kind: 'image', name: f.name, url: URL.createObjectURL(f), mimeType: f.type, size: f.size } : { kind: 'file', name: f.name, url: '', mimeType: f.type, size: f.size } }]);
     setPick(null); setText(''); setBusy(true); setErr(''); setNote('');
     try {
@@ -84,20 +86,26 @@ export default function LiveChatTest() {
   const send = () => {
     if (pick) { void sendFile(); return; }
     const t = text.trim(); if (busy || !t) return;
-    keep('lcBase', base); keep('lcTenant', tenant); keep('lcVisitor', visitor);
+    keep('lcBase', base); keep('lcTenant', tenant); keep('lcTenant:' + p.merchant, tenant); keep('lcVisitor', visitor);
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: t }]); setText(''); void call(t);
   };
   const checkFiles = async (keepErr = false) => {
     setProbing(true); setProbe(null); if (!keepErr) setErr('');
     try { setProbe((await api<{ rows: { label: string; ok: boolean; answer: string }[] }>('/api/admin/livechat-chat/probe', { baseUrl: base, tenant })).rows); } catch (e) { setErr((e as Error).message); } finally { setProbing(false); }
   };
+  const firstMerchant = useRef(true);
+  useEffect(() => {                                                   // another merchant chosen in the sidebar: its own LiveChat merchant number, and a new chat (a chat belongs to one LiveChat merchant)
+    if (firstMerchant.current) { firstMerchant.current = false; return; }
+    setTenant(store('lcTenant:' + p.merchant, demoTenant(p.merchant) ?? store('lcTenant', '1')));
+    const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); setNote('');
+  }, [p.merchant]);
   const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); setNote(''); p.toast('New chat started'); };
 
   return (
     <div className="card lcpage"><div className="head"><div><h2>LiveChat test</h2><div className="sub">Chat as a customer through a LiveChat. Your message goes to LiveChat, LiveChat asks your bot, and the reply comes back the same way. It tests the real link.</div></div>
       <span className="lcbtns"><button className="btn sm" type="button" onClick={() => setShowSet((s) => !s)}>{showSet ? 'Hide settings' : 'Settings'}</button><button className="btn sm" type="button" onClick={fresh}>New chat</button></span></div>
       {showSet && <div className="form lcset"><label className="fld"><span>LiveChat address</span><input value={base} onChange={(e) => setBase(e.target.value)} placeholder="http://localhost:8080" /></label>
-        <label className="fld"><span>Tenant id</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ width: 110 }} /></label>
+        <label className="fld"><span>Tenant id (the LiveChat merchant number)</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ width: 110 }} /><span className="lock">LiveChat picks the bot's merchant by this number, not by the merchant chosen in the sidebar. For {p.M.name} use the number of {p.M.name} in LiveChat.</span></label>
         <label className="fld"><span>The customer is</span><select aria-label="The customer is" value={who} onChange={(e) => { setWho(e.target.value); keep('lcWho', e.target.value); fresh(); }}><option value="member">Logged in (a member)</option><option value="guest">Not logged in (a guest)</option></select></label>
         {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /><span className="lock">Sample members: 8841 (Tom), 9120 (Mary)</span></label>
           <label className="fld"><span>Name</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
@@ -118,7 +126,7 @@ export default function LiveChatTest() {
       {(probing || probe) && !showSet && <div className="note" style={{ marginTop: 8 }} aria-label="Files LiveChat accepts, checked now">{probing ? 'Asking LiveChat which kinds of file it takes…' : <><b>What LiveChat takes from a customer:</b>
         <ul className="plain">{probe!.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused</span>}</li>)}</ul>
         <div className="sub">Send one of the accepted kinds. A test chat was made in LiveChat for this check.</div></>}</div>}
-      <div className="lcstat sub">{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
+      <div className="lcstat sub">{'LiveChat merchant #' + tenant + ' · '}{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/jpeg,image/png,video/mp4,video/quicktime,application/pdf,.mov" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
         <IconBtn tip="Attach a picture or file" onClick={() => { if (!busy) fileIn.current?.click(); }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></IconBtn>

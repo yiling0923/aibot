@@ -348,3 +348,5 @@ powershell -ExecutionPolicy Bypass -File deploy\local-livechat\add-merchant.ps1 
 ```
 
 It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes a bot key, sets it in that merchant's AI Bot settings and tests the link. Then refresh LiveChat and pick the merchant in the list at the top. (`add-merchants.ps1` does the same for the five demo merchants.)
+
+**Which LiveChat merchant a test chat goes to.** In **LiveChat test**, the **Tenant id** (Settings) is the number of the LiveChat merchant the chat is sent to. LiveChat, not the bot panel, then decides which bot merchant answers: the one whose bot key is set in that LiveChat merchant. The merchant chosen in the panel's sidebar does not matter for this. The page remembers a Tenant id **for each merchant** (the demo merchants start with 1 to 6: `MERCH_A` is 1 ... `MERCH_F` is 6; another merchant is typed once, `add-merchant.ps1` prints its number), switches to it when you pick another merchant in the sidebar and starts a new chat, and shows **LiveChat merchant #N** under the chat. `chat.ps1` has the same option: `-Tenant 7`.
