@@ -36,6 +36,8 @@ export interface MerchantCfg {
   languages?: Lang[];
   /** The money sign in this merchant's messages (default RM). */
   currency?: string;
+  /** The bot may read a logged-in member's account in LiveChat replies (those replies are never kept: cacheable false). */
+  accountInLiveChat?: boolean;
   /** Handoff rules of this merchant. Set only when they differ from the default (both on, no phrases). */
   handoffComplaint?: boolean; handoffAccount?: boolean; triggerPhrases?: string[];
   /** Style rules for the AI (wording and tone only). */

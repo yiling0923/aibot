@@ -105,7 +105,9 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     if (s.handed || s.closed) return { answer: '', confidence: 0, should_escalate: s.handed, should_close: s.closed, close_message: null, session_id: id, decision: 'silent', topic: null, keywords: [], choices: [], answer_id: null, cacheable: false };
 
     // LiveChat keeps a reply by the words of the question, for every customer: so no reply carries personal account data (it is for staff).
-    s.noPersonal = true;
+    // Exception: a merchant who switched it on, and a logged-in member. Those replies are never kept (cacheable false, see below).
+    const personalOk = !!(bot.engine.hasMerchant(merchant) && bot.engine.merchant(merchant).accountInLiveChat && s.member);
+    s.noPersonal = !personalOk;
     if (state.choices && !s.choices) s.choices = state.choices;       // a chat saved before the choices moved into the session
     state.choices = null;
     // A reply to the choices ("deposit", "depo", "2", "the first one") is read by the bot itself, so every channel behaves the same.
@@ -117,7 +119,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     let choices: Choice[] = [];
     if (turn.buttons?.length) { const r = renderChoices(turn.buttons); answer = (answer ? answer + '\n\n' : '') + r.text + (turn.hint ? '\n\n' + turn.hint : ''); choices = r.choices; }
     const decision = decisionOf(turn, s, choices.length > 0);
-    const cacheable = decision === 'answer' && !!turn.cacheable;
+    const cacheable = decision === 'answer' && !!turn.cacheable && !personalOk;
     const conf = Math.min(1, Math.max(0, Number(turn.trace.conf ?? 0)));
     const res: AskResponse = {
       answer, confidence: cacheable ? conf : Math.min(conf, 0.8), should_escalate: s.handed, should_close: turn.locked || s.closed,

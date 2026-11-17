@@ -268,7 +268,7 @@ Authorization: Bearer {key}
 ```
 
   Statuses are understood in many spellings (`pending`, `processing`, `success`/`completed`/`paid`, `failed`/`rejected`/`cancelled` ...). A number is shown with the merchant's money sign (see Merchant settings). A row without a reference or amount is skipped. At most 20 rows of each list are read.
-- It is used for logged-in customers on the website chat and the panel's chat page. It is **not** used in LiveChat replies, where the bot never shows account data (LiveChat keeps replies by the words of the question, for every customer).
+- It is used for logged-in customers on the website chat and the panel's chat page. In LiveChat it is **off by default**: LiveChat keeps replies by the words of the question, for every customer, so the bot hands account questions to staff. A merchant's admin can switch **Account answers in LiveChat** on (Merchant settings, General). Then a logged-in member (LiveChat must send the member id) gets their own balance, points, deposits and withdrawals; a guest never does; every reply to that member is marked `cacheable: false` so LiveChat must not keep it. Switch it on only after the LiveChat team has made the cache change (`docs/REQUEST_TO_LIVECHAT_TEAM.md`).
 - The answer is kept for 30 seconds per customer, so a busy chat does not call the merchant for every message. A failed call is tried again at once.
 - The code: `src/bot/merchantApi.ts` (the call and the reading), `src/bot/merchantApiHttp.ts` (saved settings and the live API), `src/admin/merchantApiRoutes.ts` (the panel's routes), table `merchant_api` (`db/migrations/018_merchant_api.sql`). If a merchant's real API looks different, only `parseAccount` and the URL in `fetchAccount` need to change.
 

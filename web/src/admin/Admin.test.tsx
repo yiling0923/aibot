@@ -389,6 +389,14 @@ describe('Control panel', () => {
     expect(screen.getByText(/Not added, because the bot already covers them/)).toBeTruthy();
     expect(await screen.findByRole('button', { name: new RegExp('Import ' + STARTER_ENTRIES + ' entries') })).toBeTruthy();                              // the check step reads all of the pack
   });
+  it('Merchant settings: the LiveChat account-answers switch starts off, turns on, and enables Save', async () => {
+    open('admin', '/admin/set');
+    const sw = await screen.findByRole('switch', { name: 'Account answers in LiveChat' }) as HTMLInputElement;
+    expect(sw.checked).toBe(false);
+    await userEvent.click(sw);
+    expect(sw.checked).toBe(true);
+    expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
