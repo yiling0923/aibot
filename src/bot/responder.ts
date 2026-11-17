@@ -296,14 +296,15 @@ export class Bot {
     // Not understood = no topic or question word was found at all. The first time, ask again; only a second miss goes to a human.
     // (A message that names a topic the merchant has no answer for is not a miss: it goes to a human straight away.)
     const miss = r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard && !r.ks.T.length && !r.ks.A.length;
-    let reask = miss && s.misses < 1 && s.clarifyCount === 0 && !(s.askKind && s.askKind !== 'menu');
+    const reaskMax = Math.max(0, Math.min(3, Math.round(c.reaskTimes ?? 1)));                  // the merchant's setting: how many times to ask again (default 1)
+    let reask = miss && s.misses < reaskMax && s.clarifyCount === 0 && !(s.askKind && s.askKind !== 'menu' && !(s.askKind === 'reask' && reaskMax > 1));
     if (miss) s.misses++; else if (r.decision !== 'HANDOFF') s.misses = 0;
     // The clarify rule of the plan: one question with up to 3 choices, then a person. It never asks twice.
     // "Which question about this topic?" (menu) is part of the answer once the topic is known; it may follow any other question, but not itself.
     let asking: Session['askKind'] = reask ? 'reask' : r.decision === 'CLARIFY' ? 'clarify' : r.decision === 'AMOUNT' && !r.dir ? 'clarify'
       : r.decision === 'CHOICE' ? (r.options.some((o) => o.kind === 'topic') ? 'topics' : 'menu') : null;
     const prevAsk = s.askKind ?? null;
-    if (asking && (asking === 'menu' ? prevAsk === 'menu' : !!prevAsk && prevAsk !== 'menu')) {
+    if (asking && !(asking === 'reask' && prevAsk === 'reask') && (asking === 'menu' ? prevAsk === 'menu' : !!prevAsk && prevAsk !== 'menu')) {      // (asking again after "ask again" is allowed up to the merchant's number)
       r = { ...r, decision: 'HANDOFF', conf: r.conf, why: 'The bot already asked once and it is still unclear, so a person takes over. It never asks twice.' }; reask = false; asking = null;
     }
     if (r.decision === 'ANSWER' && this.engine.entry(s.merchant, r.top.intent)?.entryType === 'needs_staff') r = { ...r, decision: 'HANDOFF', why: `"${r.top.intent}" is marked "needs staff" in the knowledge base, so a person answers this, not the bot.` };

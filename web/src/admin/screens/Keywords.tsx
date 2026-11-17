@@ -18,6 +18,7 @@ export default function Keywords() {
   const p = usePanel(); const assign = useAssign(); const lock = !p.isAdmin;
   const [tab, setTab] = useState('all'); const [q, setQ] = useState(''); const [lang, setLang] = useState('all'); const [sel, setSel] = useState<Set<string>>(new Set());
   const [topic, setTopic] = useState(''); const [busy, setBusy] = useState(false);
+  const [adding, setAdding] = useState(false); const [newWord, setNewWord] = useState('');          // "Add keyword": type a word before any customer has typed it
   const [setFor, setSetFor] = useState<{ w: string; preset?: string } | null>(null); const [drawer, setDrawer] = useState<string | null>(null);
 
   const [showAll, setShowAllState] = useState(() => { try { return localStorage.getItem('kwShowAll') === '1'; } catch { return false; } });   // also show the words of each main keyword that nobody has typed yet
@@ -108,9 +109,13 @@ export default function Keywords() {
   return (
     <>
       <div className="card kwtop">
-        <div className="head"><div><h2>Keywords · {p.M.name}</h2><div className="sub">Every word customers type is saved here automatically. Put each one under a topic, or ignore it.{p.ai.describe ? '' : <span className="dimnote" title="Add the Anthropic key to .env"> AI descriptions are off.</span>}</div></div>
-          <div className="tools">{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
+        <div className="head"><div><h2>Keywords · {p.M.name}</h2><div className="sub">Every word customers type is saved here automatically. Put each one under a topic, or ignore it. To add a word before any customer types it, press Add keyword.{p.ai.describe ? '' : <span className="dimnote" title="Add the Anthropic key to .env"> AI descriptions are off.</span>}</div></div>
+          <div className="tools"><button className="btn pri" type="button" aria-expanded={adding} onClick={() => setAdding((a) => !a)}>＋ Add keyword</button>{p.ai.describe ? <button className="btn" type="button" disabled={busy} onClick={describe} title="Claude writes a short note and suggests a type for words that have none">{busy ? 'Asking Claude…' : 'Describe new words with AI'}</button> : null}
 </div></div>
+        {adding && <form className="addrow" aria-label="Add a keyword" style={{ marginTop: 10 }} onSubmit={(e) => { e.preventDefault(); const w = newWord.trim().toLowerCase().replace(/\s+/g, ' ');
+            if (!w || w.length > 60) return p.toast('Type the word or phrase, up to 60 characters'); setSetFor({ w }); setAdding(false); setNewWord(''); }}>
+          <input type="text" aria-label="The keyword to add" placeholder="A word or phrase in any language, for example dps or free credit" value={newWord} onChange={(e) => setNewWord(e.target.value)} style={{ flex: 1, minWidth: 220 }} autoFocus />
+          <button className="btn pri" type="submit" disabled={!newWord.trim()}>Next</button><span className="sub">Then you choose what it is: a short form of a topic, a new topic, a question word and so on.</span></form>}
         <div className="kwfilter">
           <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{l} <span className="n">{counts[k]}</span></button>)}</div>
           <div className="filt"><input type="search" placeholder="Filter keywords" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />

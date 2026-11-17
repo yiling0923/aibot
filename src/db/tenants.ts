@@ -92,6 +92,7 @@ const REQUIRED: { table: string; column: string; add: string; after?: string }[]
   { table: 'settings', column: 'handoff_account', add: 'ADD COLUMN handoff_account TINYINT(1) NOT NULL DEFAULT 1' },
   { table: 'settings', column: 'trigger_phrases', add: 'ADD COLUMN trigger_phrases TEXT NULL' },
   { table: 'settings', column: 'ai_instructions', add: 'ADD COLUMN ai_instructions TEXT NULL' },
+  { table: 'settings', column: 'reask_times', add: 'ADD COLUMN reask_times INT NOT NULL DEFAULT 1' },
   { table: 'settings', column: 'max_choices', add: 'ADD COLUMN max_choices INT NOT NULL DEFAULT 3' },
   { table: 'settings', column: 'more_help_on', add: 'ADD COLUMN more_help_on TINYINT(1) NOT NULL DEFAULT 1' },
   { table: 'bot_decisions', column: 'topic', add: 'ADD COLUMN topic VARCHAR(100) NULL' },

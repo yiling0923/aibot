@@ -448,6 +448,30 @@ describe('Control panel', () => {
     await screen.findByText('Go to Wallet > Deposit.');
     expect(localStorage.getItem('lcTenant:A')).toBe('9');                                           // kept for this merchant
   });
+  it('Merchant settings: the admin sets how many times the bot asks again, staff can see it but not change it', async () => {
+    const { unmount } = open('admin', '/admin/set');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Replies' }));
+    const sel = await screen.findByLabelText('Ask again this many times') as HTMLSelectElement;
+    expect(sel.value).toBe('1'); expect([...sel.options].map((o) => o.value)).toEqual(['0', '1', '2', '3']); expect(sel.disabled).toBe(false);
+    await userEvent.selectOptions(sel, '2');
+    expect(within(await screen.findByRole('region', { name: 'Unsaved changes' })).getByText(/Ask again/)).toBeTruthy();                   // listed in the unsaved changes bar
+    await userEvent.click(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save to draft' }));
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);
+    unmount(); open('staff', '/admin/set');
+    await userEvent.click(await screen.findByRole('tab', { name: 'Replies' }));
+    expect((await screen.findByLabelText('Ask again this many times') as HTMLSelectElement).disabled).toBe(true);                         // admin only, like the rude-message limit
+  });
+  it('Keywords: Add keyword asks for a word, then opens the same form as a heard word', async () => {
+    open('staff', '/admin/store');
+    await userEvent.click(await screen.findByRole('button', { name: /Add keyword/ }));
+    const form = screen.getByRole('form', { name: 'Add a keyword' });
+    expect((within(form).getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true);                               // nothing typed yet
+    await userEvent.type(within(form).getByLabelText('The keyword to add'), '  DPS  {enter}');
+    expect(await screen.findByRole('heading', { name: /What is “dps”\?/ })).toBeTruthy();                                                  // lower case, trimmed
+    await userEvent.click(screen.getByRole('button', { name: 'Add to draft' }));
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                                                   // one change to publish
+    expect(screen.queryByRole('form', { name: 'Add a keyword' })).toBeNull();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

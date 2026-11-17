@@ -20,6 +20,8 @@ export interface SnapSettings {
   handoff_complaint?: boolean; handoff_account?: boolean; trigger_phrases?: string;
   /** Style rules for the AI, up to 5000 characters. */
   ai_instructions?: string;
+  /** How many times the bot asks again when it does not understand, before a person takes over (0 to 3, default 1). */
+  reask_times?: number;
   max_choices: number; more_help_on: boolean; more_help: Record<string, string>;
 }
 /** Everything the control panel edits. The panel works on a copy of this and sends it back on Publish. */
