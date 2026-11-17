@@ -17,7 +17,7 @@ function fakeLiveChat(opts: { replyAfterMs?: number | null; fileField?: string; 
     let raw = ''; req.on('data', (c) => (raw += c)); req.on('end', () => {
       const url = new URL(req.url!, 'http://x'); calls.push(req.method + ' ' + url.pathname);
       const send = (code: number, j: unknown) => { res.writeHead(code, { 'content-type': 'application/json' }); res.end(JSON.stringify(j)); };
-      if (req.headers['x-tenant-id'] !== '1') return send(404, { error: 'unknown tenant' });
+      if (req.headers['x-tenant-id'] !== '1') return send(404, { error: 'widget_config_not_found' });
       const isForm = String(req.headers['content-type']).startsWith('multipart/form-data');
       const body = raw && !isForm ? JSON.parse(raw) : {}; if (req.method === 'POST' && !isForm) posts.push(body); const view = (id: string) => { const c = chats.get(id)!; return { publicId: id, status: c.status, aiHandoffStatus: 'none', messages: c.messages }; };
       const reply = (id: string, q: string) => { if (opts.replyAfterMs === null) return; setTimeout(() => chats.get(id)?.messages.push({ senderType: 'ai', body: 'Bot says: ' + q }), opts.replyAfterMs ?? 150); };
@@ -129,7 +129,7 @@ describe('chatting through a LiveChat', () => {
   it('says so when LiveChat is not reachable, when the tenant is wrong, and when the bot does not answer in time', async () => {
     await expect(chatThroughLiveChat({ baseUrl: 'http://127.0.0.1:1', tenant: '1', visitor: 'vis-test-2', text: 'hi', waitMs: 200 })).rejects.toThrow(/Could not reach LiveChat/);
     const lc = await fakeLiveChat({ replyAfterMs: null });
-    await expect(chatThroughLiveChat({ baseUrl: lc.base, tenant: '9', visitor: 'vis-test-3', text: 'hi' })).rejects.toThrow(/LiveChat answered 404/);
+    await expect(chatThroughLiveChat({ baseUrl: lc.base, tenant: '9', visitor: 'vis-test-3', text: 'hi' })).rejects.toThrow(/LiveChat answered 404.*widget_config_not_found.*no active merchant with Tenant id 9 in LiveChat.*tenant_id=/s);
     const t = await chatThroughLiveChat({ baseUrl: lc.base, tenant: '1', visitor: 'vis-test-4', text: 'hi', waitMs: 300, pollMs: 50 });
     expect(t.replied).toBe(false); expect(t.messages).toEqual([{ from: 'customer', sender: 'visitor', text: 'hi' }]);   // the customer's message is there, no reply yet
     lc.close();

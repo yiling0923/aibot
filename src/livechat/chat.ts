@@ -51,7 +51,12 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
     let r: Response;
     try { r = await f(base + path, { method, headers, body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(10_000) }); }
     catch { throw new Error(`Could not reach LiveChat at ${base}. Is it running?`); }
-    if (!r.ok) { if (okMissing && (r.status === 404 || r.status === 400)) return null; throw new Error(`LiveChat answered ${r.status} for ${method} ${path.split('?')[0]}. ${(await r.text().catch(() => '')).slice(0, 200)}`.trim()); }
+    if (!r.ok) {
+      if (okMissing && (r.status === 404 || r.status === 400)) return null;
+      const said = (await r.text().catch(() => '')).slice(0, 200);
+      const noMerchant = /widget_config_not_found|invalid_tenant_id/.test(said);                  // LiveChat's way of saying: no active merchant has this number
+      throw new Error(`LiveChat answered ${r.status} for ${method} ${path.split('?')[0]}. ${said}`.trim() + (noMerchant ? ` There is no active merchant with Tenant id ${o.tenant} in LiveChat. Use the number of the merchant in LiveChat: pick the merchant there and read tenant_id= in the address bar (the demo merchants are 1 to 6; add-merchant.ps1 prints the number of a new one).` : ''));
+    }
     return (await r.json().catch(() => null)) as Record<string, any> | null;               // eslint-disable-line @typescript-eslint/no-explicit-any
   };
   const q = `visitor_session_id=${encodeURIComponent(o.visitor)}`;
