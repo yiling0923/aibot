@@ -4,10 +4,9 @@ import type { Bot } from '../bot/responder';
 import type { Store } from '../bot/store';
 import '../auth/types';
 import { ask, AskError } from './ask';
-import type { HealthMonitor } from '../monitor/health';
 import { issueKey, listKeys, resolveKey, revokeKeys } from './keys';
 
-export interface ConnectorCtx { pool: Pool; getBot: () => Promise<Bot>; store: Store; timeoutMs?: number; monitor?: HealthMonitor }
+export interface ConnectorCtx { pool: Pool; getBot: () => Promise<Bot>; store: Store; timeoutMs?: number }
 
 /** The LiveChat connector (key-protected, no login cookie) and the admin calls that make, list and stop a merchant's bot key. */
 export function connectorRoutes(app: FastifyInstance, ctx: ConnectorCtx) {
@@ -15,9 +14,9 @@ export function connectorRoutes(app: FastifyInstance, ctx: ConnectorCtx) {
 
   app.post<{ Body: Record<string, unknown> }>('/api/v1/ai/ask', async (req, reply) => {
     const merchant = await resolveKey(pool, req.headers.authorization);
-    if (!merchant) { ctx.monitor?.record('badkey', '-', 0); return reply.code(401).send({ error: 'The bot API key is missing, wrong or stopped.' }); }
-    try { return await ask({ pool, bot: await ctx.getBot(), store: ctx.store, timeoutMs: ctx.timeoutMs, monitor: ctx.monitor }, merchant, req.body ?? {}); }
-    catch (e) { if (e instanceof AskError) return reply.code(e.status).send({ error: e.message }); ctx.monitor?.record('error', merchant, 0, (e as Error).message); throw e; }
+    if (!merchant) return reply.code(401).send({ error: 'The bot API key is missing, wrong or stopped.' });
+    try { return await ask({ pool, bot: await ctx.getBot(), store: ctx.store, timeoutMs: ctx.timeoutMs }, merchant, req.body ?? {}); }
+    catch (e) { if (e instanceof AskError) return reply.code(e.status).send({ error: e.message }); throw e; }
   });
 
   const adminOnly = (req: { user?: { role: string } }, reply: { code: (n: number) => { send: (b: unknown) => unknown } }) =>

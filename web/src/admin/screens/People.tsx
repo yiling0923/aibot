@@ -1,4 +1,3 @@
-import { HealthCard } from '../health';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
@@ -34,7 +33,6 @@ export default function People() {
   const admins = P.users.filter((u) => u.role === 'admin').length;
   return (
     <>
-      <HealthCard />
       <div className="card"><div className="head"><div><h2>Merchants <span className="cnt2">{P.merchants.length}</span></h2><div className="sub">Each merchant has its own answers, words and settings. Open a merchant to connect it to LiveChat and set its AI keys.</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>＋ Add merchant</button></div>
         {P.merchants.length > 5 && <div className="pbar"><input type="search" aria-label="Find a merchant" placeholder="Find a merchant" value={mq} onChange={(e) => setMq(e.target.value)} /></div>}
         <table className="ptable"><thead><tr><th>Merchant</th><th>Tone</th><th className="num">Answers</th><th>Staff login</th><th>LiveChat link</th><th></th></tr></thead><tbody>

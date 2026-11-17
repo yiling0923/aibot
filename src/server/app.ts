@@ -1,5 +1,3 @@
-import { HealthMonitor } from '../monitor/health';
-import { createNotifier, type Notifier } from '../monitor/notify';
 import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -53,7 +51,7 @@ const WEB = path.join(webDir, (() => { try { const n = fs.readFileSync(path.join
 /** Pages that need a login. The login page and the built files (/assets) stay open. */
 const isSignedInPage = (route: string) => route === '/' || route === '/admin' || route.startsWith('/admin/') || route === '/chat';
 
-export interface AppOptions { pool?: Pool; logger?: boolean; ai?: AiService; /** For tests: a monitor with its own clock, and a way of sending alerts. */ monitor?: HealthMonitor; notifier?: Notifier }
+export interface AppOptions { pool?: Pool; logger?: boolean; ai?: AiService }
 
 export async function buildApp(opts: AppOptions = {}) {
   const pool = opts.pool ?? createPool();
@@ -86,9 +84,7 @@ export async function buildApp(opts: AppOptions = {}) {
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai, api: accountApi });
   merchantApiRoutes(app, { pool, api: merchantApis, reloadBot: () => getBot(true) });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
-  const notifier = opts.notifier ?? createNotifier({ webhookUrl: config.alertWebhookUrl, telegramToken: config.alertTelegramToken, telegramChatId: config.alertTelegramChatId, name: config.alertName });
-  const monitor = opts.monitor ?? new HealthMonitor({ notify: (t) => notifier.send(t) });
-  connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs, monitor });
+  connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs });
   billingRoutes(app, { pool, onPriceChange: () => usage.forgetPrices() });
   basicsRoutes(app, { pool, reloadBot: () => getBot(true), limits });
   livechatChatRoutes(app);
@@ -140,19 +136,10 @@ export async function buildApp(opts: AppOptions = {}) {
     return reply.code(404).send({ error: 'Not found' });
   });
 
-  /** For an uptime checker (and `npm run watchdog`): 200 when the bot and its database answer, 503 when the database does not. */
-  app.get('/health', async (_req, reply) => {
+  app.get('/health', async () => {
     let db = 'down';
     try { await pool.query('select 1'); db = 'up'; } catch { /* reported below */ }
-    if (db !== 'up') reply.code(503);
-    return { ok: db === 'up', db, state: monitor.status().state };
-  });
-
-  /** What the panel's banner and the "Bot health" card show. Everyone signed in may look; only an admin may send a test alert. */
-  app.get('/api/admin/health', async () => ({ ...(await monitor.check()), alerts: notifier.configured }));
-  app.post('/api/admin/health/test', async (req, reply) => {
-    if (req.user?.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can do this.' });
-    return { sent: await notifier.send('🔔 This is a test alert. If you can read this, alerts work.'), alerts: notifier.configured };
+    return { ok: db === 'up', db };
   });
 
   /** Staff can only work with their own merchant. */
@@ -249,8 +236,6 @@ export async function buildApp(opts: AppOptions = {}) {
     await getBot(true); return { ok: true };
   });
 
-  // every 30 seconds: does the database answer, and are the last answers going well (sends an alert when it gets worse)
-  const hb = setInterval(() => { void pool.query('select 1').then(() => monitor.setDb(true), () => monitor.setDb(false)).finally(() => monitor.check()); }, 30_000); hb.unref(); app.addHook('onClose', async () => clearInterval(hb));
   if (config.retentionSweepMs > 0) {      // old conversations are deleted for the merchants that set a retention
     const r = setInterval(() => { void purgeOldChats(pool).catch(() => undefined); }, config.retentionSweepMs); r.unref(); app.addHook('onClose', async () => clearInterval(r));
   }

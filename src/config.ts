@@ -27,10 +27,5 @@ export const config = {
   /** How often old conversations are deleted, for merchants that set a retention (milliseconds, 0 = never). */
   retentionSweepMs: Number(process.env.RETENTION_SWEEP_MS ?? 6 * 3600_000),
   askTimeoutMs: Number(process.env.ASK_TIMEOUT_MS ?? 8000),
-  /** Where an alert is sent when the bot has a problem. Any of them may be set; none set means the alert only shows in the panel. */
-  alertWebhookUrl: process.env.ALERT_WEBHOOK_URL ?? '',
-  alertTelegramToken: process.env.ALERT_TELEGRAM_TOKEN ?? '',
-  alertTelegramChatId: process.env.ALERT_TELEGRAM_CHAT_ID ?? '',
-  alertName: process.env.ALERT_NAME ?? 'AI bot',
   openaiKey: process.env.OPENAI_API_KEY ?? '',
 };
