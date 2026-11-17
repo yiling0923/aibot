@@ -43,6 +43,8 @@ function Shell() {
   const nav = useNavigate();
   const view = useLocation().pathname.split('/')[2] || 'kb';
   const [dialog, setDialog] = useState<'publish' | null>(null);
+  const where = useLocation();
+  useEffect(() => { if ((where.state as { publish?: boolean } | null)?.publish) setDialog('publish'); }, [where.key]);        // "Import and publish" opens the Publish window
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
   const n = p.changes.length;

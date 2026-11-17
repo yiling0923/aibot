@@ -25,10 +25,10 @@ const ago = (d: Date) => {
 };
 
 /** Runs every sample message of every merchant (each merchant's own test cases) through the engine built from this knowledge. */
-export async function runTests(pool: Pool, engine: Engine) {
+export async function runTests(pool: Pool, engine: Engine, only?: string[]) {
   const out: { merchant: string; message: string; language: string; expected: string; expIntent: string | null; got: string; gotIntent: string | null; ok: boolean }[] = [];
   for (const t of await new Tenants(pool).list()) {
-    if (!engine.hasMerchant(t.code)) continue;
+    if (!engine.hasMerchant(t.code) || (only && !only.includes(t.code))) continue;
     const cases = await q(pool, `SELECT message, language, expected_decision, expected_intent FROM ${tbl(t.db, 'eval_cases')} ORDER BY id`);
     for (const c of cases) {
       const r = engine.analyze(c.message, t.code, 0);
@@ -38,6 +38,17 @@ export async function runTests(pool: Pool, engine: Engine) {
     }
   }
   return out;
+}
+
+/**
+ * Which merchants' sample messages need running for this draft. A change to one merchant's answers only affects that merchant, so only its
+ * messages are run (this is what makes Publish fast: running every merchant's messages took 5 seconds or more). A change to the shared word lists
+ * reaches every merchant, and with nothing changed everything is run, as before. Undefined means every merchant.
+ */
+function merchantsToTest(snap: Snapshot, current: Snapshot): string[] | undefined {
+  if (sharedSig(sharedSlice(snap)) !== sharedSig(sharedSlice(current))) return undefined;
+  const changed = Object.keys(snap.settings).filter((c) => merchantSig(merchantSlice(snap, c)) !== merchantSig(merchantSlice(current, c)));
+  return changed.length ? changed : undefined;
 }
 
 /** The merchants a person may work with: all of them for an admin, only their own for merchant staff. */
@@ -72,8 +83,9 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
 
   app.post<{ Body: { snapshot: Snapshot; includeDrafts?: boolean } }>(`${A}/tests`, async (req) => {
     const user = req.user!;
-    const snap = effectiveSnapshot(user, await readSnapshot(pool), req.body.snapshot);
-    const all = await runTests(pool, await engineFor(pool, snap, !!req.body.includeDrafts, await readMerchants(pool)));
+    const current = await readSnapshot(pool);
+    const snap = effectiveSnapshot(user, current, req.body.snapshot);
+    const all = await runTests(pool, await engineFor(pool, snap, !!req.body.includeDrafts, await readMerchants(pool)), merchantsToTest(snap, current));
     const results = user.role === 'admin' ? all : all.filter((r) => r.merchant === user.merchant);
     return { results, pass: results.filter((r) => r.ok).length, total: results.length };
   });
@@ -86,8 +98,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     if (!snapshot?.kb) return reply.code(400).send({ error: 'snapshot is required' });
     const current = await readSnapshot(pool);
     const snap = effectiveSnapshot(user, current, snapshot);
-    const all = await runTests(pool, await engineFor(pool, snap, false, await readMerchants(pool)));
-    const tests = user.role === 'admin' ? all : all.filter((r) => r.merchant === user.merchant);
+    // (The sample messages are NOT run again here: the Publish window already ran them on this draft, and running them twice doubled the wait.)
     const changed = Object.keys(snap.settings).filter((c) => merchantSig(merchantSlice(snap, c)) !== merchantSig(merchantSlice(current, c)));
     const sharedChanged = sharedSig(sharedSlice(snap)) !== sharedSig(sharedSlice(current));
     await ensureVersions(pool);                                           // so there is always an earlier version to go back to
@@ -98,7 +109,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     for (const code of changed) published.push({ scope: 'merchant', code, ver: await recordVersion(pool, { kind: 'merchant', code }, user.username, summary, merchantSlice(after, code)) });
     if (sharedChanged) published.push({ scope: 'shared', ver: await recordVersion(pool, { kind: 'shared' }, user.username, summary, sharedSlice(after)) });
     await ctx.reloadBot();
-    return { published, pass: tests.filter((t) => t.ok).length, total: tests.length };
+    return { published };
   });
 
   /** Rolls one merchant (or the shared word lists, when no merchant is given) back to a saved version. Other merchants are not touched.

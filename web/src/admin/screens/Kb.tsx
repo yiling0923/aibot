@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
@@ -17,12 +17,31 @@ export default function Kb() {
   const p = usePanel();
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [topicF, setTopicF] = useState('all');
   const [ed, setEd] = useState<Ed | null>(null);
-  
+  const [sel, setSel] = useState<Set<number>>(new Set());                 // entries ticked for a bulk action
+  useEffect(() => { setSel(new Set()); }, [p.merchant]);
+
   const all = p.draft.kb.filter((e) => e.merchant === p.merchant);
   const needs = all.filter((e) => entryProblems(e).length).length; const drafts = all.length - all.filter((e) => e.status === 'live').length;
   const topicsIn = [...new Set(all.map((e) => e.topic).filter(Boolean))].sort();
   const list = all.filter((e) => (status === 'all' || (status === 'needs' ? entryProblems(e).length > 0 : e.status === status)) && (topicF === 'all' || e.topic === topicF) && (!q || (e.intent_key + ' ' + LANGS.map((l) => trOf(e, l).answer_text).join(' ')).toLowerCase().includes(q.toLowerCase())));
   const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => CORE_LANGS.some((l) => langState(e, l) !== 'on')).length;
+
+  const picked = list.filter((e) => sel.has(e.id));
+  const allShown = list.length > 0 && list.every((e) => sel.has(e.id));
+  const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  /** A draft the bot could use if it were live: it has an answer and at least 3 example questions (no "TO WRITE", no other problem). */
+  const readyDrafts = all.filter((e) => e.status === 'draft' && entryProblems({ ...e, status: 'live' }).length === 0);
+  const setStatusOf = (ids: Set<number>, to: 'live' | 'draft') => {
+    const n = all.filter((e) => ids.has(e.id) && e.status !== to).length; if (!n) return p.toast('Nothing to change: they are already ' + to);
+    p.edit((d, note) => { d.kb.forEach((e) => { if (ids.has(e.id) && e.merchant === p.merchant && e.status !== to) { e.status = to; e.dirty = true; } }); note(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} (${p.M.name})`); });
+    setSel(new Set()); p.toast(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} in the draft. ${to === 'live' ? 'Press Publish to make them live for customers.' : 'Press Publish to take them off.'}`);
+  };
+  const deleteSel = () => {
+    if (!picked.length || !window.confirm(`Delete ${picked.length} entr${picked.length === 1 ? 'y' : 'ies'}? You can still go back by not publishing, or from History.`)) return;
+    const ids = new Set(picked.map((e) => e.id));
+    p.edit((d, note) => { d.kb = d.kb.filter((e) => !(ids.has(e.id) && e.merchant === p.merchant)); note(`Deleted ${ids.size} entr${ids.size === 1 ? 'y' : 'ies'} (${p.M.name})`); });
+    setSel(new Set());
+  };
 
   const open = (e: Entry | null) => {
     const src = e ? clone(e) : blank(p.merchant);
@@ -38,10 +57,17 @@ export default function Kb() {
           <div className="segs" role="group" aria-label="Show">{([['all', 'All', all.length], ['live', 'Live', live], ['draft', 'Draft', drafts], ['needs', 'Needs work', needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
           <input type="search" placeholder="Search entries or answers" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" style={{ minWidth: 220 }} />
           <select aria-label="Topic" value={topicF} onChange={(e) => setTopicF(e.target.value)}><option value="all">All topics</option>{topicsIn.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <span className="sub">{list.length} shown</span></div></div>
-      <div className="card scroll"><table><thead><tr><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Questions</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
+          <span className="sub">{list.length} shown</span>
+          {readyDrafts.length > 0 && <button className="btn sm pri" type="button" title="Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts." onClick={() => setStatusOf(new Set(readyDrafts.map((e) => e.id)), 'live')}>Set {readyDrafts.length} ready draft{readyDrafts.length === 1 ? '' : 's'} live</button>}</div></div>
+      {picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} selected</b>
+        <button className="btn sm pri" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'live')}>Set live</button>
+        <button className="btn sm" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'draft')}>Set draft</button>
+        <button className="btn sm bad" type="button" onClick={deleteSel}>Delete</button>
+        <button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>Clear</button></div>}
+      <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Questions</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
+            <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
             <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).join(' ')}>needs work</span> : null}</td>
             <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">missing</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' (alone)' : ''}</Pill></> : null}</td>
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
@@ -50,7 +76,7 @@ export default function Kb() {
             <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{e.steps?.length ? <> <Pill c="info" >asks {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
           </tr>
         ))}
-        {!list.length && <tr><td colSpan={6} className="sub">No entries match.</td></tr>}
+        {!list.length && <tr><td colSpan={7} className="sub">No entries match.</td></tr>}
       </tbody></table></div>
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
     </>

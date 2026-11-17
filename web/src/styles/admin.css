@@ -593,3 +593,4 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .cdot.done{background:#7fc4a8;border-color:#7fc4a8;color:#fff}.cdot.warn{background:#f0c27b;border-color:#f0c27b;color:#fff}.cdot.optional{border-style:dashed}
 .cbody{flex:1;min-width:0}.chk.optional .cbody b,.chk.optional .cbody .sub{color:var(--muted)}
 .sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;position:sticky;top:8px;z-index:5}

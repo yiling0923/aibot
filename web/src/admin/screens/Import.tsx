@@ -25,7 +25,8 @@ export default function Import() {
 
   const copy = (txt: string, done: string) => { try { navigator.clipboard.writeText(txt).then(() => p.toast(done), () => setOut(txt)); } catch { setOut(txt); } };
 
-  const run = () => {
+  const run = (publishAfter = false) => {
+    const st: 'draft' | 'live' = publishAfter ? 'live' : status;                       // "Import and publish" makes every new entry live
     const todo = ok.filter((g) => !(g.exists && mode === 'skip')); let nn = 0, nu = 0;
     p.edit((d, note) => {
       const needT = new Map<string, string[]>();
@@ -42,13 +43,13 @@ export default function Import() {
           if (g.topic) e.topic = g.topic; if (g.aspect) e.aspect = g.aspect; if (g.optional) e.topic_optional = true; if (g.entryType) e.entry_type = g.entryType; e.dirty = true; nu++;
         } else {
           const tl: Record<string, Tr> = {}; LANGS.forEach((l) => { tl[l] = tr(l) || { question_examples: [], answer_text: '' }; });
-          const ne: Entry = { id: Math.max(0, ...d.kb.map((x) => x.id)) + 1, merchant: p.merchant, category: 'Imported', intent_key: g.key, topic: g.topic || '', aspect: g.aspect || null, topic_optional: g.optional, translations: tl, status, ...(g.entryType && g.entryType !== 'answer' ? { entry_type: g.entryType } : {}), dirty: true, updated: 'just now' };
+          const ne: Entry = { id: Math.max(0, ...d.kb.map((x) => x.id)) + 1, merchant: p.merchant, category: 'Imported', intent_key: g.key, topic: g.topic || '', aspect: g.aspect || null, topic_optional: g.optional, translations: tl, status: st, ...(g.entryType && g.entryType !== 'answer' ? { entry_type: g.entryType } : {}), dirty: true, updated: 'just now' };
           d.kb.push(ne); nn++;
         }
       });
       note('Imported ' + (nn + nu) + ' entries from ' + (name || 'pasted text') + ' (' + nn + ' new, ' + nu + ' updated) for ' + p.M.name);
     });
-    p.toast('Imported ' + (nn + nu) + ' entries to draft'); nav('/admin/kb');
+    p.toast(publishAfter ? 'Imported ' + (nn + nu) + ' entries. Check the window and press Publish.' : 'Imported ' + (nn + nu) + ' entries to draft'); nav('/admin/kb', publishAfter ? { state: { publish: true } } : undefined);
   };
 
   return (
@@ -104,7 +105,7 @@ export default function Import() {
           <div className="form" style={{ marginTop: 6 }}>
             <label className="fld"><span>If the entry already exists</span><select value={mode} onChange={(e) => setMode(e.target.value)}><option value="update">Update it (languages in the file replace the old ones)</option><option value="skip">Skip it</option></select></label>
             <label className="fld"><span>New entries start as</span><select value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'live')}><option value="draft">Draft (bot ignores them until you set them live)</option><option value="live">Live</option></select></label></div>
-          <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!willImport} onClick={run}>Import {willImport} entr{willImport === 1 ? 'y' : 'ies'} to draft</button><span className="sub">Blocked entries are left out. Warnings do not stop an import. Updated entries keep their live or draft status.</span></div></div></div>
+          <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!willImport} title="Imports the entries as live, then opens the Publish window. Entries that still say TO WRITE are ignored by the bot until they are written." onClick={() => run(true)}>Import and publish</button><button className="btn" type="button" disabled={!willImport} onClick={() => run(false)}>Import {willImport} entr{willImport === 1 ? 'y' : 'ies'} to draft</button><span className="sub">Blocked entries are left out. Warnings do not stop an import. Updated entries keep their live or draft status.</span></div></div></div>
       </div></div>
   );
 }

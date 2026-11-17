@@ -8,11 +8,15 @@ import { LUCKYPAY_ENTRIES, luckypayCsv, STARTER_ENTRIES } from './starterPack';
 
 const SET = () => ({ tone: 'friendly', handoff_group: 1, answer: 0.72, clarify: 0.45, abuse_close_after: 3, kind: {}, closing: {}, handoff: {}, tools: { deposit_status: true }, max_choices: 3, more_help_on: true, more_help: {}, ai_instructions: '', handoff_complaint: true, handoff_account: true, trigger_phrases: '' });
 const BASICS = { retentionDays: 90, name: 'LuckyPay', domain: '', defaultLanguage: 'en', languages: ['en', 'ms', 'zh', 'vi', 'th', 'tl'], monthlyTokenLimit: 500000, tokensMonth: 12400, tokensToday: 300, entries: 11, questionsToday: 7, avgConfidence: 0.81 };
+/** Entries of merchant B for the bulk-action test: two live and ready, one ready draft, one draft that still says TO WRITE. Empty in every other test. */
+let withKb = false;
+const kbEntry = (id: number, key: string, status: 'live' | 'draft', answer: string) => ({ id, merchant: 'B', category: 'General', intent_key: key, topic: 'deposit', aspect: null, topic_optional: false, status, translations: { en: { question_examples: [key + ' one', key + ' two', key + ' three'], answer_text: answer } } });
+const kbList = () => (withKb ? [kbEntry(1, 'dep_how', 'live', 'Go to Wallet.'), kbEntry(2, 'dep_time', 'live', 'Five minutes.'), kbEntry(3, 'dep_limit', 'draft', 'RM30 to RM30,000.'), kbEntry(4, 'dep_bonus', 'draft', 'TO WRITE: the bonus rules')] : []);
 const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay' }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
   snapshot: {
-    kb: [], aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
+    kb: kbList(), aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
     settings: { A: SET(), B: SET() },
   },
 });
@@ -62,7 +66,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { localStorage.clear(); setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { localStorage.clear(); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -494,6 +498,32 @@ describe('Control panel', () => {
     expect(days.length).toBe(7);
     await userEvent.hover(days[0]);
     expect(screen.getByRole('tooltip').textContent).toMatch(/14/);
+  });
+  it('Knowledge base: tick entries and set them live or draft in one go, and set every ready draft live with one button', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });                                  // wait until the entries are shown
+    await userEvent.click(screen.getByRole('checkbox', { name: 'Select all shown' }));
+    const bar = await screen.findByRole('region', { name: 'Selected entries' });
+    const total = Number(/(\d+) selected/.exec(bar.textContent ?? '')?.[1]); expect(total).toBe(4);
+    await userEvent.click(within(bar).getByRole('button', { name: 'Set draft' }));
+    expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();                       // the selection is cleared after the action
+    expect(screen.getByRole('button', { name: new RegExp('^Draft ' + total) })).toBeTruthy();            // all of them are drafts now
+    const ready = await screen.findByRole('button', { name: /Set \d+ ready drafts? live/ });             // one button for the drafts the bot could use
+    const n = Number(/Set (\d+) ready/.exec(ready.textContent ?? '')?.[1]); expect(n).toBe(3);                                                                                // the one that still says TO WRITE is not offered
+    await userEvent.click(ready);
+    expect(screen.getByRole('button', { name: /^Live 3$/ })).toBeTruthy(); expect(screen.getByRole('button', { name: /^Draft 1$/ })).toBeTruthy();   // dep_bonus stays a draft
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/2/);                    // two changes to publish, not one per entry
+    await userEvent.click(screen.getAllByRole('checkbox', { name: /^Select (?!all)/ })[0]);
+    expect((await screen.findByRole('region', { name: 'Selected entries' })).textContent).toMatch(/1 selected/);
+    await userEvent.click(screen.getByRole('button', { name: 'Clear' })); expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();
+  });
+  it('Import and publish: imports the entries as live and opens the Publish window', async () => {
+    open('staff', '/admin/imp');
+    await userEvent.click(await screen.findByRole('button', { name: /Starter packs/ }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /FAQ category starter/ }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Import and publish' }));
+    expect(await screen.findByText(/Tests on the draft:/)).toBeTruthy();                                // the Publish window, one click away from live
+    expect(screen.getAllByRole('button', { name: /^Publish/ }).length).toBe(2);                         // the top button and the one in the window
   });
   it('lets staff set an entry Type and an end date', async () => {
     open('staff', '/admin/kb');
