@@ -43,7 +43,7 @@ export function checklist(i: SetupInput): { items: CheckItem[]; done: number; to
     : { key: 'key', title: 'Bot key', state: 'todo', detail: 'No bot key yet. LiveChat cannot use the bot.', action: { to: 'key', label: 'Make key' } });
   items.push(i.keyLastUsed
     ? { key: 'livechat', title: 'LiveChat calls the bot', state: 'done', detail: `LiveChat last called the bot on ${new Date(i.keyLastUsed).toISOString().slice(0, 16).replace('T', ' ')} (UTC).` }
-    : { key: 'livechat', title: 'LiveChat calls the bot', state: 'todo', detail: i.activeKeys ? "LiveChat has not called the bot yet. Paste the address and key into this merchant's AI Bot page in LiveChat, then press Test the link." : 'Make the bot key first, then put it into LiveChat.', action: { to: 'livechat', label: 'Show the address and key' } });
+    : { key: 'livechat', title: 'LiveChat calls the bot', state: 'todo', detail: i.activeKeys ? "LiveChat has not called the bot yet. Paste the address and key into this merchant's AI Bot page in LiveChat (the same merchant must exist in LiveChat: it keeps its own list), then press Test the link." : 'Make the bot key first, then put it into LiveChat.', action: { to: 'livechat', label: 'Show the address and key' } });
   if (r.liveReady >= MIN_READY_ANSWERS) items.push({ key: 'answers', title: 'Answers', state: 'done', detail: `${r.liveReady} live answers are ready.` });
   else items.push({ key: 'answers', title: 'Answers', state: 'todo', action: r.total ? { to: 'kb', label: 'Open the knowledge base' } : { to: 'imp', label: 'Open Import' },
     detail: r.total === 0 ? 'No answers yet, so the bot hands every question to a person. Load the starter pack in Import (Starter packs).'

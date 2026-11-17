@@ -340,3 +340,11 @@ powershell -ExecutionPolicy Bypass -File deploy\local-livechat\add-merchants.ps1
 ```
 
 It adds **SwiftWallet, MegaPlay, BetKing, CashPoint and GameHub** to the local LiveChat (`seed-merchants.sql`), makes `admin@a.test` a member of each, makes a bot key for each in the bot and sets it in that merchant's AI Bot settings. Sign in again and the merchants are at the top left. Each LiveChat merchant is answered from its own merchant's knowledge base (the key says which one asks), and its conversations stay in that merchant. LiveChat takes the merchant from `?tenant_id=N` in the address (A is 1, B is 2, C is 3 ...); the widget uses the `X-Tenant-ID` header. Run it again any time: merchants are never added twice (each run makes a new bot key, the older ones keep working).
+
+**A merchant made in the bot panel is not made in LiveChat.** The bot panel and LiveChat each keep their own list of merchants; the bot key links one to the other. In the real LiveChat a platform account adds the merchant. In the local LiveChat run `add-merchant.ps1` for it (the code is shown under the merchant's name in the bot panel):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\local-livechat\add-merchant.ps1 -Code 77Y8 -Name "77Y8"
+```
+
+It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes a bot key, sets it in that merchant's AI Bot settings and tests the link. Then refresh LiveChat and pick the merchant in the list at the top. (`add-merchants.ps1` does the same for the five demo merchants.)

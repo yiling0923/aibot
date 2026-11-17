@@ -81,7 +81,7 @@ function MerchantDialog({ onClose, onDone }: { onClose: () => void; onDone: () =
   };
   return (
     <FormDialog title="Add merchant" label="Add merchant" onClose={onClose} save={save} done={'Added ' + f.name.trim()}>
-      <div className="sub">The knowledge base starts empty. After you save, this merchant's page opens with a setup checklist that shows what is left to do (the bot key, the answers and more).</div>
+      <div className="sub">The knowledge base starts empty. After you save, this merchant's page opens with a setup checklist that shows what is left to do (the bot key, the answers and more). This adds the merchant to the bot only: LiveChat keeps its own list of merchants, so the same merchant must exist there too.</div>
       <div className="form">
         <label className="fld"><span>Name</span><input placeholder="e.g. W88" autoFocus value={f.name} onChange={on('name')} /></label>
         <label className="fld"><span>Code (letters and digits, optional)</span><input placeholder="made from the name" value={f.code} onChange={on('code')} /></label>
