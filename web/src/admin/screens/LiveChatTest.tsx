@@ -78,7 +78,7 @@ export default function LiveChatTest() {
     try {
       const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
-      if (!r.replied) setNote('The picture or file went to your team in LiveChat. LiveChat does not ask the bot about a picture, so no bot reply is expected. Type a message to carry on with the bot.');
+      if (!r.replied) setNote('The picture or file went to LiveChat. If the picture patch is in LiveChat (deploy/local-livechat/patches/002-picture-to-bot.patch) the bot answers in a moment and this page refreshes by itself. Without it LiveChat does not ask the bot about a picture, so your team takes it.');
     } catch (e) { const m = (e as Error).message; setErr(m); if (/refused this file/.test(m)) void checkFiles(true); } finally { setBusy(false); }      // refused: ask LiveChat at once which kinds it takes
   };
   const send = () => {
@@ -105,7 +105,7 @@ export default function LiveChatTest() {
         <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={() => void checkFiles()}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
           <span className="sub"> Sends one tiny sample of each kind into a new test chat in LiveChat.</span>
           {probe && <ul className="plain" aria-label="Files LiveChat accepts" style={{ marginTop: 6 }}>{probe.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused, “{r.answer}”</span>}</li>)}</ul>}</div>
-        <div className="sub full">Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. A logged-in member only gets their own account answer when the merchant switched on "Account answers in LiveChat" (Merchant settings) and LiveChat sends the member to the bot (patch: deploy/local-livechat/patches/member-to-bot.patch). Otherwise "check my balance" goes to a person for both.</div>
+        <div className="sub full">Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. A logged-in member only gets their own account answer when the merchant switched on "Account answers in LiveChat" (Merchant settings) and LiveChat sends the member to the bot (patch: deploy/local-livechat/patches/001-member-to-bot.patch). Otherwise "check my balance" goes to a person for both.</div>
         <div className="sub full">The local setup uses <span className="mono">http://localhost:8080</span> and tenant <span className="mono">1</span>. This is the address the bot server uses, so it must be reachable from the computer that runs the bot.</div></div>}
       <div className="lcbox" aria-live="polite">
         {!lines.length && !busy && <div className="sub lcempty">No messages yet. Write something a customer would ask, for example “how to deposit”.</div>}

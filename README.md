@@ -293,10 +293,12 @@ Each has example questions in English and Malay.
 
 ### Make LiveChat send the member to the bot (needed for account answers)
 
-LiveChat's call to the bot carries only `question`, `history` and `session_id`, so the bot sees every customer as a guest. The patch `deploy/local-livechat/patches/member-to-bot.patch` makes LiveChat add `member: { id, name, rank }` (from the chat's customer, when they signed in with a member id) and skip its answer cache for that member's chats. Apply it to your LiveChat folder (Windows, PowerShell, in the bot folder), then rebuild and restart LiveChat. The second command builds LiveChat again and starts the API and the worker:
+LiveChat's call to the bot carries only `question`, `history` and `session_id`, so the bot sees every customer as a guest. The patch `deploy/local-livechat/patches/001-member-to-bot.patch` makes LiveChat add `member: { id, name, rank }` (from the chat's customer, when they signed in with a member id) and skip its answer cache for that member's chats. Apply it to your LiveChat folder (Windows, PowerShell, in the bot folder), then rebuild and restart LiveChat. The second command builds LiveChat again and starts the API and the worker:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File deploy\local-livechat\apply-member-patch.ps1 -LiveChatDir C:\livechat-develop
 powershell -ExecutionPolicy Bypass -File deploy\local-livechat\setup-nodocker.ps1 -LiveChatDir C:\livechat-develop
 ```
 
+
+**Picture patch (002).** LiveChat does not ask the bot about a message with a picture, video or file: it goes to the team and the customer hears nothing from the bot. `patches/002-picture-to-bot.patch` makes LiveChat ask the bot too, telling it only the file's kind and name (`attachment: { kind, name, mime_type, size }`, never the file; those chats are kept out of LiveChat's answer cache). The bot thanks the customer and hands the chat to a person, because it cannot open files. `apply-member-patch.ps1` applies both patches in order (001 first).

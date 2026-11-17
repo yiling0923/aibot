@@ -46,6 +46,15 @@ export function parseMember(raw: unknown): Member | null {
   return { id: sid, name: String(o.name ?? '').slice(0, 255), rank: o.rank != null ? String(o.rank).slice(0, 64) : o.member_rank != null ? String(o.member_rank).slice(0, 64) : undefined };
 }
 
+/** A picture, video or file from the customer, as LiveChat tells it (only its kind and name, never the file). */
+export function parseAttachment(raw: unknown): { kind: string; name: string } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const o = raw as Record<string, unknown>;
+  const name = typeof o.name === 'string' ? o.name.trim().slice(0, 255) : '';
+  if (!name) return null;
+  return { kind: typeof o.kind === 'string' ? o.kind.slice(0, 20) : 'file', name };
+}
+
 export { matchChoice } from '../bot/choices';
 
 function renderChoices(buttons: Button[]): { text: string; choices: Choice[] } {
@@ -71,13 +80,14 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     sessionId = body.session_id;
   }
   const member = parseMember(body.member);
+  const file = parseAttachment(body.attachment);                     // the customer sent a picture, video or file: the question is its name
 
   const tenant = await new Tenants(pool).get(merchant);
   if (!tenant) throw new AskError(404, 'Unknown merchant.');
   const SESSIONS = tbl(tenant.db, 'bot_sessions'), REQUESTS = tbl(tenant.db, 'bot_requests');
 
   // LiveChat sends no message id and retries when it hears nothing: the same request gets the same answer, and the chat does not move twice.
-  const requestKey = sha([merchant, sessionId ?? '', member?.id ?? '', question, JSON.stringify(history)].join('\u0001'));   // who is asking is part of the request
+  const requestKey = sha([merchant, sessionId ?? '', member?.id ?? '', question, file ? JSON.stringify(file) : '', JSON.stringify(history)].join('\u0001'));   // who is asking is part of the request
   const [seen] = await q(pool, `SELECT response, created_at FROM ${REQUESTS} WHERE request_key = ?`, [requestKey]);
   if (seen) {
     if (Date.now() - new Date(seen.created_at).getTime() < DUPLICATE_WINDOW_MS) return JSON.parse(seen.response) as AskResponse;
@@ -111,7 +121,9 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     if (state.choices && !s.choices) s.choices = state.choices;       // a chat saved before the choices moved into the session
     state.choices = null;
     // A reply to the choices ("deposit", "depo", "2", "the first one") is read by the bot itself, so every channel behaves the same.
+    s.fileNext = !!file;
     const turn: Turn | null = await bot.message(s, question);
+    s.fileNext = false;
     if (!turn) return fallback();
 
     const lang = (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? s.lang ?? state.lang) as Lang | null; state.lang = lang;
@@ -129,7 +141,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     };
     if (!abandoned && turn.log) {
       const matched = turn.trace.decision === 'ANSWER' ? ((turn.trace.top as { id?: number } | undefined)?.id ?? null) : null;
-      await store.hear(merchant, turn.log.text, turn.log.lang, turn.log.notUnderstood, deps.source ?? 'live');
+      if (!file) await store.hear(merchant, turn.log.text, turn.log.lang, turn.log.notUnderstood, deps.source ?? 'live');
       void store.logTurn({ merchant, sessionKey: id, customerRef: member?.id ?? null, text: turn.log.text, lang: turn.log.lang, decision: turn.log.decision, confidence: res.confidence,
         reply: answer, matchedKbId: matched, why: String(turn.trace.why ?? '').slice(0, 500), topic: typeof turn.trace.topic === 'string' ? turn.trace.topic : null, keywords: Array.isArray(turn.trace.kw) ? (turn.trace.kw as string[]) : [], source: deps.source ?? 'live' });
     }

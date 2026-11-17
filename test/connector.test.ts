@@ -146,6 +146,15 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     expect(off.decision).toBe('handover');                                                            // switched off again
   });
 
+  it('a picture from the customer (the question is its name) is thanked and handed to a person, whatever the name looks like', async () => {
+    const r = (await call(keyA, { question: 'MMU (3).jpg', attachment: { kind: 'image', name: 'MMU (3).jpg', mime_type: 'image/jpeg', size: 88000 } })).json();
+    expect(r.decision).toBe('handover'); expect(r.should_escalate).toBe(true); expect(r.cacheable).toBe(false);
+    expect(r.answer).toMatch(/pictures or files|gambar atau fail/);
+    const guest = (await call(keyA, { question: 'receipt 1.pdf', attachment: { kind: 'file', name: 'receipt 1.pdf' }, member: { externalId: '8841', name: 'Tom' } })).json();
+    expect(guest.should_escalate).toBe(true);                                                         // a member's file too; nothing about the account is written
+    expect(JSON.stringify(guest)).not.toMatch(/1,250/);
+  });
+
   it('never asks twice, even when the customer repeats the same words', async () => {
     const first = (await call(keyA, { question: 'blorp quux' })).json();
     expect(first.decision).toBe('clarify');                                                          // the one question

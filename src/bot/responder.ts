@@ -25,6 +25,8 @@ export interface Session {
   askKind?: 'reask' | 'clarify' | 'topics' | 'menu' | null;
   /** A channel that remembers replies by the words of the question (LiveChat) must never carry one customer's personal data to another: no account answers in a reply. */
   noPersonal?: boolean;
+  /** Set by a channel just before a message that is a picture, video or file (LiveChat sends its name as the text), so the bot does not read the name as a question. */
+  fileNext?: boolean;
 }
 /** A message that is only the name of a file (what LiveChat sends for a picture, a document or a video). */
 const FILE_NAME = /^[^\s\\/]{1,120}\.(jpe?g|png|gif|webp|heic|bmp|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp4|mov|avi|mp3|wav|m4a)$/i;
@@ -160,7 +162,7 @@ export class Bot {
     const typed = rawText.trim(); if (!typed || s.closed) return null;
     await this.warm(s);
     // The customer may answer the choices in their own words: "deposit", "depo", "2", "the first one". That is an answer, not a new question.
-    if (!s.handed && s.choices?.length) {
+    if (!s.handed && s.choices?.length && !s.fileNext) {
       const hit = matchChoice(typed, s.choices);
       if (hit) { const picked = this.pick(s, { kind: hit.kind, key: hit.key, amt: hit.amt, label: hit.label, lang: s.lang ?? this.cfg(s).defaultLanguage }); if (picked) { picked.trace = { ...picked.trace, typedReply: typed }; return picked; } }
     }
@@ -198,7 +200,8 @@ export class Bot {
       log: { text, lang: this.engine.analyze(text, s.merchant, 0).lang, decision: 'HANDED', notUnderstood: false },
     };
     // A picture or a file (LiveChat sends only its name, like MMU.JPG): the bot cannot open it, so a person takes over.
-    if (FILE_NAME.test(text)) {
+    const isFile = !!s.fileNext || FILE_NAME.test(text); s.fileNext = false;
+    if (isFile) {
       const lang = (s.lang ?? c.defaultLanguage) as Lang; const h = this.handoff(s, lang); s.pending = null;
       return { messages: [{ kind: 'bot', text: T.FILE_SENT[lang] }, h.messages[1]], buttons: null, locked: false, status: h.status, cacheable: false,
         trace: { kind: 'file', decision: 'HANDOFF', lang, conf: 1, why: 'The customer sent a picture or a file. The bot cannot open it, so a person takes over.' }, log: { text, lang, decision: 'HANDOFF', notUnderstood: false } };

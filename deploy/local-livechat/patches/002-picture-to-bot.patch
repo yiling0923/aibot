@@ -1,0 +1,192 @@
+diff -ruN a/internal/automation/ai_reply.go b/internal/automation/ai_reply.go
+--- a/internal/automation/ai_reply.go	2026-11-17 02:24:04.349461985 +0000
++++ b/internal/automation/ai_reply.go	2026-11-17 02:24:04.353037110 +0000
+@@ -42,6 +42,16 @@
+ 	TriggerMessageID *int64    `json:"trigger_message_id,omitempty"`
+ 	// Member is the signed-in customer of the chat (nil for a guest). It is sent to the AI bot so it can answer account questions.
+ 	Member *MemberInfo `json:"member,omitempty"`
++	// Attachment is set when the customer's last message is a picture, video or file. Its question is then the file's name.
++	Attachment *AttachmentInfo `json:"attachment,omitempty"`
++}
++
++// AttachmentInfo is what the AI bot is told about a file from the customer (never the file itself).
++type AttachmentInfo struct {
++	Kind     string `json:"kind"`
++	Name     string `json:"name"`
++	MIMEType string `json:"mime_type,omitempty"`
++	Size     int64  `json:"size,omitempty"`
+ }
+ 
+ // MemberInfo is who the customer is, as the website told LiveChat when the chat started.
+@@ -95,6 +105,10 @@
+ 	}
+ 	// A reply that is written for one member must never be kept for the words of the question: it could reach another customer.
+ 	personal := input.Member != nil && strings.TrimSpace(input.Member.ExternalID) != ""
++	if input.Attachment != nil {
++		payload["attachment"] = map[string]any{"kind": input.Attachment.Kind, "name": input.Attachment.Name, "mime_type": input.Attachment.MIMEType, "size": input.Attachment.Size}
++	}
++	keepOut := personal || input.Attachment != nil // the file's name is not a question: never read or keep an answer by it
+ 	if personal {
+ 		payload["member"] = map[string]any{"id": strings.TrimSpace(input.Member.ExternalID), "name": strings.TrimSpace(input.Member.Name), "rank": strings.TrimSpace(input.Member.Rank)}
+ 	}
+@@ -108,7 +122,7 @@
+ 
+ 	response := map[string]any(nil)
+ 	fromCache := false
+-	if service.Cache != nil && !personal {
++	if service.Cache != nil && !keepOut {
+ 		if cached, found, cacheErr := service.Cache.Get(ctx, tenantID, input.Question); cacheErr == nil && found {
+ 			response = cacheSafeAIResponse(cached)
+ 			fromCache = true
+@@ -138,7 +152,7 @@
+ 				return err
+ 			}
+ 		}
+-		if service.Cache != nil && !personal {
++		if service.Cache != nil && !keepOut {
+ 			_ = service.Cache.Put(ctx, tenantID, input.Question, cacheSafeAIResponse(response))
+ 		}
+ 	}
+diff -ruN a/internal/automation/ai_reply_attachment_test.go b/internal/automation/ai_reply_attachment_test.go
+--- a/internal/automation/ai_reply_attachment_test.go	1970-01-01 00:00:00.000000000 +0000
++++ b/internal/automation/ai_reply_attachment_test.go	2026-11-17 02:24:04.353102805 +0000
+@@ -0,0 +1,30 @@
++package automation
++
++import (
++	"context"
++	"testing"
++
++	merchantautomation "livechat/internal/merchant/automation"
++)
++
++func TestServiceSendsAttachmentInfoToAIAndNeverUsesTheAnswerCacheForIt(t *testing.T) {
++	provider := &fakeConfigProvider{config: merchantautomation.AIChatConfig{Enabled: true, BaseURL: "https://ai.example", APIKey: "key"}}
++	client := &fakeAIReplyClient{response: map[string]any{"reply": "we got your picture"}}
++	writer := &fakeBotWriter{}
++	service := NewService(provider, client, writer)
++	service.Cache = fakeAnswerCache{response: map[string]any{"reply": "an old answer for this file name", "confidence": 0.99}, found: true}
++	input := TriggerInput{ConversationID: 7, Question: "MMU (3).jpg", Attachment: &AttachmentInfo{Kind: "image", Name: "MMU (3).jpg", MIMEType: "image/jpeg", Size: 88000}}
++	if err := service.DispatchAIReply(context.Background(), "9", input); err != nil {
++		t.Fatal(err)
++	}
++	if client.calls != 1 || len(writer.messages) != 1 || writer.messages[0].request.Body != "we got your picture" {
++		t.Fatalf("a picture must go to the AI, never to the cache: calls=%d messages=%+v", client.calls, writer.messages)
++	}
++	att, ok := client.payload["attachment"].(map[string]any)
++	if !ok || att["kind"] != "image" || att["name"] != "MMU (3).jpg" || att["mime_type"] != "image/jpeg" {
++		t.Fatalf("expected the attachment in the AI payload, got %+v", client.payload)
++	}
++	if _, has := client.payload["member"]; has {
++		t.Fatalf("no member was given, none must be sent: %+v", client.payload)
++	}
++}
+diff -ruN a/internal/widget/ai_attachment_test.go b/internal/widget/ai_attachment_test.go
+--- a/internal/widget/ai_attachment_test.go	1970-01-01 00:00:00.000000000 +0000
++++ b/internal/widget/ai_attachment_test.go	2026-11-17 02:24:04.355678800 +0000
+@@ -0,0 +1,41 @@
++package widget
++
++import (
++	"context"
++	"testing"
++
++	"livechat/internal/tenant"
++)
++
++func TestServiceTellsTheAIBotAboutAPictureTheCustomerSends(t *testing.T) {
++	aiReplies := &fakeAIReplyDispatcher{}
++	service := Service{
++		Finder: &fakeDataFinder{
++			addResponse: ConversationResponse{
++				Conversation: ConversationPayload{
++					ID:       123,
++					PublicID: "01JCONV",
++					Messages: []MessagePayload{
++						{ID: 1, SenderType: "visitor", Body: "slip.png", MessageType: "image", Attachment: &AttachmentPayload{Kind: "image", Name: "slip.png", MIMEType: "image/png", Size: 2048}},
++					},
++				},
++			},
++		},
++		Realtime:  &fakeRealtimeGateway{},
++		AIReplies: aiReplies,
++	}
++	if _, err := service.AddMessage(context.Background(), tenant.ID("1"), "01JCONV", AddMessageRequest{
++		VisitorSessionID: "session-123",
++		Body:             "slip.png",
++		Attachment:       &AttachmentPayload{Kind: "image", Name: "slip.png", URL: "/uploads/slip.png", MIMEType: "image/png", Size: 2048},
++	}); err != nil {
++		t.Fatal(err)
++	}
++	if !aiReplies.called {
++		t.Fatal("a picture must reach the AI bot too")
++	}
++	got := aiReplies.input.Attachment
++	if got == nil || got.Kind != "image" || got.Name != "slip.png" || got.MIMEType != "image/png" || got.Size != 2048 || aiReplies.input.Question != "slip.png" {
++		t.Fatalf("expected the picture's name and kind in the AI trigger, got question=%q attachment=%+v", aiReplies.input.Question, got)
++	}
++}
+diff -ruN a/internal/widget/conversation.go b/internal/widget/conversation.go
+--- a/internal/widget/conversation.go	2026-11-17 02:24:04.351287610 +0000
++++ b/internal/widget/conversation.go	2026-11-17 02:24:04.355611501 +0000
+@@ -434,10 +434,9 @@
+ 	}
+ 
+ 	service.publishConversationMessageCreated(ctx, messageCreatedInputFromConversationResponse(response, merchant.PublicID))
+-	// An attachment carries no question for the bot to answer -- its body is
+-	// just the file name -- so the same rule as AddMessage applies: leave the
+-	// first reply to a human.
+-	if config.Features.AIBot && normalized.Attachment == nil {
++	// A picture or file carries no question, but the bot is told about it (the file's name and kind, see TriggerInput.Attachment)
++	// so it can answer the customer (for example "your receipt was received, an agent will check it") and hand the chat over.
++	if config.Features.AIBot {
+ 		service.dispatchAIReply(ctx, tenantID, response, "widget.conversation.started")
+ 	}
+ 
+@@ -568,9 +567,7 @@
+ 
+ 	service.announceMemberLinked(ctx, response)
+ 	service.publishConversationMessageCreated(ctx, messageCreatedInputFromConversationResponse(response, response.Conversation.TenantPublicID))
+-	if normalized.Attachment == nil {
+-		service.dispatchAIReply(ctx, tenantID, response, "widget.conversation.message.created")
+-	}
++	service.dispatchAIReply(ctx, tenantID, response, "widget.conversation.message.created")
+ 
+ 	return response, nil
+ }
+@@ -636,6 +633,10 @@
+ 			member.Name = strings.TrimSpace(*response.Customer.Name)
+ 		}
+ 	}
++	var attachment *automation.AttachmentInfo
++	if last := lastVisitorMessage(response.Conversation.Messages); last != nil && last.Attachment != nil {
++		attachment = &automation.AttachmentInfo{Kind: last.Attachment.Kind, Name: last.Attachment.Name, MIMEType: last.Attachment.MIMEType, Size: last.Attachment.Size}
++	}
+ 	_ = service.AIReplies.DispatchAIReply(ctx, tenantID, automation.TriggerInput{
+ 		ConversationID:   response.Conversation.ID,
+ 		AIHandoffStatus:  response.Conversation.AIHandoffStatus,
+@@ -644,6 +645,7 @@
+ 		Source:           source,
+ 		TriggerMessageID: triggerMessage,
+ 		Member:           member,
++		Attachment:       attachment,
+ 	})
+ }
+ 
+@@ -657,6 +659,16 @@
+ 	return ""
+ }
+ 
++func lastVisitorMessage(messages []MessagePayload) *MessagePayload {
++	for i := len(messages) - 1; i >= 0; i-- {
++		if messages[i].SenderType == "visitor" || messages[i].SenderType == "customer" {
++			return &messages[i]
++		}
++	}
++
++	return nil
++}
++
+ func lastVisitorMessageID(messages []MessagePayload) *int64 {
+ 	for i := len(messages) - 1; i >= 0; i-- {
+ 		if messages[i].SenderType == "visitor" || messages[i].SenderType == "customer" {
