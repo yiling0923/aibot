@@ -4,7 +4,7 @@ import { chatThroughLiveChat, probeUploads } from '../livechat/chat';
 
 /** The LiveChat test page: a chat in the panel whose messages go through a LiveChat (an admin tool). */
 const MAX_FILE = 10 * 1024 * 1024;
-const ALLOWED = /^(image\/(jpeg|png|gif|webp|heic|bmp)|application\/pdf|text\/plain|text\/csv|application\/(msword|vnd\.ms-excel|vnd\.openxmlformats-officedocument\.[a-z.]+))$/;
+const ALLOWED = /^(image\/(jpeg|png)|video\/(mp4|quicktime)|application\/pdf)$/;       // what LiveChat takes from a customer: JPEG, PNG, MP4, MOV and PDF
 export function livechatChatRoutes(app: FastifyInstance, ctx: { fetch?: typeof fetch; waitMs?: number; pollMs?: number } = {}) {
   app.post<{ Body: { baseUrl?: string; tenant?: string; visitor?: string; text?: string; file?: { name?: unknown; type?: unknown; data?: unknown }; member?: { id?: unknown; name?: unknown; rank?: unknown } | null } }>('/api/admin/livechat-chat', { bodyLimit: 15 * 1024 * 1024 }, async (req, reply) => {
     if (req.user?.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can use the LiveChat test.' });

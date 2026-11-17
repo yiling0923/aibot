@@ -78,7 +78,7 @@ describe('chatting through a LiveChat', () => {
   it('stops at once when LiveChat looks at the file and refuses its type, and says which file it was', async () => {
     const lc = await fakeLiveChat({ refuseType: 'image/png' }); const o = { baseUrl: lc.base, tenant: '1', visitor: 'vis-type', pollMs: 40, waitMs: 500 };
     const err = await chatThroughLiveChat({ ...o, file: { name: 'slip.png', type: 'image/png', data: new Uint8Array([1, 2, 3]) } }).catch((e: Error) => e.message);
-    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*does not take this kind of file from a customer/s);
+    expect(String(err)).toMatch(/LiveChat refused this file: "Unsupported attachment type\.".*slip\.png \(image\/png, 3 bytes\).*takes only JPEG and PNG pictures/s);
     expect(lc.uploads).toHaveLength(0);                                                                                           // nothing was stored, and no other field names were tried
     const ok = await chatThroughLiveChat({ ...o, visitor: 'vis-type2', file: { name: 'slip.jpg', type: 'image/jpeg', data: new Uint8Array([1, 2, 3]) } });
     expect(ok.messages.some((m) => m.attachment?.name === 'slip.jpg')).toBe(true);                                                // another type goes through
@@ -171,7 +171,7 @@ describe.skipIf(!reachable)('the LiveChat test route (needs TEST_DATABASE_URL)',
     expect((await f({ name: 'big.png', type: 'image/png', data: Buffer.alloc(10 * 1024 * 1024 + 1).toString('base64') })).statusCode).toBe(400);
     expect((await post(staff, { baseUrl: lc.base, visitor: 'vis-route-up', file: { name: 'a.png', type: 'image/png', data: png } })).statusCode).toBe(403);
     const ok = await f({ name: '../../evil slip.png', type: 'image/png', data: png });
-    expect(ok.statusCode).toBe(200); expect(lc.uploads[0].name).toBe('.._.._evil slip.png');                              // a path in the name is made harmless
+    expect(ok.statusCode).toBe(200); expect(lc.uploads[0].fields).toEqual(expect.arrayContaining(['kind', 'visitor_session_id'])); expect(lc.uploads[0].name).toBe('.._.._evil slip.png');                              // a path in the name is made harmless
     expect(ok.json().messages.find((m: { attachment?: unknown }) => m.attachment).attachment).toMatchObject({ name: '.._.._evil slip.png', mimeType: 'image/png' });
     lc.close();
   });

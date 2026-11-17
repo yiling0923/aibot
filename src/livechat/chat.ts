@@ -35,6 +35,8 @@ export const FILE_FIELDS = ['file', 'attachment', 'image'];
 /** Learned from LiveChat's own answers: the upload address is the first one, and the form field is `file`. The others are only tried when LiveChat does not know the first. */
 export const UPLOAD_PATHS = ['/widget/conversations/{id}/attachments', '/widget/conversations/{id}/uploads', '/widget/conversations/{id}/files', '/widget/attachments', '/widget/uploads', '/widget/upload'];
 
+/** What LiveChat calls a file from a customer: image (JPEG, PNG), video (MP4, MOV) or file (PDF). */
+const kindOfFile = (type: string) => (type.startsWith('image/') ? 'image' : type.startsWith('video/') ? 'video' : 'file');
 const kindOf = (sender: string): ChatLine['from'] => (/visitor|customer|member|user/i.test(sender) ? 'customer' : /agent|staff|human|operator/i.test(sender) ? 'agent' : /system|event/i.test(sender) ? 'system' : 'bot');
 
 /**
@@ -81,6 +83,8 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
       for (const field of FILE_FIELDS) {
         const form = new FormData();
         form.append('visitor_session_id', o.visitor); form.append('conversation_id', convId); if (text) form.append('body', text);
+        form.append('kind', kindOfFile(file.type));                                                  // LiveChat decides what a file may be by this field: without it everything counts as a document (PDF only)
+        if (who) { form.append('member_external_id', who.id); form.append('member_name', who.name); if (who.rank) form.append('member_rank', who.rank); }
         form.append(field, new Blob([file.data as unknown as ArrayBuffer], { type: file.type }), file.name);
         let r: Response;
         try { r = await f(base + path, { method: 'POST', headers: { 'X-Tenant-ID': o.tenant }, body: form, signal: AbortSignal.timeout(30_000) }); }
@@ -89,7 +93,7 @@ export async function chatThroughLiveChat(o: ChatOpts, f: Fetch = fetch): Promis
         tried.push(`POST ${path} (field "${field}") -> ${r.status} ${body}`.trim());
         let code = '', said = ''; try { const e = JSON.parse(full); code = String(e.error ?? ''); said = String(e.message ?? ''); } catch { /* not JSON */ }
         if (code === 'attachment_invalid') {                                                          // the address and the field are right: LiveChat looked at the file and refused it
-          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}${real && real.type !== o.file!.type ? `, really ${real.ext.toUpperCase()} inside although it was named ${o.file!.name}` : ''}, ${file.data.length} bytes) at ${path}. LiveChat's upload works, but it does not take this kind of file from a customer.`);
+          throw new Error(`LiveChat refused this file: "${said || code}" It received ${file.name} (${file.type || 'no type'}${real && real.type !== o.file!.type ? `, really ${real.ext.toUpperCase()} inside although it was named ${o.file!.name}` : ''}, ${file.data.length} bytes) at ${path}. LiveChat takes only JPEG and PNG pictures, MP4 or MOV videos and PDF files from a customer (pictures up to 5 MB, videos 15 MB, PDF 10 MB).`);
         }
         if (r.ok) {
           let j: Record<string, any> | null = null; try { j = JSON.parse(full); } catch { /* an answer that is not JSON: the message is assumed to be made */ }   // eslint-disable-line @typescript-eslint/no-explicit-any

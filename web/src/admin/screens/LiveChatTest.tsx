@@ -62,11 +62,11 @@ export default function LiveChatTest() {
     return () => clearInterval(t);
   }, []);
 
-  const MAX_FILE = 10 * 1024 * 1024; const OK_TYPE = /^(image\/(jpeg|png|gif|webp|heic|bmp)|application\/pdf|text\/plain|text\/csv|application\/(msword|vnd\.ms-excel|vnd\.openxmlformats-officedocument\..+))$/;
+  const MAX_FILE = 10 * 1024 * 1024; const OK_TYPE = /^(image\/(jpeg|png)|video\/(mp4|quicktime)|application\/pdf)$/;
   const choose = (f: File | null | undefined) => {
     if (!f) return;
     if (f.size > MAX_FILE) { setErr('That file is too big (the most is 10 MB).'); return; }
-    if (!OK_TYPE.test(f.type)) { setErr('This kind of file is not allowed here. Use a picture, a PDF, a text file or an Office document.'); return; }
+    if (!OK_TYPE.test(f.type)) { setErr('This kind of file is not allowed here. LiveChat takes JPEG or PNG pictures, MP4 or MOV videos and PDF files from a customer.'); return; }
     setErr(''); setPick(f);
   };
   const toBase64 = (f: File) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error('Could not read the file.')); r.readAsDataURL(f); });
@@ -119,7 +119,7 @@ export default function LiveChatTest() {
         <div className="sub">Send one of the accepted kinds. A test chat was made in LiveChat for this check.</div></>}</div>}
       <div className="lcstat sub">{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/*,application/pdf,.txt,.csv,.doc,.docx,.xls,.xlsx" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
+        <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/jpeg,image/png,video/mp4,video/quicktime,application/pdf,.mov" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
         <IconBtn tip="Attach a picture or file" onClick={() => { if (!busy) fileIn.current?.click(); }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></IconBtn>
         <input aria-label="Message" value={text} placeholder={pick ? 'Add a line to go with it (optional)' : 'Type a customer message'} onChange={(e) => setText(e.target.value)} disabled={busy} />
         <button className="btn pri" type="submit" disabled={busy || (!text.trim() && !pick)}>{busy ? 'Waiting…' : 'Send'}</button></form>
