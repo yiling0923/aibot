@@ -236,8 +236,13 @@ export class Engine {
     const lc = raw.toLowerCase();
     const inj = this.injection.filter((w) => lc.includes(w));
     if (inj.length) return { kind: 'injection', hit: inj, why: "The message tries to change the bot's rules, so it is not answered. A human takes over." };
-    const cmp = lc.replace(/[^a-z]/g, '');
-    const others = this.k.merchants.filter((x) => x.code !== m.code).flatMap((x) => [x.name.toLowerCase(), x.code.toLowerCase().replace(/[^a-z]/g, ''), 'merchant' + x.code.slice(-1).toLowerCase()]);
+    // Another merchant is named when its name or code is in the message (spaces and dashes ignored: "mega play" is MegaPlay). Letters AND digits are kept, and a word
+    // shorter than 4 characters (3 when it mixes letters and digits, like "7st") is not looked for: with the digits removed the code 77Y8 was just "y",
+    // so every message with the letter y ("my balance") was handed to a person.
+    const cmp = lc.replace(/[^a-z0-9]/g, '');
+    const word = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+    const usable = (w: string) => w.length >= 4 || (w.length === 3 && /[a-z]/.test(w) && /\d/.test(w));
+    const others = this.k.merchants.filter((x) => x.code !== m.code).flatMap((x) => [word(x.name), word(x.code), 'merchant' + x.code.slice(-1).toLowerCase()]).filter(usable);
     const oh = others.filter((w) => cmp.includes(w));
     if (oh.length) return { kind: 'other-merchant', hit: oh, why: 'The customer asks about another merchant. This bot only answers for ' + m.name + ', so a human takes over.' };
     const hasP = (p: string) => NOSP_RE.test(p) ? lc.includes(p) : new RegExp('(?<![a-z])' + escRe(p) + '(?![a-z])').test(lc);
