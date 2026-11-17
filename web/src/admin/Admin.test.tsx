@@ -656,7 +656,7 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('tab', { name: 'AI help' }));
     expect((screen.getByLabelText('Bot instructions') as HTMLTextAreaElement).disabled).toBe(false);   // staff may write the style rules
   });
-  it('shows the handoff rules as switches (two locked on, one not available), trigger phrases and the retention days', async () => {
+  it('shows the handoff rules as switches (four locked on), trigger phrases and the retention days', async () => {
     const { unmount } = open('admin', '/admin/set');
     await userEvent.click(await screen.findByRole('tab', { name: 'Handoff' }));
     const complaint = await screen.findByRole('switch', { name: 'Complaint or dispute' }) as HTMLInputElement;
@@ -664,7 +664,7 @@ describe('Control panel', () => {
     await userEvent.click(complaint); expect(complaint.checked).toBe(false);                      // an admin may switch the rule off
     expect((screen.getByRole('switch', { name: 'Customer asks for a person' }) as HTMLInputElement).disabled).toBe(true);        // always on
     expect((screen.getByRole('switch', { name: 'Same question again, or the bot cannot answer' }) as HTMLInputElement).checked).toBe(true);
-    const file = screen.getByRole('switch', { name: 'Picture or file sent' }) as HTMLInputElement; expect(file.checked).toBe(false); expect(file.disabled).toBe(true);
+    const file = screen.getByRole('switch', { name: 'Picture or file sent' }) as HTMLInputElement; expect(file.checked).toBe(true); expect(file.disabled).toBe(true);        // always on now: a picture goes to a person
     await userEvent.type(screen.getByLabelText('Custom trigger phrases'), 'vip, urgent');
     expect((screen.getByLabelText('Custom trigger phrases') as HTMLInputElement).value).toBe('vip, urgent');
     expect(screen.getByLabelText('Human group for handoff')).toBeTruthy();                           // moved here from Replies
