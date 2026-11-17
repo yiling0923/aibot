@@ -40,6 +40,9 @@ const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (lcRefuse && url === '/api/admin/livechat-chat' && String(init?.body).includes('"file"')
     ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    : /\/merchants\/[^/]+\/study\/measure/.test(url) ? { tested: 40, coverage: 0.72, accuracy: 0.9, scored: 25, wrongRate: 0.1, judged: 20, handoverRate: 0.2, clarifyRate: 0.08, noAnswerYet: 7, mistakes: [{ question: 'how long depo', botSaid: 'Wrong answer text', staffReply: 'Right staff text', expected: 'deposit_time' }], gaps: [{ question: 'do you have vip', count: 4, topic: 'vip', lang: 'en', reply: 'Yes, VIP has 5 levels.', examples: ['do you have vip', 'vip level?'] }] }
+    : /\/merchants\/[^/]+\/study\/import/.test(url) ? { rows: 12, kept: 8, dropped: { filler: 2, account: 1, short: 0, duplicate: 1 }, scrubbed: 3, learn: 6, test: 2, added: 8, alreadySaved: 0 }
+    : /\/merchants\/[^/]+\/study$/.test(url) ? { total: 8, learn: 6, test: 2, lastLoaded: null }
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -396,6 +399,19 @@ describe('Control panel', () => {
     await userEvent.click(sw);
     expect(sw.checked).toBe(true);
     expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+  it('Study real chats: loads and cleans a file, measures the bot against the targets, and sends the missing answers to Import', async () => {
+    open('staff', '/admin/study');
+    expect(await screen.findByText(/pairs saved/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Paste the chats'), 'question,reply');
+    await userEvent.click(screen.getByRole('button', { name: 'Clean and save' }));
+    expect((await screen.findByLabelText('Result of the cleaning')).textContent).toMatch(/12 rows read.*8.*kept.*2 filler.*Personal details removed: 3/s);
+    await userEvent.click(screen.getByRole('button', { name: 'Measure the bot' }));
+    const tiles = await screen.findByLabelText('Measured results');
+    expect(tiles.textContent).toMatch(/Coverage72%Reaches the target/); expect(tiles.textContent).toMatch(/Wrong-answer rate10%Below the target/);
+    expect(screen.getByText(/do you have vip · vip level\?/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Send 1 suggestions to Import' }));
+    expect(((await screen.findByLabelText('Paste CSV')) as HTMLTextAreaElement).value).toContain('"study_do_you_have_vip_1","vip","","en","answer","do you have vip | vip level?","Yes, VIP has 5 levels."');
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

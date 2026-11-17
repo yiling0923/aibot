@@ -302,3 +302,14 @@ powershell -ExecutionPolicy Bypass -File deploy\local-livechat\setup-nodocker.ps
 
 
 **Picture patch (002).** LiveChat does not ask the bot about a message with a picture, video or file: it goes to the team and the customer hears nothing from the bot. `patches/002-picture-to-bot.patch` makes LiveChat ask the bot too, telling it only the file's kind and name (`attachment: { kind, name, mime_type, size }`, never the file; those chats are kept out of LiveChat's answer cache). The bot thanks the customer and hands the chat to a person, because it cannot open files. `apply-member-patch.ps1` applies both patches in order (001 first).
+
+## Study real chats (Check → Study real chats)
+
+Step 5 of the plan ("how we get and study the knowledge base"), one merchant at a time.
+
+1. **Get the chats.** `deploy\local-livechat\export-chats.ps1` reads your LiveChat database (read only) and writes `chats_for_study.tsv`: each customer message and the first staff reply after it (as long as the customer did not write again in between). Options: `-Days 90`, `-Tenant 1`, and `-DbHost` / `-User` / `-Password` for another database (use a read-only user).
+2. **Load and clean.** Choose the file (or paste two columns, question and reply, CSV or tab separated). The server removes emails, phone and account numbers (8 or more digits) and member ids; it **cannot remove names**. It drops filler replies ("wait", "hi", "alright"), questions that are too short or only a file name, steps done for one member ("Done, RM100 credited") and duplicates. About 1 pair in 5 (always the same ones, chosen by a hash) is held back as the **test set**. Saved in the merchant's own database (`study_pairs`); *Delete saved chats* removes them.
+3. **Measure.** The published bot (rules only, no AI) is run on the held-back questions. **Coverage**: answered by the bot itself (target at least 70%). **Accuracy**: of the questions where the staff reply is close to one of the merchant's own answers (word overlap of 40% or more), how often the bot picked that same answer (at least 85%). **Wrong-answer rate**: answers that were not the one staff sent (at most 3%). **Clarify rate** (at most 15%) and **handover rate** (tracked only). The targets are the plan's starting points. The wrong answers are listed.
+4. **Missing answers.** Questions the bot cannot answer yet are grouped by the staff reply that followed them: one row is one possible answer with its example questions. They come only from the learn pairs, so the test stays honest. *Send to Import* puts them into the Import screen as drafts (topic from the keywords when found, otherwise `other`: check each one).
+
+Code: `src/study/clean.ts` (reading, scrubbing, cleaning, split), `src/study/measure.ts` (measure and gaps), `src/admin/studyRoutes.ts`, `web/src/admin/screens/Study.tsx`, `db/merchant/011_study.sql`.

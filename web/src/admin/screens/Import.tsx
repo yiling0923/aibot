@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
 import { STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_ELSEWHERE, starterCsv, luckypayCsv, LUCKYPAY_ENTRIES } from '../starterPack';
 import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, addOwnTopic, topicNames, kbToCSV, type Entry, type ImportGroup } from '../model';
@@ -8,8 +8,9 @@ import { Pill } from '../ui';
 type Tr = { question_examples: string[]; answer_text: string };
 
 export default function Import() {
-  const p = usePanel(); const nav = useNavigate();
-  const [text, setText] = useState(''); const [name, setName] = useState(''); const [mode, setMode] = useState('update'); const [status, setStatus] = useState<'draft' | 'live'>('draft'); const [out, setOut] = useState('');
+  const p = usePanel(); const nav = useNavigate(); const loc = useLocation();
+  const fromStudy = (loc.state as { csv?: string } | null)?.csv ?? '';                    // the Study screen sends its suggested entries here
+  const [text, setText] = useState(fromStudy); const [name, setName] = useState(fromStudy ? 'study_suggestions.csv' : ''); const [mode, setMode] = useState('update'); const [status, setStatus] = useState<'draft' | 'live'>('draft'); const [out, setOut] = useState('');
   const [menu, setMenu] = useState<'' | 'packs' | 'more'>('');
   const R = useMemo(() => analyzeImport(text, p.draft, p.merchant, p.M.name), [text, p.draft, p.merchant, p.M.name]);
   const ok = R.entries.filter((g) => !g.errors.length);
