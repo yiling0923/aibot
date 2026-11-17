@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
-import { STARTER_ENTRIES } from './starterPack';
+import { LUCKYPAY_ENTRIES, luckypayCsv, STARTER_ENTRIES } from './starterPack';
 
 const SET = () => ({ tone: 'friendly', handoff_group: 1, answer: 0.72, clarify: 0.45, abuse_close_after: 3, kind: {}, closing: {}, handoff: {}, tools: { deposit_status: true }, max_choices: 3, more_help_on: true, more_help: {}, ai_instructions: '', handoff_complaint: true, handoff_account: true, trigger_phrases: '' });
 const BASICS = { retentionDays: 90, name: 'LuckyPay', domain: '', defaultLanguage: 'en', languages: ['en', 'ms', 'zh', 'vi', 'th', 'tl'], monthlyTokenLimit: 500000, tokensMonth: 12400, tokensToday: 300, entries: 11, questionsToday: 7, avgConfidence: 0.81 };

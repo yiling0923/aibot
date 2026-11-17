@@ -287,4 +287,4 @@ Each has example questions in English and Malay.
 - Everything starts as a **draft**. Nothing is live until you publish.
 - Answers say `TO WRITE: …`. The editor and the Publish dialog flag them. The bot never says them to a customer.
 - Entries that need a person (complaint, rule violation, ads, free credit request, and so on) are type **needs staff** and hand over to an agent.
-- The seven named promotions and VIP belong to one merchant. They are not in the pack yet.
+- The seven named promotions and VIP belong to **LuckyPay** only. When LuckyPay is the chosen merchant, Import also shows **Load the LuckyPay promotions** (8 draft entries, English and Malay, answers say `TO WRITE`). Other merchants do not see it.

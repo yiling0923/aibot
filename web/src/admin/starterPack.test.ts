@@ -35,3 +35,16 @@ describe('the FAQ category starter pack', () => {
     expect(entryProblems({ status: 'draft', entry_type: 'needs_staff', translations: tr })).toHaveLength(1);                // still a draft
   });
 });
+
+import { LUCKYPAY_ENTRIES, luckypayCsv, LUCKYPAY_TAGS } from './starterPack';
+describe('LuckyPay promotions pack', () => {
+  it('holds the seven named promotions and VIP, in English and Malay, all with TO WRITE answers', () => {
+    expect(LUCKYPAY_ENTRIES).toBe(8);
+    expect(Object.values(LUCKYPAY_TAGS).filter((t) => t.startsWith('PROMOTION')).length).toBe(7);
+    expect(LUCKYPAY_TAGS.vip_info).toBe('VIP');
+    const csv = luckypayCsv();
+    expect(csv).toMatch(/promo_first_deposit_120,promotion,,en,answer/);
+    expect(csv).toMatch(/promo_daily_rescue_bonus,promotion,,ms,answer/);
+    expect((csv.match(/TO WRITE:/g) || []).length).toBe(16);
+  });
+});

@@ -2,7 +2,7 @@
  * A starter set of entries made from the team's "LIVECHAT FAQ CATEGORY" list (the tags the agents choose from).
  * It loads through the Import screen as DRAFTS: every answer says "TO WRITE: ..." until the merchant writes the real one, and the panel flags
  * (and the Publish window warns about) any answer that still says so. Entries marked "staff" hand the chat to a person when matched.
- * The seven named promotions and VIP of the list are not here: they belong to one merchant and are added for it.
+ * The seven named promotions and VIP belong to LuckyPay only: see LUCKYPAY_ROWS / luckypayCsv() (the Import screen offers them only for LuckyPay).
  */
 export const TO_WRITE = 'TO WRITE:';
 
@@ -86,11 +86,43 @@ export const STARTER_ENTRIES = ROWS.length;
 export const STARTER_TOPICS_NEW = [...new Set(ROWS.filter((r) => r.words).map((r) => r.topic))];
 
 /** The pack as a CSV for the Import screen: English and Malay for every entry. */
-export function starterCsv(): string {
+export function starterCsv(): string { return csvOf(ROWS); }
+function csvOf(rows: Row[]): string {
   const out = [HEAD];
-  for (const r of ROWS) for (const [lang, x] of [['en', r.en], ['ms', r.ms]] as const)
+  for (const r of rows) for (const [lang, x] of [['en', r.en], ['ms', r.ms]] as const)
     out.push([r.key, r.topic, '', lang, r.type, x.q.join(' | '), x.a, lang === 'en' && r.words ? r.words.join(' | ') : ''].map(cell).join(','));
   return out.join('\n');
 }
 /** Which category of the list each entry came from, for the tags column shown on the Import screen. */
 export const STARTER_TAGS: Record<string, string> = Object.fromEntries(ROWS.map((r) => [r.key, r.tag]));
+
+/** The seven named promotions and VIP of the list. They belong to LuckyPay only, so they are a separate pack. */
+const LUCKYPAY_ROWS: Row[] = [
+  { key: 'promo_first_deposit_120', topic: 'promotion', type: 'answer', tag: 'PROMOTION · FIRST DEPOSIT BONUS 120%',
+    en: { q: ['first deposit bonus 120%', 'how to claim 120% bonus', 'new member 120 percent bonus', 'what is the first deposit bonus'], a: TO_WRITE + ' the First Deposit Bonus 120%: who can claim, how, minimum deposit, turnover.' },
+    ms: { q: ['bonus deposit pertama 120%', 'macam mana nak claim bonus 120%', 'bonus 120 peratus ahli baru', 'apa itu bonus deposit pertama'], a: TO_WRITE + ' Bonus Deposit Pertama 120%: siapa boleh tuntut, cara, deposit minimum, turnover.' } },
+  { key: 'promo_daily_8_first_deposit', topic: 'promotion', type: 'answer', tag: 'PROMOTION · DAILY 8% FIRST DEPOSIT BONUS',
+    en: { q: ['daily 8% bonus', 'daily first deposit bonus 8%', 'how to claim 8% daily bonus', 'is there a daily deposit bonus'], a: TO_WRITE + ' the Daily 8% First Deposit Bonus: how to claim, limits, turnover.' },
+    ms: { q: ['bonus harian 8%', 'bonus deposit pertama harian 8%', 'macam mana nak claim bonus harian 8%', 'ada bonus deposit harian tak'], a: TO_WRITE + ' Bonus Deposit Pertama Harian 8%: cara tuntut, had, turnover.' } },
+  { key: 'promo_angpao_lucky_hour', topic: 'promotion', type: 'answer', tag: 'PROMOTION · FREE ANGPAO EVERY LUCKY HOUR',
+    en: { q: ['free angpao lucky hour', 'when is the lucky hour', 'how to get angpao every hour', 'angpao every lucky hour'], a: TO_WRITE + ' the Free Angpao Every Lucky Hour: the times, who can get it, how.' },
+    ms: { q: ['angpao percuma lucky hour', 'bila lucky hour', 'macam mana dapat angpao setiap jam', 'angpao setiap lucky hour'], a: TO_WRITE + ' Angpao Percuma Setiap Lucky Hour: waktu, siapa layak, cara.' } },
+  { key: 'promo_golden_lucky_egg', topic: 'promotion', type: 'answer', tag: 'PROMOTION · DAILY LOGIN GOLDEN LUCKY EGG',
+    en: { q: ['daily login golden lucky egg', 'what is the golden egg', 'how to get the golden lucky egg', 'login every day for a prize'], a: TO_WRITE + ' the Daily Login Golden Lucky Egg: how it works and what a member gets.' },
+    ms: { q: ['telur emas log masuk harian', 'apa itu golden lucky egg', 'macam mana dapat golden lucky egg', 'log masuk setiap hari dapat hadiah'], a: TO_WRITE + ' Telur Emas Bertuah Log Masuk Harian: cara dan hadiah.' } },
+  { key: 'promo_download_app_angpao', topic: 'promotion', type: 'answer', tag: 'PROMOTION · DOWNLOAD APP GET ANGPAO',
+    en: { q: ['download app get angpao', 'angpao for downloading the app', 'how to claim the app angpao', 'i downloaded the app where is my angpao'], a: TO_WRITE + ' the Download APP Get Angpao: how to claim after downloading.' },
+    ms: { q: ['muat turun app dapat angpao', 'angpao untuk muat turun app', 'macam mana claim angpao app', 'saya dah download app mana angpao saya'], a: TO_WRITE + ' Muat Turun APP Dapat Angpao: cara tuntut selepas muat turun.' } },
+  { key: 'promo_daily_deposit_daily_win', topic: 'promotion', type: 'answer', tag: 'PROMOTION · DAILY DEPOSIT DAILY WIN',
+    en: { q: ['daily deposit daily win', 'what is daily deposit daily win', 'how to join daily deposit daily win', 'daily win promotion rules'], a: TO_WRITE + ' the Daily Deposit Daily Win: how to join, the prizes, the rules.' },
+    ms: { q: ['deposit harian menang harian', 'apa itu daily deposit daily win', 'macam mana nak sertai daily deposit daily win', 'peraturan promosi daily win'], a: TO_WRITE + ' Deposit Harian Menang Harian: cara sertai, hadiah, peraturan.' } },
+  { key: 'promo_daily_rescue_bonus', topic: 'promotion', type: 'answer', tag: 'PROMOTION · DAILY RESCUE BONUS',
+    en: { q: ['daily rescue bonus', 'rescue bonus when i lose', 'how to claim rescue bonus', 'is there a cashback when i lose'], a: TO_WRITE + ' the Daily Rescue Bonus: who can claim, how much, when.' },
+    ms: { q: ['bonus penyelamat harian', 'bonus rescue bila kalah', 'macam mana claim rescue bonus', 'ada cashback bila kalah tak'], a: TO_WRITE + ' Bonus Penyelamat Harian: siapa boleh tuntut, jumlah, bila.' } },
+  { key: 'vip_info', topic: 'vip', type: 'answer', tag: 'VIP', words: ['vip', 'vip level', 'tahap vip', 'vip club', 'VIP等级'],
+    en: { q: ['what is vip', 'how to become vip', 'vip benefits', 'how do i upgrade my vip level'], a: TO_WRITE + ' the VIP levels, the benefits and how a member moves up.' },
+    ms: { q: ['apa itu vip', 'macam mana nak jadi vip', 'kelebihan vip', 'macam mana naik tahap vip'], a: TO_WRITE + ' tahap VIP, kelebihan dan cara naik tahap.' } },
+];
+export const LUCKYPAY_ENTRIES = LUCKYPAY_ROWS.length;
+export const LUCKYPAY_TAGS: Record<string, string> = Object.fromEntries(LUCKYPAY_ROWS.map((r) => [r.key, r.tag]));
+export function luckypayCsv(): string { return csvOf(LUCKYPAY_ROWS); }

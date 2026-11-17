@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
-import { STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_ELSEWHERE, starterCsv } from '../starterPack';
+import { STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_ELSEWHERE, starterCsv, luckypayCsv, LUCKYPAY_ENTRIES } from '../starterPack';
 import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, addOwnTopic, topicNames, kbToCSV, type Entry, type ImportGroup } from '../model';
 import { Pill } from '../ui';
 
@@ -59,6 +59,7 @@ export default function Import() {
             <input type="file" accept=".csv,.tsv,.txt" aria-label="Choose a CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { setText(String(fr.result)); setName(f.name); setOut(''); }; fr.readAsText(f, 'utf-8'); }} />
             <button className="btn sm" type="button" onClick={() => { setText(SAMPLE_CSV); setName('sample_' + p.merchant.toLowerCase() + '.csv'); setOut(''); }}>Load a sample file</button>
             <button className="btn sm" type="button" title="Entries for the categories of the team's LiveChat FAQ list. Every answer says TO WRITE until you write it." onClick={() => { setText(starterCsv()); setName('faq_category_starter.csv'); setOut(''); }}>Load the FAQ category starter</button>
+            {p.M.name.toLowerCase() === 'luckypay' && <button className="btn sm" type="button" title="The seven named promotions and VIP. Only LuckyPay has them. Every answer says TO WRITE until you write it." onClick={() => { setText(luckypayCsv()); setName('luckypay_promotions.csv'); setOut(''); }}>Load the LuckyPay promotions ({LUCKYPAY_ENTRIES})</button>}
             <button className="btn sm" type="button" onClick={() => copy(TPL_HEAD, 'Template copied')}>Copy blank template</button>
             <button className="btn sm" type="button" onClick={() => copy(kbToCSV(mine), 'KB copied as CSV')}>Copy this merchant's KB as CSV</button></div>
             <details className="fold" aria-label="About the FAQ category starter"><summary>What is in the FAQ category starter?</summary>
