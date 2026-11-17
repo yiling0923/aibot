@@ -314,3 +314,19 @@ What the customer sees: the bot gives the answer and asks question 1; each reply
 - **Pictures need patch 002.** LiveChat only tells the bot about a picture when `deploy/local-livechat/patches/002-picture-to-bot.patch` is applied. Without it, a receipt question cannot be answered; the customer can type `skip`.
 - **Not saved as a cached reply.** A guided reply is marked `cacheable: false`.
 - Code: `src/bot/responder.ts` (`startGuided`, `guidedReply`), `src/engine/steps.ts`, column `kb_entries.steps` (`db/merchant/012_steps.sql`), `web/src/admin/screens/Kb.tsx`. Tests: `test/guided.test.ts`.
+
+## Setup checklist (merchant page)
+
+**Merchants & logins → open a merchant** starts with a **Setup checklist**: what this merchant still needs before its bot can answer real customers, a progress bar, and a button for each step that is not done. After **Add merchant** the new merchant's page opens by itself, so the checklist is the first thing the admin sees. When everything is done it folds away to "complete" (a **Show the checklist** button opens it again).
+
+| Step | Done when | Button |
+|---|---|---|
+| Staff login | at least one staff login for the merchant | Add a login |
+| Bot key | an active bot key exists | Make key |
+| LiveChat calls the bot | an active key has been used by LiveChat | Show the address and key |
+| Answers | at least 10 live entries are *ready* (a real answer, not `TO WRITE`, and at least 3 example questions; a "needs staff" entry needs only the examples) | Open Import (no entries yet) or Open the knowledge base |
+| No "TO WRITE" left | no entry still says `TO WRITE:` (shown only when it applies) | Open the knowledge base |
+| Tried it | at least one chat exists (a test or a real customer) | Open LiveChat test |
+| Account data (optional) | the merchant's own API is connected | Open Account data |
+
+Account data is not counted in the progress. It shows a warning when **Account answers in LiveChat** is on but no real API is connected (members would get the built-in demo balances). The checklist is part of the merchant page's data (`GET /api/admin/merchants/:code/connection`, field `setup`); the rules are in `src/admin/setup.ts` and the card is `SetupChecklist` in `web/src/admin/screens/MerchantPage.tsx`. Tests: `test/setup.test.ts`.

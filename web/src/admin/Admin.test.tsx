@@ -19,7 +19,17 @@ const state = (role: 'admin' | 'staff') => ({
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
 const REPORT = { topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }] };
-const CONN = () => ({ merchant: { code: 'A', name: 'LuckyPay', language: 'en', tone: 'friendly', entries: 11, logins: ['luckypay'] }, livechat: { baseUrl: 'http://localhost:3000', askUrl: 'http://localhost:3000/api/v1/ai/ask', keys: [], stoppedKeys: 0, liveChats7d: 4, lastLiveChat: null },
+let setupDone = false;
+const SETUP = () => (setupDone
+  ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }, { key: 'account', title: 'Account data (optional)', state: 'optional', detail: 'Not connected. Without it the bot uses 2 built-in demo customers.', action: { to: 'api', label: 'Open Account data' } }] }
+  : { done: 2, total: 5, items: [
+    { key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' },
+    { key: 'key', title: 'Bot key', state: 'todo', detail: 'No bot key yet. LiveChat cannot use the bot.', action: { to: 'key', label: 'Make key' } },
+    { key: 'livechat', title: 'LiveChat calls the bot', state: 'todo', detail: 'Make the bot key first, then put it into LiveChat.', action: { to: 'livechat', label: 'Show the address and key' } },
+    { key: 'answers', title: 'Answers', state: 'todo', detail: 'No answers yet, so the bot hands every question to a person. Load the starter pack in Import (Starter packs).', action: { to: 'imp', label: 'Open Import' } },
+    { key: 'tried', title: 'Tried it', state: 'done', detail: '3 chats so far (tests and real customers).' },
+    { key: 'account', title: 'Account data (optional)', state: 'warn', detail: 'Account answers in LiveChat is ON but no real API is connected: members would get demo balances.', action: { to: 'api', label: 'Open Account data' } }] });
+const CONN = () => ({ setup: SETUP(), merchant: { code: 'A', name: 'LuckyPay', language: 'en', tone: 'friendly', entries: 11, logins: ['luckypay'] }, livechat: { baseUrl: 'http://localhost:3000', askUrl: 'http://localhost:3000/api/v1/ai/ask', keys: [], stoppedKeys: 0, liveChats7d: 4, lastLiveChat: null },
   ai: { anthropic: { provider: 'anthropic', configured: true, last4: 'wxyz', updatedAt: '2026-11-12T08:00:00Z', updatedBy: 'admin', using: 'merchant' }, openai: { provider: 'openai', configured: false, last4: null, updatedAt: null, updatedBy: null, using: 'none' } } });
 const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
   merchants: [{ code: 'A', name: 'LuckyPay', chats: 40, calls: 120, inputTokens: 900000, outputTokens: 60000, totalTokens: 960000, cost: 0.12, charge: 0.144, ownKeyCalls: 5, ownKeyTokens: 3000, unpricedCalls: 0 },
@@ -52,7 +62,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { localStorage.clear(); lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { localStorage.clear(); setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -144,7 +154,7 @@ describe('Control panel', () => {
     expect(screen.getByText('Real chats, 7 days')).toBeTruthy();
     expect(screen.getByText('Real chats, 7 days').parentElement?.textContent).toContain('4');
     expect(screen.getByText('No key yet. LiveChat cannot use the bot until you make one.')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: 'Make key' }));
+    await userEvent.click(screen.getAllByRole('button', { name: 'Make key' })[0]);
     expect(await screen.findByText('Copy this key now. It is shown only once.')).toBeTruthy();
     expect((screen.getByDisplayValue('aib_FRESHKEY1234567890') as HTMLInputElement).readOnly).toBe(true);
     expect(screen.getByText('Own key ····wxyz')).toBeTruthy();                                 // only the last 4 characters of a saved AI key
@@ -396,6 +406,30 @@ describe('Control panel', () => {
     await userEvent.click(sw);
     expect(sw.checked).toBe(true);
     expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+  it('Merchant page: the setup checklist shows what is done and what is to do, with a button for each', async () => {
+    open('admin', '/admin/merchants/A');
+    const card = await screen.findByLabelText('Setup checklist');
+    expect(within(card).getByText('2 of 5 done')).toBeTruthy();
+    expect(within(card).getByRole('progressbar', { name: 'Setup progress' }).getAttribute('aria-valuenow')).toBe('40');
+    for (const t of ['Staff login', 'Bot key', 'LiveChat calls the bot', 'Answers', 'Tried it']) expect(within(card).getByText(t)).toBeTruthy();
+    expect(within(card).getByText(/No answers yet, so the bot hands every question to a person/)).toBeTruthy();
+    expect(within(card).getByText(/members would get demo balances/)).toBeTruthy();                       // the warning about the account switch
+    expect(within(card).queryByRole('button', { name: 'Open Account data' })).toBeTruthy();
+    expect(within(card).getAllByRole('button').filter((b) => /Make key|Open Import|Show the address/.test(b.textContent ?? '')).length).toBe(3);   // a done step has no button
+  });
+  it('Merchant page: a button of the checklist opens the right screen for that merchant', async () => {
+    open('admin', '/admin/merchants/A');
+    await userEvent.click(within(await screen.findByLabelText('Setup checklist')).getByRole('button', { name: 'Open Import' }));
+    expect(await screen.findByText(/Import knowledge base/)).toBeTruthy();
+  });
+  it('Merchant page: a finished checklist folds away and can be opened again', async () => {
+    setupDone = true; open('admin', '/admin/merchants/A');
+    const card = await screen.findByLabelText('Setup checklist');
+    expect(within(card).getByText('complete')).toBeTruthy(); expect(within(card).queryByText('Staff login')).toBeNull();
+    await userEvent.click(within(card).getByRole('button', { name: 'Show the checklist' }));
+    expect(within(card).getByText('Staff login')).toBeTruthy();
+    expect(within(card).getByText(/Not connected\. Without it the bot uses 2 built-in demo customers/)).toBeTruthy();   // optional: no tick needed
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

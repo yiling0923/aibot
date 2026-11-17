@@ -9,6 +9,7 @@ import { ask } from '../connector/ask';
 import { listKeys } from '../connector/keys';
 import type { LiveChatLink } from '../livechat/link';
 import { MerchantAiKeys, PROVIDERS, type Provider } from '../ai/merchantKeys';
+import { checklist } from './setup';
 
 export interface MerchantPageCtx {
   pool: Pool; getBot: () => Promise<Bot>; store: Store; aiKeys: MerchantAiKeys; link: LiveChatLink; timeoutMs?: number;
@@ -40,8 +41,21 @@ export function merchantPageRoutes(app: FastifyInstance, ctx: MerchantPageCtx) {
     const proto = String(req.headers['x-forwarded-proto'] ?? req.protocol), host = String(req.headers['x-forwarded-host'] ?? req.headers.host ?? 'localhost');
     const baseUrl = ctx.publicUrl || `${proto}://${host}`;
     const keys = await listKeys(pool, t.code), aiKeys = await ctx.aiKeys.list(t.code);
+    // The setup checklist: what is done and what is still to do for this merchant.
+    const [kbRows, trRows, api, mm, chats] = await Promise.all([
+      q(pool, `SELECT id, status, entry_type FROM ${tbl(t.db, 'kb_entries')}`), q(pool, `SELECT kb_id, question_examples, answer_text FROM ${tbl(t.db, 'kb_translations')}`),
+      q(pool, 'SELECT a.base_url FROM merchant_api a JOIN merchants m ON m.id = a.merchant_id WHERE m.code = ?', [t.code]),
+      q(pool, 'SELECT livechat_account FROM merchants WHERE code = ?', [t.code]),
+      q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'chat_sessions')}`).catch(() => [{ n: 0 }]),
+    ]);
+    let apiHost: string | null = null; if (api[0]) { try { apiHost = new URL(String(api[0].base_url)).host; } catch { apiHost = String(api[0].base_url); } }
+    const activeKeys = keys.filter((k) => !k.revokedAt), lastUsed = activeKeys.map((k) => (k.lastUsedAt ? new Date(k.lastUsedAt as string | Date).toISOString() : '')).filter(Boolean).sort().pop() ?? null;
+    const setup = checklist({ logins: logins.length, activeKeys: activeKeys.length, keyLastUsed: lastUsed,
+      entries: kbRows.map((e) => ({ id: Number(e.id), status: String(e.status), type: String(e.entry_type ?? 'answer') })), translations: trRows as never,
+      apiHost, accountInLiveChat: !!Number(mm[0]?.livechat_account ?? 0), chats: Number(chats[0]?.n ?? 0) });
     return {
       merchant: { code: m.code, name: m.name, language: m.default_language, tone: st?.tone ?? 'friendly', entries: Number(n?.n ?? 0), logins },
+      setup,
       livechat: {
         baseUrl, askUrl: baseUrl + '/api/v1/ai/ask',
         keys: keys.filter((k) => !k.revokedAt), stoppedKeys: keys.filter((k) => k.revokedAt).length,

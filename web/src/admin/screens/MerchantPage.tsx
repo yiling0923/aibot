@@ -6,7 +6,10 @@ import { Pill } from '../ui';
 
 interface KeyRow { id: number; prefix: string; createdBy: string | null; createdAt: string; lastUsedAt: string | null }
 interface AiRow { provider: 'anthropic' | 'openai'; configured: boolean; last4: string | null; updatedAt: string | null; updatedBy: string | null; using: 'merchant' | 'shared' | 'none' }
+interface CheckItem { key: string; title: string; state: 'done' | 'todo' | 'optional' | 'warn'; detail: string; action?: { to: 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'api' | 'lchat'; label: string } }
+interface Setup { items: CheckItem[]; done: number; total: number }
 interface Conn {
+  setup: Setup;
   merchant: { code: string; name: string; language: string; tone: string; entries: number; logins: string[] };
   livechat: { baseUrl: string; askUrl: string; keys: KeyRow[]; stoppedKeys: number; liveChats7d: number; lastLiveChat: string | null };
   ai: Record<'anthropic' | 'openai', AiRow>;
@@ -48,6 +51,7 @@ export default function MerchantPage() {
   const aiOwn = Object.values(c.ai).some((r) => r.using === 'merchant'), aiShared = Object.values(c.ai).some((r) => r.using === 'shared');
   return (
     <>
+      <SetupChecklist s={c.setup} code={m.code} onMakeKey={makeKey} />
       <div className="card"><div className="head"><div><h2>{m.name} <span className="mcodepill">{m.code}</span></h2>
         <div className="sub">Everything LiveChat needs to reach this merchant's bot.</div></div>
         <button className="btn" type="button" onClick={() => nav('/admin/users')}>← All merchants</button></div>
@@ -107,10 +111,42 @@ export default function MerchantPage() {
   );
 }
 
+/** The setup checklist: what is done for this merchant, what is still to do, and a button for each. It folds away when everything is done. */
+function SetupChecklist({ s, code, onMakeKey }: { s: Setup; code: string; onMakeKey: () => void }) {
+  const p = usePanel(); const nav = useNavigate();
+  const complete = s.done === s.total && !s.items.some((x) => x.state === 'warn');
+  const [open, setOpen] = useState(!complete);
+  useEffect(() => { setOpen(!complete); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [code]);
+  const scroll = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const go = (to: NonNullable<CheckItem['action']>['to']) => {
+    if (to === 'users') nav('/admin/users');
+    else if (to === 'key') onMakeKey();
+    else if (to === 'livechat') scroll('mstep-1');
+    else if (to === 'api') scroll('mstep-4');
+    else { p.setMerchant(code); nav(to === 'imp' ? '/admin/imp' : to === 'kb' ? '/admin/kb' : '/admin/lchat'); }
+  };
+  const icon = (st: CheckItem['state']) => (st === 'done' ? '✓' : st === 'warn' ? '!' : st === 'optional' ? '–' : '');
+  const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
+  return (
+    <div className="card" aria-label="Setup checklist">
+      <div className="head"><div><h2>Setup checklist <span className={'pill ' + (complete ? 'ok' : 'warn')}>{complete ? 'complete' : `${s.done} of ${s.total} done`}</span></h2>
+        <div className="sub">{complete ? 'Everything the bot needs is in place for this merchant.' : 'What this merchant still needs before its bot can answer real customers.'}</div></div>
+        <button className="btn sm" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>{open ? 'Hide' : 'Show the checklist'}</button></div>
+      <div className="cbar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label="Setup progress"><i style={{ width: pct + '%' }} /></div>
+      {open && <ul className="checklist">{s.items.map((x) => (
+        <li key={x.key} className={'chk ' + x.state}>
+          <span className={'cdot ' + x.state} aria-hidden="true">{icon(x.state)}</span>
+          <div className="cbody"><b>{x.title}</b><span className="sr-only"> ({x.state === 'done' ? 'done' : x.state === 'todo' ? 'to do' : x.state === 'warn' ? 'needs attention' : 'optional'})</span><div className="sub">{x.detail}</div></div>
+          {x.action && x.state !== 'done' && <button className={'btn sm' + (x.state === 'todo' ? ' pri' : '')} type="button" onClick={() => go(x.action!.to)}>{x.action.label}</button>}
+        </li>))}</ul>}
+    </div>
+  );
+}
+
 /** One numbered step of the merchant setup: a dot (a tick when done), a title with a short note, a status tag on the right, and the content. */
 function Step({ n, done, title, badge, tone, sub, children }: { n: number; done: boolean; title: string; badge: string; tone: string; sub: ReactNode; children: ReactNode }) {
   return (
-    <div className="card mstep"><div className={'mdot' + (done ? '' : ' todo')} aria-hidden="true">{done ? '✓' : n}</div>
+    <div className="card mstep" id={'mstep-' + n}><div className={'mdot' + (done ? '' : ' todo')} aria-hidden="true">{done ? '✓' : n}</div>
       <div className="mbody"><h3 style={{ margin: 0 }}>{title}</h3><div className="sub" style={{ marginTop: 2 }}>{sub}</div><div style={{ marginTop: 14 }}>{children}</div></div>
       <Pill c={tone}>{badge}</Pill></div>
   );

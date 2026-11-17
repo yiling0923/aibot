@@ -586,3 +586,10 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .lcmsg.customer .lcpic .sub,.lcmsg.customer .lcfile{color:#fff;opacity:.92}
 .stepbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--surface)}
 .stepbox .head{margin-bottom:6px}
+.cbar{height:6px;border-radius:99px;background:var(--surface2);margin-top:12px;overflow:hidden}.cbar i{display:block;height:100%;background:#7fc4a8;border-radius:99px}
+.checklist{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column}
+.chk{display:flex;align-items:center;gap:12px;padding:10px 2px;border-top:1px solid var(--line)}.chk:first-child{border-top:0}
+.cdot{flex:none;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:13px;font-weight:700;border:2px solid var(--line);color:var(--muted)}
+.cdot.done{background:#7fc4a8;border-color:#7fc4a8;color:#fff}.cdot.warn{background:#f0c27b;border-color:#f0c27b;color:#fff}.cdot.optional{border-style:dashed}
+.cbody{flex:1;min-width:0}.chk.optional .cbody b,.chk.optional .cbody .sub{color:var(--muted)}
+.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}

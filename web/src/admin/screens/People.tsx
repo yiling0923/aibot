@@ -70,17 +70,18 @@ function FormDialog({ title, label, onClose, save, done, children }: { title: st
 }
 
 function MerchantDialog({ onClose, onDone }: { onClose: () => void; onDone: () => Promise<void> }) {
+  const nav = useNavigate();
   const [f, setF] = useState({ name: '', code: '', lang: 'en', tone: 'friendly', hg: '', lg: '', user: '', pass: '' });
   const on = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   const save = async () => {
     const name = f.name.trim(); const code = f.code.trim() || name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
     const login = f.user.trim() || f.pass ? { username: f.user.trim(), password: f.pass } : undefined;
     await api('/api/admin/merchants', { name, code, language: f.lang, tone: f.tone, handoffGroup: f.hg.trim() || null, livechatGroup: f.lg.trim() || null, login });
-    await onDone();
+    await onDone(); nav('/admin/merchants/' + code);                                  // the new merchant's page opens with its setup checklist
   };
   return (
     <FormDialog title="Add merchant" label="Add merchant" onClose={onClose} save={save} done={'Added ' + f.name.trim()}>
-      <div className="sub">The knowledge base starts empty. Add entries in the Knowledge base or Import screens after choosing this merchant.</div>
+      <div className="sub">The knowledge base starts empty. After you save, this merchant's page opens with a setup checklist that shows what is left to do (the bot key, the answers and more).</div>
       <div className="form">
         <label className="fld"><span>Name</span><input placeholder="e.g. W88" autoFocus value={f.name} onChange={on('name')} /></label>
         <label className="fld"><span>Code (letters and digits, optional)</span><input placeholder="made from the name" value={f.code} onChange={on('code')} /></label>
