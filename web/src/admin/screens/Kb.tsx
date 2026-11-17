@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
+import KbGrid from './KbGrid';
 import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 
@@ -17,6 +18,8 @@ export default function Kb() {
   const p = usePanel();
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [topicF, setTopicF] = useState('all');
   const [ed, setEd] = useState<Ed | null>(null);
+  const [view, setViewState] = useState<'list' | 'table'>(() => { try { return localStorage.getItem('kbView') === 'table' ? 'table' : 'list'; } catch { return 'list'; } });
+  const setView = (v: 'list' | 'table') => { setViewState(v); try { localStorage.setItem('kbView', v); } catch { /* ignore */ } };
   const [sel, setSel] = useState<Set<number>>(new Set());                 // entries ticked for a bulk action
   useEffect(() => { setSel(new Set()); }, [p.merchant]);
 
@@ -51,7 +54,8 @@ export default function Kb() {
   return (
     <>
       <div className="card"><div className="head"><div><h2>Knowledge base · {p.M.name}</h2><div className="sub">What the bot may answer for this merchant. Only live entries are used.</div></div>
-        <button className="btn pri" type="button" onClick={() => open(null)}>Add entry</button></div>
+        <span className="tools"><span className="segs" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title="Edit the answers and example questions in a table">Table edit</button></span>
+        <button className="btn pri" type="button" onClick={() => open(null)}>Add entry</button></span></div>
         {miss ? <div className="kwstats"><span className="st dim" title="Entries missing an answer or 3+ examples in a main language">{miss} missing a language or examples</span></div> : null}
         <div className="filt-row" style={{ marginTop: 12 }}>
           <div className="segs" role="group" aria-label="Show">{([['all', 'All', all.length], ['live', 'Live', live], ['draft', 'Draft', drafts], ['needs', 'Needs work', needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
@@ -59,12 +63,12 @@ export default function Kb() {
           <select aria-label="Topic" value={topicF} onChange={(e) => setTopicF(e.target.value)}><option value="all">All topics</option>{topicsIn.map((x) => <option key={x} value={x}>{x}</option>)}</select>
           <span className="sub">{list.length} shown</span>
           {readyDrafts.length > 0 && <button className="btn sm pri" type="button" title="Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts." onClick={() => setStatusOf(new Set(readyDrafts.map((e) => e.id)), 'live')}>Set {readyDrafts.length} ready draft{readyDrafts.length === 1 ? '' : 's'} live</button>}</div></div>
-      {picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} selected</b>
+      {view === 'list' && picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} selected</b>
         <button className="btn sm pri" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'live')}>Set live</button>
         <button className="btn sm" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'draft')}>Set draft</button>
         <button className="btn sm bad" type="button" onClick={deleteSel}>Delete</button>
         <button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>Clear</button></div>}
-      <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Questions</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
+      {view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Questions</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
             <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
@@ -77,7 +81,7 @@ export default function Kb() {
           </tr>
         ))}
         {!list.length && <tr><td colSpan={7} className="sub">No entries match.</td></tr>}
-      </tbody></table></div>
+      </tbody></table></div>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
     </>
   );

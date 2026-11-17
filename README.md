@@ -358,3 +358,12 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 **Import and publish (Import).** Imports the entries as **live** and opens the Publish window, so a whole pack goes from file to live with two clicks (check the window, press Publish). **Import N entries to draft** is still there. (The "New entries start as" choice also lets a plain import make live entries.) An entry that still says `TO WRITE` is ignored by the bot until the answer is written, even when it is live.
 
 **Why Publish was slow and what changed.** Saving 300 entries takes half a second. The time went on the sample messages (each merchant's test cases) that run on a draft: they ran for **every merchant** in the Publish window, and **again** inside the publish call. Now they run only for the merchants that changed (all merchants only when the shared word lists changed, or when nothing changed), and not a second time inside publish. A publish with about 300 entries went from about 6.6 seconds to about 0.5 seconds (the window's own check is about 1.5 seconds for a large merchant). The publish answer is now `{ published }` (the unused `pass` and `total` are gone). Tests: `test/publishScope.test.ts`.
+
+## Table edit (Knowledge base)
+
+**Knowledge base → Table edit** shows the entries as a table you edit in place, one row per entry: a **Live** box, the **answer** in English, Malay and Chinese (the **VI / TH / TL** buttons add Vietnamese, Thai and Filipino columns) and the **English example questions**, one per line. It uses the same filters and search as the list (for example *Needs work*, or one topic), so you can show only the entries that still say `TO WRITE` and write them one after the other.
+
+- Type in a cell and **leave it** (Tab or a click elsewhere) to save it to the draft. **Ctrl+Enter** saves and goes down one row in the same column. **Esc** puts the old text back without saving. The panel keeps the choice (List or Table edit).
+- A cell is red when the English answer is empty or still says `TO WRITE`, or when there are fewer than 3 example questions. Example questions: empty lines and repeats are dropped.
+- Everything goes into the draft, as with the full editor; nothing is live until **Publish**. All the cells of one entry count as **one** change in the Publish count. The entry name opens the full editor (topic, question type, entry type, end date, guided questions).
+- Code: `web/src/admin/screens/KbGrid.tsx`.

@@ -517,6 +517,42 @@ describe('Control panel', () => {
     expect((await screen.findByRole('region', { name: 'Selected entries' })).textContent).toMatch(/1 selected/);
     await userEvent.click(screen.getByRole('button', { name: 'Clear' })); expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();
   });
+  it('Knowledge base table edit: change answers and example questions in place, set live, and see it in the list and in the Publish count', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Table edit' }));
+    const grid = await screen.findByLabelText('Table editor');
+    expect(grid.querySelector('.note')!.textContent).toMatch(/1 entry still says TO WRITE/);                // dep_bonus still says TO WRITE
+    expect(within(grid).getByLabelText('Answer EN for dep_bonus').getAttribute('aria-invalid')).toBe('true');
+    expect(within(grid).queryByLabelText('Answer EN for dep_how')!.getAttribute('aria-invalid')).toBeNull();
+    const en = within(grid).getByLabelText('Answer EN for dep_limit') as HTMLTextAreaElement;
+    await userEvent.clear(en); await userEvent.type(en, 'RM50 to RM50,000.'); await userEvent.tab();     // leaving the cell saves it to the draft
+    expect(await within(grid).findByText(/Saved to the draft: dep_limit/)).toBeTruthy();
+    await userEvent.type(within(grid).getByLabelText('Answer MS for dep_limit'), 'RM50 hingga RM50,000.'); await userEvent.tab();
+    const ex = within(grid).getByLabelText('Example questions for dep_limit') as HTMLTextAreaElement;
+    await userEvent.clear(ex); await userEvent.type(ex, 'max deposit{enter}min deposit{enter}{enter}deposit limit{enter}max deposit'); await userEvent.tab();   // empty lines and a repeated one are dropped
+    await userEvent.click(within(grid).getByRole('checkbox', { name: 'Live dep_limit' }));
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                    // one entry changed, however many cells
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    const row = (await screen.findByText('dep_limit')).closest('tr')!;
+    expect(row.textContent).toContain('RM50 to RM50,000.'); expect(row.textContent).toMatch(/live/);
+    expect(row.querySelector('td.num')!.textContent).toBe('3');                                          // three different example questions
+  });
+  it('Knowledge base table edit: Esc puts the old text back, Ctrl+Enter saves and moves down, and the language buttons add columns', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });
+    await userEvent.click(screen.getByRole('button', { name: 'Table edit' }));
+    const grid = await screen.findByLabelText('Table editor');
+    const how = within(grid).getByLabelText('Answer EN for dep_how') as HTMLTextAreaElement;
+    await userEvent.type(how, ' extra'); await userEvent.keyboard('{Escape}');
+    expect(how.value).toBe('Go to Wallet.'); expect(screen.getByRole('button', { name: /^Publish/ }).textContent).not.toMatch(/\d/);   // nothing was saved
+    await userEvent.type(how, ' now'); await userEvent.keyboard('{Control>}{Enter}{/Control}');
+    expect(document.activeElement).toBe(within(grid).getByLabelText('Answer EN for dep_time'));           // moved down one row, same column
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);
+    expect(within(grid).queryByLabelText('Answer VI for dep_how')).toBeNull();
+    await userEvent.click(within(grid).getByRole('button', { name: 'VI' }));
+    expect(within(grid).getByLabelText('Answer VI for dep_how')).toBeTruthy();
+  });
   it('Import and publish: imports the entries as live and opens the Publish window', async () => {
     open('staff', '/admin/imp');
     await userEvent.click(await screen.findByRole('button', { name: /Starter packs/ }));
