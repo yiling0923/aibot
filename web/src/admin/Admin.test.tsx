@@ -491,6 +491,21 @@ describe('Control panel', () => {
     await userEvent.selectOptions(screen.getByLabelText('Type'), 'promotion');
     expect(screen.getByText(/only true for a while/)).toBeTruthy();
   });
+  it('lets staff add up to 3 questions to ask after the answer (guided answer), and warns about an empty English question', async () => {
+    open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByText('Add entry'));
+    await userEvent.click(await screen.findByRole('button', { name: '+ Add a question' }));
+    expect(screen.getByLabelText('Question 1 asks for')).toBeTruthy();
+    expect(screen.getByText(/has no English text/)).toBeTruthy();                                 // an empty question blocks the green "Ready" note
+    await userEvent.type(screen.getByLabelText('Question 1 in EN'), 'Please send the receipt.');
+    expect(screen.queryByText(/has no English text/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: '+ Add a question' }));
+    await userEvent.selectOptions(screen.getByLabelText('Question 2 asks for'), 'amount');
+    await userEvent.click(screen.getByRole('button', { name: '+ Add a question' }));
+    expect((screen.getByRole('button', { name: /\+ Add a question/ }) as HTMLButtonElement).disabled).toBe(true);     // the most is 3
+    await userEvent.click(screen.getByRole('button', { name: 'Remove question 3' }));
+    expect((screen.getByRole('button', { name: /\+ Add a question/ }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it('shows the words under a main keyword in groups: short forms, slang, same meaning', async () => {
     open('staff', '/admin/kw');
     await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));

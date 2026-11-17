@@ -1,4 +1,4 @@
-import type { AnalyzeResult, Knowledge, KbEntry, Lang, Option } from '../engine/types';
+import type { AnalyzeResult, Knowledge, KbEntry, Lang, Option, Step } from '../engine/types';
 import { Engine } from '../engine/engine';
 import { checkToken, type TokenCheck } from './token';
 import { fakeMerchantApi, type MerchantApi, type Tx } from './merchantApi';
@@ -27,6 +27,8 @@ export interface Session {
   noPersonal?: boolean;
   /** Set by a channel just before a message that is a picture, video or file (LiveChat sends its name as the text), so the bot does not read the name as a question. */
   fileNext?: boolean;
+  /** A guided answer in progress: the entry, which question is next, what the customer gave so far, and how many times the current question was asked again. */
+  guided?: { intent: string; i: number; tries: number; got: { kind: string; value: string }[] } | null;
 }
 /** A message that is only the name of a file (what LiveChat sends for a picture, a document or a video). */
 const FILE_NAME = /^[^\s\\/]{1,120}\.(jpe?g|png|gif|webp|heic|bmp|svg|pdf|docx?|xlsx?|pptx?|txt|csv|zip|rar|mp4|mov|avi|mp3|wav|m4a)$/i;
@@ -45,6 +47,8 @@ export interface Turn {
   cacheable?: boolean;
   /** A line to show after the choices ("if you need other help, contact an agent"). Null when it is off or there are no choices. */
   hint?: string | null;
+  /** Set when a guided answer is finished: the chat goes to a person, and this is the note for them (sent to LiveChat as the reason). */
+  handover?: { reason: string; collected: { kind: string; value: string }[] };
   /** For the keyword store and the review list. */
   log: { text: string; lang: Lang; decision: string; notUnderstood: boolean } | null;
 }
@@ -161,6 +165,7 @@ export class Bot {
   async message(s: Session, rawText: string): Promise<Turn | null> {
     const typed = rawText.trim(); if (!typed || s.closed) return null;
     await this.warm(s);
+    const guided = this.guidedReply(s, typed); if (guided) return this.finish(s, guided, (s.lang ?? this.cfg(s).defaultLanguage) as Lang);
     // The customer may answer the choices in their own words: "deposit", "depo", "2", "the first one". That is an answer, not a new question.
     if (!s.handed && s.choices?.length && !s.fileNext) {
       const hit = matchChoice(typed, s.choices);
@@ -189,6 +194,53 @@ export class Bot {
     if (kept.length < opts.length) turn.trace = { ...turn.trace, choicesCut: { shown: kept.length, had: opts.length, max } };
     s.choices = turn.buttons;                                  // what the customer may answer in their own words next
     return turn;
+  }
+
+  /* ---------- guided answers: ask a few details after the answer, then hand to a person with the details as a note ---------- */
+  private askText(step: Step, lang: Lang): string { return step.ask[lang] ?? step.ask.en ?? Object.values(step.ask)[0] ?? ''; }
+  /** After an answer: when the entry has questions, ask the first one and remember where we are. */
+  private startGuided(s: Session, intent: string, lang: Lang, turn: Turn) {
+    const steps = this.engine.entry(s.merchant, intent)?.steps; if (!steps?.length) return;
+    s.guided = { intent, i: 0, tries: 0, got: [] };
+    turn.messages.push({ kind: 'bot', text: this.askText(steps[0], lang) }); turn.cacheable = false; turn.trace = { ...turn.trace, guided: { intent, step: 1, of: steps.length } };
+  }
+  private readStep(kind: Step['kind'], typed: string, file: boolean, currency?: string): string | null {
+    const t = typed.trim();
+    switch (kind) {
+      case 'receipt': return file ? t : null;
+      case 'amount': { if (file) return null; const m = /\d[\d,]*(?:\.\d{1,2})?/.exec(t); const n = m ? Number(m[0].replace(/,/g, '')) : 0; return n > 0 ? T.fmtAmt(n, currency) : null; }
+      case 'phone': { if (file) return null; const d = t.replace(/\D/g, ''); return d.length >= 8 && d.length <= 15 ? t.slice(0, 30) : null; }
+      case 'username': return !file && /^\S+(?:\s\S+){0,3}$/.test(t) && t.length >= 2 && t.length <= 60 ? t : null;
+      default: return !file && t.length >= 1 && t.length <= 300 ? t : null;
+    }
+  }
+  /** The customer's reply while a guided answer is open. Null: it is not a reply to the question (a new question), so the chat goes on as usual. */
+  private guidedReply(s: Session, typed: string): Turn | null {
+    const g = s.guided; if (!g || s.handed || s.closed) return null;
+    const e = this.engine.entry(s.merchant, g.intent), steps = e?.steps;
+    if (!e || !steps?.length || g.i >= steps.length) { s.guided = null; return null; }
+    const c = this.cfg(s), lang = (s.lang ?? c.defaultLanguage) as Lang, step = steps[g.i];
+    const file = !!s.fileNext; s.fileNext = false; const n = typed.trim().toLowerCase();
+    const wantsPerson = /^(agent|human|person|staff|ejen|pegawai|manusia|人工|客服)$/.test(n), skip = /^(skip|cancel|no|nope|tak nak|tak mahu|batal|跳过|取消|不用)$/.test(n);
+    if (!file && !wantsPerson && !skip && n.split(/\s+/).length >= 3 && this.engine.analyze(typed, s.merchant, 0).decision === 'ANSWER') { s.guided = null; return null; }   // a new question, not a detail
+    const value = wantsPerson || skip ? null : this.readStep(step.kind, typed, file, c.currency);
+    const turn: Turn = { messages: [], buttons: null, locked: false, status: null, cacheable: false,
+      trace: { kind: 'guided', intent: g.intent, step: g.i + 1, of: steps.length, stepKind: step.kind, accepted: value !== null },
+      log: { text: '[' + step.kind + ']', lang, decision: 'GUIDED', notUnderstood: false } };       // what the customer typed (a phone number, a name) is not kept in the logs
+    if (value === null && !wantsPerson && !skip && g.tries < 1) {
+      g.tries++; const hint = T.GUIDED_AGAIN[step.kind]?.[lang] ?? T.GUIDED_AGAIN[step.kind]?.en ?? '';
+      turn.messages.push({ kind: 'bot', text: hint + '\n' + this.askText(step, lang) }); return turn;
+    }
+    g.got.push({ kind: step.kind, value: value ?? (skip ? 'skipped' : wantsPerson ? 'asked for a person' : 'not given') }); g.i++; g.tries = 0;
+    if (wantsPerson || g.i >= steps.length) {
+      const got = g.got; s.guided = null; const h = this.handoff(s, lang);
+      const reason = [`Topic: ${e.topic}`, ...got.map((x) => `${T.STEP_LABEL[x.kind] ?? x.kind}: ${x.value}`)].join(' · ');
+      turn.messages.push({ kind: 'bot', text: T.GUIDED_DONE[lang] ?? T.GUIDED_DONE.en }, h.messages[1]); turn.status = h.status;
+      turn.handover = { reason, collected: got }; turn.log = { text: '[details]', lang, decision: 'HANDOFF', notUnderstood: false };
+      turn.trace = { ...turn.trace, kind: 'guided-done', decision: 'HANDOFF', why: 'The details were collected, so a person takes over.', note: reason };
+      return turn;
+    }
+    turn.messages.push({ kind: 'bot', text: this.askText(steps[g.i], lang) }); return turn;
   }
 
   private async messageCore(s: Session, rawText: string): Promise<Turn | null> {
@@ -277,7 +329,7 @@ export class Bot {
     switch (r.decision) {
       case 'ANSWER':
         s.clarifyCount = 0;
-        if (out.acct) { say(out.acct.text); if (out.acct.agent) turn.buttons = this.buttons([], lang); } else say(await this.composeReply(s, text, out.kbAnswer!, lang, turn));
+        if (out.acct) { say(out.acct.text); if (out.acct.agent) turn.buttons = this.buttons([], lang); } else { say(await this.composeReply(s, text, out.kbAnswer!, lang, turn)); this.startGuided(s, r.top.intent, lang, turn); }
         break;
       case 'AMOUNT':
         if (r.dir) { s.lastTopic = r.dir; say(this.amountAnswer(s, r.dir, r.amt!.n, lang)); }
@@ -318,7 +370,7 @@ export class Bot {
     turn.log = { text, lang, decision: reask ? 'REASK' : r.decision, notUnderstood: unclear || (r.decision === 'HANDOFF' && r.via === 'similarity' && !r.guard) };
     // what is open now: the question just asked, or nothing once the customer has an answer (a greeting or a rude word leaves it as it was)
     s.askKind = asking ?? (['ANSWER', 'ACCOUNT', 'HANDOFF'].includes(r.decision) || (r.decision === 'AMOUNT' && !!r.dir) ? null : (s.askKind ?? null));
-    turn.cacheable = r.decision === 'ANSWER' && r.via !== 'ai' && query === text && !out.acct;       // depends only on the words of the question
+    turn.cacheable = r.decision === 'ANSWER' && r.via !== 'ai' && query === text && !out.acct && !s.guided;       // depends only on the words of the question
     turn.trace.askKind = s.askKind;
     return turn;
   }
@@ -368,7 +420,7 @@ export class Bot {
     }
     const intentAnswer = (k: string) => {
       if (this.engine.entry(s.merchant, k)?.entryType === 'needs_staff') { const h = this.handoff(s, lang); turn.messages.push(...h.messages); turn.status = h.status; turn.trace = { ...turn.trace, pickKind: 'intent', key: k, why: 'Marked "needs staff": a person answers this.' }; return; }
-      const a = this.ans(s.merchant, k, lang); turn.trace = { ...turn.trace, pickKind: 'intent', key: k, extra: a }; say(this.wrap(s, a, lang)); };
+      const a = this.ans(s.merchant, k, lang); turn.trace = { ...turn.trace, pickKind: 'intent', key: k, extra: a }; say(this.wrap(s, a, lang)); this.startGuided(s, k, lang, turn); };
     if (kind === 'intent') { intentAnswer(key); return turn; }
     if (kind === 'topic') {
       const list = this.engine.intentsOfTopic(s.merchant, key);

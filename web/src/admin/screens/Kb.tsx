@@ -8,6 +8,9 @@ type Tr = { question_examples: string[]; answer_text: string };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
 const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'live', category: 'General', translations: {} });
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
+/** What a guided answer can ask the customer for after the answer. */
+const STEP_KINDS: [string, string][] = [['receipt', 'A receipt picture'], ['amount', 'An amount'], ['username', 'The username'], ['phone', 'A phone number'], ['text', 'A short reply']];
+const STEP_LANGS = ['en', 'ms', 'zh'] as const;
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
 export default function Kb() {
@@ -44,7 +47,7 @@ export default function Kb() {
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={n < 3 ? 'Add at least 3 example questions' : 'Example questions in English'}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
-            <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
+            <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{e.steps?.length ? <> <Pill c="info" >asks {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
           </tr>
         ))}
         {!list.length && <tr><td colSpan={6} className="sub">No entries match.</td></tr>}
@@ -99,7 +102,9 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
     if (!topic) return p.toast('Choose a topic first. It is required.');
     if (ed.useAspect && !ed.aspect) return p.toast('Choose a question type, or untick "Add a question type".');
     const { useAspect, tab, sug: _s, newTopic: _n, newTopicW, newEx: _e, ...rest } = ed; void tab;
-    const clean: Entry = { ...rest, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
+    const steps = (ed.steps ?? []).map((x) => ({ kind: x.kind, ask: Object.fromEntries(Object.entries(x.ask ?? {}).map(([l, v]) => [l, (v ?? '').trim()]).filter(([, v]) => v)) as Record<string, string> })).filter((x) => x.ask.en || Object.keys(x.ask).length);
+    if (steps.some((x) => !x.ask.en)) return p.toast('Write the English text of each question to the customer (section 5), or remove it');
+    const clean: Entry = { ...rest, steps: steps.length ? steps : undefined, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
     p.edit((d, note) => {
       if (newTopic && !topicNames(d, p.merchant).includes(newTopic)) {                 // a topic made here belongs to this merchant (the plan: each client owns its topic list)
         addOwnTopic(d, p.merchant, newTopic, newTopicW.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)); note('Added topic "' + newTopic + '" (' + p.M.name + ')');
@@ -153,6 +158,16 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
         <div className="it" key={i}><span>{x}</span><span>
           <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) }, translations: { ...ed.translations, [ed.tab]: { ...t, question_examples: [...t.question_examples, x] } } })}>Approve</button>{' '}
           <button className="btn sm" type="button" onClick={() => set({ sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) } })}>Dismiss</button></span></div>))}</div>}
+      <div className="kbsec"><b>5</b> After the answer: ask for details (optional)</div>
+      <div className="sub" style={{ marginTop: -4 }}>For a topic that needs more from the customer, for example a deposit that is not in: the bot gives the answer, asks up to 3 questions one by one, then passes the chat to a person with the details as a note. A picture of a receipt only works when LiveChat sends pictures to the bot (patch 002). The customer can type "skip" at any question. A language left empty uses the English question.</div>
+      {(ed.steps ?? []).map((st, i) => (
+        <div className="stepbox" key={i} aria-label={'Question ' + (i + 1)}>
+          <div className="head"><b>Question {i + 1}</b><span className="tools">
+            <label className="fld" style={{ margin: 0 }}><select aria-label={'Question ' + (i + 1) + ' asks for'} value={st.kind} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, kind: e.target.value as typeof st.kind } : x)) })}>{STEP_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
+            <button className="btn sm" type="button" aria-label={'Remove question ' + (i + 1)} onClick={() => set({ steps: (ed.steps ?? []).filter((_, j) => j !== i) })}>Remove</button></span></div>
+          <div className="form">{STEP_LANGS.map((l) => <label className="fld" key={l}><span>{LN[l]}{l === 'en' ? ' (required)' : ' (optional)'}</span><input type="text" lang={l} aria-label={'Question ' + (i + 1) + ' in ' + LN[l]} value={st.ask?.[l] ?? ''} placeholder={l === 'en' ? (st.kind === 'receipt' ? 'e.g. Please send a picture of your receipt.' : st.kind === 'amount' ? 'e.g. How much did you deposit?' : 'Write the question') : ''} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, ask: { ...x.ask, [l]: e.target.value } } : x)) })} /></label>)}</div>
+        </div>))}
+      <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>+ Add a question{(ed.steps ?? []).length >= 3 ? ' (the most is 3)' : ''}</button></div>
       {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>Before the bot can use this answer:</b><ul className="plain">{pr.map((x, i) => <li key={i}>{x}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>✓ Ready: Live, with an answer and example questions. Save it, then Publish.</div>; })()}
       <div className="head" style={{ marginTop: 'auto' }}><span className="sub">Saved as a draft change until you publish.</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>Delete</button> : null}<button className="btn pri" type="button" onClick={save}>Save to draft</button></span></div>
     </Modal>

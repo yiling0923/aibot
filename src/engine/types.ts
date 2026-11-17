@@ -7,6 +7,12 @@ export type WordMap = Record<string, Record<string, string[]>>;
 
 export interface Translation { questionExamples: string[]; answerText: string }
 
+/** What a guided answer asks for after the answer: a receipt picture, an amount, a username, a phone number, or a short text. */
+export type StepKind = 'receipt' | 'amount' | 'username' | 'phone' | 'text';
+export const STEP_KINDS: StepKind[] = ['receipt', 'amount', 'username', 'phone', 'text'];
+/** One question of a guided answer, worded per language (the main language is required, a missing language falls back to English). */
+export interface Step { kind: StepKind; ask: Partial<Record<Lang, string>> }
+
 export interface KbEntry {
   id: number;
   merchant: string;            // merchant code
@@ -18,6 +24,8 @@ export interface KbEntry {
   translations: Partial<Record<Lang, Translation>>;
   /** answer (default), needs_staff (a person must answer: the bot hands over) or promotion (an answer that hides itself after endsOn). */
   entryType?: EntryType;
+  /** Up to 3 questions asked after the answer (a receipt picture, an amount ...). When they are answered the chat goes to a person with the details as a note. */
+  steps?: Step[];
   /** The last day the entry is used (YYYY-MM-DD). Empty: no end. */
   endsOn?: string | null;
 }

@@ -313,3 +313,15 @@ Step 5 of the plan ("how we get and study the knowledge base"), one merchant at 
 4. **Missing answers.** Questions the bot cannot answer yet are grouped by the staff reply that followed them: one row is one possible answer with its example questions. They come only from the learn pairs, so the test stays honest. *Send to Import* puts them into the Import screen as drafts (topic from the keywords when found, otherwise `other`: check each one).
 
 Code: `src/study/clean.ts` (reading, scrubbing, cleaning, split), `src/study/measure.ts` (measure and gaps), `src/admin/studyRoutes.ts`, `web/src/admin/screens/Study.tsx`, `db/merchant/011_study.sql`.
+
+## Guided answers (ask for details, then a person)
+
+The light version of the plan's flow builder: no drawing, just up to 3 questions after an answer. In the entry editor, section **5 After the answer: ask for details**. Each question asks for one of: a **receipt picture**, an **amount**, the **username**, a **phone number**, or a **short reply**, worded per language (English required; an empty language uses English).
+
+What the customer sees: the bot gives the answer and asks question 1; each reply moves to the next question; after the last one the bot says "Thank you, I have passed your details to our team" and the chat goes to a person.
+
+- **Checks.** An amount must contain a number, a phone number 8 to 15 digits, a username 2 to 60 characters (up to 4 words), a receipt must be a picture or file. A wrong reply is asked once more, then the question is skipped ("not given"). The customer can type `skip` / `cancel` / `no` (also `tak nak`, `batal`, `跳过`) to skip, or `agent` / `human` to go to a person at once. A new question (three or more words that the bot can answer) stops the questions and is answered.
+- **The note.** The details go to LiveChat as the `reason` of the reply, one line: `Topic: deposit · Receipt: slip.png · Amount: RM100 · Username: tom8841`, and as `metadata.collected` (a list of `{ kind, value }`). A phone number or name the customer typed is **not** written to the bot's own logs (they show `[phone]` or `[details]`).
+- **Pictures need patch 002.** LiveChat only tells the bot about a picture when `deploy/local-livechat/patches/002-picture-to-bot.patch` is applied. Without it, a receipt question cannot be answered; the customer can type `skip`.
+- **Not saved as a cached reply.** A guided reply is marked `cacheable: false`.
+- Code: `src/bot/responder.ts` (`startGuided`, `guidedReply`), `src/engine/steps.ts`, column `kb_entries.steps` (`db/merchant/012_steps.sql`), `web/src/admin/screens/Kb.tsx`. Tests: `test/guided.test.ts`.

@@ -135,3 +135,21 @@ const TABLES = { LABEL, TONE, CLARIFY_TXT, GREET, TOPIC_LABEL, CHOICE_TXT, PICK_
   ST, DAYT, KIND_W, SENT, NOTX, NOTVER, FAILHINT, ACCT_PRE, STATUS_LABEL, TXT_BAL, TXT_PTS, TXT_TXN, TYPE_W, STS, NODATA, REFUSE_TXT, KIND_DEF, REASK_TXT };
 const joinInto = (target, extra) => { for (const k of Object.keys(extra)) { const plain = extra[k] && typeof extra[k] === 'object' && !Array.isArray(extra[k]); if (plain && target[k] && typeof target[k] === 'object') joinInto(target[k], extra[k]); else target[k] = extra[k]; } };
 for (const name of Object.keys(EXTRA)) { if (!TABLES[name]) throw new Error('texts_extra: unknown table ' + name); joinInto(TABLES[name], EXTRA[name]); }
+
+/** Guided answers: said when the details are in (the chat then goes to a person), and when a detail is not what was asked for. */
+export const GUIDED_DONE: Record<Lang, string> = {
+  en: 'Thank you. I have passed your details to our team, and an agent will help you shortly. 🙏',
+  ms: 'Terima kasih. Saya telah hantar maklumat anda kepada pasukan kami, dan ejen akan membantu anda sebentar lagi. 🙏',
+  zh: '谢谢。我已把您的资料转交给我们的团队，客服很快会为您处理。🙏',
+  vi: 'Cảm ơn bạn. Mình đã chuyển thông tin cho đội ngũ, nhân viên sẽ hỗ trợ bạn ngay. 🙏',
+  th: 'ขอบคุณค่ะ ส่งข้อมูลให้ทีมงานแล้ว เจ้าหน้าที่จะรีบช่วยเหลือนะคะ 🙏',
+  tl: 'Salamat. Naipasa ko na ang inyong detalye sa team, at tutulong agad ang agent. 🙏',
+};
+export const GUIDED_AGAIN: Record<string, Record<Lang, string>> = {
+  receipt: { en: 'I need a picture of the receipt here in the chat (JPG or PNG). Or type "skip".', ms: 'Saya perlukan gambar resit di sini dalam chat (JPG atau PNG). Atau taip "skip".', zh: '请在聊天中发送收据图片（JPG 或 PNG）。或输入 "skip" 跳过。', vi: 'Mình cần ảnh biên lai gửi ngay trong khung chat (JPG hoặc PNG). Hoặc gõ "skip".', th: 'ขอรูปใบเสร็จส่งในแชทนี้ (JPG หรือ PNG) หรือพิมพ์ "skip" ค่ะ', tl: 'Kailangan ko ng larawan ng resibo dito sa chat (JPG o PNG). O i-type ang "skip".' },
+  amount: { en: 'Please type the amount as a number, for example 100. Or type "skip".', ms: 'Sila taip jumlah sebagai nombor, contohnya 100. Atau taip "skip".', zh: '请输入金额数字，例如 100。或输入 "skip" 跳过。', vi: 'Vui lòng gõ số tiền bằng số, ví dụ 100. Hoặc gõ "skip".', th: 'กรุณาพิมพ์จำนวนเงินเป็นตัวเลข เช่น 100 หรือพิมพ์ "skip" ค่ะ', tl: 'I-type ang halaga bilang numero, halimbawa 100. O i-type ang "skip".' },
+  phone: { en: 'Please type the phone number (digits only). Or type "skip".', ms: 'Sila taip nombor telefon (nombor sahaja). Atau taip "skip".', zh: '请输入电话号码（只要数字）。或输入 "skip" 跳过。', vi: 'Vui lòng gõ số điện thoại (chỉ chữ số). Hoặc gõ "skip".', th: 'กรุณาพิมพ์เบอร์โทร (ตัวเลขเท่านั้น) หรือพิมพ์ "skip" ค่ะ', tl: 'I-type ang numero ng telepono (mga numero lang). O i-type ang "skip".' },
+  username: { en: 'Please type your username (a short word). Or type "skip".', ms: 'Sila taip username anda (satu perkataan pendek). Atau taip "skip".', zh: '请输入您的用户名（简短）。或输入 "skip" 跳过。', vi: 'Vui lòng gõ tên đăng nhập (một từ ngắn). Hoặc gõ "skip".', th: 'กรุณาพิมพ์ชื่อผู้ใช้ (สั้นๆ) หรือพิมพ์ "skip" ค่ะ', tl: 'I-type ang inyong username (isang maikling salita). O i-type ang "skip".' },
+  text: { en: 'Please type a short reply. Or type "skip".', ms: 'Sila taip jawapan ringkas. Atau taip "skip".', zh: '请简短回复。或输入 "skip" 跳过。', vi: 'Vui lòng gõ một câu trả lời ngắn. Hoặc gõ "skip".', th: 'กรุณาพิมพ์ตอบสั้นๆ หรือพิมพ์ "skip" ค่ะ', tl: 'Mag-type ng maikling sagot. O i-type ang "skip".' },
+};
+export const STEP_LABEL: Record<string, string> = { receipt: 'Receipt', amount: 'Amount', phone: 'Phone', username: 'Username', text: 'Note' };

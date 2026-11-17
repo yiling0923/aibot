@@ -584,3 +584,5 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .pmenu-list button:hover,.pmenu-list button:focus-visible{background:var(--surface2)}
 
 .lcmsg.customer .lcpic .sub,.lcmsg.customer .lcfile{color:#fff;opacity:.92}
+.stepbox{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-top:8px;background:var(--surface)}
+.stepbox .head{margin-bottom:6px}

@@ -1,3 +1,4 @@
+import { cleanSteps } from '../engine/steps';
 import { withoutPlaceholders } from '../engine/placeholders';
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
@@ -14,9 +15,10 @@ const TOOLS = ['deposit_status', 'withdraw_status', 'balance', 'transactions', '
 const rows = async <T extends RowDataPacket = RowDataPacket>(c: Pool | PoolConnection, sql: string, p: unknown[] = []) => (await c.query<T[]>(sql, p))[0];
 
 /** entry_type and valid_to, ready for the database (an unknown type becomes "answer", a bad date means no end). */
-function extra(e: SnapEntry): [string, string | null] {
+function extra(e: SnapEntry): [string, string | null, string | null] {
   const type = ['answer', 'needs_staff', 'promotion'].includes(String(e.entry_type)) ? String(e.entry_type) : 'answer';
-  return [type, /^\d{4}-\d{2}-\d{2}$/.test(String(e.ends_on ?? '')) ? `${e.ends_on} 23:59:59` : null];
+  const steps = cleanSteps(e.steps);
+  return [type, /^\d{4}-\d{2}-\d{2}$/.test(String(e.ends_on ?? '')) ? `${e.ends_on} 23:59:59` : null, steps.length ? JSON.stringify(steps) : null];
 }
 function group(list: RowDataPacket[], k: string, v: string): Words {
   const out: Words = {};
@@ -53,7 +55,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     const D = (table: string) => tbl(t.db, table);
     const [own, entries, trans, [st], tools] = await Promise.all([
       rows(pool, `SELECT language, variant, canonical, kind FROM ${D('aliases')} ORDER BY id`),
-      rows(pool, `SELECT e.id, c.name AS category, e.intent_key, e.topic, e.aspect, e.topic_optional, e.status, e.updated_at, e.entry_type, DATE_FORMAT(e.valid_to, '%Y-%m-%d') AS ends_on FROM ${D('kb_entries')} e LEFT JOIN ${D('kb_categories')} c ON c.id = e.category_id ORDER BY e.id`),
+      rows(pool, `SELECT e.id, c.name AS category, e.intent_key, e.topic, e.aspect, e.topic_optional, e.status, e.updated_at, e.entry_type, e.steps, DATE_FORMAT(e.valid_to, '%Y-%m-%d') AS ends_on FROM ${D('kb_entries')} e LEFT JOIN ${D('kb_categories')} c ON c.id = e.category_id ORDER BY e.id`),
       rows(pool, `SELECT kb_id, language, question_examples, answer_text FROM ${D('kb_translations')} ORDER BY id`),
       rows(pool, `SELECT * FROM ${D('settings')} WHERE id = 1`),
       rows(pool, `SELECT tool, enabled FROM ${D('tools')}`),
@@ -68,7 +70,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     for (const e of entries) snap.kb.push({
       id: Number(e.id), merchant: t.code, category: e.category ?? 'General', intent_key: e.intent_key, topic: e.topic, aspect: e.aspect,
       topic_optional: !!e.topic_optional, status: e.status, updated: (e.updated_at as Date).toISOString(), translations: byKb.get(Number(e.id)) ?? {},
-      entry_type: e.entry_type ?? 'answer', ends_on: e.ends_on ?? null,
+      entry_type: e.entry_type ?? 'answer', ends_on: e.ends_on ?? null, ...(cleanSteps(asJson(e.steps, [])).length ? { steps: cleanSteps(asJson(e.steps, [])) } : {}),
     });
     if (!st) continue;
     const on = new Set(tools.filter((x) => x.enabled).map((x) => x.tool));
@@ -133,11 +135,11 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScop
         let id: number;
         if (found) {
           id = Number(found.id);
-          await c.query(`UPDATE ${D('kb_entries')} SET category_id=?, title=?, topic=?, aspect=?, topic_optional=?, status=?, entry_type=?, valid_to=?, version=version+1 WHERE id=?`,
+          await c.query(`UPDATE ${D('kb_entries')} SET category_id=?, title=?, topic=?, aspect=?, topic_optional=?, status=?, entry_type=?, valid_to=?, steps=?, version=version+1 WHERE id=?`,
             [cat, e.intent_key.replace(/_/g, ' '), e.topic, e.aspect || null, !!e.topic_optional, e.status, ...extra(e), id]);
         } else {
           id = (await c.query<ResultSetHeader>('INSERT INTO kb_id_seq() VALUES()'))[0].insertId;      // ids stay unique across all merchants
-          await c.query(`INSERT INTO ${D('kb_entries')}(id,category_id,intent_key,title,topic,aspect,topic_optional,status,entry_type,valid_to) VALUES(?,?,?,?,?,?,?,?,?,?)`,
+          await c.query(`INSERT INTO ${D('kb_entries')}(id,category_id,intent_key,title,topic,aspect,topic_optional,status,entry_type,valid_to,steps) VALUES(?,?,?,?,?,?,?,?,?,?,?)`,
             [id, cat, e.intent_key, e.intent_key.replace(/_/g, ' '), e.topic, e.aspect || null, !!e.topic_optional, e.status, ...extra(e)]);
         }
         await c.query(`DELETE FROM ${D('kb_translations')} WHERE kb_id=?`, [id]);
@@ -166,7 +168,7 @@ export function knowledgeFromSnapshot(snap: Snapshot, merchants: MerchantMeta[],
   });
   const entries: KbEntry[] = snap.kb.filter((e) => includeDrafts || e.status === 'live').map((e): KbEntry | null => withoutPlaceholders({
     id: e.id, merchant: e.merchant, category: e.category, intentKey: e.intent_key, topic: e.topic, aspect: e.aspect, topicOptional: !!e.topic_optional,
-    entryType: e.entry_type ?? 'answer', endsOn: e.ends_on || null,
+    entryType: e.entry_type ?? 'answer', endsOn: e.ends_on || null, ...(cleanSteps(e.steps).length ? { steps: cleanSteps(e.steps) } : {}),
     translations: Object.fromEntries(Object.entries(e.translations).map(([l, t]) => [l, { questionExamples: t!.question_examples ?? [], answerText: t!.answer_text ?? '' }])),
   })).filter((e): e is KbEntry => !!e);
   return { merchants: cfgs, kbEntries: entries, globalAliases: snap.aliases as WordMap, aspects: snap.aspects as WordMap, smalltalk: snap.smalltalk as WordMap, guard: snap.guard as WordMap, fillers: snap.fillers };

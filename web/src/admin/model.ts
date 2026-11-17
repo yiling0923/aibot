@@ -54,7 +54,7 @@ export const langState = (e: { translations: Entry['translations'] }, l: string)
 
 /** Every topic one merchant can use: the shared template, plus the topics that merchant made itself (its own keywords with a topic name of its own). */
 /** What stops the bot from using an answer, in plain words (empty when it is ready). */
-export const entryProblems = (e: { status?: string; entry_type?: string; translations: unknown }): string[] => {
+export const entryProblems = (e: { status?: string; entry_type?: string; translations: unknown; steps?: { kind: string; ask: Record<string, string | undefined> }[] }): string[] => {
   const tr = Object.values((e.translations ?? {}) as Record<string, { answer_text?: string; question_examples?: string[] }>);
   const out: string[] = []; const staff = e.entry_type === 'needs_staff';                     // a person answers these, so the bot needs no answer text, only the questions that lead to the hand-over
   if (e.status === 'draft') out.push('Status is Draft, so the bot ignores it. Set it to Live.');
@@ -63,6 +63,7 @@ export const entryProblems = (e: { status?: string; entry_type?: string; transla
   const most = Math.max(0, ...tr.map((t) => t?.question_examples?.length ?? 0));
   if (most === 0) out.push('There are no example questions, so the bot cannot find this answer. Add at least 3, with slang.');
   else if (most < 3) out.push('Only ' + most + ' example question' + (most === 1 ? '' : 's') + '. Add at least 3, with slang, so the bot finds it more often.');
+  if ((e.steps ?? []).some((x) => !(x.ask?.en ?? '').trim())) out.push('A question to ask the customer (section 5) has no English text. Write it, or remove the question.');
   return out;
 };
 export const topicNames = (d: Draft, merchant: string): string[] => [...new Set([...Object.keys(d.aliases), ...(d.mAliases[merchant] ?? []).map((a) => a.canonical)])];

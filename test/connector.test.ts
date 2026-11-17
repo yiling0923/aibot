@@ -155,6 +155,20 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     expect(JSON.stringify(guest)).not.toMatch(/1,250/);
   });
 
+  it('a guided answer goes through LiveChat: the question, then a picture, an amount, and the details as the reason of the handover', async () => {
+    const bot = new Bot(await loadKnowledge(pool!)); const store = new Store(pool!);
+    bot.knowledge.kbEntries.find((e) => e.merchant === 'MERCH_A' && e.intentKey === 'deposit_time')!.steps = [{ kind: 'receipt', ask: { en: 'Send the receipt picture.' } }, { kind: 'amount', ask: { en: 'How much?' } }];
+    const deps = { pool: pool!, bot, store }; const go = (body: Record<string, unknown>) => ask(deps, 'MERCH_A', body);
+    const first = await go({ question: 'how long deposit take guided' });
+    expect(first.decision).toBe('answer'); expect(first.answer).toContain('Send the receipt picture.'); expect(first.cacheable).toBe(false); expect(first.reason).toBeUndefined();
+    const pic = await go({ question: 'MMU (3).jpg', attachment: { kind: 'image', name: 'MMU (3).jpg' }, session_id: first.session_id });
+    expect(pic.answer).toBe('How much?'); expect(pic.should_escalate).toBe(false); expect(pic.cacheable).toBe(false);
+    const done = await go({ question: '100', session_id: first.session_id });
+    expect(done.decision).toBe('handover'); expect(done.should_escalate).toBe(true);
+    expect(done.reason).toBe('Topic: deposit · Receipt: MMU (3).jpg · Amount: RM100'); expect(done.metadata?.collected).toEqual([{ kind: 'receipt', value: 'MMU (3).jpg' }, { kind: 'amount', value: 'RM100' }]);
+    expect(done.confidence).toBeLessThanOrEqual(0.8);
+  });
+
   it('never asks twice, even when the customer repeats the same words', async () => {
     const first = (await call(keyA, { question: 'blorp quux' })).json();
     expect(first.decision).toBe('clarify');                                                          // the one question

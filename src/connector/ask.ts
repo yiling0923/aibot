@@ -27,6 +27,8 @@ export interface AskResponse {
   topic: string | null; keywords: string[]; choices: Choice[]; answer_id: number | null;
   /** True only for a plain answer that depends on nothing but the words of the question. LiveChat keeps a reply by those words for every customer, so every other reply is marked false and given a confidence under its cache limit. */
   cacheable: boolean;
+  /** Set when a guided answer is finished: the details the customer gave, as one line for staff (LiveChat keeps `reason` with the message). */
+  reason?: string; metadata?: { collected: { kind: string; value: string }[] };
 }
 interface State { session: Session; choices: Button[] | null; lang: Lang | null }
 export interface AskDeps { pool: Pool; bot: Bot; store: Store; timeoutMs?: number; /** 'test' for the panel's "Test the link" button: saved as a test chat, not as live traffic. Default 'live'. */ source?: 'live' | 'test' }
@@ -138,6 +140,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
       close_message: turn.locked || s.closed ? answer : null, session_id: id, decision,
       topic: typeof turn.trace.topic === 'string' ? turn.trace.topic : null, keywords: Array.isArray(turn.trace.kw) ? (turn.trace.kw as string[]) : [], choices,
       answer_id: decision === 'answer' && typeof turn.trace.answerId === 'number' ? turn.trace.answerId : null, cacheable,
+      ...(turn.handover ? { reason: turn.handover.reason, metadata: { collected: turn.handover.collected } } : {}),
     };
     if (!abandoned && turn.log) {
       const matched = turn.trace.decision === 'ANSWER' ? ((turn.trace.top as { id?: number } | undefined)?.id ?? null) : null;

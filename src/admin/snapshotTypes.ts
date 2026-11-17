@@ -1,5 +1,5 @@
 // The shapes the control panel and the server share. Pure types, no imports of server code, so the front end can use them too.
-import type { Lang } from '../engine/types';
+import type { Lang, Step } from '../engine/types';
 
 export type Words = Record<string, Record<string, string[]>>;
 export interface SnapEntry {
@@ -9,6 +9,8 @@ export interface SnapEntry {
   entry_type?: 'answer' | 'needs_staff' | 'promotion';
   /** Last day the entry is used, YYYY-MM-DD; empty = no end. */
   ends_on?: string | null;
+  /** Questions asked after the answer (guided answer), up to 3. */
+  steps?: Step[];
   translations: Partial<Record<Lang, { question_examples: string[]; answer_text: string }>>;
 }
 export interface SnapSettings {
