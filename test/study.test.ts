@@ -98,6 +98,12 @@ describe.skipIf(!reachable)('the Study screen (needs TEST_DATABASE_URL)', () => 
     for (const g of m.gaps) expect(test.has(g.question)).toBe(false);                              // a held-back question is never offered as a suggestion
   });
 
+  it('can measure on every saved pair when none was held back, and says it is not a fair test', async () => {
+    const all = (await call(staff, 'POST', 'MERCH_A/study/measure', { all: true })).json();
+    expect(all.fair).toBe(false); expect(all.tested).toBe(120);
+    expect((await call(staff, 'POST', 'MERCH_A/study/measure')).json().fair).toBe(true);
+  });
+
   it('clears everything', async () => {
     expect((await call(staff, 'POST', 'MERCH_A/study/clear')).json().removed).toBe(120);
     expect((await call(staff, 'GET', 'MERCH_A/study')).json().total).toBe(0);

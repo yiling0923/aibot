@@ -51,11 +51,11 @@ export function studyRoutes(app: FastifyInstance, ctx: { pool: Pool; getBot: () 
   });
 
   /** Measures the published bot on the held-back test pairs, and lists what the bot cannot answer yet (from the other pairs). */
-  app.post<{ Params: { code: string } }>(`${P}/measure`, async (req, reply) => {
+  app.post<{ Params: { code: string }; Body: { all?: unknown } }>(`${P}/measure`, async (req, reply) => {
     const t = await gate(req, reply); if (!t) return;
     const pairs = await load(t.db); const bot = await ctx.getBot();
     if (!bot.engine.hasMerchant(req.params.code)) return reply.code(404).send({ error: 'The bot has no published knowledge for this merchant yet.' });
-    return { ...measure(bot.engine, req.params.code, pairs), gaps: gaps(bot.engine, req.params.code, pairs) };
+    return { ...measure(bot.engine, req.params.code, pairs, req.body?.all === true), gaps: gaps(bot.engine, req.params.code, pairs) };
   });
 
   app.post<{ Params: { code: string } }>(`${P}/clear`, async (req, reply) => {

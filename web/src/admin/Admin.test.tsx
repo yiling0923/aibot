@@ -36,13 +36,14 @@ const lcReply = (init?: RequestInit) => {                                       
   if (text) lcLines = [...lcLines, { from: 'customer', sender: 'visitor', text }, { from: 'bot', sender: 'ai', text: 'Go to Wallet > Deposit.' }];
   return { conversationId: lcLines.length ? 'c1' : null, status: lcLines.length ? 'open' : null, handoff: lcLines.length ? 'none' : null, messages: lcLines, replied: !!text };
 };
+let studySmall = false;
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (lcRefuse && url === '/api/admin/livechat-chat' && String(init?.body).includes('"file"')
     ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
-    : /\/merchants\/[^/]+\/study\/measure/.test(url) ? { tested: 40, coverage: 0.72, accuracy: 0.9, scored: 25, wrongRate: 0.1, judged: 20, handoverRate: 0.2, clarifyRate: 0.08, noAnswerYet: 7, mistakes: [{ question: 'how long depo', botSaid: 'Wrong answer text', staffReply: 'Right staff text', expected: 'deposit_time' }], gaps: [{ question: 'do you have vip', count: 4, topic: 'vip', lang: 'en', reply: 'Yes, VIP has 5 levels.', examples: ['do you have vip', 'vip level?'] }] }
+    : /\/merchants\/[^/]+\/study\/measure/.test(url) ? { fair: !/"all":true/.test(String(init?.body)), tested: 40, coverage: 0.72, accuracy: 0.9, scored: 25, wrongRate: 0.1, judged: 20, handoverRate: 0.2, clarifyRate: 0.08, noAnswerYet: 7, mistakes: [{ question: 'how long depo', botSaid: 'Wrong answer text', staffReply: 'Right staff text', expected: 'deposit_time' }], gaps: [{ question: 'do you have vip', count: 4, topic: 'vip', lang: 'en', reply: 'Yes, VIP has 5 levels.', examples: ['do you have vip', 'vip level?'] }] }
     : /\/merchants\/[^/]+\/study\/import/.test(url) ? { rows: 12, kept: 8, dropped: { filler: 2, account: 1, short: 0, duplicate: 1 }, scrubbed: 3, learn: 6, test: 2, added: 8, alreadySaved: 0 }
-    : /\/merchants\/[^/]+\/study$/.test(url) ? { total: 8, learn: 6, test: 2, lastLoaded: null }
+    : /\/merchants\/[^/]+\/study$/.test(url) ? (studySmall ? { total: 3, learn: 3, test: 0, lastLoaded: null } : { total: 8, learn: 6, test: 2, lastLoaded: null })
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -412,6 +413,17 @@ describe('Control panel', () => {
     expect(screen.getByText(/do you have vip · vip level\?/)).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: 'Send 1 suggestions to Import' }));
     expect(((await screen.findByLabelText('Paste CSV')) as HTMLTextAreaElement).value).toContain('"study_do_you_have_vip_1","vip","","en","answer","do you have vip | vip level?","Yes, VIP has 5 levels."');
+  });
+  it('Study real chats: with no held-back test it says so, and can measure anyway, marked as not a fair test', async () => {
+    studySmall = true;
+    try {
+      open('staff', '/admin/study');
+      expect((await screen.findByLabelText('No test pairs')).textContent).toMatch(/No chat was held back/);
+      expect(screen.queryByRole('button', { name: 'Measure the bot' })).toBeNull();
+      await userEvent.click(screen.getByRole('button', { name: /Measure on all saved chats anyway/ }));
+      expect((await screen.findByText(/Not a fair test/)).parentElement!.textContent).toMatch(/look better than they are/);
+      expect(screen.getByLabelText('Measured results')).toBeTruthy();
+    } finally { studySmall = false; }
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

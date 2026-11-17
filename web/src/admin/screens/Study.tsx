@@ -7,7 +7,7 @@ interface Summary { total: number; learn: number; test: number; lastLoaded: stri
 interface LoadResult { rows: number; kept: number; dropped: { filler: number; account: number; short: number; duplicate: number }; scrubbed: number; learn: number; test: number; added: number; alreadySaved: number }
 interface Gap { question: string; count: number; topic: string | null; lang: string; reply: string; examples: string[] }
 interface Measure {
-  tested: number; coverage: number | null; accuracy: number | null; scored: number; wrongRate: number | null; judged: number; handoverRate: number | null; clarifyRate: number | null; noAnswerYet: number;
+  fair: boolean; tested: number; coverage: number | null; accuracy: number | null; scored: number; wrongRate: number | null; judged: number; handoverRate: number | null; clarifyRate: number | null; noAnswerYet: number;
   mistakes: { question: string; staffReply: string; botSaid: string; expected: string }[]; gaps: Gap[];
 }
 
@@ -36,9 +36,9 @@ export default function Study() {
     try { const r = await api<LoadResult>(base + '/import', { text, replace }); setRes(r); setText(''); setName(''); setM(null); await refresh(); p.toast('Saved ' + r.added + ' pairs'); }
     catch (e) { setErr((e as Error).message); } finally { setBusy(''); }
   };
-  const measure = async () => {
+  const measure = async (all = false) => {
     setBusy('measure'); setErr('');
-    try { setM(await api<Measure>(base + '/measure', {})); } catch (e) { setErr((e as Error).message); } finally { setBusy(''); }
+    try { setM(await api<Measure>(base + '/measure', { all })); } catch (e) { setErr((e as Error).message); } finally { setBusy(''); }
   };
   const clear = async () => {
     if (!window.confirm('Delete all saved chat pairs of ' + p.M.name + '? The knowledge base is not changed.')) return;
@@ -74,8 +74,12 @@ export default function Study() {
           {sum && <div className="stats"><div className="stat"><b>{sum.total.toLocaleString()}</b>pairs saved</div><div className="stat"><b>{sum.learn.toLocaleString()}</b>to learn from</div><div className="stat"><b>{sum.test.toLocaleString()}</b>held back as the test</div></div>}</div></div>
         <div className="step"><span className="n">3</span><div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}><b>Measure the bot</b>
           <div className="sub">Runs the <b>published</b> bot (its rules, without AI) on the held-back questions and compares it with what staff really sent.</div>
-          <div><button className="btn pri sm" type="button" disabled={!sum || sum.test === 0 || !!busy} onClick={() => void measure()}>{busy === 'measure' ? 'Measuring…' : 'Measure the bot'}</button>{sum && sum.total > 0 && sum.test === 0 && <span className="sub"> The test part is empty: load more chats.</span>}</div>
+          {sum && sum.total > 0 && sum.test === 0
+            ? <div className="note" aria-label="No test pairs"><b>No chat was held back as the test yet.</b> About 1 chat in 5 is held back, so a small file (under about 10 pairs) may have none. Load more chats for a fair test.
+              <div style={{ marginTop: 8 }}><button className="btn sm" type="button" disabled={!!busy} onClick={() => void measure(true)}>{busy === 'measure' ? 'Measuring…' : 'Measure on all saved chats anyway (not a fair test)'}</button></div></div>
+            : <div><button className="btn pri sm" type="button" disabled={!sum || sum.total === 0 || !!busy} onClick={() => void measure()}>{busy === 'measure' ? 'Measuring…' : 'Measure the bot'}</button>{(!sum || sum.total === 0) && <span className="sub"> Load the chats first (step 2).</span>}</div>}
           {m && <>
+            {!m.fair && <div className="note" style={{ background: 'var(--warnbg, #fdf3dd)' }}><b>Not a fair test.</b> Every saved chat was used, including the ones the missing answers come from, so these numbers look better than they are. Load more chats to get a held-back test.</div>}
             <div className="btiles" aria-label="Measured results">
               <Goal label="Coverage" value={pct(m.coverage)} ok={m.coverage === null ? null : m.coverage >= TARGETS.coverage} target="at least 70%" note="no test questions" />
               <Goal label="Accuracy" value={pct(m.accuracy)} ok={m.accuracy === null ? null : m.accuracy >= TARGETS.accuracy} target="at least 85%" note="no staff reply matched an answer yet" />

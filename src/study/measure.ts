@@ -12,6 +12,8 @@ const dice = (a: Set<string>, b: Set<string>) => { if (!a.size || !b.size) retur
 const SAME_ANSWER = 0.4;
 
 export interface Measure {
+  /** False when every saved pair was used (a small file has no held-back pairs): the numbers are then too good, because the bot may have been written from the same chats. */
+  fair: boolean;
   /** Pairs the bot was tested on (the held-back 20%). */
   tested: number;
   /** Share of the test questions the bot answered by itself. */
@@ -31,10 +33,10 @@ export interface Gap { question: string; count: number; topic: string | null; la
 const tidy = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 /** Runs the published bot (rules only, no AI) on the held-back test pairs and compares it with what staff really sent. */
-export function measure(engine: Engine, code: string, pairs: StudyPair[]): Measure {
+export function measure(engine: Engine, code: string, pairs: StudyPair[], all = false): Measure {
   const entries = engine.entriesOf(code).map((e) => ({ e, tks: Object.values(e.translations).map((t) => tokens(t?.answerText ?? '')).filter((t) => t.size) })).filter((x) => x.tks.length);
-  const test = pairs.filter((p) => p.split === 'test');
-  const m: Measure = { tested: test.length, coverage: null, accuracy: null, scored: 0, wrongRate: null, judged: 0, handoverRate: null, clarifyRate: null, noAnswerYet: 0, mistakes: [] };
+  const test = all ? pairs : pairs.filter((p) => p.split === 'test');
+  const m: Measure = { fair: !all, tested: test.length, coverage: null, accuracy: null, scored: 0, wrongRate: null, judged: 0, handoverRate: null, clarifyRate: null, noAnswerYet: 0, mistakes: [] };
   let answered = 0, handed = 0, clarify = 0, right = 0, wrong = 0;
   for (const p of test) {
     const r = engine.analyze(p.question, code, 0);
