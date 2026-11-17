@@ -18,12 +18,14 @@ if (-not (Test-Path (Join-Path $LiveChatDir 'internal\automation\ai_reply.go')))
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { throw 'The git command was not found. Install Git for Windows (https://git-scm.com/download/win), open a new PowerShell and run this again.' }
 Push-Location $LiveChatDir
 try {
+  # A patch counts as applied when its new code is already in the file (this also works when the line endings differ).
+  $markers = @{ '001-member-to-bot.patch' = 'type MemberInfo struct'; '002-picture-to-bot.patch' = 'type AttachmentInfo struct' }
+  $aiReply = Get-Content (Join-Path $LiveChatDir 'internal\automation\ai_reply.go') -Raw
   foreach ($p in $patches) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    & git apply --ignore-whitespace --check -R $p.FullName 2>$null
-    if ($LASTEXITCODE -eq 0) { $ErrorActionPreference = $old; Write-Host "$($p.Name): already applied, skipped." -ForegroundColor Green; continue }
+    if ($markers.ContainsKey($p.Name) -and $aiReply.Contains($markers[$p.Name])) { $ErrorActionPreference = $old; Write-Host "$($p.Name): already applied, skipped." -ForegroundColor Green; continue }
     & git apply --ignore-whitespace --check $p.FullName
-    if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = $old; throw "$($p.Name) does not fit this LiveChat folder (it may be another version, or an earlier patch is missing). Copy the lines above and send them." }
+    if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = $old; throw "$($p.Name) does not fit this LiveChat folder: it may be a newer LiveChat version, or a patch before it is missing. Nothing was changed by this patch. Copy the lines above and send them." }
     & git apply --ignore-whitespace $p.FullName
     if ($LASTEXITCODE -ne 0) { $ErrorActionPreference = $old; throw "Applying $($p.Name) failed." }
     $ErrorActionPreference = $old
