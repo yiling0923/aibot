@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
+import { studySampleCsv } from '../studySample';
 
 interface Summary { total: number; learn: number; test: number; lastLoaded: string | null }
 interface LoadResult { rows: number; kept: number; dropped: { filler: number; account: number; short: number; duplicate: number }; scrubbed: number; learn: number; test: number; added: number; alreadySaved: number }
@@ -65,6 +66,7 @@ export default function Study() {
         <div className="step"><span className="n">2</span><div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 8 }}><b>Load and clean</b>
           <div className="drop"><div className="tools">
             <input type="file" accept=".tsv,.csv,.txt" aria-label="Choose the chat file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { setText(String(fr.result)); setName(f.name); setRes(null); }; fr.readAsText(f, 'utf-8'); }} />
+            <button className="btn sm" type="button" title="About 140 made-up chats (English and Malay), only to try this screen" onClick={() => { setText(studySampleCsv()); setName('sample_chats.csv'); setRes(null); }}>Load a sample</button>
             <label className="switch"><input type="checkbox" role="switch" checked={replace} onChange={(e) => setReplace(e.target.checked)} /><span className="track"><span className="thumb" /></span> Replace the chats already saved</label>
             <button className="btn pri sm" type="button" disabled={!text.trim() || !!busy} onClick={() => void load()}>{busy === 'load' ? 'Cleaning…' : 'Clean and save'}</button></div>
             <textarea placeholder="Or paste here: two columns, question and reply (CSV or tab separated)" aria-label="Paste the chats" value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value) setName(''); }} />

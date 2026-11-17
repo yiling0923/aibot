@@ -414,6 +414,13 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Send 1 suggestions to Import' }));
     expect(((await screen.findByLabelText('Paste CSV')) as HTMLTextAreaElement).value).toContain('"study_do_you_have_vip_1","vip","","en","answer","do you have vip | vip level?","Yes, VIP has 5 levels."');
   });
+  it('Study real chats: the sample file fills the box with chats that include filler and a phone number', async () => {
+    open('staff', '/admin/study');
+    await userEvent.click(await screen.findByRole('button', { name: 'Load a sample' }));
+    const v = (screen.getByLabelText('Paste the chats') as HTMLTextAreaElement).value;
+    expect(v.split('\n').length).toBeGreaterThan(60); expect(v).toMatch(/^question,reply\n/); expect(v).toMatch(/0123456789/);
+    expect((screen.getByRole('button', { name: 'Clean and save' }) as HTMLButtonElement).disabled).toBe(false);
+  });
   it('Study real chats: with no held-back test it says so, and can measure anyway, marked as not a fair test', async () => {
     studySmall = true;
     try {
