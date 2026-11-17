@@ -382,7 +382,8 @@ describe('Control panel', () => {
   });
   it('Import: loads the FAQ category starter, shows what it holds, and previews every entry of the pack', async () => {
     open('staff', '/admin/imp');
-    await userEvent.click(await screen.findByRole('button', { name: 'Load the FAQ category starter' }));
+    await userEvent.click(await screen.findByRole('button', { name: /Starter packs/ }));
+    await userEvent.click(screen.getByRole('menuitem', { name: /FAQ category starter/ }));
     expect((screen.getByLabelText('Paste CSV') as HTMLTextAreaElement).value).toMatch(/free_credit_info,free_credit,,en,answer/);
     expect(screen.getByText('What is in the FAQ category starter?')).toBeTruthy();
     expect(screen.getByText(/Not added, because the bot already covers them/)).toBeTruthy();

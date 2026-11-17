@@ -10,6 +10,7 @@ type Tr = { question_examples: string[]; answer_text: string };
 export default function Import() {
   const p = usePanel(); const nav = useNavigate();
   const [text, setText] = useState(''); const [name, setName] = useState(''); const [mode, setMode] = useState('update'); const [status, setStatus] = useState<'draft' | 'live'>('draft'); const [out, setOut] = useState('');
+  const [menu, setMenu] = useState<'' | 'packs' | 'more'>('');
   const R = useMemo(() => analyzeImport(text, p.draft, p.merchant, p.M.name), [text, p.draft, p.merchant, p.M.name]);
   const ok = R.entries.filter((g) => !g.errors.length);
   const nNew = ok.filter((g) => !g.exists).length, nUpd = ok.filter((g) => g.exists).length, nErr = R.entries.length - ok.length, nWarn = ok.filter((g) => g.issues.length).length;
@@ -57,11 +58,15 @@ export default function Import() {
         <div className="step"><span className="n">2</span><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><b>Add the file</b>
           <div className="drop"><div className="tools">
             <input type="file" accept=".csv,.tsv,.txt" aria-label="Choose a CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { setText(String(fr.result)); setName(f.name); setOut(''); }; fr.readAsText(f, 'utf-8'); }} />
-            <button className="btn sm" type="button" onClick={() => { setText(SAMPLE_CSV); setName('sample_' + p.merchant.toLowerCase() + '.csv'); setOut(''); }}>Load a sample file</button>
-            <button className="btn sm" type="button" title="Entries for the categories of the team's LiveChat FAQ list. Every answer says TO WRITE until you write it." onClick={() => { setText(starterCsv()); setName('faq_category_starter.csv'); setOut(''); }}>Load the FAQ category starter</button>
-            {p.M.name.toLowerCase() === 'luckypay' && <button className="btn sm" type="button" title="The seven named promotions and VIP. Only LuckyPay has them. Every answer says TO WRITE until you write it." onClick={() => { setText(luckypayCsv()); setName('luckypay_promotions.csv'); setOut(''); }}>Load the LuckyPay promotions ({LUCKYPAY_ENTRIES})</button>}
-            <button className="btn sm" type="button" onClick={() => copy(TPL_HEAD, 'Template copied')}>Copy blank template</button>
-            <button className="btn sm" type="button" onClick={() => copy(kbToCSV(mine), 'KB copied as CSV')}>Copy this merchant's KB as CSV</button></div>
+            <span className="pmenu"><button className="btn sm" type="button" aria-haspopup="menu" aria-expanded={menu === 'packs'} onClick={() => setMenu(menu === 'packs' ? '' : 'packs')}>Starter packs ▾</button>
+              {menu === 'packs' && <div className="pmenu-list" role="menu">
+                <button role="menuitem" type="button" title="Entries for the categories of the team's LiveChat FAQ list. Every answer says TO WRITE until you write it." onClick={() => { setText(starterCsv()); setName('faq_category_starter.csv'); setOut(''); setMenu(''); }}>FAQ category starter ({STARTER_ENTRIES})</button>
+                {p.M.name.toLowerCase() === 'luckypay' && <button role="menuitem" type="button" title="The seven named promotions and VIP. Only LuckyPay has them. Every answer says TO WRITE until you write it." onClick={() => { setText(luckypayCsv()); setName('luckypay_promotions.csv'); setOut(''); setMenu(''); }}>LuckyPay promotions ({LUCKYPAY_ENTRIES})</button>}</div>}</span>
+            <span className="pmenu"><button className="btn sm" type="button" aria-haspopup="menu" aria-expanded={menu === 'more'} onClick={() => setMenu(menu === 'more' ? '' : 'more')}>More ▾</button>
+              {menu === 'more' && <div className="pmenu-list" role="menu">
+                <button role="menuitem" type="button" onClick={() => { setText(SAMPLE_CSV); setName('sample_' + p.merchant.toLowerCase() + '.csv'); setOut(''); setMenu(''); }}>Load a sample file</button>
+                <button role="menuitem" type="button" onClick={() => { copy(TPL_HEAD, 'Template copied'); setMenu(''); }}>Copy blank template</button>
+                <button role="menuitem" type="button" onClick={() => { copy(kbToCSV(mine), 'KB copied as CSV'); setMenu(''); }}>Copy this merchant's KB as CSV</button></div>}</span></div>
             <details className="fold" aria-label="About the FAQ category starter"><summary>What is in the FAQ category starter?</summary>
               <div className="sub" style={{ margin: '6px 0' }}>{STARTER_ENTRIES} entries in English and Malay, made from the team's LiveChat FAQ category list. They come in as <b>drafts</b> (the bot ignores them until you set them live), and every answer says <b>TO WRITE</b>: the panel flags it until you replace it with the real answer. Entries a person should answer (complaints, blocked accounts, missing credit, free-credit requests) are marked <b>needs staff</b>: the bot hands the chat over when one matches. New topics made: {STARTER_TOPICS_NEW.join(', ')}.</div>
               <table className="tight"><thead><tr><th>Entry</th><th>Category tag in the list</th></tr></thead><tbody>{Object.entries(STARTER_TAGS).map(([k, t]) => <tr key={k}><td className="mono">{k}</td><td>{t}</td></tr>)}</tbody></table>
