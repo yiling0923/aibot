@@ -2,7 +2,8 @@ import 'dotenv/config';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { createPool, type Pool } from '../src/db/pool';
 import { migrate } from '../src/db/migrate';
-import { seed } from '../src/db/seed';
+import { seed, DEMO_STAFF_PASSWORD } from '../src/db/seed';
+import { buildApp } from '../src/server/app';
 import { readSnapshot, writeSnapshot } from '../src/admin/snapshot';
 import { loadKnowledge } from '../src/db/loadKnowledge';
 import { Bot, newSession } from '../src/bot/responder';
@@ -86,6 +87,26 @@ if (url) { pool = createPool(url, 6); try { await pool.query('select 1'); reacha
 describe.skipIf(!reachable)('guided answers are saved, loaded, and sent through LiveChat (needs TEST_DATABASE_URL)', () => {
   beforeAll(async () => { await migrate(pool!, { reset: true }); await seed(pool!); });
   afterAll(async () => { await pool?.end(); });
+
+  it('publishing a change to ONLY the questions, the type or the end date really saves it (staff of the merchant, through the panel route)', async () => {
+    const app = await buildApp({ pool: pool!, logger: false });
+    try {
+      const staff = String((await app.inject({ method: 'POST', url: '/api/auth/login', payload: { username: 'luckypay', password: DEMO_STAFF_PASSWORD } })).headers['set-cookie']).split(';')[0];
+      const state = async () => (await app.inject({ method: 'GET', url: '/api/admin/state', headers: { cookie: staff } })).json().snapshot;
+      const publish = (snapshot: unknown, note: string) => app.inject({ method: 'POST', url: '/api/admin/publish', payload: { snapshot, changes: [note] } as object, headers: { cookie: staff } });
+      const find = (snap: { kb: { intent_key: string; steps?: unknown; entry_type?: string; ends_on?: string | null }[] }) => snap.kb.find((x) => x.intent_key === 'withdraw_time')!;
+      let snap = await state(); find(snap).steps = STEPS;                                            // nothing else changed
+      const r1 = (await publish(snap, 'Edited entry "withdraw_time"')).json(); expect(r1.published).toHaveLength(1);
+      expect(find(await state()).steps).toEqual(STEPS);
+      snap = await state(); find(snap).entry_type = 'promotion'; find(snap).ends_on = '2031-05-06';
+      expect((await publish(snap, 'Edited entry "withdraw_time"')).json().published).toHaveLength(1);
+      expect(find(await state())).toMatchObject({ entry_type: 'promotion', ends_on: '2031-05-06' });
+      snap = await state(); find(snap).steps = undefined;                                            // removing the questions is a change too
+      expect((await publish(snap, 'Edited entry "withdraw_time"')).json().published).toHaveLength(1);
+      expect(find(await state()).steps).toBeUndefined();
+      expect((await publish(await state(), 'No change')).json().published).toHaveLength(0);         // an untouched draft still publishes nothing
+    } finally { await app.close(); }
+  });
 
   it('saves the steps through the draft/publish path, cleans bad ones, and the bot loads them', async () => {
     const snap = await readSnapshot(pool!); const e = snap.kb.find((x) => x.merchant === 'MERCH_A' && x.intent_key === 'deposit_time')!;

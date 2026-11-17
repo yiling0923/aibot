@@ -1,3 +1,4 @@
+import { cleanSteps } from '../engine/steps';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
 import type { SessionUser } from '../auth/session';
@@ -35,6 +36,7 @@ const texts = (m: Record<string, string> | undefined) => Object.fromEntries(Obje
 const sig = (v: unknown) => JSON.stringify(sortKeys(v));
 export const merchantSig = (sl: MerchantSlice) => sig({
   kb: sl.kb.map((e) => ({ k: e.intent_key, c: e.category, t: e.topic, a: e.aspect || null, o: !!e.topic_optional, s: e.status,
+    y: e.entry_type ?? 'answer', d: e.ends_on || null, p: cleanSteps(e.steps),                            // type, end date and the questions to ask are changes too
     tr: Object.fromEntries(Object.entries(e.translations).filter(([, t]) => t && ((t.answer_text || '').trim() || (t.question_examples || []).length))) })).sort((a, b) => (a.k < b.k ? -1 : 1)),
   m: sl.mAliases.map((a) => `${a.language}|${a.variant}|${a.canonical}`).sort(),
   s: { ...sl.settings, kind: texts(sl.settings?.kind), closing: texts(sl.settings?.closing), handoff: texts(sl.settings?.handoff), more_help: texts(sl.settings?.more_help) },
