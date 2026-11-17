@@ -291,10 +291,10 @@ Each has example questions in English and Malay.
 
 ### Make LiveChat send the member to the bot (needed for account answers)
 
-LiveChat's call to the bot carries only `question`, `history` and `session_id`, so the bot sees every customer as a guest. The patch `deploy/local-livechat/patches/member-to-bot.patch` makes LiveChat add `member: { id, name, rank }` (from the chat's customer, when they signed in with a member id) and skip its answer cache for that member's chats. Apply it to the LiveChat source, rebuild and restart the LiveChat API and worker:
+LiveChat's call to the bot carries only `question`, `history` and `session_id`, so the bot sees every customer as a guest. The patch `deploy/local-livechat/patches/member-to-bot.patch` makes LiveChat add `member: { id, name, rank }` (from the chat's customer, when they signed in with a member id) and skip its answer cache for that member's chats. Apply it to your LiveChat folder (Windows, PowerShell, in the bot folder), then rebuild and restart LiveChat. The second command builds LiveChat again and starts the API and the worker:
 
-```bash
-cd /path/to/livechat-develop
-patch -p1 < /path/to/aibot/deploy/local-livechat/patches/member-to-bot.patch
-go build ./... && go test ./internal/automation ./internal/widget
+```powershell
+powershell -ExecutionPolicy Bypass -File deploy\local-livechat\apply-member-patch.ps1 -LiveChatDir C:\livechat-develop
+powershell -ExecutionPolicy Bypass -File deploy\local-livechat\setup-nodocker.ps1 -LiveChatDir C:\livechat-develop
 ```
+
