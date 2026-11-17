@@ -1,3 +1,4 @@
+import { withoutPlaceholders } from '../engine/placeholders';
 import type { PoolConnection, ResultSetHeader, RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
 import { asJson } from '../db/pool';
@@ -163,10 +164,10 @@ export function knowledgeFromSnapshot(snap: Snapshot, merchants: MerchantMeta[],
       aliases: snap.mAliases[m.code] ?? [], tools: Object.entries(s.tools).filter(([, on]) => on).map(([k]) => k).sort(), limits: limits[m.code] ?? {},
     };
   });
-  const entries: KbEntry[] = snap.kb.filter((e) => includeDrafts || e.status === 'live').map((e) => ({
+  const entries: KbEntry[] = snap.kb.filter((e) => includeDrafts || e.status === 'live').map((e): KbEntry | null => withoutPlaceholders({
     id: e.id, merchant: e.merchant, category: e.category, intentKey: e.intent_key, topic: e.topic, aspect: e.aspect, topicOptional: !!e.topic_optional,
     entryType: e.entry_type ?? 'answer', endsOn: e.ends_on || null,
     translations: Object.fromEntries(Object.entries(e.translations).map(([l, t]) => [l, { questionExamples: t!.question_examples ?? [], answerText: t!.answer_text ?? '' }])),
-  }));
+  })).filter((e): e is KbEntry => !!e);
   return { merchants: cfgs, kbEntries: entries, globalAliases: snap.aliases as WordMap, aspects: snap.aspects as WordMap, smalltalk: snap.smalltalk as WordMap, guard: snap.guard as WordMap, fillers: snap.fillers };
 }

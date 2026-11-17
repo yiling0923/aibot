@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
+import { STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_ELSEWHERE, starterCsv } from '../starterPack';
 import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, addOwnTopic, topicNames, kbToCSV, type Entry, type ImportGroup } from '../model';
 import { Pill } from '../ui';
 
@@ -37,10 +38,10 @@ export default function Import() {
         const e = d.kb.find((x) => x.merchant === p.merchant && x.intent_key === g.key);
         if (e) {
           LANGS.forEach((l) => { const x = tr(l); if (x && (x.answer_text || x.question_examples.length)) (e.translations as Record<string, Tr>)[l] = x; });
-          if (g.topic) e.topic = g.topic; if (g.aspect) e.aspect = g.aspect; if (g.optional) e.topic_optional = true; e.dirty = true; nu++;
+          if (g.topic) e.topic = g.topic; if (g.aspect) e.aspect = g.aspect; if (g.optional) e.topic_optional = true; if (g.entryType) e.entry_type = g.entryType; e.dirty = true; nu++;
         } else {
           const tl: Record<string, Tr> = {}; LANGS.forEach((l) => { tl[l] = tr(l) || { question_examples: [], answer_text: '' }; });
-          const ne: Entry = { id: Math.max(0, ...d.kb.map((x) => x.id)) + 1, merchant: p.merchant, category: 'Imported', intent_key: g.key, topic: g.topic || '', aspect: g.aspect || null, topic_optional: g.optional, translations: tl, status, dirty: true, updated: 'just now' };
+          const ne: Entry = { id: Math.max(0, ...d.kb.map((x) => x.id)) + 1, merchant: p.merchant, category: 'Imported', intent_key: g.key, topic: g.topic || '', aspect: g.aspect || null, topic_optional: g.optional, translations: tl, status, ...(g.entryType && g.entryType !== 'answer' ? { entry_type: g.entryType } : {}), dirty: true, updated: 'just now' };
           d.kb.push(ne); nn++;
         }
       });
@@ -57,8 +58,14 @@ export default function Import() {
           <div className="drop"><div className="tools">
             <input type="file" accept=".csv,.tsv,.txt" aria-label="Choose a CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { setText(String(fr.result)); setName(f.name); setOut(''); }; fr.readAsText(f, 'utf-8'); }} />
             <button className="btn sm" type="button" onClick={() => { setText(SAMPLE_CSV); setName('sample_' + p.merchant.toLowerCase() + '.csv'); setOut(''); }}>Load a sample file</button>
+            <button className="btn sm" type="button" title="Entries for the categories of the team's LiveChat FAQ list. Every answer says TO WRITE until you write it." onClick={() => { setText(starterCsv()); setName('faq_category_starter.csv'); setOut(''); }}>Load the FAQ category starter</button>
             <button className="btn sm" type="button" onClick={() => copy(TPL_HEAD, 'Template copied')}>Copy blank template</button>
             <button className="btn sm" type="button" onClick={() => copy(kbToCSV(mine), 'KB copied as CSV')}>Copy this merchant's KB as CSV</button></div>
+            <details className="fold" aria-label="About the FAQ category starter"><summary>What is in the FAQ category starter?</summary>
+              <div className="sub" style={{ margin: '6px 0' }}>{STARTER_ENTRIES} entries in English and Malay, made from the team's LiveChat FAQ category list. They come in as <b>drafts</b> (the bot ignores them until you set them live), and every answer says <b>TO WRITE</b>: the panel flags it until you replace it with the real answer. Entries a person should answer (complaints, blocked accounts, missing credit, free-credit requests) are marked <b>needs staff</b>: the bot hands the chat over when one matches. New topics made: {STARTER_TOPICS_NEW.join(', ')}.</div>
+              <table className="tight"><thead><tr><th>Entry</th><th>Category tag in the list</th></tr></thead><tbody>{Object.entries(STARTER_TAGS).map(([k, t]) => <tr key={k}><td className="mono">{k}</td><td>{t}</td></tr>)}</tbody></table>
+              <div className="sub" style={{ margin: '8px 0 2px' }}><b>Not added, because the bot already covers them:</b></div>
+              <ul className="plain">{COVERED_ELSEWHERE.map(([t, w]) => <li key={t}><b>{t}</b>: {w}</li>)}</ul></details>
             <textarea placeholder="Or paste CSV here (from Excel or Google Sheets works too)" aria-label="Paste CSV" value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value) setName(''); setOut(''); }} />
             {name && <div className="sub">Loaded: <b>{name}</b> <button className="btn sm" type="button" onClick={() => { setText(''); setName(''); }}>Clear</button></div>}</div>
           <details><summary>File format</summary><div className="sub" style={{ marginTop: 6 }}>One row for each entry and language. Use the same <span className="mono">intent_key</span> on every language row of an entry. Separate example questions with <span className="mono">|</span>.</div>

@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
+import { STARTER_ENTRIES } from './starterPack';
 
 const SET = () => ({ tone: 'friendly', handoff_group: 1, answer: 0.72, clarify: 0.45, abuse_close_after: 3, kind: {}, closing: {}, handoff: {}, tools: { deposit_status: true }, max_choices: 3, more_help_on: true, more_help: {}, ai_instructions: '', handoff_complaint: true, handoff_account: true, trigger_phrases: '' });
 const BASICS = { retentionDays: 90, name: 'LuckyPay', domain: '', defaultLanguage: 'en', languages: ['en', 'ms', 'zh', 'vi', 'th', 'tl'], monthlyTokenLimit: 500000, tokensMonth: 12400, tokensToday: 300, entries: 11, questionsToday: 7, avgConfidence: 0.81 };
@@ -378,6 +379,14 @@ describe('Control panel', () => {
     const roles = screen.getByRole('group', { name: 'Show logins' });
     await userEvent.click(within(roles).getByRole('button', { name: /Admins/ }));
     expect(screen.queryByText('alpha')).toBeNull(); expect(screen.getByText('boss')).toBeTruthy();
+  });
+  it('Import: loads the FAQ category starter, shows what it holds, and previews every entry of the pack', async () => {
+    open('staff', '/admin/imp');
+    await userEvent.click(await screen.findByRole('button', { name: 'Load the FAQ category starter' }));
+    expect((screen.getByLabelText('Paste CSV') as HTMLTextAreaElement).value).toMatch(/free_credit_info,free_credit,,en,answer/);
+    expect(screen.getByText('What is in the FAQ category starter?')).toBeTruthy();
+    expect(screen.getByText(/Not added, because the bot already covers them/)).toBeTruthy();
+    expect(await screen.findByRole('button', { name: new RegExp('Import ' + STARTER_ENTRIES + ' entries') })).toBeTruthy();                              // the check step reads all of the pack
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');

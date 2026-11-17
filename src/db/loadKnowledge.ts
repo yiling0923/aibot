@@ -1,3 +1,4 @@
+import { withoutPlaceholders } from '../engine/placeholders';
 import type { RowDataPacket } from 'mysql2/promise';
 import { asJson, type Pool } from './pool';
 import { Tenants, tbl } from './tenants';
@@ -57,7 +58,7 @@ export async function loadKnowledge(pool: Pool): Promise<Knowledge> {
       tr[x.language as Lang] = { questionExamples: asJson<string[]>(x.question_examples, []), answerText: x.answer_text };
       byKb.set(Number(x.kb_id), tr);
     }
-    for (const e of entries) kbEntries.push({ id: Number(e.id), merchant: t.code, category: e.category ?? '', intentKey: e.intent_key, topic: e.topic, aspect: e.aspect, topicOptional: !!e.topic_optional, translations: byKb.get(Number(e.id)) ?? {}, entryType: e.entry_type ?? 'answer', endsOn: e.ends_on ?? null });
+    for (const e of entries) { const k = withoutPlaceholders({ id: Number(e.id), merchant: t.code, category: e.category ?? '', intentKey: e.intent_key, topic: e.topic, aspect: e.aspect, topicOptional: !!e.topic_optional, translations: byKb.get(Number(e.id)) ?? {}, entryType: e.entry_type ?? 'answer', endsOn: e.ends_on ?? null }); if (k) kbEntries.push(k); }
   }
 
   const globalAliases: WordMap = {};

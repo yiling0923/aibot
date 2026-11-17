@@ -54,11 +54,12 @@ export const langState = (e: { translations: Entry['translations'] }, l: string)
 
 /** Every topic one merchant can use: the shared template, plus the topics that merchant made itself (its own keywords with a topic name of its own). */
 /** What stops the bot from using an answer, in plain words (empty when it is ready). */
-export const entryProblems = (e: { status?: string; translations: unknown }): string[] => {
+export const entryProblems = (e: { status?: string; entry_type?: string; translations: unknown }): string[] => {
   const tr = Object.values((e.translations ?? {}) as Record<string, { answer_text?: string; question_examples?: string[] }>);
-  const out: string[] = [];
+  const out: string[] = []; const staff = e.entry_type === 'needs_staff';                     // a person answers these, so the bot needs no answer text, only the questions that lead to the hand-over
   if (e.status === 'draft') out.push('Status is Draft, so the bot ignores it. Set it to Live.');
-  if (!(tr as { answer_text?: string }[]).some((t) => t?.answer_text?.trim())) out.push('There is no answer text yet.');
+  if (!staff && !(tr as { answer_text?: string }[]).some((t) => t?.answer_text?.trim())) out.push('There is no answer text yet.');
+  if (!staff && (tr as { answer_text?: string }[]).some((t) => /^\s*TO WRITE:/i.test(t?.answer_text ?? ''))) out.push('An answer still says "TO WRITE". Replace it with the real answer.');
   const most = Math.max(0, ...tr.map((t) => t?.question_examples?.length ?? 0));
   if (most === 0) out.push('There are no example questions, so the bot cannot find this answer. Add at least 3, with slang.');
   else if (most < 3) out.push('Only ' + most + ' example question' + (most === 1 ? '' : 's') + '. Add at least 3, with slang, so the bot finds it more often.');
@@ -152,7 +153,7 @@ export const pushUnique = (obj: Record<string, string[]>, k: string, w: string) 
 };
 
 /* ---------- import ---------- */
-const COLS: Record<string, string[]> = { intent_key: ['intent_key', 'entry', 'entry_name', 'name'], topic: ['topic', 'topic_word'], aspect: ['question_type', 'aspect', 'type'], language: ['language', 'lang'], examples: ['question_examples', 'examples', 'questions'], answer: ['answer_text', 'answer'], merchant: ['merchant'], optional: ['topic_optional', 'alone'], topicwords: ['topic_short_forms', 'short_forms'] };
+const COLS: Record<string, string[]> = { intent_key: ['intent_key', 'entry', 'entry_name', 'name'], topic: ['topic', 'topic_word'], aspect: ['question_type', 'aspect', 'type'], language: ['language', 'lang'], examples: ['question_examples', 'examples', 'questions'], answer: ['answer_text', 'answer'], merchant: ['merchant'], optional: ['topic_optional', 'alone'], topicwords: ['topic_short_forms', 'short_forms'], entry_type: ['entry_type', 'entry_kind', 'kind'] };
 export const COL_NAMES = COLS;
 const LANGMAP: Record<string, string> = { en: 'en', english: 'en', ms: 'ms', bm: 'ms', malay: 'ms', 'bahasa melayu': 'ms', zh: 'zh', cn: 'zh', chinese: 'zh', 中文: 'zh', vi: 'vi', vn: 'vi', vietnamese: 'vi', 'tiếng việt': 'vi', th: 'th', thai: 'th', ไทย: 'th', tl: 'tl', fil: 'tl', filipino: 'tl', tagalog: 'tl', ph: 'tl' };
 
@@ -172,7 +173,7 @@ export function parseTable(src: string): string[][] {
 }
 
 export interface ImportGroup {
-  key: string; raw: string; topic: string; aspect: string; optional: boolean; topicWords: string[];
+  key: string; raw: string; topic: string; aspect: string; optional: boolean; topicWords: string[]; entryType?: 'answer' | 'needs_staff' | 'promotion';
   langs: Record<string, { answer: string; examples: string[] }>; issues: string[]; errors: string[]; dups: number; fixedName?: string;
   exists: boolean; existing?: Entry;
 }
@@ -200,6 +201,7 @@ export function analyzeImport(text: string, d: Draft, merchant: string, merchant
     if (!g.topic) g.topic = get(r, 'topic').toLowerCase();
     if (!g.aspect) g.aspect = get(r, 'aspect').toLowerCase().replace(/^(none|topic alone|-|—)$/, '');
     if (/^(yes|true|1|y)$/i.test(get(r, 'optional'))) g.optional = true;
+    if (!g.entryType) { const k = get(r, 'entry_type').toLowerCase().replace(/[\s-]+/g, '_'); g.entryType = /^(needs_staff|staff|person|human)$/.test(k) ? 'needs_staff' : k === 'promotion' ? 'promotion' : k === 'answer' ? 'answer' : undefined; }
     if (!g.topicWords.length) g.topicWords = get(r, 'topicwords').split(/\s*\|\s*/).map((x) => x.trim().toLowerCase()).filter(Boolean);
   });
   const topics = topicList(d, merchant);

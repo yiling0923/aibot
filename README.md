@@ -277,3 +277,14 @@ Authorization: Bearer {key}
 A picture or file an agent sends shows in the chat (LiveChat sends `messageType: "image"` with an `attachment` holding `name`, `url`, `mimeType` and `size`; the `url` is a path on LiveChat, so the page puts the LiveChat address in front). The paperclip button sends a picture or file as the customer: a picture, PDF, text file or Office document up to 10 MB. LiveChat's message address takes plain JSON only (it answers `invalid_json` to a form), so a file needs a separate upload step. The upload address was found from LiveChat's own answers: `POST /widget/conversations/{id}/attachments` with the form field `file`; LiveChat answers `attachment_invalid` ("Unsupported attachment type.") for a file kind it does not take, and the page then says which file was refused. The chat is made first, then the bot server tries the addresses in turn (`UPLOAD_PATHS` in `src/livechat/chat.ts`, with the form field names `FILE_FIELDS`) and, when LiveChat answers with a stored file but no message, posts the message that carries it. If none works, the page shows every address tried with what LiveChat answered. Pass that text on, and the address and field can be matched to it. A message that is only a file name (what LiveChat sends the bot for a picture) is answered by handing the chat to a person.
 
 The Greetings, Fillers and Block lists tabs have no flowchart (only topics connect to answers), but a read-only **How it works** view: each list on the left and what the bot does with it on the right (a friendly hello, dropped before matching, reply kindly and close, hand to a person, refuse politely). Click a list to open it. Every tab shows how many words it holds and one line about what it is for.
+
+## FAQ category starter pack
+
+Open **Import** and press **Load the FAQ category starter**, then **Import**. It adds 19 entries
+(free credit, referral, login, verify phone, deposit, turnover, withdraw, complaints, rule violation, poster/ads and more).
+Each has example questions in English and Malay.
+
+- Everything starts as a **draft**. Nothing is live until you publish.
+- Answers say `TO WRITE: …`. The editor and the Publish dialog flag them. The bot never says them to a customer.
+- Entries that need a person (complaint, rule violation, ads, free credit request, and so on) are type **needs staff** and hand over to an agent.
+- The seven named promotions and VIP belong to one merchant. They are not in the pack yet.
