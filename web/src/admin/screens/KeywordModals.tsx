@@ -42,7 +42,7 @@ export function SetKeywordModal({ word, preset, onClose }: { word: string; prese
       if (t === 'rude_strong') { pushUnique(x.guard.abuse, l, w); note('Added rude word "' + w + '"'); }
       if (t === 'rude_mild') { pushUnique(x.guard.abuse_soft, l, w); note('Added mild rude word "' + w + '"'); }
     });
-    onClose(); p.toast(t === 'none' ? 'No change' : t === 'newtopic' ? '"' + w + '" is now a topic' : 'Added "' + w + '" to the draft');
+    onClose(); p.toast(t === 'none' ? 'No change' : t === 'newtopic' ? '"' + w + '" is now a topic. Press Publish to make it live.' : 'Added "' + w + '" to the draft. Press Publish to make it live.');
   };
 
   return (

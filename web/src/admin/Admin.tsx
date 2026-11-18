@@ -29,7 +29,6 @@ export default function Admin() {
   const [toastText, setToastText] = useState('');
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const toast = useCallback((t: string) => { setToastText(t); clearTimeout(timer.current); timer.current = setTimeout(() => setToastText(''), 2600); }, []);
-  useEffect(() => { document.title = 'LiveChat AI bot, control panel'; }, []);
   return (
     <PanelProvider onToast={toast}>
       <Shell />
@@ -48,6 +47,8 @@ function Shell() {
   const signOut = async () => { try { await api('/api/auth/logout', {}); } catch { /* leaving anyway */ } window.location.replace('/login'); };
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
   const n = p.changes.length;
+  const [showWhat, setShowWhat] = useState(false);
+  useEffect(() => { document.title = (n ? '(' + n + ') Not published · ' : '') + 'LiveChat AI bot, control panel'; }, [n]);
 
   return (
     <div className="shell">
@@ -82,6 +83,18 @@ function Shell() {
           <button className="btn pri" id="publish" type="button" disabled={!n} onClick={() => setDialog('publish')}>Publish{n ? <span className="badge">{n}</span> : null}</button>
         </header>
         <main className="main">
+          {n ? (
+            <div className="pubbar" role="status" aria-label="Not published yet">
+              <div className="pubbar-row">
+                <span><b>Not live yet.</b> {n} change{n > 1 ? 's are' : ' is'} only in your draft. Customers still get the old answers until you publish.</span>
+                <span className="pubbar-btns">
+                  <button className="btn sm ghost" type="button" aria-expanded={showWhat} onClick={() => setShowWhat((v) => !v)}>{showWhat ? 'Hide changes' : 'What changed'}</button>
+                  <button className="btn sm pri" type="button" onClick={() => setDialog('publish')}>Review and publish</button>
+                </span>
+              </div>
+              {showWhat ? <ul className="pubbar-list">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul> : null}
+            </div>
+          ) : null}
           <Routes>
             <Route index element={<Navigate to="kb" replace />} />
             <Route path="kb" element={<Kb />} />

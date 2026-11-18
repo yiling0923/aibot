@@ -98,10 +98,10 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     expect((await call(keyA, { question: 'hi', session_id: 'bad id with spaces' })).statusCode).toBe(400);
   });
 
-  it('writes choices into the answer as a numbered list and lets the next message pick one', async () => {
+  it('writes choices into the answer as a one sentence and lets the next message pick one', async () => {
     const first = (await call(keyA, { question: 'dep' })).json();
     expect(first.decision).toBe('clarify'); expect(first.choices.length).toBeGreaterThanOrEqual(3);
-    expect(first.answer).toMatch(/1\. .+\n2\. .+\n3\. /);
+    expect(first.answer).toMatch(/, .+ or .+\?/);                                       // one sentence, no list
     expect(first.choices.filter((c: { value: string }) => !c.value.startsWith('agent')).length).toBeLessThanOrEqual(3);   // at most 3 choices, the agent is extra
     expect(first.answer.endsWith('If you need other help, you can contact an agent.')).toBe(true);                       // the line comes after the list
     const second = (await call(keyA, { question: '2', session_id: first.session_id })).json();
@@ -121,7 +121,7 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     const ask = (await call(keyA, { question: 'my money not in' })).json();
     expect(ask.decision).toBe('clarify'); expect(ask.keywords).toEqual(['not in', 'money']);
     expect(ask.choices.map((c: { value: string }) => c.value)).toEqual(['topic:deposit', 'topic:withdraw', 'agent:agent']);
-    expect(ask.answer).toMatch(/deposits or withdrawals\?\n\n1\. .+\n2\. .+\n3\. /);
+    expect(ask.answer).toMatch(/deposits or withdrawals\?\n\n.+, .+ or .+\?/);
     expect(ask.cacheable).toBe(false); expect(ask.confidence).toBeLessThanOrEqual(0.8);              // a menu depends on the chat: LiveChat must not keep it for others
     const answer = (await call(keyA, { question: 'deposit', session_id: ask.session_id })).json();    // the reply in the customer's own words
     expect(answer.decision).toBe('answer'); expect(answer.answer).toContain('credited within 5 minutes');

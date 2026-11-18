@@ -601,3 +601,8 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .linklike{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--accent);cursor:pointer;text-align:left}.linklike:hover{text-decoration:underline}
 .gcell{width:100%;font:inherit;font-size:13px;line-height:1.4;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);resize:vertical;min-height:52px}
 .gcell:focus{outline:2px solid var(--accent);outline-offset:-1px}.gcell.bad{border-color:var(--bad);background:var(--badbg)}
+
+.pubbar{position:sticky;top:0;z-index:5;margin:0 0 14px;padding:10px 14px;border:1px solid #e0b252;background:#fff6dc;color:#4a3500;border-radius:10px;font-size:14px}
+.pubbar-row{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.pubbar-btns{display:flex;gap:8px}
+.pubbar-list{margin:8px 0 0;padding-left:20px;max-height:180px;overflow:auto}

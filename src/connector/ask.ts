@@ -59,8 +59,13 @@ export function parseAttachment(raw: unknown): { kind: string; name: string } | 
 
 export { matchChoice } from '../bot/choices';
 
-function renderChoices(buttons: Button[]): { text: string; choices: Choice[] } {
-  return { text: buttons.map((b, i) => `${i + 1}. ${b.label}`).join('\n'), choices: buttons.map((b) => ({ label: b.label, value: `${b.kind}:${b.key}` })) };
+const OR_WORD: Record<string, string> = { en: 'or', ms: 'atau', zh: '或', vi: 'hoặc', th: 'หรือ', tl: 'o' };
+
+/** LiveChat has no buttons, so the choices are written as one sentence: "Deposits, Withdrawals or Talk to an agent." */
+function renderChoices(buttons: Button[], lang: string | null): { text: string; choices: Choice[] } {
+  const l = buttons.map((b) => b.label), or = OR_WORD[lang ?? 'en'] ?? 'or';
+  const text = l.length < 2 ? l.join('') : lang === 'zh' ? l.slice(0, -1).join('、') + or + l[l.length - 1] : l.slice(0, -1).join(', ') + ' ' + or + ' ' + l[l.length - 1];
+  return { text: text + (lang === 'zh' ? '？' : '?'), choices: buttons.map((b) => ({ label: b.label, value: `${b.kind}:${b.key}` })) };
 }
 
 function decisionOf(turn: Turn, s: Session, hasChoices: boolean): AskResponse['decision'] {
@@ -131,7 +136,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     const lang = (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? s.lang ?? state.lang) as Lang | null; state.lang = lang;
     let answer = turn.messages.filter((m) => m.kind === 'bot').map((m) => m.text).join('\n\n');
     let choices: Choice[] = [];
-    if (turn.buttons?.length) { const r = renderChoices(turn.buttons); answer = (answer ? answer + '\n\n' : '') + r.text + (turn.hint ? '\n\n' + turn.hint : ''); choices = r.choices; }
+    if (turn.buttons?.length) { const r = renderChoices(turn.buttons, lang); answer = (answer ? answer + '\n\n' : '') + r.text + (turn.hint ? '\n\n' + turn.hint : ''); choices = r.choices; }
     const decision = decisionOf(turn, s, choices.length > 0);
     const cacheable = decision === 'answer' && !!turn.cacheable && !personalOk;
     const conf = Math.min(1, Math.max(0, Number(turn.trace.conf ?? 0)));

@@ -98,7 +98,7 @@ export default function Topics() {
   const toggleExp = (k: string) => setExp((x) => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const done = (msg: string, chip: string, word?: string) => {
     if (word) setFresh((s) => new Set(s).add(word.toLowerCase()));
-    scroll.current = true; setJust((j) => [chip, ...j].slice(0, 8)); setQ(''); setLang('all'); p.toast(msg);
+    scroll.current = true; setJust((j) => [chip, ...j].slice(0, 8)); setQ(''); setLang('all'); p.toast(msg + ' Press Publish to make it live.');
   };
   const dup = (v: string) => { const w = findDup(d, p.merchant, p.M.name, v); if (w.length) { p.toast('"' + v + '" is already ' + w[0] + '. Nothing was added.'); return true; } return false; };
 

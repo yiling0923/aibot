@@ -472,6 +472,19 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                                                   // one change to publish
     expect(screen.queryByRole('form', { name: 'Add a keyword' })).toBeNull();
   });
+  it('reminds the admin to publish after a draft change, on every screen', async () => {
+    open('staff', '/admin/store');
+    await screen.findByRole('button', { name: /Add keyword/ });
+    expect(screen.queryByRole('status', { name: 'Not published yet' })).toBeNull();                                                         // nothing to publish yet
+    await userEvent.click(screen.getByRole('button', { name: /Add keyword/ }));
+    await userEvent.type(within(screen.getByRole('form', { name: 'Add a keyword' })).getByLabelText('The keyword to add'), 'dps{enter}');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add to draft' }));
+    const bar = await screen.findByRole('status', { name: 'Not published yet' });
+    expect(bar.textContent).toMatch(/1 change is only in your draft/);
+    expect(document.title).toMatch(/^\(1\) Not published/);
+    await userEvent.click(within(bar).getByRole('button', { name: 'Review and publish' }));
+    expect(await screen.findByText(/Tests on the draft:/)).toBeTruthy();
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));

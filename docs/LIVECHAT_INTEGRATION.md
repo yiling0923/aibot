@@ -91,7 +91,7 @@ Every message goes through three steps, and the bot reports each one in the repl
 ## What the bot does with each LiveChat call
 
 - Sends back `answer`, `confidence`, `should_escalate`, `should_close`, `close_message`, `session_id`.
-- LiveChat has no buttons, so choices are written into the answer as a numbered list. The next message may be `2`, "the second one", or words from the choice.
+- LiveChat has no buttons, so the choices are written into the answer as one sentence ("Deposits, Withdrawals or Talk to an agent?"). The next message may be `2`, "the second one", or words from the choice.
 - At most **3 choices** are offered at once (the merchant may lower it; "Talk to an agent" is added on top and not counted). A line such as "If you need other help, you can contact an agent." is written after the list. Each merchant can switch it off or reword it per language in the panel under Settings.
 - Chat memory lives in the merchant's own database, so a restart loses nothing.
 - The same request sent twice within 10 minutes gets the same answer and the chat moves only once.
