@@ -82,7 +82,7 @@ export function addOwnTopic(d: Draft, merchant: string, name: string, words: str
 export type KwKind = 'short' | 'slang' | 'meaning' | 'lang';
 export const KW_KINDS: KwKind[] = ['short', 'slang', 'meaning', 'lang'];
 export const KW_LABEL: Record<KwKind, string> = { short: 'Short forms', slang: 'Slang', meaning: 'Same meaning', lang: 'Other languages' };
-export const KW_PICK: [string, string][] = [['', 'Auto (the panel decides)'], ['short', 'Short form (dep, dp)'], ['slang', 'Slang'], ['meaning', 'Same meaning']];
+export const KW_PICK: [string, string][] = [['', 'Auto'], ['short', 'Short form (dep, dp)'], ['slang', 'Slang'], ['meaning', 'Same meaning']];
 const subsequence = (s: string, of: string) => { let i = 0; for (const c of of) if (c === s[i]) i++; return i === s.length; };
 /** Where a word sits under its main keyword. A kind chosen by a person wins; otherwise: another language, or an abbreviation of the main word (dep, depo, dp), or the same meaning. */
 export function kwKind(main: string, v: { variant: string; language?: string; kind?: string | null }): KwKind {
