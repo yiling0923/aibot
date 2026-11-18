@@ -160,7 +160,7 @@ export default function Topics() {
   return (
     <div className="card"><div className="head"><div><h2>Topics · {p.M.name}</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>＋ Add a topic or keyword</button></div>
       <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}<span className="tn">{tabCount(k)}</span></button>)}</div>
-      <p className="tabintro">{INTRO[cur]}</p>
+      {cur !== 'short' && <p className="tabintro">{INTRO[cur]}</p>}
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
       <div className="tbar">
         {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['flow', 'Flowchart'], ['list', 'List']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
