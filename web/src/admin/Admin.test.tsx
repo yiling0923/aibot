@@ -442,7 +442,7 @@ describe('Control panel', () => {
   it('Merchant page: a button of the checklist opens the right screen for that merchant', async () => {
     open('admin', '/admin/merchants/A');
     await userEvent.click(within(await screen.findByLabelText('Setup checklist')).getByRole('button', { name: 'Open Import' }));
-    expect(await screen.findByText(/Import knowledge base/)).toBeTruthy();
+    expect(await screen.findByText(/Import · /)).toBeTruthy();
   });
   it('Merchant page: a finished checklist folds away and can be opened again', async () => {
     setupDone = true; open('admin', '/admin/merchants/A');
@@ -652,13 +652,32 @@ describe('Control panel', () => {
     const calls = (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls.filter((c) => String(c[0]).startsWith('/api/admin/translate'));
     expect(calls.length).toBe(2); expect(calls.map((c) => JSON.parse(String(c[1].body)).to).sort()).toEqual(['ms', 'zh']);
   });
+  it('Import: one sentence explains the AI translation, the Check shows which languages the AI will fill, and language chips change the count', async () => {
+    open('staff', '/admin/imp');
+    expect(await screen.findByText(/Write in one language only/)).toBeTruthy();
+    expect(screen.getByText(/The AI translates the other languages for you/)).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('Entry name, row 1'), 'deposit_time');
+    await userEvent.type(screen.getByLabelText('Topic, row 1'), 'deposit');
+    await userEvent.type(screen.getByLabelText('Questions, row 1'), 'how long | depo late');
+    await userEvent.type(screen.getByLabelText('Answer, row 1'), 'Within 5 minutes.');
+    expect(await screen.findByText(/EN written/)).toBeTruthy(); expect(screen.getByText('MS by AI')).toBeTruthy(); expect(screen.getByText('ZH by AI')).toBeTruthy();
+    expect(screen.getByText(/translations will be made/).textContent).toMatch(/^2 translations/);
+    await userEvent.click(screen.getByRole('button', { name: 'Chinese' }));                         // take Chinese off the list
+    expect(screen.getByText(/translation will be made/).textContent).toMatch(/^1 translation /); expect(screen.queryByText('ZH by AI')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Thai' }));
+    expect(screen.getByText(/translations will be made/).textContent).toMatch(/^2 translations/); expect(screen.getByText('TH by AI')).toBeTruthy();
+    expect(screen.queryByText('MS is missing')).toBeNull();                                          // the AI will fill it, so it is not a problem
+    await userEvent.click(screen.getByRole('switch', { name: /Translate the empty languages with AI/ }));
+    expect(await screen.findByText('MS is missing')).toBeTruthy();                                   // with the switch off it is a warning again
+    expect((screen.getByText('More options').closest('details') as HTMLDetailsElement).open).toBe(false);   // the two extra options are folded away
+  });
   it('Import: the AI translation can be switched off, and then nothing is translated', async () => {
     open('staff', '/admin/imp');
     await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'deposit_time');
     await userEvent.type(screen.getByLabelText('Topic, row 1'), 'deposit');
     await userEvent.type(screen.getByLabelText('Questions, row 1'), 'how long | depo late');
     await userEvent.type(screen.getByLabelText('Answer, row 1'), 'Within 5 minutes.');
-    await userEvent.click(screen.getByRole('checkbox', { name: /Translate the empty languages with AI/ }));
+    await userEvent.click(screen.getByRole('switch', { name: /Translate the empty languages with AI/ }));
     await userEvent.click(screen.getByRole('button', { name: /entry to draft/ }));
     expect(await screen.findByText(/Imported 1 entries to draft/)).toBeTruthy();
     expect((fetch as unknown as { mock: { calls: [string][] } }).mock.calls.some((c) => String(c[0]).startsWith('/api/admin/translate'))).toBe(false);

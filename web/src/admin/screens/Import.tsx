@@ -23,15 +23,9 @@ export default function Import() {
   const [trOn, setTrOn] = useState(true); const [trLangs, setTrLangs] = useState<Set<string>>(new Set(['ms', 'zh'])); const [busy, setBusy] = useState('');
   const R = useMemo(() => analyzeImport(text, p.draft, p.merchant, p.M.name), [text, p.draft, p.merchant, p.M.name]);
   const ok = R.entries.filter((g) => !g.errors.length);
-  const nNew = ok.filter((g) => !g.exists).length, nUpd = ok.filter((g) => g.exists).length, nErr = R.entries.length - ok.length, nWarn = ok.filter((g) => g.issues.length).length;
+  const nNew = ok.filter((g) => !g.exists).length, nUpd = ok.filter((g) => g.exists).length, nErr = R.entries.length - ok.length;
   const willImport = ok.filter((g) => !(g.exists && mode === 'skip')).length;
   const mine = p.draft.kb.filter((e) => e.merchant === p.merchant);
-
-  const dots = (g: ImportGroup) => LANGS.map((l) => {
-    const x = g.langs[l]; const ex = g.existing?.translations[l] as Tr | undefined;
-    const st = x ? (x.answer && x.examples.length >= 3 ? 'on' : 'part') : ex?.answer_text ? 'on' : '';
-    return <span key={l} className={'dot ' + st}>{LN[l]}</span>;
-  });
 
   const copy = (txt: string, done: string) => { try { navigator.clipboard.writeText(txt).then(() => p.toast(done), () => setOut(txt)); } catch { setOut(txt); } };
 
@@ -42,6 +36,20 @@ export default function Import() {
     const exs = g.langs.en?.examples ?? ex?.en?.question_examples ?? [];
     return [...trLangs].filter((l) => !g.langs[l]?.answer && !ex?.[l]?.answer_text?.trim()).map((l) => ({ key: g.key, lang: l, answer: en, examples: exs }));
   })), [ok, mode, trOn, trLangs, p.ai.translate]);
+
+  const issuesOf = (g: ImportGroup) => g.issues.filter((x) => !jobs.some((j) => j.key === g.key && x === LN[j.lang] + ' is missing'));   // a language the AI will fill is not a problem
+  const nWarn = ok.filter((g) => issuesOf(g).length).length;
+
+  /** Which languages an entry gets: the ones written in the file, the ones the AI will fill, and the ones it already has. */
+  const tags = (g: ImportGroup) => {
+    const out = LANGS.flatMap((l) => {
+      const x = g.langs[l];
+      if (x?.answer) return [<span key={l} className={'ltag ok'} title={x.examples.length < 3 ? 'Fewer than 3 example questions' : undefined}>{LN[l]} written{x.examples.length < 3 ? ' *' : ''}</span>];
+      if (jobs.some((j) => j.key === g.key && j.lang === l)) return [<span key={l} className="ltag ai">{LN[l]} by AI</span>];
+      return [];
+    });
+    return out.length ? out : <span className="sub">none</span>;
+  };
 
   /** Asks the AI for each missing translation, three at a time. A failed one is only counted: the entry stays as it was. */
   const translateAll = async () => {
@@ -99,15 +107,12 @@ export default function Import() {
   };
 
   return (
-    <div className="card"><div className="head"><div><h2>Import knowledge base · {p.M.name}</h2><div className="sub">Load a whole set from a file instead of typing it. Each merchant has its own file. Nothing goes live until you publish.</div></div></div>
+    <div className="card"><div className="head"><div><h2>Import · {p.M.name}</h2><div className="sub">Add many answers at one time. Nothing goes live until you publish.</div></div><button className="linkbtn" type="button" onClick={() => nav('/admin/guide')}>How to import →</button></div>
+      {p.ai.translate && <div className="imptip" role="note"><span aria-hidden="true">🌐</span><span><b>Write in one language only</b> (English is fine). The AI translates the other languages for you.</span></div>}
       <div className="steps" style={{ marginTop: 12 }}>
-        <div className="step"><span className="n">1</span><div><b>Merchant</b><div className="sub">The file is imported into <b>{p.M.name}</b>. Change it in the sidebar. If the file has a <span className="mono">merchant</span> column, rows for other merchants are skipped.</div></div></div>
-        <div className="step"><span className="n">2</span><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><b>Add your entries</b>
+        <div className="step"><span className="n">1</span><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><b>Add your entries</b>
           <div className="imptabs" role="group" aria-label="How to add entries"><button type="button" aria-pressed={view === 'table'} onClick={() => { if (view !== 'table') { setView('table'); setTick((t) => t + 1); } }}>Type in a table</button><button type="button" aria-pressed={view === 'file'} onClick={() => setView('file')}>Upload a file</button></div>
-          <div className="tools"><span className="sub">Not sure how to fill it?</span>
-            <button className="btn sm" type="button" onClick={() => saveFile('knowledge_base_example.xlsx', writeXlsx(EXAMPLE_ROWS, WIDTHS, 'Knowledge base'), XLSX)}>Download Excel example</button>
-            <button className="btn sm" type="button" onClick={() => saveFile('knowledge_base_blank.xlsx', writeXlsx(BLANK_ROWS, WIDTHS, 'Knowledge base'), XLSX)}>Download blank Excel</button>
-          </div>
+          <div className="imptools"><button className="linkbtn" type="button" onClick={() => saveFile('knowledge_base_example.xlsx', writeXlsx(EXAMPLE_ROWS, WIDTHS, 'Knowledge base'), XLSX)}>Download Excel example</button><button className="linkbtn" type="button" onClick={() => saveFile('knowledge_base_blank.xlsx', writeXlsx(BLANK_ROWS, WIDTHS, 'Knowledge base'), XLSX)}>Download blank Excel</button></div>
           {view === 'table' ? <ImportGrid key={tick} start={text} onCsv={(c) => { setText(c); setName(c ? 'table' : ''); setOut(''); }} /> : <>
           <div className="drop"><div className="tools">
             <input type="file" accept=".xlsx,.csv,.tsv,.txt" aria-label="Choose an Excel or CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setOut('');
@@ -130,7 +135,7 @@ export default function Import() {
               <ul className="plain">{COVERED_ELSEWHERE.map(([t, w]) => <li key={t}><b>{t}</b>: {w}</li>)}</ul></details>
             <textarea placeholder="Or paste CSV here (from Excel or Google Sheets works too)" aria-label="Paste CSV" value={text} onChange={(e) => { setText(e.target.value); if (!e.target.value) setName(''); setOut(''); }} />
             {name && <div className="sub">Loaded: <b>{name}</b> <button className="btn sm" type="button" onClick={() => { setText(''); setName(''); }}>Clear</button></div>}</div>
-          <details><summary>File format</summary><div className="sub" style={{ marginTop: 6 }}>One row for each entry and language. Use the same <span className="mono">intent_key</span> on every language row of an entry. Separate example questions with <span className="mono">|</span>.</div>
+          <details><summary>File format</summary><div className="sub" style={{ marginTop: 6 }}>The file is imported into <b>{p.M.name}</b>. If it has a <span className="mono">merchant</span> column, rows for other merchants are skipped. One row for each entry and language. Use the same <span className="mono">intent_key</span> on every language row of an entry. Separate example questions with <span className="mono">|</span>.</div>
             <div className="scroll"><table><thead><tr><th>Column</th><th>Needed?</th><th>Example</th></tr></thead><tbody>
               <tr><td className="mono">intent_key</td><td>yes</td><td>deposit_time</td></tr><tr><td className="mono">language</td><td>yes</td><td>en, ms or zh</td></tr><tr><td className="mono">answer_text</td><td>yes (English at least)</td><td>Deposits are usually credited within 5 minutes.</td></tr>
               <tr><td className="mono">question_examples</td><td>recommended</td><td>how long deposit take | dep not arrive | depo pending</td></tr><tr><td className="mono">topic</td><td><b>yes</b></td><td>deposit, refund. A new one is created automatically.</td></tr><tr><td className="mono">topic_short_forms</td><td>optional</td><td>refunds | bayaran balik | 退款</td></tr>
@@ -139,7 +144,7 @@ export default function Import() {
           {out && <div><div className="sub">Copying was blocked here, so the text is shown. Select it and copy:</div><textarea readOnly style={{ minHeight: 120, fontFamily: 'var(--mono)', fontSize: 12, whiteSpace: 'pre' }} value={out} /></div>}
           </>}
         </div></div>
-        <div className="step"><span className="n">3</span><div style={{ flex: 1, minWidth: 0 }}><b>Check</b>
+        <div className="step"><span className="n">2</span><div style={{ flex: 1, minWidth: 0 }}><b>Check</b>
           {R.fatal ? <div className="note" style={{ background: 'var(--badbg)', marginTop: 6 }}>{R.fatal}</div>
             : !R.entries.length ? <div className="sub">Add a file or paste text to see the check.</div>
             : <>
@@ -151,25 +156,26 @@ export default function Import() {
                     <tr key={i}><td><b>{g.key || '(no name)'}</b></td>
                       <td>{blocked ? <Pill c="bad">blocked</Pill> : g.exists ? (mode === 'skip' ? <Pill>skipped</Pill> : <Pill c="info">update</Pill>) : <Pill c="ok">new</Pill>}</td>
                       <td>{topic ? <Pill c="info">{topic}</Pill> : <span className="sub">none</span>} {asp ? <Pill>{asp}</Pill> : null}</td>
-                      <td><div className="dots">{dots(g)}</div></td>
+                      <td><div className="ltags">{tags(g)}</div></td>
                       <td>{blocked ? <ul className="iss" style={{ color: 'var(--bad)' }}>{g.errors.map((x, j) => <li key={j}>{x}</li>)}</ul> : null}
-                        {g.issues.length ? <ul className="iss" style={{ color: 'var(--warn)' }}>{g.issues.map((x, j) => <li key={j}>{x}</li>)}</ul> : !blocked ? <Pill c="ok">looks good</Pill> : null}</td></tr>
+                        {issuesOf(g).length ? <ul className="iss" style={{ color: 'var(--warn)' }}>{issuesOf(g).map((x, j) => <li key={j}>{x}</li>)}</ul> : !blocked ? <Pill c="ok">looks good</Pill> : null}</td></tr>
                   );
                 })}</tbody></table></div></>}
         </div></div>
-        <div className="step"><span className="n">4</span><div><b>Import</b>
-          <div className="form" style={{ marginTop: 6 }}>
-            <label className="fld"><span>If the entry already exists</span><select value={mode} onChange={(e) => setMode(e.target.value)}><option value="update">Update it (languages in the file replace the old ones)</option><option value="skip">Skip it</option></select></label>
-            <label className="fld"><span>New entries start as</span><select value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'live')}><option value="draft">Draft (bot ignores them until you set them live)</option><option value="live">Live</option></select></label></div>
-          <div className="aitr" style={{ marginTop: 10 }}>
-            {busy && <div className="note" role="status">{busy}</div>}
-            {p.ai.translate ? <>
-              <label className="chk"><input type="checkbox" checked={trOn} onChange={(e) => setTrOn(e.target.checked)} /> <b>Translate the empty languages with AI</b></label>
-              {trOn && <div className="tools" role="group" aria-label="Languages to translate">{(['ms', 'zh', 'vi', 'th', 'tl'] as const).map((l) => <label key={l} className="chk"><input type="checkbox" checked={trLangs.has(l)} onChange={(e) => setTrLangs((x) => { const n = new Set(x); if (e.target.checked) n.add(l); else n.delete(l); return n; })} /> {LANG_NAME[l]}</label>)}</div>}
-              <div className="sub">{trOn ? (jobs.length ? <><b>{jobs.length}</b> translation{jobs.length === 1 ? '' : 's'} will be made from the English answers and questions. Only languages you left empty are filled. </> : 'Nothing to translate: every chosen language already has an answer, or there is no English answer. ') : ''}The result goes into the draft. Please read it before you publish. The AI is charged to this merchant.</div></> :
-              <div className="sub">AI translation is off (no AI key yet), so only the languages in your file are imported. You can translate later inside each entry.</div>}
-          </div>
-          <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!willImport || !!busy} title="Imports the entries as live, then opens the Publish window. Entries that still say TO WRITE are ignored by the bot until they are written." onClick={() => run(true)}>Import and publish</button><button className="btn" type="button" disabled={!willImport || !!busy} onClick={() => run(false)}>Import {willImport} entr{willImport === 1 ? 'y' : 'ies'} to draft</button><span className="sub">Blocked entries are left out. Warnings do not stop an import. Updated entries keep their live or draft status.</span></div></div></div>
+        <div className="step"><span className="n">3</span><div style={{ flex: 1, minWidth: 0 }}><b>Import</b>
+          {busy && <div className="note" role="status" style={{ marginTop: 6 }}>{busy}</div>}
+          {p.ai.translate ? <div className="trbox">
+            <label className="trsw"><input type="checkbox" role="switch" checked={trOn} onChange={(e) => setTrOn(e.target.checked)} /><span className="track" aria-hidden="true" /><span><b>Translate the empty languages with AI</b><small>Only the languages you left empty are filled. You can read them before you publish.</small></span></label>
+            {trOn && <div className="chips" role="group" aria-label="Translate into"><span className="l">Translate into</span>{(['ms', 'zh', 'vi', 'th', 'tl'] as const).map((l) => <button key={l} type="button" className={'chip' + (trLangs.has(l) ? ' on' : '')} aria-pressed={trLangs.has(l)} onClick={() => setTrLangs((x) => { const n = new Set(x); if (n.has(l)) n.delete(l); else n.add(l); return n; })}>{LANG_NAME[l]}</button>)}</div>}
+            {trOn && <div className="sub">{jobs.length ? <><b>{jobs.length}</b> translation{jobs.length === 1 ? '' : 's'} will be made from the English answers and questions. The AI is charged to this merchant.</> : 'Nothing to translate: every chosen language already has an answer, or there is no English answer.'}</div>}
+          </div> : <div className="sub" style={{ marginTop: 6 }}>AI translation is off (no AI key yet), so only the languages you wrote are imported. You can translate later inside each entry.</div>}
+          <div className="tools" style={{ marginTop: 12 }}><button className="btn pri" type="button" disabled={!willImport || !!busy} onClick={() => run(false)}>Import {willImport} entr{willImport === 1 ? 'y' : 'ies'} to draft</button><button className="btn" type="button" disabled={!willImport || !!busy} title="Imports the entries as live, then opens the Publish window. Entries that still say TO WRITE are ignored by the bot until they are written." onClick={() => run(true)}>Import and publish</button></div>
+          <details className="moreopt"><summary>More options</summary>
+            <div className="form" style={{ marginTop: 6 }}>
+              <label className="fld"><span>If the entry already exists</span><select value={mode} onChange={(e) => setMode(e.target.value)}><option value="update">Update it (languages in the file replace the old ones)</option><option value="skip">Skip it</option></select></label>
+              <label className="fld"><span>New entries start as</span><select value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'live')}><option value="draft">Draft (bot ignores them until you set them live)</option><option value="live">Live</option></select></label></div>
+            <div className="sub" style={{ marginTop: 6 }}>Blocked entries are left out. Warnings do not stop an import. Updated entries keep their live or draft status.</div></details>
+        </div></div>
       </div></div>
   );
 }

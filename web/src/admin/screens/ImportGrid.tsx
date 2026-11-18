@@ -3,7 +3,7 @@ import { LANGS, LN, parseTable } from '../model';
 import { rowsToCsv } from '../xlsx';
 
 export interface GridRow { key: string; topic: string; lang: string; q: string; a: string }
-const COLS = ['Entry name', 'Topic', 'Language', 'Questions customers ask (put | between them)', 'Answer'] as const;
+const COLS = ['Entry name', 'Topic', 'Language', 'Questions (put | between)', 'Answer'] as const;
 const FIELDS = ['key', 'topic', 'lang', 'q', 'a'] as const;
 const LANG_NAME: Record<string, string> = { en: 'English', ms: 'Malay', zh: 'Chinese', vi: 'Vietnamese', th: 'Thai', tl: 'Filipino' };
 const HEADS = ['intent_key', 'topic', 'language', 'question_examples', 'answer_text'];
@@ -52,11 +52,11 @@ export default function ImportGrid({ start, onCsv }: { start: string; onCsv: (cs
       <div className="scroll"><table><thead><tr><th className="rn">#</th>{COLS.map((c) => <th key={c}>{c}</th>)}<th /></tr></thead><tbody>
         {rows.map((r, y) => (
           <tr key={y}><td className="rn">{y + 1}</td>
-            <td><input aria-label={`Entry name, row ${y + 1}`} value={r.key} placeholder={y === 0 ? 'deposit_time' : ''} onChange={(e) => set(y, 'key', e.target.value)} onPaste={(e) => paste(e, y, 0)} /></td>
-            <td><input aria-label={`Topic, row ${y + 1}`} value={r.topic} placeholder={y === 0 ? 'deposit' : ''} onChange={(e) => set(y, 'topic', e.target.value)} onPaste={(e) => paste(e, y, 1)} /></td>
-            <td><select aria-label={`Language, row ${y + 1}`} value={r.lang} onChange={(e) => set(y, 'lang', e.target.value)}>{LANGS.map((l) => <option key={l} value={l}>{LANG_NAME[l] ?? LN[l]}</option>)}</select></td>
-            <td><textarea rows={2} aria-label={`Questions, row ${y + 1}`} value={r.q} placeholder={y === 0 ? 'how long does deposit take | depo not in yet' : ''} onChange={(e) => set(y, 'q', e.target.value)} onPaste={(e) => paste(e, y, 3)} /></td>
-            <td><textarea rows={2} aria-label={`Answer, row ${y + 1}`} value={r.a} placeholder={y === 0 ? 'Deposits are credited within 5 minutes.' : ''} onChange={(e) => set(y, 'a', e.target.value)} onPaste={(e) => paste(e, y, 4)} /></td>
+            <td><input className="gcell" aria-label={`Entry name, row ${y + 1}`} value={r.key} placeholder={y === 0 ? 'deposit_time' : ''} onChange={(e) => set(y, 'key', e.target.value)} onPaste={(e) => paste(e, y, 0)} /></td>
+            <td><input className="gcell" aria-label={`Topic, row ${y + 1}`} value={r.topic} placeholder={y === 0 ? 'deposit' : ''} onChange={(e) => set(y, 'topic', e.target.value)} onPaste={(e) => paste(e, y, 1)} /></td>
+            <td><select className="gcell" aria-label={`Language, row ${y + 1}`} value={r.lang} onChange={(e) => set(y, 'lang', e.target.value)}>{LANGS.map((l) => <option key={l} value={l}>{LANG_NAME[l] ?? LN[l]}</option>)}</select></td>
+            <td><textarea className="gcell" rows={2} aria-label={`Questions, row ${y + 1}`} value={r.q} placeholder={y === 0 ? 'how long does deposit take | depo not in yet' : ''} onChange={(e) => set(y, 'q', e.target.value)} onPaste={(e) => paste(e, y, 3)} /></td>
+            <td><textarea className="gcell" rows={2} aria-label={`Answer, row ${y + 1}`} value={r.a} placeholder={y === 0 ? 'Deposits are credited within 5 minutes.' : ''} onChange={(e) => set(y, 'a', e.target.value)} onPaste={(e) => paste(e, y, 4)} /></td>
             <td><button className="btn sm ghost" type="button" aria-label={`Clear row ${y + 1}`} title="Clear this row" onClick={() => commit(rows.length > 1 ? rows.filter((_, j) => j !== y) : [blank()])}>×</button></td></tr>
         ))}</tbody></table></div>
       <div className="tools"><button className="btn sm" type="button" onClick={() => setRows([...rows, blank(), blank(), blank(), blank(), blank()])}>Add 5 rows</button>
