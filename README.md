@@ -385,9 +385,9 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 
 After any change to the draft (keyword, topic, entry, setting), a yellow bar "Not live yet" stays at the top of every screen until you publish. It has **What changed** (the list of draft changes) and **Review and publish**. The browser tab title also shows the count, e.g. `(3) Not published`. Customers keep getting the old answers until you publish.
 
-### Guide page
+### Import guide page
 
-The panel has a **Help → Guide** page: how to write the knowledge base CSV (columns, examples, writing rules), a download of an example and a blank file, and the import steps. A copy as a web page is in `docs/MARKETING_IMPORT_GUIDE.html`.
+The panel has a **Answers → Import guide** page (next to Import): how to write the knowledge base CSV (columns, examples, writing rules), a download of an example and a blank file, and the import steps. A copy as a web page is in `docs/MARKETING_IMPORT_GUIDE.html`.
 
 ### Report page
 

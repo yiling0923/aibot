@@ -20,11 +20,10 @@ import Report from './screens/Report';
 import Guide from './screens/Guide';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
-  ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
+  ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import'], ['guide', 'Import guide']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
   ['Check', [['report', 'Report'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
-  ['Help', [['guide', 'Guide']]],
 ];
 
 export default function Admin() {
