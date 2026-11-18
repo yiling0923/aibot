@@ -520,6 +520,19 @@ describe('Control panel', () => {
     await userEvent.click(within(bar).getByRole('button', { name: 'Review and publish' }));
     expect(await screen.findByText(/Tests on the draft:/)).toBeTruthy();
   });
+  it('the left menu folds to icons with a button, keeps its items reachable, and remembers the choice', async () => {
+    const { unmount } = open('staff', '/admin/kw');
+    const shell = () => document.querySelector('.shell') as HTMLElement;
+    await userEvent.click(await screen.findByRole('button', { name: 'Hide the menu' }));
+    expect(shell().className).toContain('folded');
+    expect(screen.getByRole('button', { name: 'Report' }).getAttribute('title')).toBe('Report');          // icons only, the name shows when the mouse is over one
+    expect(screen.getByRole('button', { name: 'Show the menu' }).getAttribute('aria-expanded')).toBe('false');
+    expect(localStorage.getItem('sideFolded')).toBe('1');
+    unmount(); open('staff', '/admin/kw');
+    expect((await screen.findByRole('button', { name: 'Show the menu' })).getAttribute('aria-expanded')).toBe('false');   // still folded after a reload
+    await userEvent.click(screen.getByRole('button', { name: 'Show the menu' }));
+    expect(shell().className).not.toContain('folded'); expect(screen.getByRole('button', { name: 'Hide the menu' })).toBeTruthy();
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

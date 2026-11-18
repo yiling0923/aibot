@@ -49,12 +49,14 @@ function Shell() {
   const unassigned = p.kw.filter((k) => !p.ignored.has(k.w) && p.status(k.w).t === 'Not set yet').length;
   const n = p.changes.length;
   const [showWhat, setShowWhat] = useState(false);
+  const [folded, setFoldedState] = useState(() => { try { return localStorage.getItem('sideFolded') === '1'; } catch { return false; } });   // the left menu can fold to icons
+  const setFolded = (v: boolean) => { setFoldedState(v); try { localStorage.setItem('sideFolded', v ? '1' : '0'); } catch { /* ignore */ } };
   useEffect(() => { document.title = (n ? '(' + n + ') Not published · ' : '') + 'LiveChat AI bot, control panel'; }, [n]);
 
   return (
-    <div className="shell">
+    <div className={'shell' + (folded ? ' folded' : '')}>
       <aside className="side">
-        <div className="brandwrap"><span className="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg></span><div className="brand">Bot Control Panel<small>LiveChat AI bot</small></div></div>
+        <div className="brandwrap"><span className="logo" aria-hidden="true"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg></span><div className="brand">Bot Control Panel<small>LiveChat AI bot</small></div><button type="button" className="sidetoggle" aria-label={folded ? 'Show the menu' : 'Hide the menu'} aria-expanded={!folded} title={folded ? 'Show the menu' : 'Hide the menu'} onClick={() => setFolded(!folded)}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 18-6-6 6-6" /></svg></button></div>
         <label className="fld merch"><span>Merchant</span>
           {p.isAdmin
             ? <select id="merchant" value={p.merchant} onChange={(e) => p.setMerchant(e.target.value)}>{p.merchants.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}</select>
@@ -64,7 +66,7 @@ function Shell() {
           {NAV_GROUPS.map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
               {items.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin)).map(([k, l]) => (
-                <button key={k} type="button" aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
+                <button key={k} type="button" title={folded ? l : undefined} aria-label={folded ? l : undefined} aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
                   <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
                 </button>
               ))}
@@ -75,6 +77,7 @@ function Shell() {
           <div className="whoami"><div><b>{p.me.username}</b><small>{p.isAdmin ? 'Admin · all merchants' : 'Staff · ' + p.M.name}</small></div><button className="btn sm" type="button" onClick={signOut}>Sign out</button></div>
           <label className="switch" title="Show options most staff do not need, such as question types"><input type="checkbox" checked={p.adv} onChange={(e) => p.setAdv(e.target.checked)} /><span className="track"><span className="thumb" /></span><span className="swl">Advanced options</span></label>
         </div>
+        {folded && <button type="button" className="sidetoggle" title="Sign out" aria-label="Sign out" onClick={signOut}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg></button>}
       </aside>
       <div className="content">
         <header className="topbar">

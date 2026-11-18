@@ -835,3 +835,20 @@ details.moreopt{background:none;padding:0}
 .kwmore{margin-top:8px;border:0;background:none;color:var(--accent);font-weight:600;cursor:pointer;padding:0}
 .kwgrow2{margin-top:10px}.kwglbl{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin-bottom:6px}
 .kwhint{background:var(--infobg);border:1px solid var(--line);border-radius:10px;padding:8px 12px;font-size:12.5px}
+
+/* the left menu folds to a rail of icons */
+.sidetoggle{margin-left:auto;flex:none;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--muted);display:grid;place-items:center;cursor:pointer;padding:0}
+.sidetoggle:hover{background:var(--surface2);color:var(--accent)}
+.sidetoggle svg{transition:transform .15s}
+.shell{transition:grid-template-columns .15s}
+.shell.folded{grid-template-columns:64px minmax(0,1fr)}
+.shell.folded .side{padding:14px 8px;align-items:center;gap:14px}
+.shell.folded .side .brandwrap{flex-direction:column;gap:10px;padding:0}
+.shell.folded .brandwrap>div,.shell.folded .merch,.shell.folded .nav .gl,.shell.folded .nav button>span:not(.cnt),.shell.folded .side-foot{display:none}
+.shell.folded .sidetoggle{margin-left:0}.shell.folded .sidetoggle svg{transform:rotate(180deg)}
+.shell.folded .nav{align-items:center;gap:8px}
+.shell.folded .nav .grp{align-items:center}
+.shell.folded .nav button{position:relative;justify-content:center;width:40px;height:38px;padding:0}
+.shell.folded .nav button svg{opacity:1}
+.shell.folded .nav .cnt{position:absolute;top:5px;right:5px;width:8px;height:8px;padding:0;font-size:0;margin:0}
+@media (max-width:820px){.sidetoggle{display:none}.shell.folded{grid-template-columns:minmax(0,1fr)}.shell.folded .side{align-items:stretch;padding:12px 14px}.shell.folded .brandwrap>div,.shell.folded .merch,.shell.folded .nav button>span:not(.cnt),.shell.folded .side-foot{display:revert}.shell.folded .nav button{width:auto;height:auto;padding:8px 10px}}

@@ -410,3 +410,7 @@ The Flowchart is now the first tab and what opens by default (the List is the se
 ### Keywords page
 
 The Keywords page only shows what customers typed (counts, groups under each topic, the Ignored list, search and language filter). It has no Add keyword button, no action buttons (Make a main keyword, Add under one, Ignore, Restore), no tick boxes and no AI describe button. A click on a word opens the chats that used it. Words are added and sorted on the Topics page. The layout: four summary tiles (words heard, under a topic, not under a topic, ignored), one toolbar, a card for each topic (closed except the first; open it to see short forms, slang, same meaning and other languages as chips with counts), and a side column with the most-typed words that have no topic and the words with another job. One accent colour in four shades is used for the bars.
+
+### Folding the left menu
+
+The small arrow button next to the logo folds the left menu to a rail of icons (the name of an item shows when the mouse is over it, and the yellow dot on Keywords still shows words that have no topic). Press the arrow again to open it. The choice is remembered in the browser. The merchant picker and the Advanced options switch are in the open menu. On a phone the menu is always open.
