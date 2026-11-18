@@ -47,6 +47,7 @@ export default function TopicFlow() {
   const [pal, setPalState] = useState(() => { try { return localStorage.getItem('flowpal') !== '0'; } catch { return true; } });   // the Add-a-block panel on the left can be folded away
   const setPal = (v: boolean) => { setPalState(v); try { localStorage.setItem('flowpal', v ? '1' : '0'); } catch { /* ignore */ } setTimeout(() => fit(), 50); };
   const [kwq, setKwq] = useState<Record<string, string>>({});                // the filter typed on each keywords card
+  const [fq, setFq] = useState('');                                        // the search over the whole chart: topics that do not match fade out
   const [scale, setScale] = useState(1);
   const [link, setLink] = useState<{ x0: number; y0: number; x: number; y: number } | null>(null);
 
@@ -54,6 +55,14 @@ export default function TopicFlow() {
   const mine = (d.mAliases[p.merchant] || []).map((a, i) => [a, i] as const);
   const entries = d.kb.filter((e) => e.merchant === p.merchant) as Entry[];
   const unset = p.kw.filter((r) => !r.ignored && p.status(r.w).t === 'Not set yet').slice(0, 24);
+  const fl = fq.trim().toLowerCase();
+  const matches = new Set<string>();
+  if (fl) topics.forEach((t) => {
+    const words = [...Object.values(d.aliases[t] || {}).flat(), ...mine.filter(([a]) => a.canonical === t).map(([a]) => a.variant)];
+    const hasAns = entries.some((e) => e.topic === t && ([e.intent_key, previewOf(e), ...Object.values(e.translations as Record<string, { question_examples?: string[] }>).flatMap((x) => x?.question_examples ?? [])].some((x) => x.toLowerCase().includes(fl))));
+    if (t.toLowerCase().includes(fl) || words.some((w) => w.toLowerCase().includes(fl)) || hasAns) matches.add(t);
+  });
+  const faded = (t: string) => !!fl && !matches.has(t);
 
   /* ---------- the data changes (the same as the list view makes) ---------- */
   const move = (what: Src, topic: string) => {
@@ -193,12 +202,18 @@ export default function TopicFlow() {
     <option value="">⇄</option>{topics.filter((t) => t !== from).map((t) => <option key={t} value={t}>{t}</option>)}</select>;
   useEffect(() => { const t = setTimeout(() => fit(), 0); return () => clearTimeout(t); }, [p.merchant]); // eslint-disable-line react-hooks/exhaustive-deps
   const fit = () => { const w = canvas.current?.clientWidth ?? 0; if (w) setScale(Math.max(0.5, Math.min(1, (w - 8) / width))); };
-  const box = (n: { x: number; y: number; w: number; h: number }) => ({ left: n.x, top: n.y, width: n.w, minHeight: n.h });
+  const box = (n: { x: number; y: number; w: number; h: number; topic?: string }) => ({ left: n.x, top: n.y, width: n.w, minHeight: n.h, ...(n.topic && faded(n.topic) ? { opacity: 0.22 } : {}) });
+  useEffect(() => {                                                                  // jump to the first topic that matches
+    if (!fl) return; const l = lanes.find((x) => matches.has(x.topic)); if (l) canvas.current?.scrollTo?.({ top: Math.max(0, l.y * scale - 16), behavior: 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fl]);
 
   return <div className="flow" data-testid="flow">
     <div className="flowbar">
       <span className="hint" title="Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.">Drag a keyword or an answer onto a topic to move it.</span>
       <div className="flowtools" role="toolbar" aria-label="Flowchart tools">
+        <input type="search" className="flowfind" placeholder="Find a topic, keyword or answer" aria-label="Find in the flowchart" value={fq} onChange={(e) => setFq(e.target.value)} />
+        {fl && <span className="sub" role="status">{matches.size} of {topics.length} topic{topics.length === 1 ? '' : 's'}</span>}
         <button type="button" className="tbtn" onClick={() => { setPos({}); persist({}); }} title="Put every card back in its place"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>Auto-arrange</button>
         <button type="button" className="tbtn" onClick={fit} title="Fit the whole chart in the window"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>Fit to screen</button>
         <button type="button" className={'tbtn' + (pal ? '' : ' on')} aria-pressed={!pal} onClick={() => setPal(!pal)} title="Fold the blocks panel away to give the chart the full width"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>{pal ? 'Hide blocks' : 'Show blocks'}</button>
@@ -222,7 +237,7 @@ export default function TopicFlow() {
       <div className="flowcanvas" ref={canvas} onDragOver={onCanvasOver} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(null); }} onDrop={onCanvasDrop}>
         <div style={{ width: width * scale, height: height * scale }}>
           <div className="flowinner" style={{ position: 'relative', width, height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
-            {lanes.map((l) => <div key={'lane' + l.topic} className={'lane' + (over === l.topic ? ' over' : '')} style={{ left: l.x, top: l.y, width: l.w, height: l.h }}><span className="lt">{l.topic}</span></div>)}
+            {lanes.map((l) => <div key={'lane' + l.topic} className={'lane' + (over === l.topic ? ' over' : '')} style={{ left: l.x, top: l.y, width: l.w, height: l.h, ...(faded(l.topic) ? { opacity: 0.35 } : {}) }}><span className="lt">{l.topic}</span></div>)}
             <svg className="flowedges" width={width} height={height} aria-hidden="true">
               <defs>{(['kw', 'ans', 'ho'] as const).map((k) => <marker key={k} id={'arr-' + k} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className={'ar-' + k} /></marker>)}
                 <marker id="arr-live" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className="ar-live" /></marker></defs>

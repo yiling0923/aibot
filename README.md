@@ -394,3 +394,5 @@ The panel has a **Answers → Import guide** page (next to Import): how to write
 The Report now shows an arrow on each number against the days before (green is better), a **Fix these first** list (missed messages with **Add keyword** and **Add answer** buttons), **Top topics and how well they are answered**, **Languages**, and **Why chats went to a person**. Chats from before this version have no written reason, so they show under "Other".
 
 The Report period can be **Last 7 days**, **Last 30 days** or **Custom dates** (from and to, both days included, at most one year). **Download CSV** saves the summary, the numbers per day, topics, languages, hand-over reasons and missed messages for the chosen period.
+
+The Topics flowchart has a **Find a topic, keyword or answer** box. Topics that do not match fade out, it says how many match, and the chart scrolls to the first match. (Keyword cards with more than 10 words keep their own small search.)

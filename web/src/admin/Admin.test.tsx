@@ -235,6 +235,21 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByLabelText('Add a keyword to deposit'), 'topupz{enter}');
     expect(await screen.findByLabelText('Remove topupz')).toBeTruthy();
   });
+  it('the flowchart has a search: topics that do not match fade out, and it says how many match', async () => {
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('Flowchart'));
+    expect(await screen.findByLabelText('Topic deposit')).toBeTruthy();
+    const faded = () => [...document.querySelectorAll<HTMLElement>('.flow .fc[data-topic], .flow .lane')].filter((x) => x.style.opacity !== '' && Number(x.style.opacity) < 1).length;
+    expect(faded()).toBe(0);
+    await userEvent.type(screen.getByLabelText('Find in the flowchart'), 'dps');                    // a shared keyword of the deposit topic
+    expect(screen.getByText(/^1 of \d+ topics?$/)).toBeTruthy();
+    expect((screen.getByLabelText('Topic deposit') as HTMLElement).style.opacity).toBe('');         // the match stays clear
+    await userEvent.clear(screen.getByLabelText('Find in the flowchart')); await userEvent.type(screen.getByLabelText('Find in the flowchart'), 'zzzz');
+    expect(screen.getByText(/^0 of \d+ topics?$/)).toBeTruthy();
+    expect(faded()).toBeGreaterThan(0);                                                              // nothing matches: the topic fades
+    await userEvent.clear(screen.getByLabelText('Find in the flowchart'));
+    expect(faded()).toBe(0);
+  });
   it('opens the add form from the top button also in the flowchart view', async () => {
     open('staff', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
