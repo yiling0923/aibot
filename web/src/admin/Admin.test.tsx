@@ -564,7 +564,7 @@ describe('Control panel', () => {
   });
   it('shows the handoff number copied from LiveChat on the merchant page, with a button to send a change to LiveChat', async () => {
     open('admin', '/admin/merchants/A');
-    expect(await screen.findByText('Handoff number')).toBeTruthy();
+    expect(await screen.findByText('Human Handoff')).toBeTruthy();
     const box = await screen.findByLabelText('Ask for a person after N replies') as HTMLInputElement;
     expect(box.value).toBe('4');
     expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(true);       // nothing to send until the number differs

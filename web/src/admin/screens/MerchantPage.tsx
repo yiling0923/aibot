@@ -185,10 +185,10 @@ function HandoffSync({ code }: { code: string }) {
   const run = async (what: string, fn: () => Promise<LcLink>, ok: string) => { setBusy(what); setMsg(''); try { apply(await fn()); p.toast(ok); } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); } };
   useEffect(() => { api<LcLink>(base).then(apply).catch((e) => setMsg((e as Error).message)); }, [base]);
   const sub = <>After this many bot replies, LiveChat asks the customer if they want a person (0 = never). It is one number: change it in LiveChat or here and the other follows. LiveChat is the source of truth: the bot copies it every minute and whenever this page opens. A change made here is sent to LiveChat first and saved only if LiveChat accepts it.</>;
-  if (!l) return <Step n={3} done={false} title="Handoff number" badge="Loading…" tone="" sub={sub}><div className="sub">{msg || 'Loading…'}</div></Step>;
+  if (!l) return <Step n={3} done={false} title="Human Handoff" badge="Loading…" tone="" sub={sub}><div className="sub">{msg || 'Loading…'}</div></Step>;
   const badge = !l.configured ? 'Not connected' : l.error ? 'Last sync failed' : 'In sync · ' + (l.handoffAfterReplies ?? '?') + ' replies';
   return (
-    <Step n={3} done={l.configured && !l.error} title="Handoff number" badge={badge} tone={!l.configured ? '' : l.error ? 'bad' : 'ok'} sub={sub}>
+    <Step n={3} done={l.configured && !l.error} title="Human Handoff" badge={badge} tone={!l.configured ? '' : l.error ? 'bad' : 'ok'} sub={sub}>
       {l.configured ? <>
         <div className="mrow" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <label className="fld"><span>Ask for a person after N replies</span><input type="number" min={0} max={100} value={n} onChange={(e) => setN(e.target.value)} style={{ width: 120 }} /></label>
