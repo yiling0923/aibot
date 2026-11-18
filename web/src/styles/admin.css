@@ -674,3 +674,4 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .gd-done{margin-top:14px;text-align:center;font-size:22px;font-weight:800;color:var(--ok)}
 .gd-more{padding:14px 18px}.gd-more summary{cursor:pointer;font-weight:700;font-size:16px}
 .gd-more h3{margin:16px 0 6px}
+.gd-plain{margin:10px 0 0;padding-left:22px;display:flex;flex-direction:column;gap:12px;font-size:15px}

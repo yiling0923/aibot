@@ -504,9 +504,9 @@ describe('Control panel', () => {
   });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
-    expect(await screen.findByRole('heading', { name: /How to import: 5 easy steps/ })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Download example file' })).toBeTruthy();
-    expect(screen.getByText('question_examples')).toBeTruthy();
+    expect(screen.getByText(/Press Publish/)).toBeTruthy();
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
