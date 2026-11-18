@@ -497,24 +497,23 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByRole('tab', { name: 'Replies' }));
     expect((await screen.findByLabelText('Ask again this many times') as HTMLSelectElement).disabled).toBe(true);                         // admin only, like the rude-message limit
   });
-  it('Keywords: Add keyword asks for a word, then opens the same form as a heard word', async () => {
+  it('Keywords page only shows words: no Add keyword, no action buttons, no tick boxes, and a word still opens its chats', async () => {
     open('staff', '/admin/store');
-    await userEvent.click(await screen.findByRole('button', { name: /Add keyword/ }));
-    const form = screen.getByRole('form', { name: 'Add a keyword' });
-    expect((within(form).getByRole('button', { name: 'Next' }) as HTMLButtonElement).disabled).toBe(true);                               // nothing typed yet
-    await userEvent.type(within(form).getByLabelText('The keyword to add'), '  DPS  {enter}');
-    expect(await screen.findByRole('heading', { name: /What is “dps”\?/ })).toBeTruthy();                                                  // lower case, trimmed
-    await userEvent.click(screen.getByRole('button', { name: 'Add to draft' }));
-    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                                                   // one change to publish
+    expect(await screen.findByRole('heading', { name: /Keywords · / })).toBeTruthy();
+    expect(screen.getByText(/This page only shows them/)).toBeTruthy();
+    for (const gone of [/Add keyword/, /Make a main keyword/, /Add under one/, /^Ignore$/, /Restore/, /Add to this topic/, /Mark as filler/, /Describe new words with AI/]) expect(screen.queryByRole('button', { name: gone })).toBeNull();
+    expect(screen.queryAllByRole('checkbox', { name: /^Select / }).length).toBe(0);
     expect(screen.queryByRole('form', { name: 'Add a keyword' })).toBeNull();
+    const word = document.querySelector('.kwlink') as HTMLElement; expect(word).toBeTruthy();
+    await userEvent.click(word);
+    expect(await screen.findByRole('dialog', { name: 'Keyword chats' })).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Set…' })).toBeNull();                                      // nothing to change from here
   });
   it('reminds the admin to publish after a draft change, on every screen', async () => {
-    open('staff', '/admin/store');
-    await screen.findByRole('button', { name: /Add keyword/ });
+    open('staff', '/admin/kw');
+    await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
     expect(screen.queryByRole('status', { name: 'Not published yet' })).toBeNull();                                                         // nothing to publish yet
-    await userEvent.click(screen.getByRole('button', { name: /Add keyword/ }));
-    await userEvent.type(within(screen.getByRole('form', { name: 'Add a keyword' })).getByLabelText('The keyword to add'), 'dps{enter}');
-    await userEvent.click(await screen.findByRole('button', { name: 'Add to draft' }));
+    await userEvent.type(await screen.findByPlaceholderText('e.g. depoo'), 'dpzz{enter}');
     const bar = await screen.findByRole('status', { name: 'Not published yet' });
     expect(bar.textContent).toMatch(/1 change is only in your draft/);
     expect(document.title).toMatch(/^\(1\) Not published/);

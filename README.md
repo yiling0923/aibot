@@ -406,3 +406,7 @@ The Topics flowchart has a **Find a topic, keyword or answer** box. Topics that 
 ### Topics flowchart
 
 The Flowchart is now the first tab and what opens by default (the List is the second tab). Cards always line up by themselves: there is no Auto-arrange button and no saved card places. Dragging an answer card onto another topic moves it there, and the chart lines up again on drop. The **Add a block** panel folds away by its title bar (the small arrow). The search box takes the whole toolbar. Everything that is only in the draft is amber with a dashed border and a **DRAFT** tag (a new keyword, topic or answer); published items are green with a **LIVE** tag. The "Show If not clear" switch is gone (the **If not clear** block in the panel still shows or hides it).
+
+### Keywords page
+
+The Keywords page only shows what customers typed (counts, groups under each topic, the Ignored list, search and language filter). It has no Add keyword button, no action buttons (Make a main keyword, Add under one, Ignore, Restore), no tick boxes and no AI describe button. A click on a word opens the chats that used it. Words are added and sorted on the Topics page.
