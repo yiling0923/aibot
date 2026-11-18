@@ -17,12 +17,14 @@ import MerchantPage from './screens/MerchantPage';
 import Billing from './screens/Billing';
 import History from './screens/History';
 import Report from './screens/Report';
+import Guide from './screens/Guide';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
   ['Check', [['report', 'Report'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
+  ['Help', [['guide', 'Guide for marketing']]],
 ];
 
 export default function Admin() {
@@ -108,6 +110,7 @@ function Shell() {
             <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="merchants/:code" element={p.isAdmin ? <MerchantPage /> : <div className="card"><h2>Merchant</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="billing" element={p.isAdmin ? <Billing /> : <div className="card"><h2>Usage &amp; billing</h2><div className="sub">Only an admin can use this screen.</div></div>} />
+            <Route path="guide" element={<Guide />} />
             <Route path="hist" element={<History />} />
             <Route path="*" element={<Navigate to="/admin/kb" replace />} />
           </Routes>
