@@ -872,3 +872,6 @@ details.moreopt{background:none;padding:0}
 .logobtn:hover .lg-a,.logobtn:focus-visible .lg-a{display:none}
 .logobtn:hover .lg-b,.logobtn:focus-visible .lg-b{display:block}
 .logobtn:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.kbsw{display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
+.kbsw .kbswt{font-size:12px;font-weight:700}
+.kbsw.on .kbswt{color:var(--ok)}.kbsw.off .kbswt{color:var(--warn)}

@@ -533,6 +533,25 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: 'Download example file' })).toBeTruthy();
     expect(screen.getByText(/Customers see the answers only after this/)).toBeTruthy(); expect(document.querySelectorAll('.gd-list li').length).toBe(5);
   });
+  it('Knowledge base: an on/off switch makes one entry live or draft, after a confirmation, and Cancel changes nothing', async () => {
+    withKb = true;
+    open('staff', '/admin/kb');
+    const sw = (await screen.findAllByRole('switch', { name: /^Live / }))[0] as HTMLInputElement;
+    expect(sw.checked).toBe(true);
+    await userEvent.click(sw);
+    const dlg = await screen.findByRole('dialog', { name: 'Change the status' });
+    expect(screen.queryByText('Edit entry')).toBeNull();                                               // the switch does not also open the entry
+    expect(within(dlg).getByRole('heading').textContent).toMatch(/to draft\?/); expect(dlg.textContent).toMatch(/ignore this answer after you publish/);
+    await userEvent.click(within(dlg).getByRole('button', { name: 'Cancel' }));
+    expect(screen.queryByRole('dialog', { name: 'Change the status' })).toBeNull(); expect((screen.getAllByRole('switch', { name: /^Live / })[0] as HTMLInputElement).checked).toBe(true);   // nothing changed
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).not.toMatch(/\d/);
+    await userEvent.click(screen.getAllByRole('switch', { name: /^Live / })[0]);
+    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Change the status' })).getByRole('button', { name: 'Set to draft' }));
+    expect((screen.getAllByRole('switch', { name: /^Live / })[0] as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                 // one change to publish
+    await userEvent.click(screen.getAllByRole('switch', { name: /^Live / })[0]);
+    expect((await screen.findByRole('dialog', { name: 'Change the status' })).textContent).toMatch(/start using this answer/);
+  });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
@@ -636,7 +655,7 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                    // one entry changed, however many cells
     await userEvent.click(screen.getByRole('button', { name: 'List' }));
     const row = (await screen.findByText('dep_limit')).closest('tr')!;
-    expect(row.textContent).toContain('RM50 to RM50,000.'); expect(row.textContent).toMatch(/live/);
+    expect(row.textContent).toContain('RM50 to RM50,000.'); expect(row.textContent).toMatch(/live/i);
     expect(row.querySelector('td.num')!.textContent).toBe('3');                                          // three different example questions
   });
   it('Knowledge base table edit: Esc puts the old text back, Ctrl+Enter saves and moves down, and the language buttons add columns', async () => {

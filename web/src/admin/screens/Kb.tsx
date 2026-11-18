@@ -39,6 +39,12 @@ export default function Kb() {
     p.edit((d, note) => { d.kb.forEach((e) => { if (ids.has(e.id) && e.merchant === p.merchant && e.status !== to) { e.status = to; e.dirty = true; } }); note(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} (${p.M.name})`); });
     setSel(new Set()); p.toast(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} in the draft. ${to === 'live' ? 'Press Publish to make them live for customers.' : 'Press Publish to take them off.'}`);
   };
+  const [ask, setAsk] = useState<{ e: Entry; to: 'live' | 'draft' } | null>(null);          // the on/off switch of one entry asks first
+  const flipOne = () => {
+    if (!ask) return; const { e, to } = ask; setAsk(null);
+    p.edit((d, note) => { const x = d.kb.find((k) => k.id === e.id && k.merchant === p.merchant); if (x && x.status !== to) { x.status = to; x.dirty = true; note(`Set "${e.intent_key}" ${to} (${p.M.name})`); } });
+    p.toast(`“${e.intent_key}” is ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}`);
+  };
   const deleteSel = () => {
     if (!picked.length || !window.confirm(`Delete ${picked.length} entr${picked.length === 1 ? 'y' : 'ies'}? You can still go back by not publishing, or from History.`)) return;
     const ids = new Set(picked.map((e) => e.id));
@@ -77,11 +83,17 @@ export default function Kb() {
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={n < 3 ? 'Add at least 3 example questions' : 'Example questions in English'}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
-            <td><Pill c={e.status === 'live' ? 'ok' : 'warn'}>{e.status}</Pill>{e.steps?.length ? <> <Pill c="info" >asks {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
+            <td><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={e.status === 'live' ? 'Live: the bot uses this answer. Switch off to make it a draft.' : 'Draft: the bot ignores this answer. Switch on to make it live.'}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => setAsk({ e, to: e.status === 'live' ? 'draft' : 'live' })} /><span className="track"><span className="thumb" /></span><span className="kbswt">{e.status === 'live' ? 'Live' : 'Draft'}</span></label>{e.steps?.length ? <> <Pill c="info" >asks {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</td>
           </tr>
         ))}
         {!list.length && <tr><td colSpan={7} className="sub">No entries match.</td></tr>}
       </tbody></table></div>}
+      {ask && <Modal label="Change the status" small onClose={() => setAsk(null)}>
+        <div className="head"><h2>{ask.to === 'draft' ? 'Set “' + ask.e.intent_key + '” to draft?' : 'Set “' + ask.e.intent_key + '” live?'}</h2></div>
+        <p style={{ margin: '8px 0' }}>{ask.to === 'draft' ? 'The bot will ignore this answer after you publish. Questions about it will not get this answer.' : 'The bot will start using this answer after you publish.'}</p>
+        {ask.to === 'live' && entryProblems({ ...ask.e, status: 'live' }).length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>It is not ready yet:</b><ul className="plain">{entryProblems({ ...ask.e, status: 'live' }).map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
+        <div className="sub">The change goes into the draft. Customers see it only after you press Publish.</div>
+        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>Cancel</button><button className="btn pri" type="button" onClick={flipOne}>{ask.to === 'draft' ? 'Set to draft' : 'Set live'}</button></div></Modal>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
     </>
   );

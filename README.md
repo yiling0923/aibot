@@ -427,3 +427,7 @@ The bot never reads account data. A question about a balance, a deposit or a wit
 General answers (limits, how to deposit, times) are unchanged. The member id is taken as LiveChat sends it: it is not checked. The old sections of this README and of `docs/` that describe account answers and the merchant API describe a feature that is now off; the merchant API routes still exist in the server but nothing in the bot calls them.
 
 The Report page no longer has the **Fix these first** list or **Check recent answers**. The wrong-answer tile therefore has nothing new to count (it shows only marks made earlier).
+
+### Live / draft switch in the Knowledge base
+
+In the list, the Status column has an on/off switch for each entry (on is live, off is draft). Switching asks first ("Set “x” to draft?" or "Set “x” live?", with Cancel). If the entry is not ready (for example it still says TO WRITE) the question lists what is missing. The change goes into the draft; customers see it after Publish.
