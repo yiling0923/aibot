@@ -1,9 +1,6 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { IconBtn } from '../ui';
-import { useNavigate } from 'react-router-dom';
-import { SetKeywordModal } from './KeywordModals';
 
 interface Report {
   days: number; total: number; helped: number; notUnderstood: number; handedOver: number; rude: number; byDecision: Record<string, number>; tests: number;
@@ -126,7 +123,7 @@ function downloadCsv(merchant: string, r: Report) {
 /** How the bot is doing for this merchant: what it handled, what it did not understand, what went to a person. */
 export default function Report() {
   const p = usePanel(); const [days, setDays] = useState<7 | 30 | 'custom'>(7); const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [withTest, setWithTest] = useState(true);
-  const [r, setR] = useState<Report | null>(null); const [err, setErr] = useState(''); const [kw, setKw] = useState<string | null>(null); const nav = useNavigate();
+  const [r, setR] = useState<Report | null>(null); const [err, setErr] = useState('');
   const range = days === 'custom' ? `&from=${from}&to=${to}` : `&days=${days}`;
   const load = () => api<Report>(`/api/admin/report?merchant=${encodeURIComponent(p.merchant)}${range}&test=${withTest ? 1 : 0}`);
   useEffect(() => {
@@ -137,9 +134,6 @@ export default function Report() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [p.merchant, days, from, to, withTest]);
 
-  const mark = async (id: number, verdict: 'right' | 'wrong' | null) => {
-    try { await api('/api/admin/feedback', { merchant: p.merchant, decisionId: id, verdict }); setR(await load()); } catch (e) { p.toast((e as Error).message); }
-  };
   const v = r ? parts(r) : null; const a = r?.accuracy;
   return (
     <>
@@ -148,7 +142,6 @@ export default function Report() {
           {days === 'custom' && <span className="rpdates"><label>From <input type="date" aria-label="From date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label><label>To <input type="date" aria-label="To date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label></span>}
           <button className="btn sm" type="button" disabled={!r || !r.total} onClick={() => r && downloadCsv(p.M.name, r)}>Download CSV</button>
           <label className="switch"><input type="checkbox" role="switch" checked={withTest} onChange={(e) => setWithTest(e.target.checked)} /><span className="track"><span className="thumb" /></span> Include test chat{r && r.tests ? ` (${r.tests})` : ''}</label></div></div>
-      {kw && <SetKeywordModal word={kw.toLowerCase()} onClose={() => setKw(null)} />}
       {err && <div className="note" style={{ background: 'var(--badbg)' }}>{err}</div>}
       {r && v && <>
         <div className="rptiles">
@@ -160,12 +153,6 @@ export default function Report() {
         </div>
         <div className="sub">Arrows compare with the {r.days} days before. Green is better, red is worse. Chats in this period: <b>{r.chatsBy.members}</b> from logged-in members, <b>{r.chatsBy.visitors}</b> from visitors.</div>
         {!r.total ? <div className="card"><div className="sub">No messages in this period yet. {withTest ? '' : 'Try "Include test chat" to see the messages typed in the tests.'}</div></div> : <div className="card"><h3 style={{ margin: 0 }}>Messages per day</h3><div className="sub" style={{ marginBottom: 6 }}>Every day of the period is shown, also the days with no messages.</div><DayChart daily={r.daily} /></div>}
-
-        <div className="card"><h3 style={{ margin: 0 }}>Fix these first</h3><div className="sub" style={{ marginBottom: 6 }}>Messages the bot could not answer, most often first. “Add keyword” teaches it a word. “Add answer” opens a new entry with the question filled in.</div>
-          {r.topMissing.length ? <>{r.topMissing.map((m) => <div className="rprec" key={m.text}><div className="rpq">“{m.text}”</div><span className="rpact"><span className="sub">{m.hits} time{m.hits === 1 ? '' : 's'}</span>
-            <button className="btn sm" type="button" onClick={() => setKw(m.text)}>Add keyword</button><button className="btn sm" type="button" onClick={() => nav('/admin/kb', { state: { newQuestion: m.text } })}>Add answer</button></span></div>)}
-            <div className="sub" style={{ marginTop: 6 }}>These {r.topMissing.length} were missed {r.topMissing.reduce((x, m) => x + m.hits, 0)} times in total.</div></>
-            : <div className="sub">Nothing is waiting. Every message was understood or already dealt with.</div>}</div>
 
         <div className="card"><h3 style={{ margin: 0 }}>Top topics, and how well they are answered</h3><div className="sub" style={{ marginBottom: 6 }}>The bar is the share of messages on the topic that the bot answered itself. The number on the right is the change since the {r.days} days before.</div>
           {r.topicRates.length ? <div className="scroll"><table><thead><tr><th>Topic</th><th>Messages</th><th>Answered by the bot</th><th>Change</th></tr></thead><tbody>
@@ -182,10 +169,6 @@ export default function Report() {
             <BarList color={COL.hand} empty="No chat went to a person in this period." rows={r.reasons.map((x) => ({ label: x.reason, n: x.n, tip: `${x.reason}: ${x.n}` }))} /></div>
         </div>
 
-        <div className="card"><h3>Check recent answers</h3><div className="sub" style={{ marginBottom: 4 }}>The last answers the bot gave. Mark each one right or wrong; this feeds the wrong-answer rate.</div>
-          {r.recent.length ? r.recent.map((x) => <div className="rprec" key={x.id}><div><div className="rpq">“{x.question}”{x.topic ? <span className="rptag">{x.topic}</span> : null}</div><div className="sub rpans">{x.answer}</div></div>
-            <span className="rpact"><IconBtn tip="Right" pressed={x.verdict === 'right'} onClick={() => void mark(x.id, x.verdict === 'right' ? null : 'right')}><path d="m5 12 4 4 10-10" /></IconBtn><IconBtn tip="Wrong" danger pressed={x.verdict === 'wrong'} onClick={() => void mark(x.id, x.verdict === 'wrong' ? null : 'wrong')}><path d="M6 6l12 12M18 6 6 18" /></IconBtn></span></div>)
-            : <div className="sub">No answers in this period.</div>}</div>
       </>}
     </>
   );

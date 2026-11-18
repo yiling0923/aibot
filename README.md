@@ -391,7 +391,7 @@ The panel has a **Answers → Import guide** page (next to Import): how to write
 
 ### Report page
 
-The Report now shows an arrow on each number against the days before (green is better), a **Fix these first** list (missed messages with **Add keyword** and **Add answer** buttons), **Top topics and how well they are answered**, **Languages**, and **Why chats went to a person**. Chats from before this version have no written reason, so they show under "Other".
+The Report now shows an arrow on each number against the days before (green is better), a **Top topics and how well they are answered**, **Languages**, and **Why chats went to a person**. Chats from before this version have no written reason, so they show under "Other".
 
 The Report period can be **Last 7 days**, **Last 30 days** or **Custom dates** (from and to, both days included, at most one year). **Download CSV** saves the summary, the numbers per day, topics, languages, hand-over reasons and missed messages for the chosen period.
 
@@ -425,3 +425,5 @@ The bot never reads account data. A question about a balance, a deposit or a wit
 - In the bot: the account lookup, and the "Where is my deposit" choice.
 
 General answers (limits, how to deposit, times) are unchanged. The member id is taken as LiveChat sends it: it is not checked. The old sections of this README and of `docs/` that describe account answers and the merchant API describe a feature that is now off; the merchant API routes still exist in the server but nothing in the bot calls them.
+
+The Report page no longer has the **Fix these first** list or **Check recent answers**. The wrong-answer tile therefore has nothing new to count (it shows only marks made earlier).

@@ -575,9 +575,8 @@ describe('Control panel', () => {
     expect(screen.getByText(/Not understood most in/).textContent).toMatch(/English/);               // 7 of 40 is higher than 3 of 60
     expect(screen.getByText('25%')).toBeTruthy();                                                   // 1 wrong of 4 checked
     expect(screen.getByText(/from logged-in members/).textContent).toMatch(/12 from logged-in members, 30 from visitors/);
-    expect(screen.getByText('Check recent answers')).toBeTruthy();
-    await userEvent.click(screen.getAllByRole('button', { name: 'Wrong' })[0]);                                         // sends the mark, then reloads the report
-    expect(screen.getByText('Check recent answers')).toBeTruthy();
+    expect(screen.queryByText('Check recent answers')).toBeNull(); expect(screen.queryByText('Fix these first')).toBeNull();       // these two parts are not on the page
+    expect(screen.queryByRole('button', { name: 'Wrong' })).toBeNull(); expect(screen.queryByRole('button', { name: 'Add answer' })).toBeNull();
   });
   it('Report: custom dates ask for the report between two days, and Download CSV saves the numbers', async () => {
     open('staff', '/admin/report');
@@ -591,15 +590,6 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
     const text = await (saved as unknown as Blob).text();
     expect(text).toContain('Messages per day'); expect(text).toContain('Customer asked for a person'); expect(text).toContain('tarik duit lambat');
-  });
-  it('Fix these first: Add keyword opens the keyword form, Add answer opens a new entry with the question in it', async () => {
-    const { unmount } = open('staff', '/admin/report');
-    await userEvent.click(await screen.findByRole('button', { name: 'Add answer' }));
-    expect(await screen.findByRole('heading', { name: 'New entry' })).toBeTruthy();
-    expect(screen.getByText('tarik duit lambat')).toBeTruthy();                                    // the customer's words are the first example question
-    unmount(); open('staff', '/admin/report');
-    await userEvent.click(await screen.findByRole('button', { name: 'Add keyword' }));
-    expect(await screen.findByRole('heading', { name: /What is “tarik duit lambat”\?/ })).toBeTruthy();
   });
   it('shows details when hovering a day on the chart', async () => {
     open('staff', '/admin/report');
