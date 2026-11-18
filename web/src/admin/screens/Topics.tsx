@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePanel } from '../store';
 import TopicFlow from './TopicFlow';
+import { Modal } from '../ui';
 import { KW_PICK, LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, groupKeywords, guessLang, slug, topicNames } from '../model';
 
 const FOLD = 12;                                                              // words shown per group before "+N more"
@@ -151,7 +152,7 @@ export default function Topics() {
   };
 
   return (
-    <div className="card"><div className="head"><div><h2>Topics · {p.M.name}</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>＋ Add a topic or keyword</button></div>
+    <div className="card"><div className="head"><div><h2>Topics · {p.M.name}</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-haspopup="dialog" onClick={() => setAdding(true)}>＋ Add a topic or keyword</button></div>
       <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}<span className="tn">{tabCount(k)}</span></button>)}</div>
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
       <div className="tbar">
@@ -161,7 +162,9 @@ export default function Topics() {
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
           <span className="sub">{shown} words shown</span></div>}
       </div>
-      {adding && <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={done} /></div>}
+      {adding && <Modal label="Add a topic or keyword" small wide onClose={() => setAdding(false)}>
+        <div className="head"><h2>Add a topic or keyword</h2><button className="btn sm" type="button" onClick={() => setAdding(false)}>Close</button></div>
+        <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={(msg, chip, word) => { done(msg, chip, word); setAdding(false); }} /></div></Modal>}
       {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : showHow ? <div style={{ marginTop: 10 }}><HowItWorks outcomes={outcomes()} onOpen={openList} /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
         {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div id="kwlists" ref={listRef}>{lists()}</div>

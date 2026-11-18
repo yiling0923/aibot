@@ -1,14 +1,14 @@
 import { useEffect, type ReactNode } from 'react';
 
 /** A dialog over the page. Clicking the dark area or pressing Escape closes it. */
-export function Modal({ label, onClose, small, children }: { label: string; onClose: () => void; small?: boolean; children: ReactNode }) {
+export function Modal({ label, onClose, small, wide, children }: { label: string; onClose: () => void; small?: boolean; wide?: boolean; children: ReactNode }) {
   useEffect(() => {
     const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     document.addEventListener('keydown', k); return () => document.removeEventListener('keydown', k);
   }, [onClose]);
   return (
     <div className={'ov' + (small ? ' c' : '')} onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className={'pane' + (small ? ' modal' : '')} role="dialog" aria-label={label}>{children}</div>
+      <div className={'pane' + (small ? ' modal' : '') + (wide ? ' wide' : '')} role="dialog" aria-label={label}>{children}</div>
     </div>
   );
 }

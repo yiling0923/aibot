@@ -763,6 +763,9 @@ describe('Control panel', () => {
     expect(await screen.findByText('Short forms')).toBeTruthy();                                            // under the main keyword "deposit", not under a topic called 0
     expect(screen.queryByText(/own topic/)).toBeNull();
     expect(screen.getAllByText(/main keyword/).length).toBeGreaterThan(0);
+    expect(screen.queryByRole('dialog', { name: 'Add a topic or keyword' })).toBeNull();                       // the pop-up closed after the word was added
+    await userEvent.click(screen.getByText('＋ Add a topic or keyword'));
+    expect(screen.getByRole('dialog', { name: 'Add a topic or keyword' })).toBeTruthy();                       // it is a pop-up
     await userEvent.selectOptions(screen.getByLabelText('Kind'), 'slang');
     await userEvent.type(screen.getByPlaceholderText('e.g. depoo'), 'cashin{enter}');
     await screen.findByText('cashin');
