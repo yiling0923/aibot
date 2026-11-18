@@ -763,3 +763,8 @@ details.moreopt{background:none;padding:0}
 .igrid select.gcell.lang{font-weight:600;color:var(--accent);cursor:pointer;appearance:none;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235d6b78' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center!important;padding-right:26px}
 .igrid td.del{width:36px;text-align:center;vertical-align:middle}
 .igrid td.del .btn{border:0;color:var(--muted);padding:2px 8px;font-size:15px}.igrid td.del .btn:hover{color:var(--bad)}
+/* the blocks panel folds to a thin strip on the left */
+.flowwrap.nopal{grid-template-columns:44px minmax(0,1fr)}
+.flowpal.folded{padding:8px 0;align-self:stretch;display:flex;justify-content:center;min-height:120px}
+.flowpal.folded .palh{flex-direction:column;justify-content:flex-start;gap:12px;width:auto;padding:0}
+.flowpal.folded .palh>span:first-child{writing-mode:vertical-rl}

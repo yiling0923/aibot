@@ -226,7 +226,7 @@ export default function TopicFlow() {
     </div>
     <div className={'flowwrap' + (pal ? '' : ' nopal')}>
       <aside className={'flowpal' + (pal ? '' : ' folded')} aria-label="Blocks">
-        <button type="button" className="palh" aria-expanded={pal} onClick={() => setPal(!pal)} title={pal ? 'Hide the blocks' : 'Show the blocks'}><span>Add a block</span><span className="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" /></svg></span></button>
+        <button type="button" className="palh" aria-expanded={pal} onClick={() => setPal(!pal)} title={pal ? 'Hide the blocks' : 'Show the blocks'}><span>Add a block</span><span className="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg></span></button>
         {pal && <>
         <button type="button" className="ftile t-tp" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'topic')} onClick={() => addBlock('topic')}><i>◆</i><span><b>Topic</b><small>what the customer wants</small></span></button>
         <button type="button" className="ftile t-kw" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'keyword')} onClick={() => addBlock('keyword')}><i>#</i><span><b>Keyword</b><small>a word that means a topic</small></span></button>
