@@ -226,7 +226,12 @@ export default function TopicFlow() {
     </div>
     <div className={'flowwrap' + (pal ? '' : ' nopal')}>
       <aside className={'flowpal' + (pal ? '' : ' folded')} aria-label="Blocks">
-        <button type="button" className="palh" aria-expanded={pal} onClick={() => setPal(!pal)} title={pal ? 'Hide the blocks' : 'Show the blocks'}><span>Add a block</span><span className="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg></span></button>
+        <button type="button" className="palh" aria-label="Add a block" aria-expanded={pal} onClick={() => setPal(!pal)} title={pal ? 'Hide the blocks' : 'Show the blocks'}><span>Add a block</span><span className="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6" /></svg></span></button>
+        {!pal && <div className="palrail" role="group" aria-label="Blocks (folded)"><span className="sep" aria-hidden="true" />
+          <button type="button" className="ib t-tp" aria-label="Topic" title="Topic: what the customer wants" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'topic')} onClick={() => addBlock('topic')}>◆</button>
+          <button type="button" className="ib t-kw" aria-label="Keyword" title="Keyword: a word that means a topic" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'keyword')} onClick={() => addBlock('keyword')}>#</button>
+          <button type="button" className="ib t-an" aria-label="Answer" title="Answer: drag into a topic to write one" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'answer')} onClick={() => addBlock('answer')}>▤</button>
+          <button type="button" className="ib t-ho" aria-label="If not clear" title="If not clear: drag into a topic, or click to show it on every topic" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'ifnotclear')} onClick={() => setHoTopics(topics.every(showHoFor) ? new Set() : new Set(topics))}>⚑</button></div>}
         {pal && <>
         <button type="button" className="ftile t-tp" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'topic')} onClick={() => addBlock('topic')}><i>◆</i><span><b>Topic</b><small>what the customer wants</small></span></button>
         <button type="button" className="ftile t-kw" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'keyword')} onClick={() => addBlock('keyword')}><i>#</i><span><b>Keyword</b><small>a word that means a topic</small></span></button>

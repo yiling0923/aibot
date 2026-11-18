@@ -288,6 +288,10 @@ describe('Control panel', () => {
     await userEvent.click(bar);
     expect(screen.getByRole('button', { name: /Add a block/ }).getAttribute('aria-expanded')).toBe('false');
     expect(screen.queryByRole('button', { name: /Topic.*what the customer wants/ })).toBeNull();
+    const rail = screen.getByRole('group', { name: 'Blocks (folded)' });                              // folded: a thin rail with the four block icons
+    expect(['Topic', 'Keyword', 'Answer', 'If not clear'].every((n) => within(rail).queryByRole('button', { name: n }))).toBe(true);
+    await userEvent.click(within(rail).getByRole('button', { name: 'Keyword' }));                     // a block can be added from the rail
+    expect(await screen.findByLabelText('New keyword')).toBeTruthy();
     await userEvent.click(screen.getByRole('button', { name: /Add a block/ }));
     expect(screen.getByRole('button', { name: /Topic.*what the customer wants/ })).toBeTruthy();
     for (const gone of [/Auto-arrange/, /Hide blocks/, /Show blocks/]) expect(screen.queryByRole('button', { name: gone })).toBeNull();      // the old buttons are gone
