@@ -321,8 +321,8 @@ describe('Control panel', () => {
   });
   it('Topics: the tabs show counts, each tab says what it is for, and Greetings, Fillers and Block lists have a "How it works" picture', async () => {
     open('staff', '/admin/kw');
+    const tabs = await screen.findByRole('tablist');
     expect(screen.queryByText(/A main keyword \(topic\) and the words that point to it/)).toBeNull();                 // the Topics tab has no intro line
-    const tabs = screen.getByRole('tablist');
     expect(within(tabs).getByRole('tab', { name: /Fillers/ }).textContent).toMatch(/Fillers\d/);                       // a count on every tab
     await userEvent.click(within(tabs).getByRole('tab', { name: /Block lists/ }));
     expect(screen.getByText(/make the bot reply carefully, refuse, or hand the chat to a person/)).toBeTruthy();
