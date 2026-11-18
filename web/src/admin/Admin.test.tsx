@@ -506,7 +506,7 @@ describe('Control panel', () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Download example file' })).toBeTruthy();
-    expect(screen.getByText(/Press Publish/)).toBeTruthy();
+    expect(screen.getByText(/Customers see the answers only after this/)).toBeTruthy(); expect(document.querySelectorAll('.gd-list li').length).toBe(5);
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
