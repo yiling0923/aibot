@@ -740,3 +740,26 @@ details.moreopt{background:none;padding:0}
 .fc.tp.draft{border-color:#d99a1c;box-shadow:none}
 .kc.nl{border:1px dashed #d99a1c;background:var(--warnbg)}
 .lane.nl{border-style:dashed;border-color:#d99a1c;background:rgba(217,154,28,.05)}.lane.nl .lt{color:var(--warn)}
+
+/* import: calmer tabs, download buttons and table */
+.improw{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.imptabs{margin:0;border-radius:99px;padding:3px;background:var(--surface2);border:0;gap:2px}
+.imptabs button{border-radius:99px;padding:6px 16px;background:transparent;color:var(--muted)}
+.imptabs button[aria-pressed=true]{background:var(--accent);color:var(--accentfg);box-shadow:0 1px 3px rgba(0,0,0,.15)}
+.imptools{gap:8px}.btn.dl{display:inline-flex;gap:6px;align-items:center;color:var(--accent);border-color:color-mix(in srgb,var(--accent) 35%,var(--line))}
+.btn.ghost{background:transparent}
+.igrid .gridbox{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--surface)}
+.igrid .scroll{overflow-x:auto}
+.igrid table{border-collapse:collapse;width:100%;min-width:760px;table-layout:fixed}
+.igrid thead th{background:var(--surface2);color:var(--muted);font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:9px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap}
+.igrid td{border:0;border-bottom:1px solid color-mix(in srgb,var(--line) 70%,transparent);border-right:1px solid color-mix(in srgb,var(--line) 45%,transparent);padding:0;vertical-align:top;background:transparent}
+.igrid td:last-child{border-right:0}.igrid tbody tr:last-child td{border-bottom:0}
+.igrid tbody tr:hover td{background:color-mix(in srgb,var(--accent) 4%,transparent)}
+.igrid td.rn,.igrid th.rn{width:36px;text-align:center;color:var(--muted);font-size:11.5px;padding:10px 4px;background:var(--surface2)}
+.igrid .gcell{width:100%;min-height:38px;padding:9px 12px;font-size:13.5px;line-height:1.4;resize:none;overflow:hidden;display:block}
+.igrid textarea.gcell{overflow:hidden}
+.igrid .gcell:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--surface)!important;position:relative;z-index:1}
+.igrid .gcell::placeholder{color:color-mix(in srgb,var(--muted) 70%,transparent)}
+.igrid select.gcell.lang{font-weight:600;color:var(--accent);cursor:pointer;appearance:none;background:transparent url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%235d6b78' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center!important;padding-right:26px}
+.igrid td.del{width:36px;text-align:center;vertical-align:middle}
+.igrid td.del .btn{border:0;color:var(--muted);padding:2px 8px;font-size:15px}.igrid td.del .btn:hover{color:var(--bad)}
