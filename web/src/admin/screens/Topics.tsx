@@ -60,7 +60,7 @@ export default function Topics() {
   const lock = !p.isAdmin; const d = p.draft;
   const cur = !p.adv && tab === 'aspect' ? 'short' : tab;
   const [shown, setShown] = useState(0);
-  const [view, setViewState] = useState<'list' | 'flow'>(() => { try { return localStorage.getItem('topicsView') === 'flow' ? 'flow' : 'list'; } catch { return 'list'; } });
+  const [view, setViewState] = useState<'list' | 'flow'>(() => { try { return localStorage.getItem('topicsView') === 'list' ? 'list' : 'flow'; } catch { return 'flow'; } });
   const setView = (v: 'list' | 'flow') => { setViewState(v); try { localStorage.setItem('topicsView', v); } catch { /* ignore */ } };
   const flow = cur === 'short' && view === 'flow';
   const [how, setHowState] = useState(() => { try { return localStorage.getItem('topicsHow') === '1'; } catch { return false; } });   // Greetings, Fillers, Block lists: the "How it works" picture
@@ -163,7 +163,7 @@ export default function Topics() {
       <p className="tabintro">{INTRO[cur]}</p>
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
       <div className="tbar">
-        {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['list', 'List'], ['flow', 'Flowchart']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
+        {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['flow', 'Flowchart'], ['list', 'List']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
         {(cur === 'small' || cur === 'filler' || cur === 'block') && <div className="segs" role="group" aria-label="View">{([[false, 'List'], [true, 'How it works']] as const).map(([k, l]) => <button key={l} type="button" aria-pressed={how === k} className={how === k ? 'on' : ''} onClick={() => setHow(k)}>{l}</button>)}</div>}
         {!flow && !showHow && <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>

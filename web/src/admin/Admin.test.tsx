@@ -68,7 +68,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { localStorage.clear(); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { localStorage.clear(); localStorage.setItem('topicsView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -280,14 +280,29 @@ describe('Control panel', () => {
     expect(screen.getByText(/Before the bot can use this answer/)).toBeTruthy();                // the checklist shows what is missing
     expect(screen.getByText(/no example questions/i)).toBeTruthy();
   });
-  it('folds the blocks panel away and brings it back', async () => {
+  it('folds the blocks panel away by its title bar and brings it back', async () => {
     open('staff', '/admin/kw');
     await userEvent.click(await screen.findByText('Flowchart'));
-    expect(screen.getByLabelText('Blocks')).toBeTruthy();
-    await userEvent.click(screen.getByRole('button', { name: /Hide blocks/ }));
-    expect(screen.queryByLabelText('Blocks')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: /Show blocks/ }));
-    expect(screen.getByLabelText('Blocks')).toBeTruthy();
+    const bar = screen.getByRole('button', { name: /Add a block/ });
+    expect(bar.getAttribute('aria-expanded')).toBe('true'); expect(screen.getByRole('button', { name: /Topic.*what the customer wants/ })).toBeTruthy();
+    await userEvent.click(bar);
+    expect(screen.getByRole('button', { name: /Add a block/ }).getAttribute('aria-expanded')).toBe('false');
+    expect(screen.queryByRole('button', { name: /Topic.*what the customer wants/ })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /Add a block/ }));
+    expect(screen.getByRole('button', { name: /Topic.*what the customer wants/ })).toBeTruthy();
+    for (const gone of [/Auto-arrange/, /Hide blocks/, /Show blocks/]) expect(screen.queryByRole('button', { name: gone })).toBeNull();      // the old buttons are gone
+    expect(screen.queryByRole('switch', { name: /If not clear/ })).toBeNull();
+  });
+  it('the Flowchart tab comes first and is what opens, and a keyword that is only in the draft looks different from a live one', async () => {
+    localStorage.removeItem('topicsView');
+    open('staff', '/admin/kw');
+    expect(await screen.findByLabelText('Topic deposit')).toBeTruthy();                                // the flowchart opens by itself
+    const tabs = [...document.querySelectorAll('[aria-label="View"] button')].map((x) => x.textContent); expect(tabs).toEqual(['Flowchart', 'List']);
+    expect(document.querySelector('.fc.tp .tag.lvt')?.textContent).toBe('LIVE');                       // the deposit topic is published
+    expect(document.querySelector('.kc.nl')).toBeNull();
+    await userEvent.type(screen.getByLabelText('Add a keyword to deposit'), 'topupz{enter}');
+    const fresh = [...document.querySelectorAll('.kc.nl')].map((x) => x.textContent); expect(fresh.some((x) => x?.includes('topupz'))).toBe(true);   // new in the draft: amber
+    expect(document.querySelector('.kc.sh:not(.nl)')).toBeTruthy();                                    // the published words stay as they were
   });
   it('deletes an answer from its card in the flowchart', async () => {
     open('staff', '/admin/kw');

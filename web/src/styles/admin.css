@@ -716,3 +716,27 @@ details.moreopt{background:none;padding:0}
 .igrid .gcell{border:0!important;border-radius:0!important;background:transparent!important;box-shadow:none!important}
 .igrid .gcell:focus{background:var(--bg)!important}
 .igrid th{overflow:hidden;text-overflow:ellipsis}
+
+/* flowchart: wide search, one palette bar, same title bars, draft look */
+.flowbar{justify-content:stretch}
+.flowtools{flex:1 1 100%;width:100%}
+.flowfind{flex:1 1 360px;min-width:260px;max-width:none}
+.flowcanvas{height:max(740px,calc(100vh - 240px))}
+.flowpal .palh{display:flex;width:100%;justify-content:space-between;align-items:center;border:0;background:none;padding:0 0 10px;margin:0;font:inherit;cursor:pointer;color:var(--muted);font-size:11.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.flowpal .chev{width:24px;height:24px;border-radius:7px;display:grid;place-items:center;background:var(--surface2);color:var(--muted)}
+.flowpal .chev svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;transition:transform .15s}
+.flowpal .palh:hover .chev{background:var(--infobg);color:var(--accent)}
+.flowpal.folded{padding:8px 14px}.flowpal.folded .palh{padding:0}.flowpal.folded .chev svg{transform:rotate(180deg)}
+.flowpal .palhint{margin-top:10px;font-size:12px}
+.fc{display:flex;flex-direction:column}
+.fc .hd{height:24px;padding:0 11px}
+.fc .bd{flex:1;display:flex;flex-direction:column;justify-content:center;padding:8px 11px}
+.fc.kw .bd{justify-content:flex-start}
+.fc .hd .tag{margin-left:auto;font-size:9.5px;font-weight:800;border-radius:99px;padding:0 7px;line-height:15px;letter-spacing:.04em}
+.fc .hd .tag ~ .x,.fc .hd .tag ~ .mv{margin-left:6px}
+.tag.lvt{background:var(--ok);color:#fff}.tag.drt{background:#d99a1c;color:#fff}
+.fc.draft{border:2px dashed #d99a1c;background:var(--warnbg);box-shadow:none}
+.fc.draft .hd{background:color-mix(in srgb,#d99a1c 24%,var(--surface));color:var(--warn)}
+.fc.tp.draft{border-color:#d99a1c;box-shadow:none}
+.kc.nl{border:1px dashed #d99a1c;background:var(--warnbg)}
+.lane.nl{border-style:dashed;border-color:#d99a1c;background:rgba(217,154,28,.05)}.lane.nl .lt{color:var(--warn)}

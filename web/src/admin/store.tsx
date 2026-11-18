@@ -9,6 +9,8 @@ export interface Panel {
   merchant: string; M: MerchantRowAdmin; setMerchant: (code: string) => void;
   adv: boolean; setAdv: (on: boolean) => void;
   draft: Draft; changes: string[];
+  /** What customers get right now: the published version. Used to mark what is only in the draft. */
+  live: Snapshot;
   /** Change the draft. The callback gets a copy to change and a `note` function that adds a line to the list of changes. */
   edit: (fn: (d: Draft, note: (text: string) => void) => void) => void;
   discard: () => void;
@@ -98,7 +100,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
     const M = srv.merchants.find((m) => m.code === merchant) || srv.merchants[0] || { code: merchant, name: merchant };
     return {
       me: srv.user, isAdmin: srv.user.role === 'admin', ver: srv.versions[merchant] ?? 0, sharedVer: srv.sharedVer, merchants: srv.merchants, ai: srv.ai, history: srv.history,
-      merchant, M, setMerchant, adv, setAdv, draft, changes, edit,
+      merchant, M, setMerchant, adv, setAdv, draft, changes, edit, live: srv.snapshot,
       discard: () => { if (confirm('Throw away all unpublished changes?')) { clearSaved(); load({ merchant }).catch((e: Error) => onToast(e.message)); } },
       kw, kwMap, ignored, reloadKeywords: () => loadKeywordsFor(merchant), ignoreWord, unignoreWord, 
       status: (w) => kwStatus(draft, merchant, w), typeOf: (w) => classify(draft, merchant, kwMap, w),

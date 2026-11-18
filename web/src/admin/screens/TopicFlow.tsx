@@ -34,11 +34,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 export default function TopicFlow() {
   const p = usePanel(); const d = p.draft; const assign = useAssign(); const nav = useNavigate();
   const canvas = useRef<HTMLDivElement>(null);
-  const storeKey = 'flowpos:' + p.merchant;
-  const read = (): Pos => { try { return JSON.parse(localStorage.getItem(storeKey) || '{}') as Pos; } catch { return {}; } };
-  const [pos, setPos] = useState<Pos>(read);
-  useEffect(() => { setPos(read()); }, [storeKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const persist = (n: Pos) => { try { localStorage.setItem(storeKey, JSON.stringify(n)); } catch { /* ignore */ } };
+  const [pos, setPos] = useState<Pos>({});                                   // only while a card is being dragged: on drop every card goes back to its place in the automatic layout
   const [pend, setPend] = useState<Pending[]>([]); const nextId = useRef(1);
   const [over, setOver] = useState<string | null>(null);
   const [hoTopics, setHoTopicsState] = useState<Set<string>>(() => { try { return new Set<string>(JSON.parse(localStorage.getItem('flowho2') || '[]')); } catch { return new Set<string>(); } });   // topics that show their "If not clear" card (it is the same for every topic, so they start hidden)
@@ -55,6 +51,14 @@ export default function TopicFlow() {
   const mine = (d.mAliases[p.merchant] || []).map((a, i) => [a, i] as const);
   const entries = d.kb.filter((e) => e.merchant === p.merchant) as Entry[];
   const unset = p.kw.filter((r) => !r.ignored && p.status(r.w).t === 'Not set yet').slice(0, 24);
+  /* what is live (published) and what is only in the draft, so the two can look different */
+  const lv = p.live; const liveOwn = lv.mAliases[p.merchant] || [];
+  const topicLive = (t: string) => !!lv.aliases[t] || liveOwn.some((a) => a.canonical === t) || lv.kb.some((e) => e.merchant === p.merchant && e.topic === t && e.status !== 'draft');
+  const entryLive = (e: Entry) => e.status !== 'draft' && lv.kb.some((x) => x.merchant === p.merchant && x.intent_key === e.intent_key && x.status !== 'draft');
+  const ownLive = (a: { variant: string; canonical: string; language?: string | null }) => liveOwn.some((x) => x.variant === a.variant && x.canonical === a.canonical && (x.language ?? null) === (a.language ?? null));
+  const sharedLive = (t: string, l: string, w: string) => (lv.aliases[t]?.[l] ?? []).includes(w);
+  const tag = (isLive: boolean, text = 'DRAFT') => (isLive ? <span className="tag lvt">LIVE</span> : <span className="tag drt" title="Only in your draft. Customers do not get this until you press Publish.">{text}</span>);
+
   const fl = fq.trim().toLowerCase();
   const matches = new Set<string>();
   if (fl) topics.forEach((t) => {
@@ -106,7 +110,7 @@ export default function TopicFlow() {
   const deleteAnswer = (id: number) => {
     const e = entries.find((x) => x.id === id); if (!e || !confirm('Delete the answer "' + e.intent_key + '"? It is removed from the draft until you publish.')) return;
     p.edit((x, note) => { x.kb = x.kb.filter((k) => !(k.id === id && k.merchant === p.merchant)); note('Deleted answer "' + e.intent_key + '" (' + p.M.name + ')'); });
-    setPos((o) => { const n = { ...o }; delete n['ans:' + id]; persist(n); return n; }); p.toast('Answer deleted. Press Publish to make it final.');
+    p.toast('Answer deleted. Press Publish to make it final.');
   };
   const deleteTopic = (t: string) => {
     const n = entries.filter((x) => x.topic === t).length;
@@ -159,6 +163,7 @@ export default function TopicFlow() {
   const toCanvas = (cx: number, cy: number) => { const r = canvas.current?.getBoundingClientRect(); return { x: (cx - (r?.left ?? 0) + (canvas.current?.scrollLeft ?? 0)) / scale, y: (cy - (r?.top ?? 0) + (canvas.current?.scrollTop ?? 0)) / scale }; };
   const dragNode = (key: string, e: RPointerEvent, set?: (x: number, y: number) => void) => {
     if ((e.target as HTMLElement).closest('button,input,select,textarea,.port,.kc')) return;
+    if (!set && !key.startsWith('ans:')) return;
     const n = by.get(key); const lane = n?.kind === 'topic' && !set ? (groups.get(n.topic) ?? []).map((k) => [k, by.get(k)!] as const) : null;
     const start = { cx: e.clientX, cy: e.clientY, x: n?.x ?? 0, y: n?.y ?? 0 }; let last: Pos = {};
     const mv = (ev: PointerEvent) => {
@@ -169,11 +174,12 @@ export default function TopicFlow() {
     };
     const up = (ev: PointerEvent) => {
       window.removeEventListener('pointermove', mv); window.removeEventListener('pointerup', up);
-      if (n?.kind === 'ans' && !set) {                               // an answer dropped inside another topic's box moves to that topic and takes its place there
+      if (set) return;
+      setPos({});                                                  // the chart lines up again by itself
+      if (n?.kind === 'ans') {                                     // an answer dropped inside another topic's box moves to that topic
         const to = laneAt(ev.clientX, ev.clientY);
-        if (to && to !== n.topic && Math.hypot(ev.clientX - start.cx, ev.clientY - start.cy) > 6) { move({ t: 'entry', id: Number(key.slice(4)) }, to); setPos((o) => { const x = { ...o }; delete x[key]; persist(x); return x; }); return; }
+        if (to && to !== n.topic && Math.hypot(ev.clientX - start.cx, ev.clientY - start.cy) > 6) move({ t: 'entry', id: Number(key.slice(4)) }, to);
       }
-      if (!set) setPos((o) => { persist(o); return o; });
     };
     window.addEventListener('pointermove', mv); window.addEventListener('pointerup', up);
   };
@@ -210,34 +216,32 @@ export default function TopicFlow() {
 
   return <div className="flow" data-testid="flow">
     <div className="flowbar">
-      <span className="hint" title="Drag a keyword chip or the dot on an answer onto a topic to move it. Drag cards by their title to arrange. Same data as the list view.">Drag a keyword or an answer onto a topic to move it.</span>
       <div className="flowtools" role="toolbar" aria-label="Flowchart tools">
         <input type="search" className="flowfind" placeholder="Find a topic, keyword or answer" aria-label="Find in the flowchart" value={fq} onChange={(e) => setFq(e.target.value)} />
         {fl && <span className="sub" role="status">{matches.size} of {topics.length} topic{topics.length === 1 ? '' : 's'}</span>}
-        <button type="button" className="tbtn" onClick={() => { setPos({}); persist({}); }} title="Put every card back in its place"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="7" rx="1.5" /><rect x="14" y="3" width="7" height="7" rx="1.5" /><rect x="3" y="14" width="7" height="7" rx="1.5" /><rect x="14" y="14" width="7" height="7" rx="1.5" /></svg>Auto-arrange</button>
         <button type="button" className="tbtn" onClick={fit} title="Fit the whole chart in the window"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" /></svg>Fit to screen</button>
-        <button type="button" className={'tbtn' + (pal ? '' : ' on')} aria-pressed={!pal} onClick={() => setPal(!pal)} title="Fold the blocks panel away to give the chart the full width"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg>{pal ? 'Hide blocks' : 'Show blocks'}</button>
-        <span className="tdiv" aria-hidden="true" />
-        <label className="switch" title="What happens when the bot is not sure. It is the same for every topic: ask once, then a person."><input type="checkbox" role="switch" checked={topics.length > 0 && topics.every(showHoFor)} onChange={(e) => setHoTopics(e.target.checked ? new Set(topics) : new Set())} /><span className="track"><span className="thumb" /></span> Show “If not clear”</label>
         <span className="tdiv" aria-hidden="true" />
         <span className="zoom"><button type="button" aria-label="Zoom out" onClick={() => setScale((s) => Math.max(0.5, +(s - 0.1).toFixed(2)))}>−</button><span className="zoomv">{Math.round(scale * 100)}%</span><button type="button" aria-label="Zoom in" onClick={() => setScale((s) => Math.min(1.5, +(s + 0.1).toFixed(2)))}>＋</button></span>
       </div>
     </div>
     <div className={'flowwrap' + (pal ? '' : ' nopal')}>
-      {pal && <aside className="flowpal" aria-label="Blocks">
-        <h4>Add a block</h4>
+      <aside className={'flowpal' + (pal ? '' : ' folded')} aria-label="Blocks">
+        <button type="button" className="palh" aria-expanded={pal} onClick={() => setPal(!pal)} title={pal ? 'Hide the blocks' : 'Show the blocks'}><span>Add a block</span><span className="chev" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="m18 15-6-6-6 6" /></svg></span></button>
+        {pal && <>
         <button type="button" className="ftile t-tp" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'topic')} onClick={() => addBlock('topic')}><i>◆</i><span><b>Topic</b><small>what the customer wants</small></span></button>
         <button type="button" className="ftile t-kw" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'keyword')} onClick={() => addBlock('keyword')}><i>#</i><span><b>Keyword</b><small>a word that means a topic</small></span></button>
         <button type="button" className="ftile t-an" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'answer')} onClick={() => addBlock('answer')}><i>▤</i><span><b>Answer</b><small>drag into a topic to write one</small></span></button>
         <button type="button" className="ftile t-ho" draggable onDragStart={(e) => e.dataTransfer.setData('application/x-aibot-block', 'ifnotclear')} onClick={() => setHoTopics(topics.every(showHoFor) ? new Set() : new Set(topics))} title="Drag into a topic to show what happens there when the bot is not sure. Click to show or hide it on every topic."><i>⚑</i><span><b>If not clear</b><small>drag into a topic to show it</small></span></button>
+        <div className="sub palhint">Drag a keyword or an answer onto a topic to move it. Cards line up by themselves.</div>
         <button type="button" className="btn sm ghost" style={{ marginTop: 8 }} onClick={() => nav('/admin/kb')}>Open Knowledge base →</button>
         {unset.length > 0 && <><h4 style={{ marginTop: 14 }}>Words not set yet</h4><div className="sub" style={{ marginBottom: 6 }}>Drag onto a topic</div>
           <div className="chips">{unset.map((r) => <span key={r.w} className="chip ro" draggable onDragStart={(e) => { e.dataTransfer.setData(MIME, JSON.stringify({ t: 'word', w: r.w } as Src)); }}>{r.w}<span className="n">{r.n}</span></span>)}</div></>}
-      </aside>}
+        </>}
+      </aside>
       <div className="flowcanvas" ref={canvas} onDragOver={onCanvasOver} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(null); }} onDrop={onCanvasDrop}>
         <div style={{ width: width * scale, height: height * scale }}>
           <div className="flowinner" style={{ position: 'relative', width, height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
-            {lanes.map((l) => <div key={'lane' + l.topic} className={'lane' + (over === l.topic ? ' over' : '')} style={{ left: l.x, top: l.y, width: l.w, height: l.h, ...(faded(l.topic) ? { opacity: 0.35 } : {}) }}><span className="lt">{l.topic}</span></div>)}
+            {lanes.map((l) => <div key={'lane' + l.topic} className={'lane' + (over === l.topic ? ' over' : '') + (topicLive(l.topic) ? '' : ' nl')} style={{ left: l.x, top: l.y, width: l.w, height: l.h, ...(faded(l.topic) ? { opacity: 0.35 } : {}) }}><span className="lt">{l.topic}{topicLive(l.topic) ? '' : ' · not live'}</span></div>)}
             <svg className="flowedges" width={width} height={height} aria-hidden="true">
               <defs>{(['kw', 'ans', 'ho'] as const).map((k) => <marker key={k} id={'arr-' + k} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className={'ar-' + k} /></marker>)}
                 <marker id="arr-live" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className="ar-live" /></marker></defs>
@@ -246,23 +250,23 @@ export default function TopicFlow() {
             </svg>
             {nodes.map((n) => {
               const t = n.topic;
-              if (n.kind === 'topic') return <div key={n.key} className={'fc tp' + (over === t ? ' over' : '')} style={box(n)} data-topic={t} aria-label={'Topic ' + t} onPointerDown={(e) => dragNode(n.key, e)} onDragOver={(e) => { e.preventDefault(); setOver(t); }} onDragLeave={() => setOver(null)} onDrop={html5Drop(t)}>
-                <div className="hd">◆ Topic{!d.aliases[t] && <button type="button" className="x del" aria-label={'Delete topic ' + t} title="Delete this topic (only topics made for this merchant)" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => deleteTopic(t)}>{trash}</button>}</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
+              if (n.kind === 'topic') return <div key={n.key} className={'fc tp' + (over === t ? ' over' : '') + (topicLive(t) ? '' : ' draft')} style={box(n)} data-topic={t} aria-label={'Topic ' + t} onDragOver={(e) => { e.preventDefault(); setOver(t); }} onDragLeave={() => setOver(null)} onDrop={html5Drop(t)}>
+                <div className="hd">◆ Topic{tag(topicLive(t))}{!d.aliases[t] && <button type="button" className="x del" aria-label={'Delete topic ' + t} title="Delete this topic (only topics made for this merchant)" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => deleteTopic(t)}>{trash}</button>}</div><div className="bd"><div className="big">{t}</div><div className="pv">{entries.filter((x) => x.topic === t).length} answers · {d.aliases[t] ? 'shared topic' : p.M.name + ' only'}</div></div><span className="port l" /><span className="port r" /></div>;
               if (n.kind === 'kw') { const sharedL = Object.entries(d.aliases[t] || {}).flatMap(([l, ws]) => ws.map((w): [string, string] => [w, l])); const own = mine.filter(([a]) => a.canonical === t);
                 const q = (kwq[t] || '').trim().toLowerCase(); const hit = (w: string) => !q || w.toLowerCase().includes(q); const total = own.length + sharedL.length;
-                return <div key={n.key} className="fc kw" style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd"># Keywords <span className="cnt">{total}</span></div><div className="bd kwbd">
+                return <div key={n.key} className={'fc kw' + (topicLive(t) ? '' : ' draft')} style={box(n)}><div className="hd"># Keywords <span className="cnt">{total}</span>{tag(topicLive(t))}</div><div className="bd kwbd">
                   <input className="kadd" placeholder="＋ Add a keyword, press Enter" aria-label={'Add a keyword to ' + t} onPointerDown={(e) => e.stopPropagation()} onKeyDown={(e) => { if (e.key !== 'Enter') return; const el = e.target as HTMLInputElement; if (addKeyword(t, el.value)) el.value = ''; }} />
                   {total > 10 && <input className="kadd find" type="search" placeholder="Find a keyword" aria-label={'Find a keyword in ' + t} value={kwq[t] || ''} onPointerDown={(e) => e.stopPropagation()} onChange={(e) => setKwq({ ...kwq, [t]: e.target.value })} />}
-                  <div className="kwscroll" style={{ maxHeight: KWSCROLL }} onPointerDown={(e) => { if (e.target === e.currentTarget) dragNode(n.key, e); }}>
-                  {own.filter(([a]) => hit(a.variant)).map(([a, i]) => <span key={i} className="kc" onPointerDown={(e) => { e.stopPropagation(); startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i }, to)); }} title="Drag onto a topic to move it">{a.variant}{moveMenu('Move ' + a.variant + ' to topic', t, { t: 'kw', i })}<button type="button" className="x" aria-label={'Remove ' + a.variant} onClick={() => removeKw(i)}>×</button></span>)}
-                  {sharedL.filter(([w]) => hit(w)).map(([w, l]) => <span key={l + w} className={'kc sh' + (p.isAdmin ? ' adm' : '')} title={p.isAdmin ? 'Shared by all merchants. Drag onto another topic to move it.' : 'Shared by all merchants (an admin edits it)'} onPointerDown={(e) => { e.stopPropagation(); if (p.isAdmin) startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'sh', topic: t, l, w }, to)); }}>{w}{p.isAdmin && <button type="button" className="x" aria-label={'Remove shared ' + w} onClick={() => removeShared(t, l, w)}>×</button>}</span>)}
+                  <div className="kwscroll" style={{ maxHeight: KWSCROLL }}>
+                  {own.filter(([a]) => hit(a.variant)).map(([a, i]) => <span key={i} className={'kc' + (ownLive(a) ? '' : ' nl')} onPointerDown={(e) => { e.stopPropagation(); startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'kw', i }, to)); }} title="Drag onto a topic to move it">{a.variant}{moveMenu('Move ' + a.variant + ' to topic', t, { t: 'kw', i })}<button type="button" className="x" aria-label={'Remove ' + a.variant} onClick={() => removeKw(i)}>×</button></span>)}
+                  {sharedL.filter(([w]) => hit(w)).map(([w, l]) => <span key={l + w} className={'kc sh' + (p.isAdmin ? ' adm' : '') + (sharedLive(t, l, w) ? '' : ' nl')} title={p.isAdmin ? 'Shared by all merchants. Drag onto another topic to move it.' : 'Shared by all merchants (an admin edits it)'} onPointerDown={(e) => { e.stopPropagation(); if (p.isAdmin) startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, e, (to) => move({ t: 'sh', topic: t, l, w }, to)); }}>{w}{p.isAdmin && <button type="button" className="x" aria-label={'Remove shared ' + w} onClick={() => removeShared(t, l, w)}>×</button>}</span>)}
                   {q && ![...own.map(([a]) => a.variant), ...sharedL.map(([w]) => w)].some(hit) && <span className="sub">No keyword matches.</span>}</div></div><span className="port r" /></div>; }
               if (n.kind === 'ans') { const e = entries.find((x) => x.id === Number(n.key.slice(4))); if (!e) return null; const ty = e.entry_type ?? 'answer'; const ended = !!e.ends_on && e.ends_on < today();
-                return <div key={n.key} className="fc an" style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}<button type="button" className="x del" aria-label={'Delete answer ' + e.intent_key} title="Delete this answer" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => deleteAnswer(e.id)}>{trash}</button></div>
+                return <div key={n.key} className={'fc an' + (entryLive(e) ? '' : ' draft')} style={box(n)} onPointerDown={(ev) => dragNode(n.key, ev)}><div className="hd">▤ Answer{ty !== 'answer' && <span className={'badge ' + (ty === 'promotion' ? 'b-pr' : 'b-st')}>{TYPE_LABEL[ty]}</span>}{tag(entryLive(e), 'DRAFT · NOT LIVE')}{moveMenu('Move ' + e.intent_key + ' to topic', t, { t: 'entry', id: e.id })}<button type="button" className="x del" aria-label={'Delete answer ' + e.intent_key} title="Delete this answer" onPointerDown={(ev) => ev.stopPropagation()} onClick={() => deleteAnswer(e.id)}>{trash}</button></div>
                   <div className="bd"><div className="nm">{e.intent_key}</div><div className="pv clamp">{previewOf(e) || 'No text yet'}</div>{e.status === 'draft' && <div><span className="badge b-end ended" title="A draft answer is ignored by the bot. Set it to Live in Knowledge base.">draft: bot ignores it</span></div>}{!Object.values(e.translations as Record<string, { question_examples?: string[] }>).some((x) => x?.question_examples?.length) && <div><span className="badge b-end ended" title="The bot finds an answer by the questions listed for it. Add some in Knowledge base.">no questions yet</span></div>}{e.ends_on && <div><span className={'badge b-end' + (ended ? ' ended' : '')}>{ended ? 'ended ' : 'ends '}{e.ends_on}</span></div>}</div>
                   <span className="port l" /><span className="port r" title="Drag onto a topic to move this answer" onPointerDown={(ev) => startLink({ x: n.x + n.w, y: n.y + n.h / 2 }, ev, (to) => move({ t: 'entry', id: e.id }, to))} /></div>; }
               const has = entries.some((x) => x.topic === t);
-              return <div key={n.key} className={'fc ho' + (has ? '' : ' warn')} style={box(n)} onPointerDown={(e) => dragNode(n.key, e)}><div className="hd">⚑ If not clear</div><div className="bd"><b>{has ? 'Ask once,' : 'A person'}</b><div className="pv">{has ? 'then a person' : 'no answer yet'}</div></div><span className="port l" /></div>;
+              return <div key={n.key} className={'fc ho' + (has ? '' : ' warn')} style={box(n)}><div className="hd">⚑ If not clear</div><div className="bd"><b>{has ? 'Ask once,' : 'A person'}</b><div className="pv">{has ? 'then a person' : 'no answer yet'}</div></div><span className="port l" /></div>;
             })}
             {pend.map((b) => <div key={b.id} className={'fc pend ' + (b.kind === 'topic' ? 'tp' : b.kind === 'answer' ? 'an' : 'kw')} style={{ left: b.x, top: b.y, width: 240 }} onPointerDown={(e) => dragNode('p' + b.id, e, (x, y) => setPend((l) => l.map((z) => (z.id === b.id ? { ...z, x, y } : z))))}>
               <div className="hd">{b.kind === 'topic' ? '◆ New topic' : b.kind === 'answer' ? '▤ New answer' : '# New keyword'}<button type="button" className="x" aria-label="Cancel" onClick={() => setPend((l) => l.filter((z) => z.id !== b.id))}>×</button></div>
