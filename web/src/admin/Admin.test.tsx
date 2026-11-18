@@ -777,7 +777,7 @@ describe('Control panel', () => {
     expect(await screen.findByText('◆ deposit')).toBeTruthy();                                   // the main keywords show at once
     expect(screen.getAllByText('Short forms').length).toBeGreaterThan(1);                        // the legend and the column: dep is a short form of deposit
     expect(screen.getAllByText('Other languages').length).toBeGreaterThan(1);                    // 充值 is Chinese
-    expect(screen.getByText(/Not under a main keyword yet/)).toBeTruthy();                       // xyzzy has no topic yet
+    expect(screen.getByText(/Not under a topic yet/)).toBeTruthy();                                // xyzzy has no topic yet
     expect(screen.getByText('xyzzy')).toBeTruthy();
   });
   it('shows the stat tiles, the basics and the bot instructions with presets on Merchant settings, and locks the basics for staff', async () => {
