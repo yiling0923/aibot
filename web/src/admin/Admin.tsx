@@ -24,7 +24,7 @@ const NAV_GROUPS: [string, [string, string][]][] = [
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
   ['Check', [['report', 'Report'], ['lchat', 'LiveChat test']]],
   ['Setup', [['set', 'Merchant settings'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing'], ['hist', 'History']]],
-  ['Help', [['guide', 'Guide for marketing']]],
+  ['Help', [['guide', 'Guide']]],
 ];
 
 export default function Admin() {
