@@ -661,3 +661,16 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .igrid input:focus,.igrid textarea:focus,.igrid select:focus{outline:2px solid var(--accent);outline-offset:-2px;background:var(--bg)}
 .imptabs{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;margin-bottom:8px}.imptabs button{border:0;background:var(--surface);padding:6px 14px;font-weight:600;cursor:pointer}.imptabs button[aria-pressed=true]{background:var(--accent);color:var(--accentfg)}
 .chk{display:inline-flex;gap:6px;align-items:center;cursor:pointer}
+
+/* import guide: big simple steps */
+.gd-steps2{list-style:none;padding:0;margin:14px 0 0;display:flex;flex-direction:column;gap:12px}
+.gd-step{display:flex;align-items:center;gap:16px;background:var(--surface2);border-radius:16px;padding:16px 18px;font-size:18px}
+.gd-step b{font-size:20px}
+.gd-bignum{flex:none;display:grid;place-items:center;width:46px;height:46px;border-radius:50%;background:var(--accent);color:var(--accentfg);font-weight:800;font-size:24px}
+.gd-icon{flex:none;font-size:38px;line-height:1}
+.gd-sub{margin-top:6px;font-size:16px;color:var(--muted);display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.gd-sub .btn{font-size:15px;padding:8px 14px}
+.gd-fakebtn{display:inline-block;border:1px solid var(--accent);background:var(--surface);color:var(--accent);font-weight:700;border-radius:8px;padding:2px 10px}
+.gd-done{margin-top:14px;text-align:center;font-size:22px;font-weight:800;color:var(--ok)}
+.gd-more{padding:14px 18px}.gd-more summary{cursor:pointer;font-weight:700;font-size:16px}
+.gd-more h3{margin:16px 0 6px}

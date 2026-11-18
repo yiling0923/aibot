@@ -504,7 +504,7 @@ describe('Control panel', () => {
   });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
-    expect(await screen.findByRole('heading', { name: /Guide: write the knowledge base/ })).toBeTruthy();
+    expect(await screen.findByRole('heading', { name: /How to import: 5 easy steps/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Download example file' })).toBeTruthy();
     expect(screen.getByText('question_examples')).toBeTruthy();
   });
