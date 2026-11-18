@@ -1,3 +1,4 @@
+import { handReason } from '../src/admin/routes';
 import 'dotenv/config';
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import type { FastifyInstance } from 'fastify';
@@ -47,9 +48,30 @@ describe.skipIf(!reachable)('report: top topics, keywords, topics handed over, w
     expect(r.handedByTopic.find((t: { topic: string }) => t.topic === 'deposit')?.handed).toBeGreaterThanOrEqual(1);
   });
 
+  it('reports the languages, the reasons for hand-over, the period before and the answered share of each topic', async () => {
+    await ask('my deposit was rejected', 'r4'); await ask('talk to a human please', 'r5'); await wait(400);
+    const r = await report();
+    expect(Object.keys(r.prev).sort()).toEqual(['handedOver', 'helped', 'notUnderstood', 'total']);        // the sample traffic of the days before is counted here, not in the period
+    expect(r.languages.reduce((x: number, l: { n: number }) => x + l.n, 0)).toBe(r.total);
+    expect(r.reasons.map((x: { reason: string }) => x.reason)).toContain('Customer asked for a person');
+    const dep = r.topicRates.find((t: { topic: string }) => t.topic === 'deposit');
+    expect(dep.rate).toBeGreaterThan(0); expect(dep.rate).toBeLessThanOrEqual(1); expect(dep.prevRate === null || (dep.prevRate >= 0 && dep.prevRate <= 1)).toBe(true);
+  });
+
   it('keeps feedback inside the merchant, and rejects a bad mark', async () => {
     expect((await as(staff, 'POST', '/api/admin/feedback', { merchant: 'MERCH_B', decisionId: 1, verdict: 'wrong' })).statusCode).toBe(403);
     expect((await as(admin, 'POST', '/api/admin/feedback', { merchant: 'MERCH_A', decisionId: 1, verdict: 'maybe' })).statusCode).toBe(400);
     expect((await as(admin, 'POST', '/api/admin/feedback', { merchant: 'MERCH_A', decisionId: 999999, verdict: 'wrong' })).statusCode).toBe(404);
+  });
+});
+
+describe('handReason', () => {
+  it('puts the bot\'s reasons under plain headings', () => {
+    expect(handReason('ABUSE', '')).toBe('Rude message');
+    expect(handReason('HANDOFF', 'The customer asks for a human agent, so the chat is handed over.')).toBe('Customer asked for a person');
+    expect(handReason('HANDOFF', 'The bot already asked once and it is still unclear, so a person takes over.')).toBe('Not understood, asked once already');
+    expect(handReason('HANDOFF', '"x" is marked "needs staff" in the knowledge base')).toBe('Needs a person (set on the entry)');
+    expect(handReason('HANDOFF', 'The customer sent a picture or a file.')).toBe('Picture or file sent');
+    expect(handReason('HANDOFF', 'something else')).toBe('Other');
   });
 });

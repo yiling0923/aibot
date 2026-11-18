@@ -388,3 +388,7 @@ After any change to the draft (keyword, topic, entry, setting), a yellow bar "No
 ### Guide page
 
 The panel has a **Help → Guide** page: how to write the knowledge base CSV (columns, examples, writing rules), a download of an example and a blank file, and the import steps. A copy as a web page is in `docs/MARKETING_IMPORT_GUIDE.html`.
+
+### Report page
+
+The Report now shows an arrow on each number against the days before (green is better), a **Fix these first** list (missed messages with **Add keyword** and **Add answer** buttons), **Top topics and how well they are answered**, **Languages**, and **Why chats went to a person**. Chats from before this version have no written reason, so they show under "Other".

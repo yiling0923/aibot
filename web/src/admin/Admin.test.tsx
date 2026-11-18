@@ -22,7 +22,7 @@ const state = (role: 'admin' | 'staff') => ({
 });
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
-const REPORT = { topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }] };
+const REPORT = { topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let setupDone = false;
 const SETUP = () => (setupDone
   ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }, { key: 'account', title: 'Account data (optional)', state: 'optional', detail: 'Not connected. Without it the bot uses 2 built-in demo customers.', action: { to: 'api', label: 'Open Account data' } }] }
@@ -121,7 +121,6 @@ describe('Control panel', () => {
     open('admin', '/admin/report');
     expect(await screen.findByText('70%')).toBeTruthy();                          // answered by the bot
     expect(screen.getByText('10%')).toBeTruthy(); expect(screen.getByText('15%')).toBeTruthy();
-    expect(screen.getByText('deposit_how')).toBeTruthy();
     expect(screen.getByText(/Include test chat \(3\)/)).toBeTruthy();
   });
   it('has no Not understood page any more: it is not in the menu and the old address goes to the Knowledge base', async () => {
@@ -523,15 +522,27 @@ describe('Control panel', () => {
     await userEvent.clear(box); await userEvent.type(box, '6');
     expect((screen.getByText('Save to LiveChat') as HTMLButtonElement).disabled).toBe(false);
   });
-  it('shows top topics, top keywords, topics handed over, the wrong-answer rate, and lets staff mark an answer', async () => {
+  it('shows the arrows against the period before, the topics, the languages and why chats went to a person', async () => {
     open('staff', '/admin/report');
-    expect(await screen.findByText('Top topics')).toBeTruthy();
-    expect(screen.getByText('Top keywords')).toBeTruthy(); expect(screen.getByText('Topics handed to a person most')).toBeTruthy();
+    expect(await screen.findByText('Top topics, and how well they are answered')).toBeTruthy();
+    expect(screen.getByText('▲ 25%')).toBeTruthy();                                                 // 100 messages against 80 before
+    expect(screen.getByText('▲ 7 pts')).toBeTruthy();                                              // 70% answered against 63% before
+    expect(screen.getByText('80%')).toBeTruthy(); expect(screen.getByText('▲ 10')).toBeTruthy();    // deposit: 80% now, 70% before
+    expect(screen.getByText('Chinese')).toBeTruthy(); expect(screen.getByText('Customer asked for a person')).toBeTruthy();
+    expect(screen.getByText(/Not understood most in/).textContent).toMatch(/English/);               // 7 of 40 is higher than 3 of 60
     expect(screen.getByText('25%')).toBeTruthy();                                                   // 1 wrong of 4 checked
-    expect(screen.getByText('withdraw')).toBeTruthy();
     expect(screen.getByText('Check recent answers')).toBeTruthy();
     await userEvent.click(screen.getAllByRole('button', { name: 'Wrong' })[0]);                                         // sends the mark, then reloads the report
     expect(screen.getByText('Check recent answers')).toBeTruthy();
+  });
+  it('Fix these first: Add keyword opens the keyword form, Add answer opens a new entry with the question in it', async () => {
+    const { unmount } = open('staff', '/admin/report');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add answer' }));
+    expect(await screen.findByRole('heading', { name: 'New entry' })).toBeTruthy();
+    expect(screen.getByText('tarik duit lambat')).toBeTruthy();                                    // the customer's words are the first example question
+    unmount(); open('staff', '/admin/report');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add keyword' }));
+    expect(await screen.findByRole('heading', { name: /What is “tarik duit lambat”\?/ })).toBeTruthy();
   });
   it('shows details when hovering a day on the chart', async () => {
     open('staff', '/admin/report');

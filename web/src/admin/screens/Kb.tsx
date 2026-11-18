@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import KbGrid from './KbGrid';
-import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
+import { guessLang, ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 
 type Tr = { question_examples: string[]; answer_text: string };
@@ -51,6 +52,16 @@ export default function Kb() {
     LANGS.forEach((l) => { (src.translations as Record<string, Tr>)[l] = trOf(src, l); });
     setEd({ ...src, useAspect: !!src.aspect, tab: 'en', sug: {}, newTopic: '', newTopicW: '', newEx: '' });
   };
+  // "Add answer" in the Report opens a new entry with the customer's question as its first example
+  const where = useLocation();
+  useEffect(() => {
+    const q = (where.state as { newQuestion?: string } | null)?.newQuestion; if (!q) return;
+    const src = blank(p.merchant); LANGS.forEach((l) => { (src.translations as Record<string, Tr>)[l] = trOf(src, l); });
+    const lg = guessLang(q); const tab = (LANGS as readonly string[]).includes(lg) ? lg : 'en';
+    (src.translations as Record<string, Tr>)[tab] = { ...trOf(src, tab), question_examples: [q] };
+    setEd({ ...src, useAspect: false, tab, sug: {}, newTopic: '', newTopicW: '', newEx: '' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [where.key]);
   return (
     <>
       <div className="card"><div className="head"><div><h2>Knowledge base · {p.M.name}</h2><div className="sub">What the bot may answer for this merchant. Only live entries are used.</div></div>
