@@ -33,7 +33,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 
 export default function TopicFlow() {
   const p = usePanel(); const d = p.draft; const assign = useAssign(); const nav = useNavigate();
-  const canvas = useRef<HTMLDivElement>(null);
+  const canvas = useRef<HTMLDivElement>(null); const inner = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<Pos>({});                                   // only while a card is being dragged: on drop every card goes back to its place in the automatic layout
   const [pend, setPend] = useState<Pending[]>([]); const nextId = useRef(1);
   const [over, setOver] = useState<string | null>(null);
@@ -160,7 +160,7 @@ export default function TopicFlow() {
   const curve = (x1: number, y1: number, x2: number, y2: number) => { const dx = Math.max(40, Math.abs(x2 - x1) / 2); return `M${x1},${y1} C${x1 + dx},${y1} ${x2 - dx},${y2} ${x2},${y2}`; };
 
   /* ---------- pointer work: moving cards, and drawing a line from a chip or a dot ---------- */
-  const toCanvas = (cx: number, cy: number) => { const r = canvas.current?.getBoundingClientRect(); return { x: (cx - (r?.left ?? 0) + (canvas.current?.scrollLeft ?? 0)) / scale, y: (cy - (r?.top ?? 0) + (canvas.current?.scrollTop ?? 0)) / scale }; };
+  const toCanvas = (cx: number, cy: number) => { const r = inner.current?.getBoundingClientRect(); return { x: (cx - (r?.left ?? 0)) / scale, y: (cy - (r?.top ?? 0)) / scale }; };   // the chart may sit in the middle of the canvas, so measure from the chart itself
   const dragNode = (key: string, e: RPointerEvent, set?: (x: number, y: number) => void) => {
     if ((e.target as HTMLElement).closest('button,input,select,textarea,.port,.kc')) return;
     if (!set && !key.startsWith('ans:')) return;
@@ -244,8 +244,8 @@ export default function TopicFlow() {
         </>}
       </aside>
       <div className="flowcanvas" ref={canvas} onDragOver={onCanvasOver} onDragLeave={(e) => { if (e.currentTarget === e.target) setOver(null); }} onDrop={onCanvasDrop}>
-        <div style={{ width: width * scale, height: height * scale }}>
-          <div className="flowinner" style={{ position: 'relative', width, height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
+        <div style={{ width: width * scale, height: height * scale, margin: "0 auto" }}>
+          <div className="flowinner" ref={inner} style={{ position: 'relative', width, height, transform: `scale(${scale})`, transformOrigin: '0 0' }}>
             {lanes.map((l) => <div key={'lane' + l.topic} className={'lane' + (over === l.topic ? ' over' : '') + (topicLive(l.topic) ? '' : ' nl')} style={{ left: l.x, top: l.y, width: l.w, height: l.h, ...(faded(l.topic) ? { opacity: 0.35 } : {}) }}><span className="lt">{l.topic}{topicLive(l.topic) ? '' : ' · not live'}</span></div>)}
             <svg className="flowedges" width={width} height={height} aria-hidden="true">
               <defs>{(['kw', 'ans', 'ho'] as const).map((k) => <marker key={k} id={'arr-' + k} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0,0L10,5L0,10z" className={'ar-' + k} /></marker>)}
