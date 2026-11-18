@@ -396,10 +396,10 @@ describe('Control panel', () => {
     open('staff', '/admin/store');
     expect(await screen.findByText('◆ deposit')).toBeTruthy();
     expect(screen.queryByText('dps')).toBeNull();                                               // nobody typed "dps"
-    await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
+    await userEvent.click(screen.getByRole('switch', { name: /nobody typed/ }));
     expect(await screen.findByText('dps')).toBeTruthy();
     expect(screen.getAllByTitle('nobody has typed this yet').length).toBeGreaterThan(0);
-    await userEvent.click(screen.getByRole('switch', { name: /nobody has typed yet/ }));
+    await userEvent.click(screen.getByRole('switch', { name: /nobody typed/ }));
     expect(screen.queryByText('dps')).toBeNull();
   });
   it('Keyword ranking: top three, a compact week picker, filters in the heading card, a bar behind each count', async () => {
@@ -788,8 +788,8 @@ describe('Control panel', () => {
     expect(screen.queryByText('By main keyword')).toBeNull();                                    // there is only one view now: no switch
     expect(screen.queryByRole('button', { name: 'List' })).toBeNull();
     expect(await screen.findByText('◆ deposit')).toBeTruthy();                                   // the main keywords show at once
-    expect(screen.getAllByText('Short forms').length).toBeGreaterThan(1);                        // the legend and the column: dep is a short form of deposit
-    expect(screen.getAllByText('Other languages').length).toBeGreaterThan(1);                    // 充值 is Chinese
+    expect(screen.getAllByText(/^short forms$/i).length).toBeGreaterThan(1);                        // the legend and the column: dep is a short form of deposit
+    expect(screen.getAllByText(/^other languages$/i).length).toBeGreaterThan(1);                    // 充值 is Chinese
     expect(screen.getByText(/Not under a topic yet/)).toBeTruthy();                                // xyzzy has no topic yet
     expect(screen.getByText('xyzzy')).toBeTruthy();
   });

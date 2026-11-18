@@ -67,7 +67,7 @@ export default function Keywords() {
         <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{l} <span className="n">{counts[k]}</span></button>)}</div>
         <input type="search" placeholder="Search a word" aria-label="Filter keywords" value={q} onChange={(e) => setQ(e.target.value)} />
         <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">All languages</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-        <label className="switch"><input type="checkbox" role="switch" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /><span className="track"><span className="thumb" /></span> Also show the words nobody has typed yet</label>
+        <label className="switch"><input type="checkbox" role="switch" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /><span className="track"><span className="thumb" /></span> Show words nobody typed</label>
         <span className="sub">{list.length} shown</span>
       </div>
       <div className="kwgrid">
@@ -91,7 +91,7 @@ export default function Keywords() {
               </div>
             );
           })}
-          {byTopic.length > 0 && <div className="sub kwkey">Bar colours, dark to light: {KW_KINDS.map((k, i) => <span key={k}>{i ? <span aria-hidden="true"> · </span> : null}<span>{KW_LABEL[k]}</span></span>)}</div>}
+          {byTopic.length > 0 && <div className="sub kwkey">Bar colours: {KW_KINDS.map((k, i) => <span key={k}>{i ? <span aria-hidden="true"> · </span> : null}<b className={'kwk ' + KSHADE[k]}>{KW_LABEL[k].toLowerCase()}</b></span>)}</div>}
           {!byTopic.length && <div className="card sub" style={{ padding: 16 }}>{rest.length || other.length ? 'No topic has a word that matches.' : 'No keywords match. Words customers type are saved here automatically.'}</div>}
         </div>
         <div className="kwright">
