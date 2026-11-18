@@ -55,14 +55,14 @@ function BarList({ rows, color, empty }: { rows: { label: string; n: number; tip
 /** Messages per day: every day of the period, with the day names, a number scale and a card with the numbers when the mouse is over a day. */
 function DayChart({ daily }: { daily: Report['daily'] }) {
   const [hov, setHov] = useState<number | null>(null);
-  const W = 760, H = 230, L = 40, R = 8, T = 10, B = 30; const pw = W - L - R, ph = H - T - B; const n = daily.length;
+  const W = 1200, H = 175, L = 40, R = 8, T = 10, B = 30; const pw = W - L - R, ph = H - T - B; const n = daily.length;
   const m = Math.max(1, ...daily.map((d) => d.total)); const step = m <= 5 ? 1 : m <= 10 ? 2 : m <= 25 ? 5 : m <= 50 ? 10 : m <= 100 ? 20 : m <= 250 ? 50 : 100;
   const top = Math.ceil(m / step) * step; const grp = pw / n, bw = Math.min(64, grp * 0.68); const y = (v: number) => T + ph - (v / top) * ph;
   const every = n <= 10 ? 1 : n <= 20 ? 2 : 5;
   const d = hov === null ? null : daily[hov]; const pd = d ? parts(d) : null; const cx = hov === null ? 0 : L + grp * hov + grp / 2;
   return (
     <div className="rpchart" onMouseLeave={() => setHov(null)}>
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Messages per day" style={{ width: '100%', display: 'block' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label="Messages per day" style={{ width: "100%", maxHeight: 200, display: "block" }}>
         {Array.from({ length: top / step + 1 }, (_, i) => i * step).map((g) => <g key={g}><line x1={L} x2={W - R} y1={y(g)} y2={y(g)} stroke="var(--line)" strokeDasharray={g === 0 ? '0' : '3 4'} /><text x={L - 8} y={y(g) + 4} textAnchor="end" fontSize="11" fill="var(--muted)">{g}</text></g>)}
         {daily.map((dd, i) => {
           const x = L + grp * i + (grp - bw) / 2; let yy = y(0); const p = parts(dd);
