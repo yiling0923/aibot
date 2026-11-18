@@ -11,6 +11,7 @@ interface Report {
   topTopics: { topic: string; n: number }[]; handedByTopic: { topic: string; handed: number; total: number }[]; topKeywords: { word: string; n: number }[];
   accuracy: { right: number; wrong: number; checked: number; wrongRate: number | null }; recent: { id: number; question: string; answer: string; topic: string | null; at: string; verdict: 'right' | 'wrong' | null }[];
   topAnswers: { intent: string; n: number }[]; topMissing: { text: string; hits: number }[];
+  from: string; to: string;
   prev: { total: number; helped: number; notUnderstood: number; handedOver: number };
   topicRates: { topic: string; n: number; rate: number; prevRate: number | null }[];
   languages: { lang: string; n: number; notUnderstood: number }[]; reasons: { reason: string; n: number }[];
@@ -105,17 +106,36 @@ function Ring({ r }: { r: Report }) {
   );
 }
 
+/** One CSV with the numbers of the page, in blocks: summary, per day, topics, languages, reasons, missed messages. Opens in Excel. */
+function downloadCsv(merchant: string, r: Report) {
+  const cell = (x: unknown) => { const t = String(x ?? ''); return /[",\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+  const rows: unknown[][] = [];
+  const block = (title: string, head: string[], body: unknown[][]) => { rows.push([title]); rows.push(head); body.forEach((b) => rows.push(b)); rows.push([]); };
+  block('Report', ['merchant', 'from', 'to', 'days'], [[merchant, r.from, r.to, r.days]]);
+  block('Summary', ['what', 'this period', 'period before'], [['messages', r.total, r.prev.total], ['answered by the bot', r.helped, r.prev.helped], ['not understood', r.notUnderstood, r.prev.notUnderstood], ['handed to a person', r.handedOver, r.prev.handedOver], ['wrong-answer rate %', r.accuracy.wrongRate === null ? '' : Math.round(r.accuracy.wrongRate * 100), '']]);
+  block('Messages per day', ['day', 'messages', 'answered', 'not understood', 'handed to a person'], r.daily.map((d) => [d.day, d.total, d.helped, d.notUnderstood, d.handedOver]));
+  block('Topics', ['topic', 'messages', 'answered by the bot %', 'answered % before'], r.topicRates.map((t) => [t.topic, t.n, Math.round(t.rate * 100), t.prevRate === null ? '' : Math.round(t.prevRate * 100)]));
+  block('Languages', ['language', 'messages', 'not understood'], r.languages.map((l) => [LANG_NAME[l.lang] ?? l.lang, l.n, l.notUnderstood]));
+  block('Why chats went to a person', ['reason', 'chats'], r.reasons.map((x) => [x.reason, x.n]));
+  block('Messages the bot missed', ['message', 'times'], r.topMissing.map((m) => [m.text, m.hits]));
+  const text = '\ufeff' + rows.map((x) => x.map(cell).join(',')).join('\r\n');
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8' }));
+  a.download = `report_${merchant.toLowerCase().replace(/[^a-z0-9]+/g, '_')}_${r.from}_to_${r.to}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+
 /** How the bot is doing for this merchant: what it handled, what it did not understand, what went to a person. */
 export default function Report() {
-  const p = usePanel(); const [days, setDays] = useState<7 | 30>(7); const [withTest, setWithTest] = useState(true);
+  const p = usePanel(); const [days, setDays] = useState<7 | 30 | 'custom'>(7); const [from, setFrom] = useState(''); const [to, setTo] = useState(''); const [withTest, setWithTest] = useState(true);
   const [r, setR] = useState<Report | null>(null); const [err, setErr] = useState(''); const [kw, setKw] = useState<string | null>(null); const nav = useNavigate();
-  const load = () => api<Report>(`/api/admin/report?merchant=${encodeURIComponent(p.merchant)}&days=${days}&test=${withTest ? 1 : 0}`);
+  const range = days === 'custom' ? `&from=${from}&to=${to}` : `&days=${days}`;
+  const load = () => api<Report>(`/api/admin/report?merchant=${encodeURIComponent(p.merchant)}${range}&test=${withTest ? 1 : 0}`);
   useEffect(() => {
+    if (days === 'custom' && (!from || !to)) return;                                  // wait until both dates are chosen
     let alive = true; setErr('');
     load().then((x) => { if (alive) setR(x); }).catch((e: Error) => { if (alive) setErr(e.message); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p.merchant, days, withTest]);
+  }, [p.merchant, days, from, to, withTest]);
 
   const mark = async (id: number, verdict: 'right' | 'wrong' | null) => {
     try { await api('/api/admin/feedback', { merchant: p.merchant, decisionId: id, verdict }); setR(await load()); } catch (e) { p.toast((e as Error).message); }
@@ -124,13 +144,15 @@ export default function Report() {
   return (
     <>
       <div className="head"><div><h2 style={{ margin: 0 }}>Report · {p.M.name}</h2><div className="sub">What the bot did with customer messages. Hover a bar or a ring to see the numbers.</div></div>
-        <div className="tools"><div className="segs" role="group" aria-label="Period">{([7, 30] as const).map((d) => <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}>Last {d} days</button>)}</div>
+        <div className="tools"><div className="segs" role="group" aria-label="Period">{([7, 30] as const).map((d) => <button key={d} type="button" aria-pressed={days === d} onClick={() => setDays(d)}>Last {d} days</button>)}<button type="button" aria-pressed={days === 'custom'} onClick={() => { if (days !== 'custom') { const t = new Date(), f = new Date(Date.now() - 29 * 86400000); const iso = (x: Date) => x.toISOString().slice(0, 10); if (!from) setFrom(iso(f)); if (!to) setTo(iso(t)); setDays('custom'); } }}>Custom dates</button></div>
+          {days === 'custom' && <span className="rpdates"><label>From <input type="date" aria-label="From date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} /></label><label>To <input type="date" aria-label="To date" value={to} min={from || undefined} onChange={(e) => setTo(e.target.value)} /></label></span>}
+          <button className="btn sm" type="button" disabled={!r || !r.total} onClick={() => r && downloadCsv(p.M.name, r)}>Download CSV</button>
           <label className="switch"><input type="checkbox" role="switch" checked={withTest} onChange={(e) => setWithTest(e.target.checked)} /><span className="track"><span className="thumb" /></span> Include test chat{r && r.tests ? ` (${r.tests})` : ''}</label></div></div>
       {kw && <SetKeywordModal word={kw.toLowerCase()} onClose={() => setKw(null)} />}
       {err && <div className="note" style={{ background: 'var(--badbg)' }}>{err}</div>}
       {r && v && <>
         <div className="rptiles">
-          <Tile label="Messages" value={String(r.total)} note={`in the last ${r.days} days`} color="var(--accent)" delta={change(r.total, r.prev.total, true, false)} spark={r.daily.map((x) => x.total)} />
+          <Tile label="Messages" value={String(r.total)} note={days === 'custom' ? `from ${r.from} to ${r.to}` : `in the last ${r.days} days`} color="var(--accent)" delta={change(r.total, r.prev.total, true, false)} spark={r.daily.map((x) => x.total)} />
           <Tile label="Answered by bot" value={pct(r.helped, r.total) + '%'} note={`${r.helped} messages`} color={COL.ans} delta={r.prev.total ? change(pct(r.helped, r.total), pct(r.prev.helped, r.prev.total), true, true) : undefined} spark={r.daily.map((x) => x.helped)} />
           <Tile label="Not understood" value={pct(r.notUnderstood, r.total) + '%'} note={`${r.notUnderstood} messages`} color={COL.not} delta={r.prev.total ? change(pct(r.notUnderstood, r.total), pct(r.prev.notUnderstood, r.prev.total), false, true) : undefined} spark={r.daily.map((x) => x.notUnderstood)} />
           <Tile label="Handed to a person" value={pct(r.handedOver, r.total) + '%'} note={`${r.handedOver} messages`} color={COL.hand} delta={r.prev.total ? change(pct(r.handedOver, r.total), pct(r.prev.handedOver, r.prev.total), false, true) : undefined} spark={r.daily.map((x) => x.handedOver)} />

@@ -58,6 +58,16 @@ describe.skipIf(!reachable)('report: top topics, keywords, topics handed over, w
     expect(dep.rate).toBeGreaterThan(0); expect(dep.rate).toBeLessThanOrEqual(1); expect(dep.prevRate === null || (dep.prevRate >= 0 && dep.prevRate <= 1)).toBe(true);
   });
 
+  it('takes two dates for the period, and refuses a wrong range', async () => {
+    const day = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
+    const r = (await as(admin, 'GET', `/api/admin/report?merchant=MERCH_A&from=${day(2)}&to=${day(0)}`)).json();
+    expect(r.days).toBe(3); expect(r.daily.length).toBe(3); expect(r.from).toBe(day(2));
+    const one = (await as(admin, 'GET', `/api/admin/report?merchant=MERCH_A&from=${day(0)}&to=${day(0)}`)).json(); expect(one.days).toBe(1);
+    expect((await as(admin, 'GET', `/api/admin/report?merchant=MERCH_A&from=${day(0)}&to=${day(3)}`)).statusCode).toBe(400);          // end before start
+    expect((await as(admin, 'GET', `/api/admin/report?merchant=MERCH_A&from=2020-01-01&to=2022-01-01`)).statusCode).toBe(400);        // longer than a year
+    expect((await report()).days).toBe(7);                                                                                               // no dates: the last 7 days as before
+  });
+
   it('keeps feedback inside the merchant, and rejects a bad mark', async () => {
     expect((await as(staff, 'POST', '/api/admin/feedback', { merchant: 'MERCH_B', decisionId: 1, verdict: 'wrong' })).statusCode).toBe(403);
     expect((await as(admin, 'POST', '/api/admin/feedback', { merchant: 'MERCH_A', decisionId: 1, verdict: 'maybe' })).statusCode).toBe(400);

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import Admin from './Admin';
@@ -22,7 +22,7 @@ const state = (role: 'admin' | 'staff') => ({
 });
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
-const REPORT = { topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
+const REPORT = { from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let setupDone = false;
 const SETUP = () => (setupDone
   ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }, { key: 'account', title: 'Account data (optional)', state: 'optional', detail: 'Not connected. Without it the bot uses 2 built-in demo customers.', action: { to: 'api', label: 'Open Account data' } }] }
@@ -534,6 +534,19 @@ describe('Control panel', () => {
     expect(screen.getByText('Check recent answers')).toBeTruthy();
     await userEvent.click(screen.getAllByRole('button', { name: 'Wrong' })[0]);                                         // sends the mark, then reloads the report
     expect(screen.getByText('Check recent answers')).toBeTruthy();
+  });
+  it('Report: custom dates ask for the report between two days, and Download CSV saves the numbers', async () => {
+    open('staff', '/admin/report');
+    await userEvent.click(await screen.findByRole('button', { name: 'Custom dates' }));
+    const from = screen.getByLabelText('From date') as HTMLInputElement; const to = screen.getByLabelText('To date') as HTMLInputElement;
+    expect(from.value).toMatch(/^\d{4}-\d{2}-\d{2}$/); expect(to.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    await userEvent.clear(from); await userEvent.type(from, '2026-10-01');
+    await waitFor(() => expect((fetch as unknown as { mock: { calls: unknown[][] } }).mock.calls.some((c) => String(c[0]).includes('from=2026-10-01&to='))).toBe(true));
+    let saved: Blob | null = null;
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b) => { saved = b; return 'blob:x'; }; (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined;
+    await userEvent.click(screen.getByRole('button', { name: 'Download CSV' }));
+    const text = await (saved as unknown as Blob).text();
+    expect(text).toContain('Messages per day'); expect(text).toContain('Customer asked for a person'); expect(text).toContain('tarik duit lambat');
   });
   it('Fix these first: Add keyword opens the keyword form, Add answer opens a new entry with the question in it', async () => {
     const { unmount } = open('staff', '/admin/report');

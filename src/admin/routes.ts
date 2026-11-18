@@ -231,15 +231,27 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
   /* ---------- report: how the bot is doing ---------- */
   const HELPED = new Set(['ANSWER', 'CHOICE', 'CLARIFY', 'SMALLTALK', 'ACCOUNT', 'AMOUNT', 'REFUSE']);
   /** What the bot did over the last 7 or 30 days: how many messages it handled, did not understand or handed to a person. */
-  app.get<{ Querystring: { merchant: string; days?: string; test?: string } }>(`${A}/report`, async (req, reply) => {
+  app.get<{ Querystring: { merchant: string; days?: string; test?: string; from?: string; to?: string } }>(`${A}/report`, async (req, reply) => {
     if (!mayUse(req, req.query.merchant)) return forbidden(reply);
-    const days = Number(req.query.days) === 30 ? 30 : 7; const includeTest = req.query.test !== '0';
+    const includeTest = req.query.test !== '0';
+    // the period: the last 7 or 30 days, or two dates the person picked (both days included, at most a year)
+    const [{ today }] = await q(pool, `SELECT DATE_FORMAT(CURDATE(), '%Y-%m-%d') AS today`);
+    const dayNo = (iso: string) => Math.floor(Date.UTC(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) / 86400000);
+    const dayIso = (n: number) => new Date(n * 86400000).toISOString().slice(0, 10);
+    const ISO = /^\d{4}-\d{2}-\d{2}$/; const custom = ISO.test(req.query.from ?? '') && ISO.test(req.query.to ?? '');
+    let first = dayNo(today) - ((Number(req.query.days) === 30 ? 30 : 7) - 1), last = dayNo(today);
+    if (custom) {
+      first = dayNo(req.query.from!); last = dayNo(req.query.to!);
+      if (last < first || last - first > 365) return reply.code(400).send({ error: 'Choose a start date before the end date, and at most one year.' });
+    }
+    const days = last - first + 1, start = dayIso(first), end = dayIso(last + 1), prevStart = dayIso(first - days);
+    const P = [start, end];
     const D = await mt(req.query.merchant, 'bot_decisions'), M = await mt(req.query.merchant, 'chat_messages'), S = await mt(req.query.merchant, 'chat_sessions'), E = await mt(req.query.merchant, 'kb_entries'), U = await mt(req.query.merchant, 'unmatched_messages');
-    const empty = { prev: { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }, topicRates: [] as unknown[], languages: [] as unknown[], reasons: [] as unknown[], days, total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0, topTopics: [] as unknown[], handedByTopic: [] as unknown[], topKeywords: [] as unknown[], accuracy: { right: 0, wrong: 0, checked: 0, wrongRate: null as number | null }, recent: [] as unknown[] };
+    const empty = { prev: { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }, topicRates: [] as unknown[], languages: [] as unknown[], reasons: [] as unknown[], days, from: start, to: dayIso(last), total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0, topTopics: [] as unknown[], handedByTopic: [] as unknown[], topKeywords: [] as unknown[], accuracy: { right: 0, wrong: 0, checked: 0, wrongRate: null as number | null }, recent: [] as unknown[] };
     if (!D || !M || !S || !E || !U) return empty;
-    const where = `d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
+    const where = `d.created_at >= ? AND d.created_at < ? AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
     const base = `FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE ${where}`;
-    const rows = await q(pool, `SELECT DATE_FORMAT(d.created_at, '%Y-%m-%d') AS day, d.decision, COUNT(*) AS n ${base} GROUP BY day, d.decision`, [days - 1]);
+    const rows = await q(pool, `SELECT DATE_FORMAT(d.created_at, '%Y-%m-%d') AS day, d.decision, COUNT(*) AS n ${base} GROUP BY day, d.decision`, P);
     const byDecision: Record<string, number> = {}; const perDay = new Map<string, { total: number; helped: number; notUnderstood: number; handedOver: number }>();
     for (const r of rows) {
       const n = Number(r.n); byDecision[r.decision] = (byDecision[r.decision] ?? 0) + n;
@@ -247,36 +259,36 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
       if (HELPED.has(r.decision)) d.helped += n; if (r.decision === 'REASK') d.notUnderstood += n; if (r.decision === 'HANDOFF') d.handedOver += n; perDay.set(r.day, d);
     }
     const sum = (f: (k: string) => boolean) => Object.entries(byDecision).filter(([k]) => f(k)).reduce((a, [, v]) => a + v, 0);
-    const daily = []; for (let i = days - 1; i >= 0; i--) { const dt = new Date(Date.now() - i * 86400000), key = dt.toISOString().slice(0, 10); daily.push({ day: key, ...(perDay.get(key) ?? { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }) }); }
-    const top = await q(pool, `SELECT e.intent_key AS intent, COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id JOIN ${E} e ON e.id = d.matched_kb_id WHERE ${where} AND d.decision = 'ANSWER' GROUP BY e.intent_key ORDER BY n DESC, e.intent_key LIMIT 8`, [days - 1]);
+    const daily = []; for (let n = first; n <= last; n++) { const key = dayIso(n); daily.push({ day: key, ...(perDay.get(key) ?? { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }) }); }
+    const top = await q(pool, `SELECT e.intent_key AS intent, COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id JOIN ${E} e ON e.id = d.matched_kb_id WHERE ${where} AND d.decision = 'ANSWER' GROUP BY e.intent_key ORDER BY n DESC, e.intent_key LIMIT 8`, P);
     const missing = await q(pool, `SELECT text, hits FROM ${U} WHERE resolved = false ORDER BY hits DESC, last_seen DESC LIMIT 8`);
-    const [t] = await q(pool, `SELECT COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND s.source = 'test' AND d.decision <> 'HANDED'`, [days - 1]);
+    const [t] = await q(pool, `SELECT COUNT(*) AS n FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE d.created_at >= ? AND d.created_at < ? AND s.source = 'test' AND d.decision <> 'HANDED'`, P);
     // the plan's reports: top topics, topics handed to a person most, top keywords, and how often staff marked an answer wrong
     const F = await mt(req.query.merchant, 'feedback');
-    const topics = await q(pool, `SELECT d.topic AS topic, COUNT(*) AS n, SUM(d.decision = 'HANDOFF') AS handed, SUM(d.decision = 'REASK') AS reask ${base} AND d.topic IS NOT NULL GROUP BY d.topic ORDER BY n DESC`, [days - 1]);
-    const kwRows = await q(pool, `SELECT d.keywords AS k ${base} AND d.keywords IS NOT NULL ORDER BY d.id DESC LIMIT 5000`, [days - 1]);
+    const topics = await q(pool, `SELECT d.topic AS topic, COUNT(*) AS n, SUM(d.decision = 'HANDOFF') AS handed, SUM(d.decision = 'REASK') AS reask ${base} AND d.topic IS NOT NULL GROUP BY d.topic ORDER BY n DESC`, P);
+    const kwRows = await q(pool, `SELECT d.keywords AS k ${base} AND d.keywords IS NOT NULL ORDER BY d.id DESC LIMIT 5000`, P);
     const kwCount = new Map<string, number>(); for (const r of kwRows) for (const w of String(r.k).split('\n')) { const x = w.trim().toLowerCase(); if (x) kwCount.set(x, (kwCount.get(x) ?? 0) + 1); }
     // the period before this one, so the report can show up or down arrows
-    const prevWhere = `d.created_at >= DATE_SUB(CURDATE(), INTERVAL ? DAY) AND d.created_at < DATE_SUB(CURDATE(), INTERVAL ? DAY) AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
+    const prevWhere = `d.created_at >= ? AND d.created_at < ? AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
     const prevBase = `FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE ${prevWhere}`;
-    const prevRows = await q(pool, `SELECT d.decision, COUNT(*) AS n ${prevBase} GROUP BY d.decision`, [2 * days - 1, days - 1]);
+    const prevRows = await q(pool, `SELECT d.decision, COUNT(*) AS n ${prevBase} GROUP BY d.decision`, [prevStart, start]);
     const prev = { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 };
     for (const r of prevRows) { const n = Number(r.n); prev.total += n; if (HELPED.has(r.decision)) prev.helped += n; if (r.decision === 'REASK') prev.notUnderstood += n; if (r.decision === 'HANDOFF') prev.handedOver += n; }
-    const prevTopics = await q(pool, `SELECT d.topic AS topic, COUNT(*) AS n, SUM(d.decision = 'HANDOFF' OR d.decision = 'REASK') AS bad ${prevBase} AND d.topic IS NOT NULL GROUP BY d.topic`, [2 * days - 1, days - 1]);
+    const prevTopics = await q(pool, `SELECT d.topic AS topic, COUNT(*) AS n, SUM(d.decision = 'HANDOFF' OR d.decision = 'REASK') AS bad ${prevBase} AND d.topic IS NOT NULL GROUP BY d.topic`, [prevStart, start]);
     const prevRate = new Map(prevTopics.map((r) => [r.topic as string, Number(r.n) ? 1 - Number(r.bad) / Number(r.n) : null]));
     // which language customers write in, and where the bot understands least
-    const langRows = await q(pool, `SELECT COALESCE(NULLIF(s.language, ''), 'other') AS lang, COUNT(*) AS n, SUM(d.decision = 'REASK') AS nu ${base} GROUP BY lang ORDER BY n DESC`, [days - 1]);
+    const langRows = await q(pool, `SELECT COALESCE(NULLIF(s.language, ''), 'other') AS lang, COUNT(*) AS n, SUM(d.decision = 'REASK') AS nu ${base} GROUP BY lang ORDER BY n DESC`, P);
     // why chats went to a person: the bot writes a reason for every decision; group the reasons into a few plain headings
-    const whyRows = await q(pool, `SELECT d.decision, d.why, COUNT(*) AS n ${base} AND d.decision IN ('HANDOFF', 'ABUSE') GROUP BY d.decision, d.why LIMIT 3000`, [days - 1]);
+    const whyRows = await q(pool, `SELECT d.decision, d.why, COUNT(*) AS n ${base} AND d.decision IN ('HANDOFF', 'ABUSE') GROUP BY d.decision, d.why LIMIT 3000`, P);
     const reasonCount = new Map<string, number>();
     for (const r of whyRows) { const k = handReason(String(r.decision), String(r.why ?? '')); reasonCount.set(k, (reasonCount.get(k) ?? 0) + Number(r.n)); }
     let right = 0, wrong = 0; let recent: Record<string, unknown>[] = [];
     if (F) {
-      const fb = await q(pool, `SELECT v.verdict, COUNT(*) AS n FROM (SELECT d.id, (SELECT f.verdict FROM ${F} f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS verdict ${base}) v WHERE v.verdict IS NOT NULL GROUP BY v.verdict`, [days - 1]);
+      const fb = await q(pool, `SELECT v.verdict, COUNT(*) AS n FROM (SELECT d.id, (SELECT f.verdict FROM ${F} f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS verdict ${base}) v WHERE v.verdict IS NOT NULL GROUP BY v.verdict`, P);
       for (const r of fb) { if (r.verdict === 'right') right = Number(r.n); if (r.verdict === 'wrong') wrong = Number(r.n); }
-      recent = await q(pool, `SELECT d.id, m.text AS question, d.reply_text AS answer, d.topic, DATE_FORMAT(d.created_at, '%Y-%m-%d %H:%i') AS at, (SELECT f.verdict FROM ${F} f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS verdict ${base} AND d.decision = 'ANSWER' ORDER BY d.id DESC LIMIT 10`, [days - 1]);
+      recent = await q(pool, `SELECT d.id, m.text AS question, d.reply_text AS answer, d.topic, DATE_FORMAT(d.created_at, '%Y-%m-%d %H:%i') AS at, (SELECT f.verdict FROM ${F} f WHERE f.decision_id = d.id ORDER BY f.id DESC LIMIT 1) AS verdict ${base} AND d.decision = 'ANSWER' ORDER BY d.id DESC LIMIT 10`, P);
     }
-    return { days, total: sum(() => true), helped: sum((k) => HELPED.has(k)), notUnderstood: byDecision.REASK ?? 0, handedOver: byDecision.HANDOFF ?? 0, rude: byDecision.ABUSE ?? 0, byDecision, daily,
+    return { days, from: start, to: dayIso(last), total: sum(() => true), helped: sum((k) => HELPED.has(k)), notUnderstood: byDecision.REASK ?? 0, handedOver: byDecision.HANDOFF ?? 0, rude: byDecision.ABUSE ?? 0, byDecision, daily,
       topAnswers: top.map((r) => ({ intent: r.intent, n: Number(r.n) })), topMissing: missing.map((r) => ({ text: r.text, hits: Number(r.hits) })), tests: Number(t.n),
       prev,
       topTopics: topics.slice(0, 8).map((r) => ({ topic: r.topic, n: Number(r.n) })),
