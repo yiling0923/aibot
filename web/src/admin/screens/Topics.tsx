@@ -24,13 +24,6 @@ const BLOCK_GROUPS: [string, string, string][] = [
 
 type Words = Record<string, string[]>;
 /** One line under the tabs: what the tab is for. */
-const INTRO: Record<string, string> = {
-  short: 'A main keyword (topic) and the words that point to it: short forms, slang, the same meaning and other languages. The bot looks for them anywhere in the customer\'s sentence.',
-  aspect: 'The words that tell the bot what the customer wants to know about a topic: how long, the limit, how to.',
-  small: 'Phrases that get a friendly reply and no answer lookup: hello, thanks, goodbye.',
-  filler: 'Words with no meaning of their own. The bot drops them before it looks for keywords.',
-  block: 'Words that make the bot reply carefully, refuse, or hand the chat to a person.',
-};
 const flatCount = (o: Record<string, string[]> | undefined) => Object.values(o ?? {}).flat().length;
 
 type Lst = { id: string; name: string; n: number; sample: string[] };
@@ -160,7 +153,6 @@ export default function Topics() {
   return (
     <div className="card"><div className="head"><div><h2>Topics · {p.M.name}</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-expanded={adding} onClick={() => setAdding(!adding)}>＋ Add a topic or keyword</button></div>
       <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}<span className="tn">{tabCount(k)}</span></button>)}</div>
-      {cur !== 'short' && <p className="tabintro">{INTRO[cur]}</p>}
       {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
       <div className="tbar">
         {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['flow', 'Flowchart'], ['list', 'List']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
