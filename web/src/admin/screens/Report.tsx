@@ -11,7 +11,7 @@ interface Report {
   topTopics: { topic: string; n: number }[]; handedByTopic: { topic: string; handed: number; total: number }[]; topKeywords: { word: string; n: number }[];
   accuracy: { right: number; wrong: number; checked: number; wrongRate: number | null }; recent: { id: number; question: string; answer: string; topic: string | null; at: string; verdict: 'right' | 'wrong' | null }[];
   topAnswers: { intent: string; n: number }[]; topMissing: { text: string; hits: number }[];
-  from: string; to: string;
+  from: string; to: string; chatsBy: { members: number; visitors: number };
   prev: { total: number; helped: number; notUnderstood: number; handedOver: number };
   topicRates: { topic: string; n: number; rate: number; prevRate: number | null }[];
   languages: { lang: string; n: number; notUnderstood: number }[]; reasons: { reason: string; n: number }[];
@@ -112,7 +112,7 @@ function downloadCsv(merchant: string, r: Report) {
   const rows: unknown[][] = [];
   const block = (title: string, head: string[], body: unknown[][]) => { rows.push([title]); rows.push(head); body.forEach((b) => rows.push(b)); rows.push([]); };
   block('Report', ['merchant', 'from', 'to', 'days'], [[merchant, r.from, r.to, r.days]]);
-  block('Summary', ['what', 'this period', 'period before'], [['messages', r.total, r.prev.total], ['answered by the bot', r.helped, r.prev.helped], ['not understood', r.notUnderstood, r.prev.notUnderstood], ['handed to a person', r.handedOver, r.prev.handedOver], ['wrong-answer rate %', r.accuracy.wrongRate === null ? '' : Math.round(r.accuracy.wrongRate * 100), '']]);
+  block('Summary', ['what', 'this period', 'period before'], [['messages', r.total, r.prev.total], ['answered by the bot', r.helped, r.prev.helped], ['not understood', r.notUnderstood, r.prev.notUnderstood], ['handed to a person', r.handedOver, r.prev.handedOver], ['wrong-answer rate %', r.accuracy.wrongRate === null ? '' : Math.round(r.accuracy.wrongRate * 100), ''], ['chats from logged-in members', r.chatsBy.members, ''], ['chats from visitors', r.chatsBy.visitors, '']]);
   block('Messages per day', ['day', 'messages', 'answered', 'not understood', 'handed to a person'], r.daily.map((d) => [d.day, d.total, d.helped, d.notUnderstood, d.handedOver]));
   block('Topics', ['topic', 'messages', 'answered by the bot %', 'answered % before'], r.topicRates.map((t) => [t.topic, t.n, Math.round(t.rate * 100), t.prevRate === null ? '' : Math.round(t.prevRate * 100)]));
   block('Languages', ['language', 'messages', 'not understood'], r.languages.map((l) => [LANG_NAME[l.lang] ?? l.lang, l.n, l.notUnderstood]));
@@ -158,7 +158,7 @@ export default function Report() {
           <Tile label="Handed to a person" value={pct(r.handedOver, r.total) + '%'} note={`${r.handedOver} messages`} color={COL.hand} delta={r.prev.total ? change(pct(r.handedOver, r.total), pct(r.prev.handedOver, r.prev.total), false, true) : undefined} spark={r.daily.map((x) => x.handedOver)} />
           <Tile label="Wrong-answer rate" value={a?.wrongRate === null || !a ? '—' : Math.round(a.wrongRate * 100) + '%'} note={a && a.checked ? `${a.wrong} of ${a.checked} checked` : 'no answer checked yet'} color={COL.oth} />
         </div>
-        <div className="sub">Arrows compare with the {r.days} days before. Green is better, red is worse.</div>
+        <div className="sub">Arrows compare with the {r.days} days before. Green is better, red is worse. Chats in this period: <b>{r.chatsBy.members}</b> from logged-in members, <b>{r.chatsBy.visitors}</b> from visitors.</div>
         {!r.total ? <div className="card"><div className="sub">No messages in this period yet. {withTest ? '' : 'Try "Include test chat" to see the messages typed in the tests.'}</div></div> : <div className="card"><h3 style={{ margin: 0 }}>Messages per day</h3><div className="sub" style={{ marginBottom: 6 }}>Every day of the period is shown, also the days with no messages.</div><DayChart daily={r.daily} /></div>}
 
         <div className="card"><h3 style={{ margin: 0 }}>Fix these first</h3><div className="sub" style={{ marginBottom: 6 }}>Messages the bot could not answer, most often first. “Add keyword” teaches it a word. “Add answer” opens a new entry with the question filled in.</div>

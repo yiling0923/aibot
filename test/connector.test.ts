@@ -131,13 +131,18 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     expect(byNumber.answer).toContain('processed within 30 minutes');                                // 2 = withdrawal
   });
 
-  it('ignores the member LiveChat sends: a balance question goes to a person, member or not, and nothing about the member is kept', async () => {
-    const tom = (await call(keyA, { question: 'check my balance now', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' }, session_id: 'nomember-1' })).json();
-    expect(tom.decision).toBe('handover'); expect(tom.should_escalate).toBe(true); expect(JSON.stringify(tom)).not.toMatch(/1,250|Tom/);
+  it('says who the customer is, a member (with the id) or a visitor, and still reads no account: a balance question goes to a person', async () => {
+    const tom = (await call(keyA, { question: 'check my balance now', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' }, session_id: 'who-1' })).json();
+    expect(tom.customer).toEqual({ type: 'member', member_id: '8841', name: 'Tom', rank: 'GOLD' });
+    expect(tom.decision).toBe('handover'); expect(tom.should_escalate).toBe(true); expect(JSON.stringify(tom.answer)).not.toMatch(/1,250/);
+    expect(tom.metadata.customer).toMatchObject({ type: 'member', member_id: '8841' });                // a person who takes the chat sees who it is
     const guest = (await call(keyA, { question: 'check my balance now' })).json();
-    expect(guest.decision).toBe('handover');
-    const mary = (await call(keyA, { question: 'how much is my deposit balance', member: { externalId: '9120', name: 'Mary' } })).json();   // another member: the same
-    expect(mary.decision).toBe('handover'); expect(JSON.stringify(mary)).not.toMatch(/Mary/);
+    expect(guest.customer).toEqual({ type: 'visitor', member_id: null, name: null, rank: null }); expect(guest.decision).toBe('handover');
+    const plain = (await call(keyA, { question: 'how to deposit', member: { externalId: '9120', name: 'Mary' } })).json();
+    expect(plain.customer).toMatchObject({ type: 'member', member_id: '9120' }); expect(plain.decision).toBe('answer');   // general answers work for a member too
+    const later = (await call(keyA, { question: 'withdrawal time', session_id: 'who-2', member: { externalId: '9120', name: 'Mary' } })).json();
+    const next = (await call(keyA, { question: 'deposit time', session_id: 'who-2' })).json();         // LiveChat does not repeat the member: the chat still knows
+    expect(later.customer.type).toBe('member'); expect(next.customer).toMatchObject({ type: 'member', member_id: '9120' });
   });
 
   it('a picture from the customer (the question is its name) is thanked and handed to a person, whatever the name looks like', async () => {
@@ -173,7 +178,7 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
 
   it('never writes personal account data, so LiveChat cannot keep it for another customer', async () => {
     const r = (await call(keyA, { question: 'what is my balance', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' } })).json();
-    expect(r.decision).toBe('handover'); expect(JSON.stringify(r)).not.toMatch(/1,250|Tom/); expect(r.cacheable).toBe(false);
+    expect(r.decision).toBe('handover'); expect(r.answer).not.toMatch(/1,250|Tom/); expect(r.cacheable).toBe(false);
     const dep = (await call(keyA, { question: 'my deposit not in yet', member: { externalId: '8841', name: 'Tom' } })).json();
     expect(dep.decision).toBe('answer'); expect(dep.answer).not.toContain('Tom'); expect(dep.answer).toContain('credited within 5 minutes');   // the general answer, no lookup
   });

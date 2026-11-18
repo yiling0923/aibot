@@ -58,6 +58,12 @@ describe.skipIf(!reachable)('report: top topics, keywords, topics handed over, w
     expect(dep.rate).toBeGreaterThan(0); expect(dep.rate).toBeLessThanOrEqual(1); expect(dep.prevRate === null || (dep.prevRate >= 0 && dep.prevRate <= 1)).toBe(true);
   });
 
+  it('counts the chats from logged-in members and from visitors', async () => {
+    await app.inject({ method: 'POST', url: '/api/v1/ai/ask', payload: { question: 'how to deposit', session_id: 'rm-1', member: { externalId: '5511', name: 'Ann' } }, headers: { authorization: 'Bearer ' + key } });
+    await ask('how to deposit', 'rv-1'); await wait(500);
+    const r = await report();
+    expect(r.chatsBy.members).toBeGreaterThanOrEqual(1); expect(r.chatsBy.visitors).toBeGreaterThanOrEqual(1);
+  });
   it('takes two dates for the period, and refuses a wrong range', async () => {
     const day = (n: number) => new Date(Date.now() - n * 86400000).toISOString().slice(0, 10);
     const r = (await as(admin, 'GET', `/api/admin/report?merchant=MERCH_A&from=${day(2)}&to=${day(0)}`)).json();

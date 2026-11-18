@@ -415,12 +415,13 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 The small arrow button next to the logo folds the left menu to a rail of icons (the name of an item shows when the mouse is over it, and the yellow dot on Keywords still shows words that have no topic). Press the arrow again to open it. The choice is remembered in the browser. The merchant picker and the Advanced options switch are in the open menu. On a phone the menu is always open.
 
-### The bot does not read customer information
+### Who the customer is, and no account data
 
-The bot never looks at who the customer is and never reads account data. A question about a balance, a deposit or a withdrawal of this customer (for example "check my balance", "where is my deposit") goes to a person, in every channel. What was removed:
+The bot notes **who the customer is**: a logged-in **member** (LiveChat sent a member id) or a **visitor** (it sent none). Every `/api/v1/ai/ask` answer carries `customer: { type: "member" | "visitor", member_id, name, rank }`, and a handover also carries it in `metadata.customer`, so the person who takes the chat sees it. Once a chat has a member, the bot remembers it for that chat even if LiveChat does not repeat it. The member id is written to the chat log (the Report counts **chats from logged-in members and from visitors**).
+
+The bot never reads account data. A question about a balance, a deposit or a withdrawal of this customer (for example "check my balance", "where is my deposit") goes to a person, for members and visitors alike. What was removed:
 
 - The **Account tools** tab and the **Account answers in LiveChat** switch in Merchant settings, and the **Account data** step on the merchant page. The setup checklist has no account step.
-- In the LiveChat test page, the choice of a member (the bot would ignore it).
-- In the bot: the account lookup. The `member` that LiveChat may send with a question is ignored, not used, not kept in the chat memory and not logged. The "Where is my deposit" choice is no longer offered.
+- In the bot: the account lookup, and the "Where is my deposit" choice.
 
-General answers (limits, how to deposit, times) are unchanged. The old sections of this README and of `docs/` that describe account answers, member identity and the merchant API describe a feature that is now off. The merchant API routes still exist in the server but nothing in the bot calls them.
+General answers (limits, how to deposit, times) are unchanged. The member id is taken as LiveChat sends it: it is not checked. The old sections of this README and of `docs/` that describe account answers and the merchant API describe a feature that is now off; the merchant API routes still exist in the server but nothing in the bot calls them.

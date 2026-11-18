@@ -62,7 +62,7 @@ export class Bot {
   constructor(public readonly knowledge: Knowledge, private api: MerchantApi = fakeMerchantApi(), private ai?: AiService) { this.engine = new Engine(knowledge); }
 
   /** Who the customer is: the member the channel sent, else the signed token, else nobody. */
-  /** The bot never looks at who the customer is and never reads account data: a question about a balance, a deposit or a withdrawal of this customer goes to a person. */
+  /** The bot never reads account data, so no customer is "verified" for a lookup: a question about a balance, a deposit or a withdrawal of this customer goes to a person. */
   private who(_s: Session): TokenCheck { return { state: 'none' }; }
 
   /* ---------- small helpers ---------- */
@@ -164,7 +164,7 @@ export class Bot {
 
   /* ---------- a typed message ---------- */
   async message(s: Session, rawText: string): Promise<Turn | null> {
-    s.noPersonal = true; s.member = null;                  // the bot never reads customer information: account questions go to a person
+    s.noPersonal = true;                                   // the bot knows who the customer is (member or visitor) but never reads account data: account questions go to a person
     const typed = rawText.trim(); if (!typed || s.closed) return null;
     await this.warm(s);
     const guided = this.guidedReply(s, typed); if (guided) return this.finish(s, guided, (s.lang ?? this.cfg(s).defaultLanguage) as Lang);

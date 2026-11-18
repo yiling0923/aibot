@@ -247,7 +247,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const days = last - first + 1, start = dayIso(first), end = dayIso(last + 1), prevStart = dayIso(first - days);
     const P = [start, end];
     const D = await mt(req.query.merchant, 'bot_decisions'), M = await mt(req.query.merchant, 'chat_messages'), S = await mt(req.query.merchant, 'chat_sessions'), E = await mt(req.query.merchant, 'kb_entries'), U = await mt(req.query.merchant, 'unmatched_messages');
-    const empty = { prev: { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }, topicRates: [] as unknown[], languages: [] as unknown[], reasons: [] as unknown[], days, from: start, to: dayIso(last), total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0, topTopics: [] as unknown[], handedByTopic: [] as unknown[], topKeywords: [] as unknown[], accuracy: { right: 0, wrong: 0, checked: 0, wrongRate: null as number | null }, recent: [] as unknown[] };
+    const empty = { chatsBy: { members: 0, visitors: 0 }, prev: { total: 0, helped: 0, notUnderstood: 0, handedOver: 0 }, topicRates: [] as unknown[], languages: [] as unknown[], reasons: [] as unknown[], days, from: start, to: dayIso(last), total: 0, helped: 0, notUnderstood: 0, handedOver: 0, rude: 0, byDecision: {} as Record<string, number>, daily: [] as unknown[], topAnswers: [] as unknown[], topMissing: [] as unknown[], tests: 0, topTopics: [] as unknown[], handedByTopic: [] as unknown[], topKeywords: [] as unknown[], accuracy: { right: 0, wrong: 0, checked: 0, wrongRate: null as number | null }, recent: [] as unknown[] };
     if (!D || !M || !S || !E || !U) return empty;
     const where = `d.created_at >= ? AND d.created_at < ? AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
     const base = `FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE ${where}`;
@@ -269,6 +269,9 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const kwRows = await q(pool, `SELECT d.keywords AS k ${base} AND d.keywords IS NOT NULL ORDER BY d.id DESC LIMIT 5000`, P);
     const kwCount = new Map<string, number>(); for (const r of kwRows) for (const w of String(r.k).split('\n')) { const x = w.trim().toLowerCase(); if (x) kwCount.set(x, (kwCount.get(x) ?? 0) + 1); }
     // the period before this one, so the report can show up or down arrows
+    // who the chats are from: logged-in members (LiveChat sent a member id) or visitors
+    const whoRows = await q(pool, `SELECT (s.customer_ref IS NOT NULL) AS member, COUNT(DISTINCT s.id) AS n ${base} GROUP BY member`, P);
+    const chatsBy = { members: Number(whoRows.find((r) => Number(r.member) === 1)?.n ?? 0), visitors: Number(whoRows.find((r) => Number(r.member) === 0)?.n ?? 0) };
     const prevWhere = `d.created_at >= ? AND d.created_at < ? AND d.decision <> 'HANDED'${includeTest ? '' : " AND s.source = 'live'"}`;
     const prevBase = `FROM ${D} d JOIN ${M} m ON m.id = d.message_id JOIN ${S} s ON s.id = m.session_id WHERE ${prevWhere}`;
     const prevRows = await q(pool, `SELECT d.decision, COUNT(*) AS n ${prevBase} GROUP BY d.decision`, [prevStart, start]);
@@ -290,7 +293,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     }
     return { days, from: start, to: dayIso(last), total: sum(() => true), helped: sum((k) => HELPED.has(k)), notUnderstood: byDecision.REASK ?? 0, handedOver: byDecision.HANDOFF ?? 0, rude: byDecision.ABUSE ?? 0, byDecision, daily,
       topAnswers: top.map((r) => ({ intent: r.intent, n: Number(r.n) })), topMissing: missing.map((r) => ({ text: r.text, hits: Number(r.hits) })), tests: Number(t.n),
-      prev,
+      prev, chatsBy,
       topTopics: topics.slice(0, 8).map((r) => ({ topic: r.topic, n: Number(r.n) })),
       topicRates: topics.slice(0, 8).map((r) => { const n = Number(r.n), rate = n ? 1 - (Number(r.handed) + Number(r.reask)) / n : 0, pr = prevRate.get(r.topic) ?? null; return { topic: r.topic, n, rate, prevRate: pr }; }),
       languages: langRows.map((r) => ({ lang: r.lang, n: Number(r.n), notUnderstood: Number(r.nu) })),

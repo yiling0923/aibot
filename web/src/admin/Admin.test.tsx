@@ -23,7 +23,7 @@ const state = (role: 'admin' | 'staff') => ({
 });
 const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolved: false, resolution: null, first: '2 days ago', last: 'today' }, { text: 'abc xyz', language: 'en', hits: 1, resolved: true, resolution: 'ignored', first: 'x', last: 'y' }];
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
-const REPORT = { from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
+const REPORT = { chatsBy: { members: 12, visitors: 30 }, from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let setupDone = false;
 const SETUP = () => (setupDone
   ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }] }
@@ -339,11 +339,13 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'List' }));
     expect(screen.getByLabelText('Filter words')).toBeTruthy();
   });
-  it('LiveChat test: shows what an agent writes in LiveChat without a refresh, with no member to choose', async () => {
+  it('LiveChat test: shows what an agent writes in LiveChat without a refresh, and can chat as a guest', async () => {
     open('admin', '/admin/lchat');
     await userEvent.click(await screen.findByRole('button', { name: 'Settings' }));
-    expect(screen.queryByLabelText('The customer is')).toBeNull();                                  // no member to choose: the bot does not read customer information
+    expect(screen.getByLabelText('The customer is')).toBeTruthy();                                  // the bot only notes: member (with the id) or visitor
+    await userEvent.selectOptions(screen.getByLabelText('The customer is'), 'guest');
     expect(screen.queryByLabelText(/Member id/)).toBeNull();
+    expect(screen.getByText(/Customer: not logged in/)).toBeTruthy();
     lcLines = [{ from: 'agent', sender: 'operator', text: 'Hello, this is an agent.' }];            // written in LiveChat, not in this page
     expect(await screen.findByText('Hello, this is an agent.', {}, { timeout: 5000 })).toBeTruthy();   // the page looks again by itself
   }, 10000);
@@ -572,6 +574,7 @@ describe('Control panel', () => {
     expect(screen.getByText('Chinese')).toBeTruthy(); expect(screen.getByText('Customer asked for a person')).toBeTruthy();
     expect(screen.getByText(/Not understood most in/).textContent).toMatch(/English/);               // 7 of 40 is higher than 3 of 60
     expect(screen.getByText('25%')).toBeTruthy();                                                   // 1 wrong of 4 checked
+    expect(screen.getByText(/from logged-in members/).textContent).toMatch(/12 from logged-in members, 30 from visitors/);
     expect(screen.getByText('Check recent answers')).toBeTruthy();
     await userEvent.click(screen.getAllByRole('button', { name: 'Wrong' })[0]);                                         // sends the mark, then reloads the report
     expect(screen.getByText('Check recent answers')).toBeTruthy();

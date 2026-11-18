@@ -33,6 +33,8 @@ export default function LiveChatTest() {
   const p = usePanel();
   const [base, setBase] = useState(() => store('lcBase', 'http://localhost:8080')); const [tenant, setTenant] = useState(() => store('lcTenant:' + p.merchant, demoTenant(p.merchant) ?? store('lcTenant', '1')));   // LiveChat picks the bot's merchant by this number, so it is remembered for each merchant
   const [visitor, setVisitor] = useState(() => store('lcVisitor', newVisitor()));
+  const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => { const v = store('lcMid', '8841'); return v === 'tom8841' ? '8841' : v; });
+  const [mname, setMname] = useState(() => store('lcMname', 'Tom')); const [mrank, setMrank] = useState(() => store('lcMrank', 'GOLD'));
   const [lines, setLines] = useState<Line[]>([]); const [info, setInfo] = useState<{ status: string | null; handoff: string | null }>({ status: null, handoff: null });
   const [probe, setProbe] = useState<{ label: string; ok: boolean; answer: string }[] | null>(null); const [probing, setProbing] = useState(false);
   const [pick, setPick] = useState<File | null>(null); const fileIn = useRef<HTMLInputElement>(null);
@@ -43,7 +45,7 @@ export default function LiveChatTest() {
   const call = async (t: string, v = visitor) => {
     setBusy(true); setErr('');
     try {
-      const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor: v, text: t, member: null });
+      const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor: v, text: t, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
       if (t && !r.replied) setErr('LiveChat has not answered yet. The bot may be slow, or the bot link is off. Press Send with an empty box to look again.');
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
@@ -76,7 +78,7 @@ export default function LiveChatTest() {
     setLines((l) => [...l, { from: 'customer', sender: 'visitor', text: caption || f.name, attachment: f.type.startsWith('image/') ? { kind: 'image', name: f.name, url: URL.createObjectURL(f), mimeType: f.type, size: f.size } : { kind: 'file', name: f.name, url: '', mimeType: f.type, size: f.size } }]);
     setPick(null); setText(''); setBusy(true); setErr(''); setNote('');
     try {
-      const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: null });
+      const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
       if (!r.replied) setNote('The picture or file went to LiveChat. If the picture patch is in LiveChat (deploy/local-livechat/patches/002-picture-to-bot.patch) the bot answers in a moment and this page refreshes by itself. Without it LiveChat does not ask the bot about a picture, so your team takes it.');
     } catch (e) { const m = (e as Error).message; setErr(m); if (/refused this file/.test(m)) void checkFiles(true); } finally { setBusy(false); }      // refused: ask LiveChat at once which kinds it takes
@@ -104,10 +106,14 @@ export default function LiveChatTest() {
       <span className="lcbtns"><button className="btn sm" type="button" onClick={() => setShowSet((s) => !s)}>{showSet ? 'Hide settings' : 'Settings'}</button><button className="btn sm" type="button" onClick={fresh}>New chat</button></span></div>
       {showSet && <div className="form lcset"><label className="fld"><span>LiveChat address</span><input value={base} onChange={(e) => setBase(e.target.value)} placeholder="http://localhost:8080" /></label>
         <label className="fld"><span>Tenant id (the LiveChat merchant number)</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ width: 110 }} /><span className="lock">LiveChat picks the bot's merchant by this number, not by the merchant chosen in the sidebar. For {p.M.name} use the number of {p.M.name} in LiveChat: pick it there and read tenant_id= in the address bar.</span></label>
+        <label className="fld"><span>The customer is</span><select aria-label="The customer is" value={who} onChange={(e) => { setWho(e.target.value); keep('lcWho', e.target.value); fresh(); }}><option value="member">Logged in (a member)</option><option value="guest">Not logged in (a guest)</option></select></label>
+        {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /><span className="lock">Sample members: 8841 (Tom), 9120 (Mary)</span></label>
+          <label className="fld"><span>Name</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
+          <label className="fld"><span>Rank</span><input value={mrank} onChange={(e) => { setMrank(e.target.value); keep('lcMrank', e.target.value); }} style={{ width: 110 }} /></label></>}
         <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={() => void checkFiles()}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
           <span className="sub"> Sends one tiny sample of each kind into a new test chat in LiveChat.</span>
           {probe && <ul className="plain" aria-label="Files LiveChat accepts" style={{ marginTop: 6 }}>{probe.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused, “{r.answer}”</span>}</li>)}</ul>}</div>
-        <div className="sub full">The bot does not read customer information, so there is no member to choose: "check my balance" and "where is my deposit" go to a person.</div>
+        <div className="sub full">Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. The bot notes whether the customer is a logged-in member (with the member id) or a visitor, and a person who takes the chat can see it. The bot reads no account data: "check my balance" goes to a person for both (patch for a local LiveChat: deploy/local-livechat/patches/001-member-to-bot.patch).</div>
         <div className="sub full">The local setup uses <span className="mono">http://localhost:8080</span> and tenant <span className="mono">1</span>. This is the address the bot server uses, so it must be reachable from the computer that runs the bot.</div></div>}
       <div className="lcbox" aria-live="polite">
         {!lines.length && !busy && <div className="sub lcempty">No messages yet. Write something a customer would ask, for example “how to deposit”.</div>}
@@ -120,7 +126,7 @@ export default function LiveChatTest() {
       {(probing || probe) && !showSet && <div className="note" style={{ marginTop: 8 }} aria-label="Files LiveChat accepts, checked now">{probing ? 'Asking LiveChat which kinds of file it takes…' : <><b>What LiveChat takes from a customer:</b>
         <ul className="plain">{probe!.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused</span>}</li>)}</ul>
         <div className="sub">Send one of the accepted kinds. A test chat was made in LiveChat for this check.</div></>}</div>}
-      <div className="lcstat sub">{'LiveChat merchant #' + tenant + ' · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
+      <div className="lcstat sub">{'LiveChat merchant #' + tenant + ' · '}{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
         <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/jpeg,image/png,video/mp4,video/quicktime,application/pdf,.mov" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
         <IconBtn tip="Attach a picture or file" onClick={() => { if (!busy) fileIn.current?.click(); }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></IconBtn>
