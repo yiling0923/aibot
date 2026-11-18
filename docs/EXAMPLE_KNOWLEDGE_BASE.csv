@@ -1,0 +1,16 @@
+intent_key,topic,question_type,language,entry_type,question_examples,answer_text,topic_short_forms
+deposit_time,deposit,time,en,answer,how long does deposit take | deposit not in yet | depo still pending | when will my deposit arrive,"Deposits are usually credited within 5 minutes. If it takes longer, please send us your payment receipt.",
+deposit_time,deposit,time,ms,answer,berapa lama deposit masuk | deposit belum masuk | depo lambat | bila deposit sampai,"Deposit biasanya dikreditkan dalam masa 5 minit. Jika lebih lama, sila hantar resit pembayaran anda.",
+deposit_time,deposit,time,zh,answer,充值要多久 | 充值还没到账 | 充值多久到 | 什么时候到账,"充值通常在5分钟内到账。如果超过时间，请发送您的付款凭证。",
+deposit_limit,deposit,limit,en,answer,minimum deposit | what is the min deposit | max deposit per day | deposit limit,"The minimum deposit is RM30 and the maximum is RM30,000 for each transaction.",
+deposit_limit,deposit,limit,ms,answer,deposit minimum berapa | had deposit maksimum | had deposit sehari | deposit minima,"Deposit minimum ialah RM30 dan maksimum ialah RM30,000 bagi setiap transaksi.",
+deposit_limit,deposit,limit,zh,answer,最低充值多少 | 最高充值多少 | 充值限额 | 每天充值上限,"最低充值RM30，每笔最高RM30,000。",
+withdraw_time,withdraw,time,en,answer,how long does withdraw take | my withdrawal not received | wd still processing | when will i get my withdrawal,"Withdrawals are processed within 30 minutes. If it takes longer, please wait a little or contact us with your username.",
+withdraw_time,withdraw,time,ms,answer,berapa lama withdraw | tarik duit belum masuk | wd lambat | bila duit sampai,"Pengeluaran diproses dalam masa 30 minit. Jika lebih lama, sila tunggu sebentar atau hubungi kami dengan username anda.",
+withdraw_time,withdraw,time,zh,answer,提款要多久 | 提款还没到账 | 提款多久到 | 什么时候到账,"提款在30分钟内处理。如果超过时间，请稍等或提供您的用户名联系我们。",
+free_credit_info,free_credit,,en,answer,is there free credit | how to claim free credit | do new users get free credit | any free bonus for new member,"New members get RM10 free credit after verifying their phone number. Please check the promotion page for the details.",free credit | percuma | kredit percuma | freecredit | 免费彩金
+free_credit_info,free_credit,,ms,answer,ada free credit tak | macam mana nak claim free credit | ahli baru dapat free ke | ada bonus percuma,"Ahli baru mendapat kredit percuma RM10 selepas mengesahkan nombor telefon. Sila semak halaman promosi untuk butiran.",
+free_credit_info,free_credit,,zh,answer,有没有免费彩金 | 怎么领取免费彩金 | 新会员有免费彩金吗 | 新人有什么优惠,"新会员验证手机号码后可获得RM10免费彩金。详情请查看优惠页面。",
+change_bank,bank_account,,en,needs_staff,how to change my bank account | want to change my bank | update bank details please,"A person will help you change your bank account. Please wait a moment.",
+change_bank,bank_account,,ms,needs_staff,macam mana nak tukar akaun bank | nak tukar bank | kemaskini butiran bank,"Seorang pegawai akan membantu anda menukar akaun bank. Sila tunggu sebentar.",
+change_bank,bank_account,,zh,needs_staff,怎么更改银行账户 | 我要换银行 | 更新银行资料,"客服人员会协助您更改银行账户，请稍等。",
