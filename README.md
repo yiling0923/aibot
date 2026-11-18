@@ -396,3 +396,9 @@ The Report now shows an arrow on each number against the days before (green is b
 The Report period can be **Last 7 days**, **Last 30 days** or **Custom dates** (from and to, both days included, at most one year). **Download CSV** saves the summary, the numbers per day, topics, languages, hand-over reasons and missed messages for the chosen period.
 
 The Topics flowchart has a **Find a topic, keyword or answer** box. Topics that do not match fade out, it says how many match, and the chart scrolls to the first match. (Keyword cards with more than 10 words keep their own small search.)
+
+### Import: table, Excel and AI translation
+
+- **Type in a table.** The Import page opens with an Excel-like table. Type in the cells, or copy cells from Excel or Google Sheets and paste them (the header line is skipped, a cell with line breaks is kept in one cell, and "English", "Malay" and so on are read as languages).
+- **Excel files.** **Upload a file** accepts `.xlsx` (the first sheet), `.csv`, `.tsv` and `.txt`. **Download Excel example** and **Download blank Excel** give a ready file; the example is English only. **Download this merchant's KB as Excel** is under More. The Excel reader and writer are small and built in (`web/src/admin/xlsx.ts`, using `fflate`).
+- **AI translation on import.** If the AI is set up, **Translate the empty languages with AI** is ticked. It fills only the languages you left empty (Malay and Chinese by default; Vietnamese, Thai and Filipino can be ticked) from the English answer and questions, three at a time, using the same checked translation as the Translate button in an entry. The result goes into the draft with a line in the change list; a failed one is counted and the entry stays as it was. Placeholders that still say TO WRITE are not translated. The cost is charged to the merchant like other AI use.

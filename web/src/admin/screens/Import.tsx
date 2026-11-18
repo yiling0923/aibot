@@ -1,16 +1,26 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
-import { STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_ELSEWHERE, starterCsv, luckypayCsv, LUCKYPAY_ENTRIES } from '../starterPack';
-import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, addOwnTopic, topicNames, kbToCSV, type Entry, type ImportGroup } from '../model';
+import { api } from '../../lib/api';
+import ImportGrid from './ImportGrid';
+import { readXlsx, rowsToCsv, writeXlsx } from '../xlsx';
+import { BLANK_ROWS, EXAMPLE_ROWS, WIDTHS } from '../importSamples';
+import { TO_WRITE, STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_ELSEWHERE, starterCsv, luckypayCsv, LUCKYPAY_ENTRIES } from '../starterPack';
+import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, addOwnTopic, topicNames, kbToCSV, parseTable, type Entry, type ImportGroup } from '../model';
 import { Pill } from '../ui';
 
 type Tr = { question_examples: string[]; answer_text: string };
+
+const saveFile = (name: string, bytes: Uint8Array | string, type: string) => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); };
+const XLSX = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const LANG_NAME: Record<string, string> = { ms: 'Malay', zh: 'Chinese', vi: 'Vietnamese', th: 'Thai', tl: 'Filipino' };
 
 export default function Import() {
   const p = usePanel(); const nav = useNavigate();
   const [text, setText] = useState(''); const [name, setName] = useState(''); const [mode, setMode] = useState('update'); const [status, setStatus] = useState<'draft' | 'live'>('draft'); const [out, setOut] = useState('');
   const [menu, setMenu] = useState<'' | 'packs' | 'more'>('');
+  const [view, setView] = useState<'table' | 'file'>('table'); const [tick, setTick] = useState(0);
+  const [trOn, setTrOn] = useState(true); const [trLangs, setTrLangs] = useState<Set<string>>(new Set(['ms', 'zh'])); const [busy, setBusy] = useState('');
   const R = useMemo(() => analyzeImport(text, p.draft, p.merchant, p.M.name), [text, p.draft, p.merchant, p.M.name]);
   const ok = R.entries.filter((g) => !g.errors.length);
   const nNew = ok.filter((g) => !g.exists).length, nUpd = ok.filter((g) => g.exists).length, nErr = R.entries.length - ok.length, nWarn = ok.filter((g) => g.issues.length).length;
@@ -25,7 +35,41 @@ export default function Import() {
 
   const copy = (txt: string, done: string) => { try { navigator.clipboard.writeText(txt).then(() => p.toast(done), () => setOut(txt)); } catch { setOut(txt); } };
 
-  const run = (publishAfter = false) => {
+  /** The translations the AI would make: only for languages left empty, from the English answer. Placeholders that still say TO WRITE are not translated. */
+  const jobs = useMemo(() => (!trOn || !p.ai.translate ? [] : ok.filter((g) => !(g.exists && mode === 'skip')).flatMap((g) => {
+    const ex = g.existing?.translations as Record<string, Tr> | undefined;
+    const en = g.langs.en?.answer || ex?.en?.answer_text || ''; if (!en.trim() || en.includes(TO_WRITE)) return [];
+    const exs = g.langs.en?.examples ?? ex?.en?.question_examples ?? [];
+    return [...trLangs].filter((l) => !g.langs[l]?.answer && !ex?.[l]?.answer_text?.trim()).map((l) => ({ key: g.key, lang: l, answer: en, examples: exs }));
+  })), [ok, mode, trOn, trLangs, p.ai.translate]);
+
+  /** Asks the AI for each missing translation, three at a time. A failed one is only counted: the entry stays as it was. */
+  const translateAll = async () => {
+    const got: { key: string; lang: string; answer: string; examples: string[] }[] = []; let failed = 0, why = '', next = 0, done = 0;
+    setBusy(`Translating 0 of ${jobs.length}…`);
+    const worker = async () => {
+      while (next < jobs.length) {
+        const j = jobs[next++];
+        try { const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: j.lang, answer: j.answer, examples: j.examples, style: p.draft.settings[p.merchant]?.ai_instructions ?? '' }); got.push({ ...j, answer: r.answer, examples: r.examples }); }
+        catch (e) { failed++; why = why || (e as Error).message; }
+        setBusy(`Translating ${++done} of ${jobs.length}…`);
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
+    if (got.length) p.edit((d, note) => {
+      got.forEach((r) => {
+        const e = d.kb.find((x) => x.merchant === p.merchant && x.intent_key === r.key); if (!e) return;
+        const t = e.translations as Record<string, Tr>; const cur = t[r.lang]; if (cur?.answer_text?.trim()) return;
+        const have = new Set((cur?.question_examples ?? []).map((q) => q.toLowerCase()));
+        t[r.lang] = { answer_text: r.answer, question_examples: [...(cur?.question_examples ?? []), ...r.examples.filter((q) => !have.has(q.toLowerCase()))] }; e.dirty = true;
+      });
+      note('AI translated ' + got.length + ' answer' + (got.length === 1 ? '' : 's') + ' (' + [...new Set(got.map((g) => LANG_NAME[g.lang]))].join(', ') + ') for ' + p.M.name + '. Check the wording before publishing');
+    });
+    setBusy('');
+    return { made: got.length, failed, why };
+  };
+
+  const run = async (publishAfter = false) => {
     const st: 'draft' | 'live' = publishAfter ? 'live' : status;                       // "Import and publish" makes every new entry live
     const todo = ok.filter((g) => !(g.exists && mode === 'skip')); let nn = 0, nu = 0;
     p.edit((d, note) => {
@@ -49,16 +93,26 @@ export default function Import() {
       });
       note('Imported ' + (nn + nu) + ' entries from ' + (name || 'pasted text') + ' (' + nn + ' new, ' + nu + ' updated) for ' + p.M.name);
     });
-    p.toast(publishAfter ? 'Imported ' + (nn + nu) + ' entries. Check the window and press Publish.' : 'Imported ' + (nn + nu) + ' entries to draft'); nav('/admin/kb', publishAfter ? { state: { publish: true } } : undefined);
+    let extra = '';
+    if (jobs.length) { const r = await translateAll(); extra = r.made ? ` The AI translated ${r.made} answer${r.made === 1 ? '' : 's'}: please check the wording.` : ''; if (r.failed) extra += ` ${r.failed} translation${r.failed === 1 ? '' : 's'} failed (${r.why}). Open the entry and use Translate.`; }
+    p.toast(publishAfter ? 'Imported ' + (nn + nu) + ' entries. Check the window and press Publish.' + extra : 'Imported ' + (nn + nu) + ' entries to draft.' + extra); nav('/admin/kb', publishAfter ? { state: { publish: true } } : undefined);
   };
 
   return (
     <div className="card"><div className="head"><div><h2>Import knowledge base · {p.M.name}</h2><div className="sub">Load a whole set from a file instead of typing it. Each merchant has its own file. Nothing goes live until you publish.</div></div></div>
       <div className="steps" style={{ marginTop: 12 }}>
         <div className="step"><span className="n">1</span><div><b>Merchant</b><div className="sub">The file is imported into <b>{p.M.name}</b>. Change it in the sidebar. If the file has a <span className="mono">merchant</span> column, rows for other merchants are skipped.</div></div></div>
-        <div className="step"><span className="n">2</span><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><b>Add the file</b>
+        <div className="step"><span className="n">2</span><div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}><b>Add your entries</b>
+          <div className="imptabs" role="group" aria-label="How to add entries"><button type="button" aria-pressed={view === 'table'} onClick={() => { if (view !== 'table') { setView('table'); setTick((t) => t + 1); } }}>Type in a table</button><button type="button" aria-pressed={view === 'file'} onClick={() => setView('file')}>Upload a file</button></div>
+          <div className="tools"><span className="sub">Not sure how to fill it?</span>
+            <button className="btn sm" type="button" onClick={() => saveFile('knowledge_base_example.xlsx', writeXlsx(EXAMPLE_ROWS, WIDTHS, 'Knowledge base'), XLSX)}>Download Excel example</button>
+            <button className="btn sm" type="button" onClick={() => saveFile('knowledge_base_blank.xlsx', writeXlsx(BLANK_ROWS, WIDTHS, 'Knowledge base'), XLSX)}>Download blank Excel</button>
+          </div>
+          {view === 'table' ? <ImportGrid key={tick} start={text} onCsv={(c) => { setText(c); setName(c ? 'table' : ''); setOut(''); }} /> : <>
           <div className="drop"><div className="tools">
-            <input type="file" accept=".csv,.tsv,.txt" aria-label="Choose a CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; const fr = new FileReader(); fr.onload = () => { setText(String(fr.result)); setName(f.name); setOut(''); }; fr.readAsText(f, 'utf-8'); }} />
+            <input type="file" accept=".xlsx,.csv,.tsv,.txt" aria-label="Choose an Excel or CSV file" onChange={(e) => { const f = e.target.files?.[0]; if (!f) return; setOut('');
+              if (/\.xlsx$/i.test(f.name)) { const fr = new FileReader(); fr.onload = () => { try { setText(rowsToCsv(readXlsx(new Uint8Array(fr.result as ArrayBuffer)))); setName(f.name); } catch (er) { p.toast((er as Error).message); } }; fr.readAsArrayBuffer(f); }
+              else { const fr = new FileReader(); fr.onload = () => { setText(String(fr.result)); setName(f.name); }; fr.readAsText(f, 'utf-8'); } }} />
             <span className="pmenu"><button className="btn sm" type="button" aria-haspopup="menu" aria-expanded={menu === 'packs'} onClick={() => setMenu(menu === 'packs' ? '' : 'packs')}>Starter packs ▾</button>
               {menu === 'packs' && <div className="pmenu-list" role="menu">
                 <button role="menuitem" type="button" title="Entries for the categories of the team's LiveChat FAQ list. Every answer says TO WRITE until you write it." onClick={() => { setText(starterCsv()); setName('faq_category_starter.csv'); setOut(''); setMenu(''); }}>FAQ category starter ({STARTER_ENTRIES})</button>
@@ -67,7 +121,8 @@ export default function Import() {
               {menu === 'more' && <div className="pmenu-list" role="menu">
                 <button role="menuitem" type="button" onClick={() => { setText(SAMPLE_CSV); setName('sample_' + p.merchant.toLowerCase() + '.csv'); setOut(''); setMenu(''); }}>Load a sample file</button>
                 <button role="menuitem" type="button" onClick={() => { copy(TPL_HEAD, 'Template copied'); setMenu(''); }}>Copy blank template</button>
-                <button role="menuitem" type="button" onClick={() => { copy(kbToCSV(mine), 'KB copied as CSV'); setMenu(''); }}>Copy this merchant's KB as CSV</button></div>}</span></div>
+                <button role="menuitem" type="button" onClick={() => { copy(kbToCSV(mine), 'KB copied as CSV'); setMenu(''); }}>Copy this merchant's KB as CSV</button>
+                <button role="menuitem" type="button" onClick={() => { saveFile('knowledge_base_' + p.merchant.toLowerCase() + '.xlsx', writeXlsx(parseTable(kbToCSV(mine)), WIDTHS, 'Knowledge base'), XLSX); setMenu(''); }}>Download this merchant's KB as Excel</button></div>}</span></div>
             <details className="fold" aria-label="About the FAQ category starter"><summary>What is in the FAQ category starter?</summary>
               <div className="sub" style={{ margin: '6px 0' }}>{STARTER_ENTRIES} entries in English and Malay, made from the team's LiveChat FAQ category list. They come in as <b>drafts</b> (the bot ignores them until you set them live), and every answer says <b>TO WRITE</b>: the panel flags it until you replace it with the real answer. Entries a person should answer (complaints, blocked accounts, missing credit, free-credit requests) are marked <b>needs staff</b>: the bot hands the chat over when one matches. New topics made: {STARTER_TOPICS_NEW.join(', ')}.</div>
               <table className="tight"><thead><tr><th>Entry</th><th>Category tag in the list</th></tr></thead><tbody>{Object.entries(STARTER_TAGS).map(([k, t]) => <tr key={k}><td className="mono">{k}</td><td>{t}</td></tr>)}</tbody></table>
@@ -82,6 +137,7 @@ export default function Import() {
               {p.adv && <tr><td className="mono">question_type</td><td>optional</td><td>time, limit, how, change, hours</td></tr>}<tr><td className="mono">merchant</td><td>optional</td><td>MERCH_A or LuckyPay</td></tr></tbody></table></div>
             <div className="sub" style={{ marginTop: 6 }}>Files made by this tool's "Copy KB as CSV" import back with no changes.</div></details>
           {out && <div><div className="sub">Copying was blocked here, so the text is shown. Select it and copy:</div><textarea readOnly style={{ minHeight: 120, fontFamily: 'var(--mono)', fontSize: 12, whiteSpace: 'pre' }} value={out} /></div>}
+          </>}
         </div></div>
         <div className="step"><span className="n">3</span><div style={{ flex: 1, minWidth: 0 }}><b>Check</b>
           {R.fatal ? <div className="note" style={{ background: 'var(--badbg)', marginTop: 6 }}>{R.fatal}</div>
@@ -105,7 +161,15 @@ export default function Import() {
           <div className="form" style={{ marginTop: 6 }}>
             <label className="fld"><span>If the entry already exists</span><select value={mode} onChange={(e) => setMode(e.target.value)}><option value="update">Update it (languages in the file replace the old ones)</option><option value="skip">Skip it</option></select></label>
             <label className="fld"><span>New entries start as</span><select value={status} onChange={(e) => setStatus(e.target.value as 'draft' | 'live')}><option value="draft">Draft (bot ignores them until you set them live)</option><option value="live">Live</option></select></label></div>
-          <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!willImport} title="Imports the entries as live, then opens the Publish window. Entries that still say TO WRITE are ignored by the bot until they are written." onClick={() => run(true)}>Import and publish</button><button className="btn" type="button" disabled={!willImport} onClick={() => run(false)}>Import {willImport} entr{willImport === 1 ? 'y' : 'ies'} to draft</button><span className="sub">Blocked entries are left out. Warnings do not stop an import. Updated entries keep their live or draft status.</span></div></div></div>
+          <div className="aitr" style={{ marginTop: 10 }}>
+            {busy && <div className="note" role="status">{busy}</div>}
+            {p.ai.translate ? <>
+              <label className="chk"><input type="checkbox" checked={trOn} onChange={(e) => setTrOn(e.target.checked)} /> <b>Translate the empty languages with AI</b></label>
+              {trOn && <div className="tools" role="group" aria-label="Languages to translate">{(['ms', 'zh', 'vi', 'th', 'tl'] as const).map((l) => <label key={l} className="chk"><input type="checkbox" checked={trLangs.has(l)} onChange={(e) => setTrLangs((x) => { const n = new Set(x); if (e.target.checked) n.add(l); else n.delete(l); return n; })} /> {LANG_NAME[l]}</label>)}</div>}
+              <div className="sub">{trOn ? (jobs.length ? <><b>{jobs.length}</b> translation{jobs.length === 1 ? '' : 's'} will be made from the English answers and questions. Only languages you left empty are filled. </> : 'Nothing to translate: every chosen language already has an answer, or there is no English answer. ') : ''}The result goes into the draft. Please read it before you publish. The AI is charged to this merchant.</div></> :
+              <div className="sub">AI translation is off (no AI key yet), so only the languages in your file are imported. You can translate later inside each entry.</div>}
+          </div>
+          <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={!willImport || !!busy} title="Imports the entries as live, then opens the Publish window. Entries that still say TO WRITE are ignored by the bot until they are written." onClick={() => run(true)}>Import and publish</button><button className="btn" type="button" disabled={!willImport || !!busy} onClick={() => run(false)}>Import {willImport} entr{willImport === 1 ? 'y' : 'ies'} to draft</button><span className="sub">Blocked entries are left out. Warnings do not stop an import. Updated entries keep their live or draft status.</span></div></div></div>
       </div></div>
   );
 }

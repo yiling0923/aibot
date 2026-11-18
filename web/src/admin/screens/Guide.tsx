@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { SAMPLE_CSV, TPL_HEAD } from '../model';
+import { writeXlsx } from '../xlsx';
+import { BLANK_ROWS, EXAMPLE_ROWS, WIDTHS } from '../importSamples';
 
-function save(name: string, text: string) {
+function save(name: string, bytes: Uint8Array) {
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(new Blob(['﻿' + text], { type: 'text/csv;charset=utf-8' }));
+  a.href = URL.createObjectURL(new Blob([bytes as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }));
   a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
 }
 
@@ -19,8 +20,8 @@ const COLS: [string, string, string, string][] = [
   ['merchant', 'Optional', 'Only if one file holds several merchants. Otherwise leave it out.', 'LuckyPay'],
 ];
 
-const STEPS: [string, string][] = [['Write', 'Fill the CSV file'], ['Import', 'Pick it in Import'], ['Check', 'Read the preview'], ['Publish', 'Make it live']];
-const CHECKS = ['Saved as CSV UTF-8', 'Every row has intent_key, topic, language and answer_text', 'Questions are separated with |, not commas', 'Each entry has at least an English row', 'No private data (real names, phone numbers, passwords)'];
+const STEPS: [string, string][] = [['Write', 'Type in the table or an Excel file'], ['Import', 'Pick it in Import'], ['Check', 'Read the preview'], ['Publish', 'Make it live']];
+const CHECKS = ['Each entry has an English row (the AI can translate the rest)', 'Every row has intent_key, topic, language and answer_text', 'Questions are separated with |, not commas', 'No private data (real names, phone numbers, passwords)'];
 const EXAMPLE: [string, string, string, string][] = [
   ['deposit_time', 'en', 'how long deposit take | depo not in yet', 'Deposits are credited within 5 minutes.'],
   ['deposit_time', 'ms', 'berapa lama deposit masuk | depo lambat', 'Deposit dikreditkan dalam masa 5 minit.'],
@@ -41,15 +42,15 @@ export default function Guide() {
           {STEPS.map(([t, d], i) => <li key={t}><span className="gd-num">{i + 1}</span><b>{t}</b><small>{d}</small></li>)}
         </ol>
         <div className="gd-actions">
-          <button className="btn pri" type="button" onClick={() => save('knowledge_base_example.csv', SAMPLE_CSV)}>Download example file</button>
-          <button className="btn" type="button" onClick={() => save('knowledge_base_blank.csv', TPL_HEAD + '\n')}>Download blank file</button>
+          <button className="btn pri" type="button" onClick={() => save('knowledge_base_example.xlsx', writeXlsx(EXAMPLE_ROWS, WIDTHS, 'Knowledge base'))}>Download example file</button>
+          <button className="btn" type="button" onClick={() => save('knowledge_base_blank.xlsx', writeXlsx(BLANK_ROWS, WIDTHS, 'Knowledge base'))}>Download blank file</button>
           <span className="gd-jump">Jump to: {[['gd-cols', 'Columns'], ['gd-rules', 'Rules'], ['gd-import', 'Import steps']].map(([id, l]) => <button key={id} type="button" className="linkbtn" onClick={() => jump(id)}>{l}</button>)}</span>
         </div>
       </section>
 
       <section className="card">
         <h3>1. Make the file</h3>
-        <p>Use Excel or Google Sheets. One row is <b>one answer in one language</b>. When done choose <b>File, Save as, CSV (UTF-8)</b>. UTF-8 matters, or Chinese and Thai letters turn into strange symbols.</p>
+        <p>Pick the way you like best. One row is <b>one answer in one language</b>.</p><ul><li><b>Type in a table:</b> on the Import page, type straight into the table, or copy cells from Excel or Google Sheets and paste them in (click the first cell, press Ctrl+V).</li><li><b>Excel file:</b> download the Excel example, fill it in, and upload the .xlsx file on the Import page. You do not need to save it as CSV.</li><li><b>CSV:</b> still works if you already have one (save it as CSV UTF-8).</li></ul><p><b>You only need English.</b> If AI translation is on, the Import page translates the empty languages for you. The result is a draft: read it before you publish.</p>
         <p className="sub">Easiest start: download the example file, change the words, keep the first row.</p>
         <div className="scroll"><table className="gd-ex"><thead><tr><th>Entry name</th><th>Language</th><th>How customers ask</th><th>Reply</th></tr></thead><tbody>
           {EXAMPLE.map((r, i) => <tr key={i}>{r.map((c, j) => <td key={j} className={j < 2 ? 'mono' : ''}>{c}</td>)}</tr>)}
@@ -90,9 +91,9 @@ export default function Guide() {
         <h3>3. Import it</h3>
         <ol className="gd-steps">
           <li>Choose the <b>merchant</b> at the top left.</li>
-          <li>Go to <b>Import</b> and pick the CSV file.</li>
+          <li>Go to <b>Import</b>. Type or paste into the table, or choose <b>Upload a file</b> and pick your Excel file.</li>
           <li>Read the preview: <b>new</b> entries, entries that will <b>update</b> an old one, and <b>problems</b> in red. Fix problems in the file and import again.</li>
-          <li>Press the import button. The entries go into the <b>draft</b> only.</li>
+          <li>Keep <b>Translate the empty languages with AI</b> ticked (if you see it), choose the languages, and press the import button. The entries go into the <b>draft</b> only.</li>
           <li>Check a few entries in <b>Knowledge base</b>.</li>
           <li><b>Press Publish.</b> Customers get the new answers only after this. The yellow "Not live yet" bar reminds you.</li>
         </ol>

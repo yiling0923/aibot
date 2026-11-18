@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { readXlsx, writeXlsx } from './xlsx';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -60,6 +61,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? (peopleBig ? BIG_PEOPLE : { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] })
     : url.startsWith('/api/admin/report') ? REPORT
+    : url.startsWith('/api/admin/translate') ? { answer: 'Translated answer', examples: ['translated question'] }
     : url.startsWith('/api/admin/ranking') ? RANKING
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
     : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : []))));
@@ -410,6 +412,7 @@ describe('Control panel', () => {
   });
   it('Import: loads the FAQ category starter, shows what it holds, and previews every entry of the pack', async () => {
     open('staff', '/admin/imp');
+    await userEvent.click(await screen.findByRole('button', { name: 'Upload a file' }));
     await userEvent.click(await screen.findByRole('button', { name: /Starter packs/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: /FAQ category starter/ }));
     expect((screen.getByLabelText('Paste CSV') as HTMLTextAreaElement).value).toMatch(/free_credit_info,free_credit,,en,answer/);
@@ -635,8 +638,57 @@ describe('Control panel', () => {
     await userEvent.click(within(grid).getByRole('button', { name: 'VI' }));
     expect(within(grid).getByLabelText('Answer VI for dep_how')).toBeTruthy();
   });
+  it('Import: type entries in a table like Excel, see the check, and the AI translates the empty languages', async () => {
+    open('staff', '/admin/imp');
+    await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'deposit_time');
+    await userEvent.type(screen.getByLabelText('Topic, row 1'), 'deposit');
+    await userEvent.type(screen.getByLabelText('Questions, row 1'), 'how long | depo late');
+    await userEvent.type(screen.getByLabelText('Answer, row 1'), 'Within 5 minutes.');
+    expect((await screen.findAllByText('deposit_time')).length).toBeGreaterThan(0);
+    expect(screen.getAllByText('new').length).toBeGreaterThan(0);
+    expect(screen.getByText(/translations will be made/).textContent).toMatch(/2 translations/);       // Malay and Chinese are empty
+    await userEvent.click(screen.getByRole('button', { name: /entry to draft/ }));
+    expect(await screen.findByText(/The AI translated 2 answers/)).toBeTruthy();
+    const calls = (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls.filter((c) => String(c[0]).startsWith('/api/admin/translate'));
+    expect(calls.length).toBe(2); expect(calls.map((c) => JSON.parse(String(c[1].body)).to).sort()).toEqual(['ms', 'zh']);
+  });
+  it('Import: the AI translation can be switched off, and then nothing is translated', async () => {
+    open('staff', '/admin/imp');
+    await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'deposit_time');
+    await userEvent.type(screen.getByLabelText('Topic, row 1'), 'deposit');
+    await userEvent.type(screen.getByLabelText('Questions, row 1'), 'how long | depo late');
+    await userEvent.type(screen.getByLabelText('Answer, row 1'), 'Within 5 minutes.');
+    await userEvent.click(screen.getByRole('checkbox', { name: /Translate the empty languages with AI/ }));
+    await userEvent.click(screen.getByRole('button', { name: /entry to draft/ }));
+    expect(await screen.findByText(/Imported 1 entries to draft/)).toBeTruthy();
+    expect((fetch as unknown as { mock: { calls: [string][] } }).mock.calls.some((c) => String(c[0]).startsWith('/api/admin/translate'))).toBe(false);
+  });
+  it('Import: cells copied from Excel can be pasted into the table', async () => {
+    open('staff', '/admin/imp');
+    const first = await screen.findByLabelText('Entry name, row 1');
+    fireEvent.paste(first, { clipboardData: { getData: () => 'intent_key\ttopic\tlanguage\tquestions\tanswer\nwd_time\twithdraw\tEnglish\thow long wd | wd late\t30 minutes.\nwd_limit\twithdraw\ten\tmax wd\t"MYR 50,000\nper day"' } });
+    expect((screen.getByLabelText('Entry name, row 1') as HTMLInputElement).value).toBe('wd_time');      // the header line of the paste is skipped
+    expect((screen.getByLabelText('Language, row 1') as HTMLSelectElement).value).toBe('en');
+    expect((screen.getByLabelText('Entry name, row 2') as HTMLInputElement).value).toBe('wd_limit');
+    expect((screen.getByLabelText('Answer, row 2') as HTMLTextAreaElement).value).toBe('MYR 50,000\nper day');
+    expect((await screen.findAllByText('wd_limit')).length).toBeGreaterThan(0);
+  });
+  it('Import: Excel example and blank file can be downloaded, and an .xlsx file can be uploaded', async () => {
+    open('staff', '/admin/imp');
+    let saved: Blob | null = null;
+    (URL as unknown as { createObjectURL: (b: Blob) => string }).createObjectURL = (b) => { saved = b; return 'blob:x'; }; (URL as unknown as { revokeObjectURL: () => void }).revokeObjectURL = () => undefined;
+    await userEvent.click(await screen.findByRole('button', { name: 'Download Excel example' }));
+    const bytes = await new Promise<Uint8Array>((res) => { const fr = new FileReader(); fr.onload = () => res(new Uint8Array(fr.result as ArrayBuffer)); fr.readAsArrayBuffer(saved as unknown as Blob); });
+    const rows = readXlsx(bytes);
+    expect(rows[0]).toEqual(['intent_key', 'topic', 'language', 'question_examples', 'answer_text']); expect(rows.length).toBe(6); expect(rows.every((r, i) => i === 0 || r[2] === 'en')).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Upload a file' }));
+    const file = new File([writeXlsx([rows[0], ['from_excel', 'deposit', 'en', 'how long | depo late', 'Within 5 minutes.']]) as BlobPart], 'my.xlsx');
+    await userEvent.upload(screen.getByLabelText('Choose an Excel or CSV file'), file);
+    expect(await screen.findByText('my.xlsx')).toBeTruthy(); expect((await screen.findAllByText('from_excel')).length).toBeGreaterThan(0);
+  });
   it('Import and publish: imports the entries as live and opens the Publish window', async () => {
     open('staff', '/admin/imp');
+    await userEvent.click(await screen.findByRole('button', { name: 'Upload a file' }));
     await userEvent.click(await screen.findByRole('button', { name: /Starter packs/ }));
     await userEvent.click(screen.getByRole('menuitem', { name: /FAQ category starter/ }));
     await userEvent.click(await screen.findByRole('button', { name: 'Import and publish' }));
