@@ -34,12 +34,11 @@ describe('Part E: at most 3 choices, and a line after them', () => {
     expect(t.trace.choicesCut).toBeUndefined();
   });
 
-  it('keeps "where is my deposit" for a signed-in member and cuts a normal choice instead', async () => {
+  it('never offers "where is my deposit" (an account check), even to a signed-in member', async () => {
     const tom = makeToken({ customer_id: 8841, name: 'Tom' });
     const t = await say('deposit', tom);
-    const kinds = options(t).map((b) => b.kind);
-    expect(kinds).toHaveLength(3); expect(kinds).toContain('status');
-    expect(options(t).map((b) => b.key)).toEqual(['deposit_how', 'deposit_time', 'deposit']);
+    expect(options(t).map((b) => b.kind)).not.toContain('status');
+    expect(options(t).map((b) => b.key)).toEqual(['deposit_how', 'deposit_time', 'deposit_limit']);   // plain answers only: the account check is not one of them
   });
 
   it('adds the standard sentence after the choices, in the customer language', async () => {

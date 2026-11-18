@@ -103,7 +103,7 @@ describe.skipIf(!reachable)('a merchant API connected to a merchant (needs TEST_
     const bad = await call(admin, 'POST', P, { baseUrl: m.base, apiKey: 'wrong-key-999', testCustomerId: 'tom8841' });
     expect(bad.statusCode).toBe(400); expect(bad.json().error).toMatch(/did not accept the key/); expect((await call(admin, 'GET', P)).json().configured).toBe(false);
   });
-  it('saves the key encrypted, never shows it again, and the bot then reads the customer live', async () => {
+  it('saves the key encrypted, never shows it again, and the bot still does not read the customer', async () => {
     const r = await call(admin, 'POST', P, { baseUrl: m.base, apiKey: 'secret-key-123', testCustomerId: 'tom8841' });
     expect(r.statusCode).toBe(200); expect(JSON.stringify(r.json())).not.toContain('secret-key-123'); expect(r.json()).toMatchObject({ configured: true, keyLast4: '-123' });
     const [row] = (await pool!.query<import('mysql2/promise').RowDataPacket[]>('SELECT api_key_encrypted FROM merchant_api'))[0]; expect(String(row.api_key_encrypted)).not.toContain('secret-key-123');
@@ -112,8 +112,8 @@ describe.skipIf(!reachable)('a merchant API connected to a merchant (needs TEST_
     const tok = makeToken({ customer_id: 8841, name: 'Tom' });
     const s = (await call(admin, 'POST', '/api/chat/start', { merchant: 'MERCH_A', token: tok })).json().sessionId;
     const turn = (await call(admin, 'POST', '/api/chat/message', { sessionId: s, text: 'check my balance', silent: true })).json().turn;
-    expect(turn.messages.map((x: { text: string }) => x.text).join(' ')).toContain('1,250.50');
-    expect(m.calls.some((c) => c.url === '/bot/customers/8841/account')).toBe(true);
+    expect(turn.messages.map((x: { text: string }) => x.text).join(' ')).not.toContain('1,250.50');   // the bot no longer reads the customer: a person takes it
+    expect(m.calls.some((c) => c.url === '/bot/customers/8841/account')).toBe(false);
   });
   it('can be disconnected, and the merchant goes back to the sample customers', async () => {
     expect((await call(admin, 'POST', P + '/remove', {})).json()).toEqual({ removed: true }); expect((await call(admin, 'GET', P)).json().configured).toBe(false);
@@ -123,18 +123,13 @@ describe.skipIf(!reachable)('a merchant API connected to a merchant (needs TEST_
 describe('the bot when the merchant API fails', () => {
   const tok = makeToken({ customer_id: 8841, name: 'Tom' });
   const bot = (api: import('../src/bot/merchantApi').MerchantApi) => new Bot(knowledgeFromSeed(seedJson, accountsJson), api);
-  it('says it cannot look right now and offers a person, instead of "no account found"', async () => {
-    const down = { getAccount: () => undefined, failed: () => true, load: async () => 'error' as const };
-    const s = newSession('api1', 'MERCH_A', tok); const t = (await bot(down).message(s, 'check my balance'))!;
-    const said = t.messages.map((x) => x.text).join(' '); expect(said).toMatch(/can't reach your account details/); expect(said).not.toMatch(/no data|not found/i);
-    expect(t.buttons?.some((b) => b.kind === 'agent')).toBe(true);
-  });
-  it('asks the merchant for the customer before answering, and keeps sample data for a merchant with nothing connected', async () => {
-    let asked = '';
-    const live = { getAccount: (_m: string, id: string) => (asked === id ? { name: 'Tom', balance: 'MYR 7.00' } : undefined), load: async (_m: string, id: string) => { asked = id; return 'ok' as const; } };
-    const t = (await bot(live).message(newSession('api2', 'MERCH_A', tok), 'check my balance'))!;
-    expect(asked).toBe('8841'); expect(t.messages.map((x) => x.text).join(' ')).toContain('MYR 7.00');
-    const sample = (await bot(fakeMerchantApi()).message(newSession('api3', 'MERCH_A', tok), 'check my balance'))!; expect(sample.messages.map((x) => x.text).join(' ')).toContain('1,250');
+  it('does not ask the merchant at all, even when it is down or connected: a balance question goes to a person', async () => {
+    let asked = false;
+    const live = { getAccount: () => undefined, failed: () => true, load: async () => { asked = true; return 'ok' as const; } };
+    const t = (await bot(live).message(newSession('api1', 'MERCH_A', tok), 'check my balance'))!;
+    expect(asked).toBe(false); expect(t.trace.decision).toBe('HANDOFF');
+    const sample = (await bot(fakeMerchantApi()).message(newSession('api3', 'MERCH_A', tok), 'check my balance'))!;
+    expect(sample.messages.map((x) => x.text).join(' ')).not.toContain('1,250');
   });
   it('never asks the merchant in a channel that shows no account data (LiveChat)', async () => {
     let asked = false; const live = { getAccount: () => undefined, load: async () => { asked = true; return 'ok' as const; } };

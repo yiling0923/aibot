@@ -7,7 +7,7 @@ import { LANGS, LANG_NAMES, LN, clone } from '../model';
 const TN: Record<string, string> = { deposit_status: 'Deposit status', withdraw_status: 'Withdrawal status', balance: 'Balance', transactions: 'Recent transactions', points: 'Points and level' };
 const FN: Record<string, string> = { deposit_status: 'get_recent_deposits', withdraw_status: 'get_recent_withdrawals', balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
 
-interface Basics { currency: string; accountInLiveChat?: boolean; retentionDays: number; name: string; domain: string; defaultLanguage: string; languages: string[]; monthlyTokenLimit: number | null; tokensMonth: number; tokensToday: number; entries: number; questionsToday: number; avgConfidence: number | null }
+interface Basics { currency: string; retentionDays: number; name: string; domain: string; defaultLanguage: string; languages: string[]; monthlyTokenLimit: number | null; tokensMonth: number; tokensToday: number; entries: number; questionsToday: number; avgConfidence: number | null }
 const PRESETS: [string, string][] = [
   ['Formal tone', 'Always use formal, professional language.'], ['Warm and friendly', 'Use a warm, friendly and casual tone.'],
   ['Address as “Dear Member”', 'Address the customer as "Dear Member".'], ['Max 2 sentences', 'Keep every translation or reworded reply to 2 sentences at most.'],
@@ -36,15 +36,15 @@ function Form() {
   const [tab, setTabState] = useState(() => { try { return localStorage.getItem('settingsTab') || 'general'; } catch { return 'general'; } });
   const setTab = (t: string) => { setTabState(t); try { localStorage.setItem('settingsTab', t); } catch { /* ignore */ } };
   const base = useRef(clone(p.draft.settings[p.merchant]));        // what the draft held when the page opened or was last saved
-  const [b, setB] = useState<Basics | null>(null); const [f, setF] = useState({ name: '', domain: '', limit: '', retention: '', currency: 'RM', acct: false, languages: new Set<string>() }); const [busy, setBusy] = useState(false);
+  const [b, setB] = useState<Basics | null>(null); const [f, setF] = useState({ name: '', domain: '', limit: '', retention: '', currency: 'RM', languages: new Set<string>() }); const [busy, setBusy] = useState(false);
   const loadBasics = useCallback(async () => {
-    try { const x = await api<Basics>(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`); setB(x); setF({ name: x.name, domain: x.domain, limit: x.monthlyTokenLimit === null ? '' : String(x.monthlyTokenLimit), retention: x.retentionDays ? String(x.retentionDays) : '', currency: x.currency || 'RM', acct: !!x.accountInLiveChat, languages: new Set(x.languages) }); } catch { setB(null); }
+    try { const x = await api<Basics>(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`); setB(x); setF({ name: x.name, domain: x.domain, limit: x.monthlyTokenLimit === null ? '' : String(x.monthlyTokenLimit), retention: x.retentionDays ? String(x.retentionDays) : '', currency: x.currency || 'RM', languages: new Set(x.languages) }); } catch { setB(null); }
   }, [p.merchant]);
   useEffect(() => { void loadBasics(); }, [loadBasics]);
   const saveBasics = async () => {
     setBusy(true);
     try {
-      await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), retentionDays: f.retention.trim() === '' ? 0 : Number(f.retention), currency: f.currency.trim(), accountInLiveChat: f.acct, languages: [...f.languages] });
+      await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), retentionDays: f.retention.trim() === '' ? 0 : Number(f.retention), currency: f.currency.trim(), languages: [...f.languages] });
       await loadBasics(); await p.reloadAll(); p.toast('Basics saved');
     } catch (e) { p.toast((e as Error).message); } finally { setBusy(false); }
   };
@@ -63,8 +63,8 @@ function Form() {
   const LABEL: Record<string, string> = { tone: 'Tone', answer: 'Match levels', clarify: 'Match levels', ai_instructions: 'Bot instructions', handoff_complaint: 'Complaint or dispute', handoff_account: 'Account details', trigger_phrases: 'Trigger phrases', tools: 'Account tools', max_choices: 'Choices', reask_times: 'Ask again', more_help_on: 'Line after choices', abuse_close_after: 'Rude messages', kind: 'Messages', closing: 'Messages', handoff: 'Messages', more_help: 'Messages', handoff_group: 'Human group' };
   const changed = [...new Set((Object.keys(s) as (keyof typeof s)[]).filter((k) => JSON.stringify(s[k] ?? null) !== JSON.stringify(base.current[k] ?? null)).map((k) => LABEL[k as string] ?? String(k)))];
   const discard = () => { setS(clone(base.current)); p.toast('Changes discarded'); };
-  const basicsDirty = !!b && (f.name !== b.name || f.domain !== b.domain || f.limit !== (b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit)) || f.retention !== (b.retentionDays ? String(b.retentionDays) : '') || f.currency !== (b.currency || 'RM') || f.acct !== !!b.accountInLiveChat || [...f.languages].sort().join() !== [...b.languages].sort().join());
-  const TABS: [string, string][] = [['general', 'General'], ['replies', 'Replies'], ['handoff', 'Handoff'], ['ai', 'AI help'], ['messages', 'Messages'], ['tools', 'Account tools']];
+  const basicsDirty = !!b && (f.name !== b.name || f.domain !== b.domain || f.limit !== (b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit)) || f.retention !== (b.retentionDays ? String(b.retentionDays) : '') || f.currency !== (b.currency || 'RM') || [...f.languages].sort().join() !== [...b.languages].sort().join());
+  const TABS: [string, string][] = [['general', 'General'], ['replies', 'Replies'], ['handoff', 'Handoff'], ['ai', 'AI help'], ['messages', 'Messages']];
   const cur = TABS.some(([k]) => k === tab) ? tab : 'general';
   return (
     <>
@@ -80,7 +80,6 @@ function Form() {
           <div><label className="fld"><span>Monthly AI token limit (empty = unlimited)</span><input type="number" min={0} value={f.limit} placeholder="e.g. 500000" disabled={lock} onChange={(e) => setF({ ...f, limit: e.target.value })} /></label>
             <div className="sub" style={{ marginTop: 4 }}>Used this month: {b.tokensMonth.toLocaleString()}. When the limit is reached the bot keeps answering from the knowledge base; only the AI help stops until next month.</div></div>
           <label className="fld"><span>Money sign in bot messages</span><input value={f.currency} maxLength={8} placeholder="RM" disabled={lock} onChange={(e) => setF({ ...f, currency: e.target.value })} /><span className="lock">For example RM, SGD, $ or ฿. It appears in "RM500 is within the limits".</span></label>
-          <div className="full"><SRow title="Account answers in LiveChat" sub="When on, a logged-in member who asks &quot;check my balance&quot;, &quot;my deposit&quot; or &quot;my points&quot; gets their own account answer (from the Account data on the Merchant page). A guest never does. Switch it on only after LiveChat stops keeping replies by the words of the question (see docs/REQUEST_TO_LIVECHAT_TEAM.md) and sends the member id with every message. These replies are marked &quot;do not keep&quot;." checked={f.acct} disabled={lock} onChange={(v) => setF({ ...f, acct: v })} /></div>
           <div><label className="fld"><span>Keep conversations for (days)</span><input type="number" min={0} max={3650} value={f.retention} placeholder="0" disabled={lock} onChange={(e) => setF({ ...f, retention: e.target.value })} /></label>
             <div className="sub" style={{ marginTop: 4 }}>Chats older than this are deleted every day. Empty or 0 keeps them for ever. The Report only counts chats that are kept. The keyword counts are not changed.</div></div>
           <div className="full"><div className="fld"><span>Languages the bot answers in</span></div>
@@ -138,11 +137,6 @@ function Form() {
           <label className="fld full"><span>Last message before the chat is closed (after repeated rude messages)</span><textarea lang={lang} value={s.closing[lang] || ''} onChange={(e) => msg('closing', e.target.value)} /></label>
           <label className="fld full"><span>Line after the choices (leave empty to use the standard sentence)</span><textarea lang={lang} value={s.more_help[lang] || ''} onChange={(e) => msg('more_help', e.target.value)} /></label>
           <label className="fld full"><span>Message when transferring to a human</span><textarea lang={lang} value={s.handoff[lang] || ''} onChange={(e) => msg('handoff', e.target.value)} /></label></div></div>
-      </>}
-      {cur === 'tools' && <>
-      <div className="card"><h3>Account tools {lock ? <span className="lock">(admin only)</span> : null}</h3><div className="sub" style={{ marginBottom: 6 }}>A tool lets the bot read this customer's own data from the merchant's system, only after the signed login token is checked. An off tool hands the customer to a human.</div>
-        {Object.keys(s.tools).map((k) => <SRow key={k} title={TN[k] || k} sub={<span className="mono">{FN[k]}</span>} checked={!!s.tools[k]} disabled={lock} onChange={(v) => up({ tools: { ...s.tools, [k]: v } })} />)}
-        <div className="note" style={{ marginTop: 8 }}>Always on and locked: the customer must be identified by a signed token. Passwords, OTP codes and full bank, card or ID numbers are never shown.</div></div>
       </>}
       {changed.length > 0 && <div className="ubar" role="region" aria-label="Unsaved changes"><b>{changed.length} unsaved change{changed.length === 1 ? '' : 's'}</b><span className="ulist">{changed.join(' · ')}</span>
         <span className="uact"><button className="btn" type="button" onClick={discard}>Discard</button><button className="btn pri" type="button" onClick={save}>Save to draft</button></span></div>}

@@ -131,19 +131,13 @@ describe.skipIf(!reachable)('the LiveChat connector (needs TEST_DATABASE_URL)', 
     expect(byNumber.answer).toContain('processed within 30 minutes');                                // 2 = withdrawal
   });
 
-  it('with the merchant switch on, answers a logged-in member from their own account, never for a guest, and never lets LiveChat keep it', async () => {
-    expect((await admin('POST', '/api/admin/merchants/MERCH_A/basics', { accountInLiveChat: true })).json().saved).toBe(true);
-    try {
-      const tom = (await call(keyA, { question: 'check my balance now', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' } })).json();
-      expect(tom.decision).toBe('answer'); expect(tom.answer).toContain('1,250'); expect(tom.cacheable).toBe(false); expect(tom.confidence).toBeLessThanOrEqual(0.8);
-      expect(tom.should_escalate).toBe(false);
-      const guest = (await call(keyA, { question: 'check my balance now' })).json();                   // not logged in: no data, a person (or a login request)
-      expect(JSON.stringify(guest)).not.toContain('1,250'); expect(guest.cacheable).toBe(false);
-      const general = (await call(keyA, { question: 'how to deposit', member: { externalId: '8841', name: 'Tom' } })).json();
-      expect(general.cacheable).toBe(false);                                                         // every reply to a member in this mode is kept out of the cache
-    } finally { await admin('POST', '/api/admin/merchants/MERCH_A/basics', { accountInLiveChat: false }); }
-    const off = (await call(keyA, { question: 'check my balance please', member: { externalId: '8841', name: 'Tom' } })).json();
-    expect(off.decision).toBe('handover');                                                            // switched off again
+  it('ignores the member LiveChat sends: a balance question goes to a person, member or not, and nothing about the member is kept', async () => {
+    const tom = (await call(keyA, { question: 'check my balance now', member: { externalId: '8841', name: 'Tom', rank: 'GOLD' }, session_id: 'nomember-1' })).json();
+    expect(tom.decision).toBe('handover'); expect(tom.should_escalate).toBe(true); expect(JSON.stringify(tom)).not.toMatch(/1,250|Tom/);
+    const guest = (await call(keyA, { question: 'check my balance now' })).json();
+    expect(guest.decision).toBe('handover');
+    const mary = (await call(keyA, { question: 'how much is my deposit balance', member: { externalId: '9120', name: 'Mary' } })).json();   // another member: the same
+    expect(mary.decision).toBe('handover'); expect(JSON.stringify(mary)).not.toMatch(/Mary/);
   });
 
   it('a picture from the customer (the question is its name) is thanked and handed to a person, whatever the name looks like', async () => {

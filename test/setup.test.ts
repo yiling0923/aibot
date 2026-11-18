@@ -12,7 +12,7 @@ import { Bot } from '../src/bot/responder';
 import { Store } from '../src/bot/store';
 import { loadKnowledge } from '../src/db/loadKnowledge';
 
-const empty: SetupInput = { logins: 0, activeKeys: 0, keyLastUsed: null, entries: [], translations: [], apiHost: null, accountInLiveChat: false, chats: 0 };
+const empty: SetupInput = { logins: 0, activeKeys: 0, keyLastUsed: null, entries: [], translations: [], chats: 0 };
 const ex = JSON.stringify(['a b', 'c d', 'e f']);
 const many = (n: number, answer = 'A real answer.') => ({ entries: Array.from({ length: n }, (_, i) => ({ id: i + 1, status: 'live', type: 'answer' })), translations: Array.from({ length: n }, (_, i) => ({ kb_id: i + 1, question_examples: ex, answer_text: answer })) });
 const by = (r: ReturnType<typeof checklist>, key: string) => r.items.find((x) => x.key === key)!;
@@ -38,14 +38,14 @@ describe('how many answers are ready', () => {
 describe('the setup checklist', () => {
   it('a brand new merchant has nothing done, and says what to do first', () => {
     const r = checklist(empty);
-    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'todo'], ['key', 'todo'], ['livechat', 'todo'], ['answers', 'todo'], ['tried', 'todo'], ['account', 'optional']]);
+    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'todo'], ['key', 'todo'], ['livechat', 'todo'], ['answers', 'todo'], ['tried', 'todo']]);
     expect(r).toMatchObject({ done: 0, total: 5 });
     expect(by(r, 'answers').detail).toMatch(/No answers yet.*every question to a person.*starter pack/); expect(by(r, 'answers').action).toEqual({ to: 'imp', label: 'Open Import' });
     expect(by(r, 'livechat').detail).toMatch(/Make the bot key first/); expect(by(r, 'key').action?.to).toBe('key');
   });
-  it('shows each step done when it is, and counts only the required ones', () => {
+  it('shows each step done when it is, ', () => {
     const r = checklist({ ...empty, logins: 1, activeKeys: 1, keyLastUsed: '2026-11-17T04:27:00.000Z', ...many(MIN_READY_ANSWERS), chats: 3 });
-    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'done'], ['key', 'done'], ['livechat', 'done'], ['answers', 'done'], ['towrite', 'done'], ['tried', 'done'], ['account', 'optional']]);
+    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'done'], ['key', 'done'], ['livechat', 'done'], ['answers', 'done'], ['towrite', 'done'], ['tried', 'done']]);
     expect(r).toMatchObject({ done: 6, total: 6 }); expect(by(r, 'livechat').detail).toContain('2026-11-17 04:27');
   });
   it('asks for more answers below the minimum, and tells how many are drafts', () => {
@@ -56,12 +56,9 @@ describe('the setup checklist', () => {
     const m = many(MIN_READY_ANSWERS + 1, 'x'); m.translations[0].answer_text = 'TO WRITE: this one'; m.translations[1].answer_text = 'TO WRITE: and this';
     const t = by(checklist({ ...empty, ...m }), 'towrite'); expect(t.state).toBe('todo'); expect(t.detail).toMatch(/2 entries still say TO WRITE/);
   });
-  it('the account API: connected, optional, or a warning when the LiveChat switch is on without it', () => {
-    expect(by(checklist({ ...empty, apiHost: 'api.luckypay.test' }), 'account')).toMatchObject({ state: 'done', detail: 'Connected to api.luckypay.test.' });
-    expect(by(checklist(empty), 'account').state).toBe('optional');
-    const w = by(checklist({ ...empty, accountInLiveChat: true }), 'account'); expect(w.state).toBe('warn'); expect(w.detail).toMatch(/demo balances/);
-    expect(by(checklist({ ...empty, accountInLiveChat: true, apiHost: 'x.test' }), 'account').state).toBe('done');
-    expect(checklist({ ...empty, accountInLiveChat: true }).total).toBe(5);                              // never counted: it is optional
+  it('has no account step: the bot does not read customer information', () => {
+    expect(checklist(empty).items.map((x) => x.key)).not.toContain('account');
+    expect(checklist(empty).total).toBe(5);
   });
 });
 
@@ -83,7 +80,7 @@ describe.skipIf(!reachable)('the checklist on the merchant page, step by step fo
   it('follows a new merchant from nothing to set up', async () => {
     expect((await call('POST', '/api/admin/merchants', { code: 'NEWCO', name: 'NewCo' })).statusCode).toBe(200);
     let s = await setup('NEWCO');
-    expect(s.items.map((x) => x.state)).toEqual(['todo', 'todo', 'todo', 'todo', 'todo', 'optional']); expect(s).toMatchObject({ done: 0, total: 5 });
+    expect(s.items.map((x) => x.state)).toEqual(['todo', 'todo', 'todo', 'todo', 'todo']); expect(s).toMatchObject({ done: 0, total: 5 });
 
     expect((await call('POST', '/api/admin/users', { username: 'newco', password: 'secret123', role: 'staff', merchant: 'NEWCO' })).statusCode).toBe(200);
     const key = (await call('POST', '/api/admin/merchants/NEWCO/bot-key', {})).json().key as string;

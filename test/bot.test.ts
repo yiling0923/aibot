@@ -66,13 +66,12 @@ describe('replies', () => {
     expect(text(t)).toMatch(/^Hai!/);                                                   // friendly tone, Malay
   });
 
-  it('reads account data only for a verified customer', async () => {
-    expect(text((await bot.message(newSession('2', 'MERCH_A', tom), 'my balance')))).toContain('Tom');
-    const guest = (await bot.message(newSession('3', 'MERCH_A', null), 'my balance'))!;
-    expect(text(guest)).toMatch(/log in/i);
-    expect(text(guest)).not.toMatch(/MYR/);
-    const forged = makeToken({ customer_id: 9120, name: 'Mary' }).split('.')[0] + '.' + tom.split('.')[1];
-    expect(text((await bot.message(newSession('4', 'MERCH_A', forged), 'my balance')))).not.toMatch(/MYR/);
+  it('never reads account data, even for a verified customer: a balance question goes to a person', async () => {
+    for (const [id, tok] of [['2', tom], ['3', null], ['4', makeToken({ customer_id: 9120, name: 'Mary' }).split('.')[0] + '.' + tom.split('.')[1]]] as const) {
+      const t = (await bot.message(newSession(id, 'MERCH_A', tok), 'my balance'))!;
+      expect(t.trace.decision).toBe('HANDOFF');
+      expect(text(t)).not.toMatch(/MYR|1,250|Tom/);
+    }
   });
 
   it('never shows secrets, even to a verified customer', async () => {

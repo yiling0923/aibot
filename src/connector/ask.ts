@@ -86,7 +86,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     if (typeof body.session_id !== 'string' || !SESSION_ID.test(body.session_id)) throw new AskError(400, 'session_id must be up to 64 letters, digits, dots, dashes or colons.');
     sessionId = body.session_id;
   }
-  const member = parseMember(body.member);
+  // LiveChat may send who the customer is ("member"). The bot ignores it: it does not use it, keep it or log it.
   const file = parseAttachment(body.attachment);                     // the customer sent a picture, video or file: the question is its name
 
   const tenant = await new Tenants(pool).get(merchant);
@@ -94,7 +94,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
   const SESSIONS = tbl(tenant.db, 'bot_sessions'), REQUESTS = tbl(tenant.db, 'bot_requests');
 
   // LiveChat sends no message id and retries when it hears nothing: the same request gets the same answer, and the chat does not move twice.
-  const requestKey = sha([merchant, sessionId ?? '', member?.id ?? '', question, file ? JSON.stringify(file) : '', JSON.stringify(history)].join('\u0001'));   // who is asking is part of the request
+  const requestKey = sha([merchant, sessionId ?? '', question, file ? JSON.stringify(file) : '', JSON.stringify(history)].join('\u0001'));   // who is asking is part of the request
   const [seen] = await q(pool, `SELECT response, created_at FROM ${REQUESTS} WHERE request_key = ?`, [requestKey]);
   if (seen) {
     if (Date.now() - new Date(seen.created_at).getTime() < DUPLICATE_WINDOW_MS) return JSON.parse(seen.response) as AskResponse;
@@ -105,7 +105,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
   const [row] = await q(pool, `SELECT state FROM ${SESSIONS} WHERE session_id = ?`, [id]);
   const state: State = row ? (JSON.parse(row.state) as State) : { session: newSession(id, merchant, null), choices: null, lang: null };
   state.session.merchant = merchant;
-  if (member) state.session.member = member;
+  state.session.member = null;                                  // nothing about the customer is kept in the chat memory
 
   const started = Date.now();
   const fallback = (): AskResponse => {                       // slow or not ready: pass the chat to a person, never leave the customer in silence
@@ -123,8 +123,8 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
 
     // LiveChat keeps a reply by the words of the question, for every customer: so no reply carries personal account data (it is for staff).
     // Exception: a merchant who switched it on, and a logged-in member. Those replies are never kept (cacheable false, see below).
-    const personalOk = !!(bot.engine.hasMerchant(merchant) && bot.engine.merchant(merchant).accountInLiveChat && s.member);
-    s.noPersonal = !personalOk;
+    s.noPersonal = true;                                                                // no account answers, ever: a person takes those
+    const personalOk = false;
     if (state.choices && !s.choices) s.choices = state.choices;       // a chat saved before the choices moved into the session
     state.choices = null;
     // A reply to the choices ("deposit", "depo", "2", "the first one") is read by the bot itself, so every channel behaves the same.
@@ -150,7 +150,7 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     if (!abandoned && turn.log) {
       const matched = turn.trace.decision === 'ANSWER' ? ((turn.trace.top as { id?: number } | undefined)?.id ?? null) : null;
       if (!file) await store.hear(merchant, turn.log.text, turn.log.lang, turn.log.notUnderstood, deps.source ?? 'live');
-      void store.logTurn({ merchant, sessionKey: id, customerRef: member?.id ?? null, text: turn.log.text, lang: turn.log.lang, decision: turn.log.decision, confidence: res.confidence,
+      void store.logTurn({ merchant, sessionKey: id, customerRef: null, text: turn.log.text, lang: turn.log.lang, decision: turn.log.decision, confidence: res.confidence,
         reply: answer, matchedKbId: matched, why: String(turn.trace.why ?? '').slice(0, 500), topic: typeof turn.trace.topic === 'string' ? turn.trace.topic : null, keywords: Array.isArray(turn.trace.kw) ? (turn.trace.kw as string[]) : [], source: deps.source ?? 'live' });
     }
     return res;

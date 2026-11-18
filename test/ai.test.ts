@@ -166,8 +166,8 @@ describe('the bot with the AI on', () => {
     const tom = (await import('../src/bot/token')).makeToken({ customer_id: 8841, name: 'Tom' });
     await botWith(ai).message(newSession('c1', 'MERCH_A', tom), 'my balance');             // an account answer
     expect(log.write).toBe(0);
-    await botWith(ai).message(newSession('c2', 'MERCH_A', tom), 'my deposit still pending');
-    expect(log.write).toBe(0);
+    await botWith(ai).message(newSession('c2', 'MERCH_A', tom), 'my deposit still pending');      // a plain answer now: the bot reads no account
+    expect(log.writeFacts.every((f) => !/MYR 1,250|D-20931|Tom/.test(f))).toBe(true);
     await botWith(ai).message(newSession('c3', 'MERCH_A', null), 'any promo for new member?');
     expect(log.writeFacts.every((f) => !/MYR 1,250|D-20931|Tom/.test(f))).toBe(true);
   });

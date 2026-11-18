@@ -26,14 +26,14 @@ const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) =>
 const REPORT = { from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let setupDone = false;
 const SETUP = () => (setupDone
-  ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }, { key: 'account', title: 'Account data (optional)', state: 'optional', detail: 'Not connected. Without it the bot uses 2 built-in demo customers.', action: { to: 'api', label: 'Open Account data' } }] }
+  ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }] }
   : { done: 2, total: 5, items: [
     { key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' },
     { key: 'key', title: 'Bot key', state: 'todo', detail: 'No bot key yet. LiveChat cannot use the bot.', action: { to: 'key', label: 'Make key' } },
     { key: 'livechat', title: 'LiveChat calls the bot', state: 'todo', detail: 'Make the bot key first, then put it into LiveChat.', action: { to: 'livechat', label: 'Show the address and key' } },
     { key: 'answers', title: 'Answers', state: 'todo', detail: 'No answers yet, so the bot hands every question to a person. Load the starter pack in Import (Starter packs).', action: { to: 'imp', label: 'Open Import' } },
     { key: 'tried', title: 'Tried it', state: 'done', detail: '3 chats so far (tests and real customers).' },
-    { key: 'account', title: 'Account data (optional)', state: 'warn', detail: 'Account answers in LiveChat is ON but no real API is connected: members would get demo balances.', action: { to: 'api', label: 'Open Account data' } }] });
+  ] });
 const CONN = () => ({ setup: SETUP(), merchant: { code: 'A', name: 'LuckyPay', language: 'en', tone: 'friendly', entries: 11, logins: ['luckypay'] }, livechat: { baseUrl: 'http://localhost:3000', askUrl: 'http://localhost:3000/api/v1/ai/ask', keys: [], stoppedKeys: 0, liveChats7d: 4, lastLiveChat: null },
   ai: { anthropic: { provider: 'anthropic', configured: true, last4: 'wxyz', updatedAt: '2026-11-12T08:00:00Z', updatedBy: 'admin', using: 'merchant' }, openai: { provider: 'openai', configured: false, last4: null, updatedAt: null, updatedBy: null, using: 'none' } } });
 const BILL = () => ({ from: '2026-11-01', to: '2026-11-12', markupPct: 20,
@@ -339,25 +339,20 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'List' }));
     expect(screen.getByLabelText('Filter words')).toBeTruthy();
   });
-  it('LiveChat test: shows what an agent writes in LiveChat without a refresh, and can chat as a guest', async () => {
+  it('LiveChat test: shows what an agent writes in LiveChat without a refresh, with no member to choose', async () => {
     open('admin', '/admin/lchat');
     await userEvent.click(await screen.findByRole('button', { name: 'Settings' }));
-    expect(screen.getByLabelText('The customer is')).toBeTruthy();
-    await userEvent.selectOptions(screen.getByLabelText('The customer is'), 'guest');
+    expect(screen.queryByLabelText('The customer is')).toBeNull();                                  // no member to choose: the bot does not read customer information
     expect(screen.queryByLabelText(/Member id/)).toBeNull();
-    expect(screen.getByText(/Customer: not logged in/)).toBeTruthy();
     lcLines = [{ from: 'agent', sender: 'operator', text: 'Hello, this is an agent.' }];            // written in LiveChat, not in this page
     expect(await screen.findByText('Hello, this is an agent.', {}, { timeout: 5000 })).toBeTruthy();   // the page looks again by itself
   }, 10000);
-  it('merchant page: connects the merchant API with a try-first button', async () => {
+  it('merchant page: has no Account data step, because the bot does not read customer information', async () => {
     open('admin', '/admin/merchants/A');
-    expect(await screen.findByText('Account data')).toBeTruthy();
-    expect(screen.getByText('Sample customers only')).toBeTruthy();
-    expect(screen.getByText(/What the merchant's API must provide/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(true);        // address and key are needed
-    await userEvent.type(screen.getByLabelText(/^API address/), 'https://api.merchant.test/bot');
-    await userEvent.type(screen.getByLabelText(/^API key/), 'secret-key-123');
-    expect((screen.getByRole('button', { name: 'Connect' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(await screen.findByText('Human Handoff')).toBeTruthy();
+    expect(screen.queryByText('Account data')).toBeNull(); expect(screen.queryByText('Sample customers only')).toBeNull();
+    expect(screen.queryByText(/What the merchant's API must provide/)).toBeNull();
+    expect(screen.getByText('AI keys')).toBeTruthy();
   });
   it('LiveChat test: shows a picture an agent sent, and a plain link when it is not a picture', async () => {
     open('admin', '/admin/lchat');
@@ -439,13 +434,10 @@ describe('Control panel', () => {
     expect(screen.getByText(/Not added, because the bot already covers them/)).toBeTruthy();
     expect(await screen.findByRole('button', { name: new RegExp('Import ' + STARTER_ENTRIES + ' entries') })).toBeTruthy();                              // the check step reads all of the pack
   });
-  it('Merchant settings: the LiveChat account-answers switch starts off, turns on, and enables Save', async () => {
+  it('Merchant settings: there is no switch for account answers', async () => {
     open('admin', '/admin/set');
-    const sw = await screen.findByRole('switch', { name: 'Account answers in LiveChat' }) as HTMLInputElement;
-    expect(sw.checked).toBe(false);
-    await userEvent.click(sw);
-    expect(sw.checked).toBe(true);
-    expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(await screen.findByRole('tab', { name: 'General' })).toBeTruthy();
+    expect(screen.queryByRole('switch', { name: 'Account answers in LiveChat' })).toBeNull();
   });
   it('Merchant page: the setup checklist shows what is done and what is to do, with a button for each', async () => {
     open('admin', '/admin/merchants/A');
@@ -454,8 +446,8 @@ describe('Control panel', () => {
     expect(within(card).getByRole('progressbar', { name: 'Setup progress' }).getAttribute('aria-valuenow')).toBe('40');
     for (const t of ['Staff login', 'Bot key', 'LiveChat calls the bot', 'Answers', 'Tried it']) expect(within(card).getByText(t)).toBeTruthy();
     expect(within(card).getByText(/No answers yet, so the bot hands every question to a person/)).toBeTruthy();
-    expect(within(card).getByText(/members would get demo balances/)).toBeTruthy();                       // the warning about the account switch
-    expect(within(card).queryByRole('button', { name: 'Open Account data' })).toBeTruthy();
+    expect(within(card).queryByText(/Account data/)).toBeNull();                                           // no account step: the bot reads no customer data
+    expect(within(card).queryByRole('button', { name: 'Open Account data' })).toBeNull();
     expect(within(card).getAllByRole('button').filter((b) => /Make key|Open Import|Show the address/.test(b.textContent ?? '')).length).toBe(3);   // a done step has no button
   });
   it('Merchant page: a button of the checklist opens the right screen for that merchant', async () => {
@@ -469,7 +461,7 @@ describe('Control panel', () => {
     expect(within(card).getByText('complete')).toBeTruthy(); expect(within(card).queryByText('Staff login')).toBeNull();
     await userEvent.click(within(card).getByRole('button', { name: 'Show the checklist' }));
     expect(within(card).getByText('Staff login')).toBeTruthy();
-    expect(within(card).getByText(/Not connected\. Without it the bot uses 2 built-in demo customers/)).toBeTruthy();   // optional: no tick needed
+    expect(within(card).queryByText(/built-in demo customers/)).toBeNull();
   });
   it('LiveChat test: shows which LiveChat merchant it chats in, and remembers the Tenant id for each merchant', async () => {
     localStorage.setItem('lcTenant:A', '7');                                                        // typed once for this merchant before
@@ -842,7 +834,8 @@ describe('Control panel', () => {
   it('groups the settings in tabs, and shows the unsaved changes in a bar with Discard and Save to draft', async () => {
     open('admin', '/admin/set');
     expect(await screen.findByRole('tab', { name: 'General' })).toBeTruthy();
-    for (const t of ['Replies', 'Handoff', 'AI help', 'Messages', 'Account tools']) expect(screen.getByRole('tab', { name: t })).toBeTruthy();
+    for (const t of ['Replies', 'Handoff', 'AI help', 'Messages']) expect(screen.getByRole('tab', { name: t })).toBeTruthy();
+    expect(screen.queryByRole('tab', { name: 'Account tools' })).toBeNull();                                                      // the bot reads no customer data
     expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();                                                 // nothing changed: no bar
     await userEvent.click(screen.getByRole('tab', { name: 'Handoff' }));
     const complaint = await screen.findByRole('switch', { name: 'Complaint or dispute' }) as HTMLInputElement;

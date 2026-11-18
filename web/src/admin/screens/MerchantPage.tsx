@@ -6,7 +6,7 @@ import { Pill } from '../ui';
 
 interface KeyRow { id: number; prefix: string; createdBy: string | null; createdAt: string; lastUsedAt: string | null }
 interface AiRow { provider: 'anthropic' | 'openai'; configured: boolean; last4: string | null; updatedAt: string | null; updatedBy: string | null; using: 'merchant' | 'shared' | 'none' }
-interface CheckItem { key: string; title: string; state: 'done' | 'todo' | 'optional' | 'warn'; detail: string; action?: { to: 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'api' | 'lchat'; label: string } }
+interface CheckItem { key: string; title: string; state: 'done' | 'todo' | 'optional' | 'warn'; detail: string; action?: { to: 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'lchat'; label: string } }
 interface Setup { items: CheckItem[]; done: number; total: number }
 interface Conn {
   setup: Setup;
@@ -100,9 +100,7 @@ export default function MerchantPage() {
 
       <HandoffSync code={m.code} />
 
-      <AccountApi code={m.code} />
-
-      <Step n={5} done={aiOwn || aiShared} title="AI keys" badge={aiOwn ? 'Own key' : aiShared ? 'Using shared key' : 'AI off'} tone={aiOwn ? 'ok' : aiShared ? 'info' : ''}
+      <Step n={4} done={aiOwn || aiShared} title="AI keys" badge={aiOwn ? 'Own key' : aiShared ? 'Using shared key' : 'AI off'} tone={aiOwn ? 'ok' : aiShared ? 'info' : ''}
         sub={<>Optional. With its own key, this merchant's AI use is billed to its own account. Without one, the bot uses the shared key from <span className="mono">.env</span>, or runs without AI. Keys are saved encrypted and only the last 4 characters are ever shown.</>}>
         <AiKeyRow code={m.code} provider="anthropic" title="Claude (Anthropic)" help="Picks the right answer when no keyword matches, describes new keywords, and translates answers." row={c.ai.anthropic} onChange={load} />
         <AiKeyRow code={m.code} provider="openai" title="ChatGPT (OpenAI)" help="Only used to reword replies, and only if OPENAI_MODEL is set in .env." row={c.ai.openai} onChange={load} />
@@ -122,7 +120,6 @@ function SetupChecklist({ s, code, onMakeKey }: { s: Setup; code: string; onMake
     if (to === 'users') nav('/admin/users');
     else if (to === 'key') onMakeKey();
     else if (to === 'livechat') scroll('mstep-1');
-    else if (to === 'api') scroll('mstep-4');
     else { p.setMerchant(code); nav(to === 'imp' ? '/admin/imp' : to === 'kb' ? '/admin/kb' : '/admin/lchat'); }
   };
   const icon = (st: CheckItem['state']) => (st === 'done' ? '✓' : st === 'warn' ? '!' : st === 'optional' ? '–' : '');
@@ -203,43 +200,6 @@ function HandoffSync({ code }: { code: string }) {
           <label className="fld"><span>Password (saved encrypted)</span><input type="password" value={f.password} autoComplete="off" onChange={(e) => setF({ ...f, password: e.target.value })} /></label></div>
         <div className="mrow" style={{ marginTop: 10 }}><button className="btn pri" type="button" disabled={!!busy} onClick={() => run('connect', () => api<LcLink>(base, f), 'Connected to LiveChat')}>{busy === 'connect' ? 'Checking…' : 'Connect and copy the number'}</button></div></>}
       {msg && <div className="note" style={{ marginTop: 8, background: 'var(--badbg)' }}>{msg}</div>}
-    </Step>
-  );
-}
-
-interface ApiState { configured: boolean; baseUrl: string | null; keyLast4: string | null; checkedAt: string | null; error: string | null }
-interface ApiTest { status: 'ok' | 'missing' | 'error'; error: string | null; account: { name: string; balance: string | null; points: number | null; level: string | null; deposits: number; withdrawals: number; transactions: number } | null }
-
-/** The merchant's own API: where the bot reads a logged-in customer's balance, points, deposits and withdrawals. */
-function AccountApi({ code }: { code: string }) {
-  const p = usePanel(); const base = `/api/admin/merchants/${encodeURIComponent(code)}/api`;
-  const [s, setS] = useState<ApiState | null>(null); const [f, setF] = useState({ baseUrl: '', apiKey: '', customer: '' }); const [busy, setBusy] = useState(''); const [msg, setMsg] = useState(''); const [t, setT] = useState<ApiTest | null>(null);
-  const load = () => api<ApiState>(base).then((x) => { setS(x); setF((o) => ({ ...o, baseUrl: x.baseUrl ?? o.baseUrl })); }).catch((e) => setMsg((e as Error).message));
-  useEffect(() => { void load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [base]);
-  const run = async (what: string, fn: () => Promise<void>) => { setBusy(what); setMsg(''); try { await fn(); } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); } };
-  const test = () => run('test', async () => setT(await api<ApiTest>(base + '/test', { baseUrl: f.baseUrl, apiKey: f.apiKey, customerId: f.customer })));
-  const save = () => run('save', async () => { await api(base, { baseUrl: f.baseUrl, apiKey: f.apiKey, testCustomerId: f.customer }); setF((o) => ({ ...o, apiKey: '' })); await load(); p.toast('Account data connected'); });
-  const off = () => run('off', async () => { if (!confirm('Disconnect the account data of this merchant? The bot then uses the built-in sample customers.')) return; await api(base + '/remove', {}); setT(null); setF({ baseUrl: '', apiKey: '', customer: '' }); await load(); p.toast('Disconnected'); });
-  const on = !!s?.configured;
-  return (
-    <Step n={4} done={on} title="Account data" badge={on ? 'Connected' : 'Sample customers only'} tone={on ? 'ok' : ''}
-      sub={<>Where the bot reads a <b>logged-in</b> customer's balance, points, deposits and withdrawals, from the merchant's own system. Read only: the bot never changes anything. Not used in LiveChat replies. Without it the bot uses built-in sample customers (a demo only).</>}>
-      {on && <div className="keyline"><span className="mono">{s?.baseUrl}</span><Pill c="ok">Key …{s?.keyLast4}</Pill>{s?.checkedAt ? <span className="sub">Checked {when(s.checkedAt)}</span> : <span className="sub">Saved without a test</span>}</div>}
-      <div className="form" style={{ marginTop: 8 }}>
-        <label className="fld"><span>API address</span><input value={f.baseUrl} placeholder="https://api.merchant.com/bot" autoComplete="off" onChange={(e) => setF({ ...f, baseUrl: e.target.value })} /></label>
-        <label className="fld"><span>API key {on ? '(leave empty to keep the saved one)' : ''}</span><input type="password" value={f.apiKey} placeholder={on ? '••••' + (s?.keyLast4 ?? '') : ''} autoComplete="new-password" onChange={(e) => setF({ ...f, apiKey: e.target.value })} /></label>
-        <label className="fld"><span>A customer id to try</span><input value={f.customer} placeholder="e.g. 8841" autoComplete="off" onChange={(e) => setF({ ...f, customer: e.target.value })} /></label></div>
-      <div className="mrow" style={{ marginTop: 10 }}>
-        <button className="btn" type="button" disabled={!!busy || !f.baseUrl || !f.customer || (!f.apiKey && !on)} onClick={test}>{busy === 'test' ? 'Trying…' : 'Try it'}</button>
-        <button className="btn pri" type="button" disabled={!!busy || !f.baseUrl || !f.apiKey} onClick={save}>{busy === 'save' ? 'Saving…' : on ? 'Save changes' : 'Connect'}</button>
-        {on && <button className="btn danger" type="button" disabled={!!busy} onClick={off}>Disconnect</button>}</div>
-      {t && (t.status === 'ok' && t.account
-        ? <div className="note" style={{ marginTop: 10, background: 'var(--okbg)' }}><b>It works.</b> {t.account.name || 'The customer'}: balance {t.account.balance ?? 'not sent'}{t.account.points !== null ? ` · ${t.account.points} points` : ''}{t.account.level ? ` (${t.account.level})` : ''} · {t.account.deposits} deposits, {t.account.withdrawals} withdrawals, {t.account.transactions} transactions found.</div>
-        : t.status === 'missing' ? <div className="note" style={{ marginTop: 10, background: 'var(--warnbg)' }}>The address and key work, but the API has no customer with that id.</div>
-        : <div className="note" style={{ marginTop: 10, background: 'var(--badbg)' }}>{t.error}</div>)}
-      {msg && <div className="note" style={{ marginTop: 8, background: 'var(--badbg)' }}>{msg}</div>}
-      <details className="fold" style={{ marginTop: 10 }}><summary>What the merchant's API must provide</summary>
-        <div className="sub" style={{ marginTop: 6 }}>The bot calls <span className="mono">GET {'{address}'}/customers/{'{customer id}'}/account</span> with the header <span className="mono">Authorization: Bearer {'{key}'}</span>. Answer <b>200</b> with JSON, <b>404</b> when there is no such customer. The customer id is the one the website signs into the chat token. See the README ("Merchant API") for the fields.</div></details>
     </Step>
   );
 }

@@ -13,7 +13,7 @@ export interface SetupInput {
   entries: { id: number; status: string; type: string }[];
   translations: { kb_id: number; question_examples: unknown; answer_text: string }[];
   /** The host of the merchant's own API, or null when none is connected. */
-  apiHost: string | null; accountInLiveChat: boolean; chats: number;
+  chats: number;
 }
 
 const TO_WRITE = /^\s*TO WRITE:/i;
@@ -52,10 +52,6 @@ export function checklist(i: SetupInput): { items: CheckItem[]; done: number; to
   else if (r.total > 0) items.push({ key: 'towrite', title: 'No "TO WRITE" left', state: 'done', detail: 'Every answer is written.' });
   items.push(i.chats > 0
     ? { key: 'tried', title: 'Tried it', state: 'done', detail: `${i.chats} chat${i.chats === 1 ? '' : 's'} so far (tests and real customers).` }
-    : { key: 'tried', title: 'Tried it', state: 'todo', detail: 'Nobody has chatted with the bot yet. Try it in LiveChat test, as a guest and as a member.', action: { to: 'lchat', label: 'Open LiveChat test' } });
-  const required = items.length;                                   // the account API is not counted: it is optional
-  if (i.apiHost) items.push({ key: 'account', title: 'Account data (optional)', state: 'done', detail: `Connected to ${i.apiHost}.` });
-  else if (i.accountInLiveChat) items.push({ key: 'account', title: 'Account data (optional)', state: 'warn', detail: 'Account answers in LiveChat is ON but no real API is connected: members would get demo balances. Connect the merchant API, or switch it off in Merchant settings.', action: { to: 'api', label: 'Open Account data' } });
-  else items.push({ key: 'account', title: 'Account data (optional)', state: 'optional', detail: "Not connected. Without it the bot uses 2 built-in demo customers. Connect the merchant's own API before real members ask about their balance.", action: { to: 'api', label: 'Open Account data' } });
-  return { items, done: items.slice(0, required).filter((x) => x.state === 'done').length, total: required };
+    : { key: 'tried', title: 'Tried it', state: 'todo', detail: 'Nobody has chatted with the bot yet. Try it in LiveChat test.', action: { to: 'lchat', label: 'Open LiveChat test' } });
+  return { items, done: items.filter((x) => x.state === 'done').length, total: items.length };
 }

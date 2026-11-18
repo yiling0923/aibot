@@ -414,3 +414,13 @@ The Keywords page only shows what customers typed (counts, groups under each top
 ### Folding the left menu
 
 The small arrow button next to the logo folds the left menu to a rail of icons (the name of an item shows when the mouse is over it, and the yellow dot on Keywords still shows words that have no topic). Press the arrow again to open it. The choice is remembered in the browser. The merchant picker and the Advanced options switch are in the open menu. On a phone the menu is always open.
+
+### The bot does not read customer information
+
+The bot never looks at who the customer is and never reads account data. A question about a balance, a deposit or a withdrawal of this customer (for example "check my balance", "where is my deposit") goes to a person, in every channel. What was removed:
+
+- The **Account tools** tab and the **Account answers in LiveChat** switch in Merchant settings, and the **Account data** step on the merchant page. The setup checklist has no account step.
+- In the LiveChat test page, the choice of a member (the bot would ignore it).
+- In the bot: the account lookup. The `member` that LiveChat may send with a question is ignored, not used, not kept in the chat memory and not logged. The "Where is my deposit" choice is no longer offered.
+
+General answers (limits, how to deposit, times) are unchanged. The old sections of this README and of `docs/` that describe account answers, member identity and the merchant API describe a feature that is now off. The merchant API routes still exist in the server but nothing in the bot calls them.
