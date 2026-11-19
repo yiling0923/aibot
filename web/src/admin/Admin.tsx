@@ -62,11 +62,6 @@ function Shell() {
         <div className="brandwrap">{folded
           ? <button type="button" className="logo logobtn" aria-label="Show the menu" aria-expanded={false} title="Show the menu" onClick={() => setFolded(false)}><svg className="lg-a" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg><svg className="lg-b" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg></button>
           : <span className="logo" aria-hidden="true"><svg className="lg-a" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg></span>}<div className="brand">Bot Control Panel<small>LiveChat AI bot</small></div>{!folded && <button type="button" className="sidetoggle" aria-label="Hide the menu" aria-expanded={true} title="Hide the menu" onClick={() => setFolded(true)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg></button>}</div>
-        <label className="fld merch"><span>Merchant</span>
-          {p.isAdmin
-            ? <select id="merchant" value={p.merchant} onChange={(e) => p.setMerchant(e.target.value)}>{p.merchants.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}</select>
-            : <div className="merch-fixed">{p.M.name}</div>}
-        </label>
         <nav className="nav" aria-label="Sections">
           {NAV_GROUPS.map(([g, all]) => [g, all.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin))] as const).filter(([, items]) => items.length > 0).map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
@@ -86,6 +81,11 @@ function Shell() {
       </aside>
       <div className="content">
         <header className="topbar">
+          <label className="merchtop"><span>Merchant</span>
+            {p.isAdmin
+              ? <select id="merchant" value={p.merchant} onChange={(e) => p.setMerchant(e.target.value)}>{p.merchants.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}</select>
+              : <div className="merch-fixed">{p.M.name}</div>}
+          </label>
           <div className="vers"><span className="vchip"><i />Live v{p.ver}</span>
             {p.M.bot_mode === 'listening' ? <span className="vchip warn" title="The bot is only listening: it saves conversations and does not reply. Open Learning."><i />Listening · bot silent</span> : null}{n ? <><span className="vchip warn">Draft · {n} change{n > 1 ? 's' : ''}</span><button className="btn sm ghost" type="button" onClick={p.discard}>Discard</button></> : null}
           </div>
