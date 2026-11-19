@@ -576,6 +576,15 @@ describe('Control panel', () => {
     expect(await screen.findByText(/Only an admin can change this/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Start answering' })).toBeNull();
   });
+  it('the menu groups the admin items apart, and staff do not see empty groups', async () => {
+    const { unmount } = open('admin', '/admin/kw');
+    const groups = async () => [...document.querySelectorAll('.nav .grp')].map((g) => [g.querySelector('.gl')?.textContent, [...g.querySelectorAll('button')].map((b) => b.textContent?.replace(/\d+$/, ''))]);
+    await screen.findByRole('button', { name: 'Report' });
+    const g = await groups();
+    expect(g.slice(-3)).toEqual([['Setup', ['Merchant settings', 'History']], ['Connect', ['LiveChat test']], ['Admin', ['Merchants & logins', 'Usage & billing']]]);
+    unmount(); open('staff', '/admin/kw'); await screen.findByRole('button', { name: 'Report' });
+    const s = (await groups()).map((x) => x[0]); expect(s).toContain('Setup'); expect(s).not.toContain('Connect'); expect(s).not.toContain('Admin');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

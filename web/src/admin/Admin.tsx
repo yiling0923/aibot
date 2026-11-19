@@ -24,7 +24,9 @@ const NAV_GROUPS: [string, [string, string][]][] = [
   ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import'], ['guide', 'Import guide'], ['learn', 'Learning']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
   ['Check', [['report', 'Report']]],
-  ['Setup', [['set', 'Merchant settings'], ['hist', 'History'], ['lchat', 'LiveChat test'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing']]],
+  ['Setup', [['set', 'Merchant settings'], ['hist', 'History']]],
+  ['Connect', [['lchat', 'LiveChat test']]],
+  ['Admin', [['users', 'Merchants & logins'], ['billing', 'Usage & billing']]],
 ];
 
 export default function Admin() {
@@ -66,9 +68,9 @@ function Shell() {
             : <div className="merch-fixed">{p.M.name}</div>}
         </label>
         <nav className="nav" aria-label="Sections">
-          {NAV_GROUPS.map(([g, items]) => (
+          {NAV_GROUPS.map(([g, all]) => [g, all.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin))] as const).filter(([, items]) => items.length > 0).map(([g, items]) => (
             <div className="grp" key={g}><div className="gl">{g}</div>
-              {items.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin)).map(([k, l]) => (
+              {items.map(([k, l]) => (
                 <button key={k} type="button" title={folded ? l : undefined} aria-label={folded ? l : undefined} aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
                   <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
                 </button>
