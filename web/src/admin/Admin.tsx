@@ -18,9 +18,10 @@ import Billing from './screens/Billing';
 import History from './screens/History';
 import Report from './screens/Report';
 import Guide from './screens/Guide';
+import Learning from './screens/Learning';
 
 const NAV_GROUPS: [string, [string, string][]][] = [
-  ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import'], ['guide', 'Import guide']]],
+  ['Answers', [['kb', 'Knowledge base'], ['imp', 'Import'], ['guide', 'Import guide'], ['learn', 'Learning']]],
   ['Words', [['kw', 'Topics'], ['store', 'Keywords'], ['rank', 'Keyword ranking']]],
   ['Check', [['report', 'Report']]],
   ['Setup', [['set', 'Merchant settings'], ['hist', 'History'], ['lchat', 'LiveChat test'], ['users', 'Merchants & logins'], ['billing', 'Usage & billing']]],
@@ -84,7 +85,7 @@ function Shell() {
       <div className="content">
         <header className="topbar">
           <div className="vers"><span className="vchip"><i />Live v{p.ver}</span>
-            {n ? <><span className="vchip warn">Draft · {n} change{n > 1 ? 's' : ''}</span><button className="btn sm ghost" type="button" onClick={p.discard}>Discard</button></> : null}
+            {p.M.bot_mode === 'listening' ? <span className="vchip warn" title="The bot is only listening: it saves conversations and does not reply. Open Learning."><i />Listening · bot silent</span> : null}{n ? <><span className="vchip warn">Draft · {n} change{n > 1 ? 's' : ''}</span><button className="btn sm ghost" type="button" onClick={p.discard}>Discard</button></> : null}
           </div>
           <button className="btn pri" id="publish" type="button" disabled={!n} onClick={() => setDialog('publish')}>Publish{n ? <span className="badge">{n}</span> : null}</button>
         </header>
@@ -115,6 +116,7 @@ function Shell() {
             <Route path="merchants/:code" element={p.isAdmin ? <MerchantPage /> : <div className="card"><h2>Merchant</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="billing" element={p.isAdmin ? <Billing /> : <div className="card"><h2>Usage &amp; billing</h2><div className="sub">Only an admin can use this screen.</div></div>} />
             <Route path="guide" element={<Guide />} />
+            <Route path="learn" element={<Learning />} />
             <Route path="hist" element={<History />} />
             <Route path="*" element={<Navigate to="/admin/kb" replace />} />
           </Routes>

@@ -27,6 +27,7 @@ import { livechatChatRoutes } from '../admin/livechatChat';
 import { purgeOldChats } from '../db/retention';
 import { merchantPageRoutes } from '../admin/merchantPage';
 import { merchantApiRoutes } from '../admin/merchantApiRoutes';
+import { learningRoutes } from '../admin/learningRoutes';
 import { MerchantApiStore } from '../bot/merchantApiHttp';
 import { fakeMerchantApi } from '../bot/merchantApi';
 import { peopleRoutes } from '../admin/people';
@@ -83,6 +84,7 @@ export async function buildApp(opts: AppOptions = {}) {
   const botFor = async (s: Session) => (s.draft && drafts.get(s.draft)) || (await getBot());
   adminRoutes(app, { pool, reloadBot: () => getBot(true), drafts, ai, api: accountApi });
   merchantApiRoutes(app, { pool, api: merchantApis, reloadBot: () => getBot(true) });
+  learningRoutes(app, { pool });
   peopleRoutes(app, { pool, reloadBot: () => getBot(true) });
   connectorRoutes(app, { pool, getBot, store, timeoutMs: config.askTimeoutMs });
   billingRoutes(app, { pool, onPriceChange: () => usage.forgetPrices() });

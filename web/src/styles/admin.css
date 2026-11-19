@@ -875,3 +875,12 @@ details.moreopt{background:none;padding:0}
 .kbsw{display:inline-flex;align-items:center;gap:8px;cursor:pointer;white-space:nowrap}
 .kbsw .kbswt{font-size:12px;font-weight:700}
 .kbsw.on .kbswt{color:var(--ok)}.kbsw.off .kbswt{color:var(--warn)}
+
+/* Learning */
+.lrn{display:flex;flex-direction:column;gap:14px;margin-top:14px}
+.lrnstat{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.lrnprog{flex:1 1 220px;max-width:360px;height:8px;border-radius:99px;background:var(--surface2);overflow:hidden}.lrnprog i{display:block;height:100%;background:var(--accent);border-radius:99px}
+.lrntiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+@media (max-width:900px){.lrntiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.lrntile{background:var(--surface2);border-radius:12px;padding:10px 14px;display:flex;flex-direction:column}.lrntile b{font-size:24px;letter-spacing:-.02em}.lrntile span{color:var(--muted);font-size:12.5px}
+.lrntable td{vertical-align:top}.lrntable .num{width:70px;text-align:center}.lrnact{white-space:nowrap}

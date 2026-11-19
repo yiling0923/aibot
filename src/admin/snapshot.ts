@@ -27,7 +27,7 @@ function group(list: RowDataPacket[], k: string, v: string): Words {
 }
 
 export async function readMerchants(pool: Pool): Promise<MerchantMeta[]> {
-  return (await rows(pool, "SELECT code, name, default_language, livechat_group_id, languages FROM merchants WHERE status = 'active' ORDER BY id")) as unknown as MerchantMeta[];
+  return (await rows(pool, "SELECT code, name, default_language, livechat_group_id, languages, bot_mode, DATE_FORMAT(listening_since, '%Y-%m-%dT%H:%i:%sZ') AS listening_since FROM merchants WHERE status = 'active' ORDER BY id")) as unknown as MerchantMeta[];
 }
 
 /** Reads the whole editable knowledge base, drafts included: every merchant from its own database, the shared word lists from the main one. */

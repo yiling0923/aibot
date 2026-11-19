@@ -19,6 +19,8 @@ export interface Panel {
   status: (w: string) => Status; typeOf: (w: string) => string;
   tests: TestResult[]; testsRun: boolean; runTests: () => Promise<{ pass: number; total: number; results: TestResult[] }>;
   reloadAll: () => Promise<void>;
+  /** Reads the merchant list again (for example after the bot mode changed) without touching the draft. */
+  refreshMerchants: () => Promise<void>;
   toast: (text: string) => void;
 }
 
@@ -104,7 +106,8 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
       discard: () => { if (confirm('Throw away all unpublished changes?')) { clearSaved(); load({ merchant }).catch((e: Error) => onToast(e.message)); } },
       kw, kwMap, ignored, reloadKeywords: () => loadKeywordsFor(merchant), ignoreWord, unignoreWord, 
       status: (w) => kwStatus(draft, merchant, w), typeOf: (w) => classify(draft, merchant, kwMap, w),
-      tests, testsRun, runTests, reloadAll: async () => { clearSaved(); await load({ merchant }); }, toast: onToast,
+      tests, testsRun, runTests, reloadAll: async () => { clearSaved(); await load({ merchant }); },
+      refreshMerchants: async () => { const st = await api<ServerState>('/api/admin/state'); setSrv((o) => (o ? { ...o, merchants: st.merchants } : o)); }, toast: onToast,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [srv, draft, changes, merchant, adv, kw, kwMap, ignored, tests, testsRun, edit, runTests]);

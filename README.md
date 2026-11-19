@@ -431,3 +431,13 @@ The Report page no longer has the **Fix these first** list or **Check recent ans
 ### Live / draft switch in the Knowledge base
 
 In the list, the Status column has an on/off switch for each entry (on is live, off is draft). Switching asks first ("Set “x” to draft?" or "Set “x” live?", with Cancel). If the entry is not ready (for example it still says TO WRITE) the question lists what is missing. The change goes into the draft; customers see it after Publish.
+
+### Learning: listen first, answer later
+
+A merchant put in LiveChat can first only **listen**. In the panel: **Answers → Learning**. An admin switches the merchant to listening (and later to answering) there; a merchant that already exists stays on answering until someone switches it.
+
+- **Listening:** `/api/v1/ai/ask` returns a silent reply (`decision: "silent"`, empty answer, no handover). LiveChat posts nothing and staff answer as usual. The top bar shows **Listening · bot silent**.
+- **What is saved** (in the merchant database, table `learned_pairs`): each customer question and the staff reply that followed it, read from the `history` LiveChat sends with every message. While the bot is silent, every "bot" message in that history is a person (LiveChat calls an operator "bot"). Emails, links and long numbers are masked before saving.
+- **The Learning screen:** days listening, chats, questions saved, how many have a staff reply, and a list grouped by meaning (the question, the topic, or the knowledge base answer that already covers it) with the reply staff gave most often. **Add to Knowledge base** makes a **draft** entry from a group (the questions as examples, the staff reply as the answer) for staff to check. A group the knowledge base already answers is marked and has no button.
+- **Answering:** the admin presses **Start answering** (after a confirmation). The bot answers only from the live Knowledge base, as before. It never sends a past staff reply by itself: a reply is used only after staff added it to the Knowledge base, set it live and published.
+- **What to know about LiveChat:** a staff reply is saved when LiveChat calls the bot again in that chat (the next customer message), because that is when the history is sent. If LiveChat stops calling the bot once a person has taken a chat, later replies in that chat are not seen. LiveChat keeps a reply by the words of the question for up to two hours, so the same question asked again in that time may not reach the bot, and a silent reply can stay for a little while after the switch to answering.

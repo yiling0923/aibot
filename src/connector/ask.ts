@@ -1,3 +1,4 @@
+import { extractPairs, recordPairs } from '../learning/collect';
 import { createHash, randomUUID } from 'node:crypto';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
@@ -97,6 +98,15 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
   const tenant = await new Tenants(pool).get(merchant);
   if (!tenant) throw new AskError(404, 'Unknown merchant.');
   const SESSIONS = tbl(tenant.db, 'bot_sessions'), REQUESTS = tbl(tenant.db, 'bot_requests');
+
+  // A merchant that only LISTENS (first weeks in LiveChat): the bot stays silent, so LiveChat posts nothing and staff answer as usual. The question and the
+  // staff replies LiveChat sends in `history` are saved (personal details masked) for the Learning screen. The bot answers only after an admin says so.
+  const [modeRow] = await q(pool, 'SELECT bot_mode FROM merchants WHERE code = ?', [merchant]);
+  if (modeRow?.bot_mode === 'listening') {
+    const sid = sessionId ?? `bot_${randomUUID()}`;
+    if (!file) { try { await recordPairs(pool, tenant.db, sid, extractPairs(history, question), null); } catch (e) { console.error('learning: could not save the chat', e); } }
+    return { answer: '', confidence: 0, should_escalate: false, should_close: false, close_message: null, session_id: sid, decision: 'silent', topic: null, keywords: [], choices: [], answer_id: null, cacheable: false, customer: customerOf(member) };
+  }
 
   // LiveChat sends no message id and retries when it hears nothing: the same request gets the same answer, and the chat does not move twice.
   const requestKey = sha([merchant, sessionId ?? '', member?.id ?? '', question, file ? JSON.stringify(file) : '', JSON.stringify(history)].join('\u0001'));   // who is asking is part of the request

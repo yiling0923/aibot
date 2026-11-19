@@ -29,4 +29,4 @@ export interface Snapshot {
   kb: SnapEntry[]; aliases: Words; mAliases: Record<string, { language: string; variant: string; canonical: string; kind?: string | null }[]>;
   aspects: Words; smalltalk: Words; guard: Words; fillers: Record<string, string[]>; settings: Record<string, SnapSettings>;
 }
-export interface MerchantMeta { code: string; name: string; default_language: Lang; livechat_group_id: number | null; languages?: string | null }
+export interface MerchantMeta { code: string; name: string; default_language: Lang; livechat_group_id: number | null; languages?: string | null; bot_mode?: string; listening_since?: string | null }
