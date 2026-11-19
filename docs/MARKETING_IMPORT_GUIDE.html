@@ -1,45 +1,13 @@
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How to write the knowledge base file</title>
-<style>body{font:16px/1.55 system-ui,sans-serif;max-width:860px;margin:0 auto;padding:24px 16px;color:#1d2433}h1{font-size:26px}h2{margin-top:32px;border-bottom:1px solid #dde;padding-bottom:4px}code,.m{font-family:ui-monospace,monospace;background:#eef1f6;padding:1px 5px;border-radius:4px}table{border-collapse:collapse;width:100%;font-size:14px;margin:10px 0}th,td{border:1px solid #cdd3df;padding:6px 8px;text-align:left;vertical-align:top}th{background:#f1f4f9}.ok{background:#e8f7ec;border-left:4px solid #2e9e55;padding:8px 12px;margin:10px 0}.no{background:#fdecec;border-left:4px solid #d64545;padding:8px 12px;margin:10px 0}.tip{background:#fff6dc;border-left:4px solid #e0b252;padding:8px 12px;margin:10px 0}</style></head><body>
-<h1>How to write the knowledge base file</h1>
-<p>The bot answers customers <b>only</b> from what you write here. If it is not in the file, the bot will not guess; it asks once and then passes the customer to a person. So the file is the bot's whole memory.</p>
-
-<h2>1. Make the file</h2>
-<p>Use Excel or Google Sheets. One row = <b>one answer in one language</b>. When done: <b>File → Save as → CSV (UTF-8)</b>. UTF-8 is important, or Chinese and Thai letters turn into strange symbols.</p>
-<p>Easiest start: open <code>EXAMPLE_KNOWLEDGE_BASE.csv</code> (in the same folder), change the words, keep the first row.</p>
-
-<h2>2. The columns</h2>
-<table><tr><th>Column</th><th>Must fill?</th><th>What to write</th><th>Example</th></tr>
-<tr><td class="m">intent_key</td><td>Yes</td><td>A short name for the question, no spaces (use <code>_</code>). Use the <b>same name</b> on every language row of the same answer.</td><td>deposit_time</td></tr>
-<tr><td class="m">topic</td><td>Yes</td><td>The big subject. A new subject is created automatically.</td><td>deposit</td></tr>
-<tr><td class="m">language</td><td>Yes</td><td><code>en</code> English, <code>ms</code> Malay, <code>zh</code> Chinese, <code>vi</code> Vietnamese, <code>th</code> Thai, <code>tl</code> Filipino</td><td>en</td></tr>
-<tr><td class="m">question_examples</td><td>Strongly yes</td><td>How real customers type this question. Put <code>|</code> between each one. 4 to 8 is good. Include short, lazy and spelling-mistake versions.</td><td>how long deposit take | depo not in yet | deposit pending</td></tr>
-<tr><td class="m">answer_text</td><td>Yes</td><td>The reply the customer sees. Facts only. Put it inside quotes <code>"..."</code> if it has a comma.</td><td>"Deposits are credited within 5 minutes."</td></tr>
-<tr><td class="m">question_type</td><td>Optional</td><td>Splits one topic into kinds: <code>time</code>, <code>limit</code>, <code>how</code>, <code>change</code>, <code>hours</code>. Leave empty if unsure.</td><td>time</td></tr>
-<tr><td class="m">entry_type</td><td>Optional</td><td><code>answer</code> (bot replies, default), <code>promotion</code> (current offer, can end on a date), <code>needs_staff</code> (a person must handle it; bot only passes it on, no answer text needed).</td><td>answer</td></tr>
-<tr><td class="m">topic_short_forms</td><td>Optional</td><td>Other words customers use for the topic. Put <code>|</code> between.</td><td>depo | top up | 充值</td></tr>
-<tr><td class="m">merchant</td><td>Optional</td><td>Only if one file holds several merchants. Otherwise leave out; the file goes into the merchant you picked.</td><td>LuckyPay</td></tr></table>
-
-<h2>3. Example rows</h2>
-<table><tr><th>intent_key</th><th>topic</th><th>language</th><th>question_examples</th><th>answer_text</th></tr>
-<tr><td>deposit_time</td><td>deposit</td><td>en</td><td>how long deposit take | depo not in yet</td><td>Deposits are credited within 5 minutes.</td></tr>
-<tr><td>deposit_time</td><td>deposit</td><td>ms</td><td>berapa lama deposit masuk | depo lambat</td><td>Deposit dikreditkan dalam masa 5 minit.</td></tr>
-<tr><td>deposit_time</td><td>deposit</td><td>zh</td><td>充值要多久 | 充值还没到账</td><td>充值通常在5分钟内到账。</td></tr></table>
-<p>Same <code>intent_key</code> = same answer in three languages.</p>
-
-<h2>4. Writing rules (please read)</h2>
-<div class="ok"><b>Do:</b> write real facts (time, amount, steps). Write each question the way customers type it. One topic of one question per row. Keep answers short, 1 to 3 sentences.</div>
-<div class="no"><b>Don't:</b> promise things you are not sure of ("always instant"). Put two different questions in one answer. Copy the same example question into two different entries, because the bot then cannot tell which to answer. Leave <code>answer_text</code> empty for normal entries.</div>
-<div class="tip"><b>Tip:</b> do <b>English first</b>. The bot needs at least the English answer. Add other languages after.</div>
-
-<h2>5. Import it</h2>
-<ol><li>Open the control panel and choose the <b>merchant</b> at the top left.</li>
-<li>Go to <b>Import</b>, pick the CSV file.</li>
-<li>Read the preview: it shows which entries are <b>new</b>, which will <b>update</b> an old one, and any <b>problems</b> (shown in red). Fix problems in the file and import again.</li>
-<li>Press the import button. The entries go into the <b>draft</b> only.</li>
-<li>Check a few entries in <b>Knowledge base</b>.</li>
-<li><b>Press Publish.</b> Customers get the new answers only after this. The yellow "Not live yet" bar reminds you.</li></ol>
-<p>Importing the same <code>intent_key</code> again <b>updates</b> that entry, so you can fix the file and re-import safely.</p>
-
-<h2>6. Before you send the file, check</h2>
-<ul><li>Saved as CSV <b>UTF-8</b></li><li>Every row has <code>intent_key</code>, <code>topic</code>, <code>language</code>, <code>answer_text</code></li><li>Questions separated with <code>|</code> (not commas)</li><li>Each entry has at least an English row</li><li>No private data (real names, numbers, passwords)</li></ul>
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>How to import</title>
+<style>body{font:16px/1.55 system-ui,sans-serif;max-width:760px;margin:0 auto;padding:24px 16px;color:#1d2433}h1{font-size:26px;margin:0 0 4px}.sub{color:#5d6b78}ol{list-style:none;margin:22px 0 0;padding:0}li{display:flex;gap:16px;position:relative;padding-bottom:22px}li:last-child{padding-bottom:0}li:not(:last-child)::before{content:"";position:absolute;left:15px;top:34px;bottom:2px;width:2px;background:#d6e7e8}.n{flex:none;width:32px;height:32px;border-radius:50%;background:#0E7C86;color:#fff;font-weight:700;display:grid;place-items:center;z-index:1}li b{font-size:16.5px}li p{margin:2px 0 0;color:#5d6b78}.tag{display:inline-block;border:1px solid #0E7C86;color:#0E7C86;border-radius:6px;padding:0 8px;font-weight:700;font-size:14px}.end{margin-top:22px;padding-top:14px;border-top:1px solid #e3e8ee;color:#1b7f4b;font-weight:700}code{background:#eef1f6;padding:1px 5px;border-radius:4px}</style></head><body>
+<h1>How to import</h1><div class="sub">Add many answers at one time. It takes about 5 minutes. (The same steps are in the panel: Answers, Import guide.)</div>
+<ol>
+<li><span class="n">1</span><div><b>Get the Excel file</b><p>In the panel, open <b>Import guide</b> or <b>Import</b> and download the example file or the blank file. Open it in Excel.</p></div></li>
+<li><span class="n">2</span><div><b>Fill it in</b><p>One row for each question and its answer. The columns are <code>intent_key</code> (a short name), <code>topic</code>, <code>language</code>, <code>question_examples</code> (the ways customers ask, with <code>|</code> between them) and <code>answer_text</code>. English is enough: the AI can translate the other languages for you.</p></div></li>
+<li><span class="n">3</span><div><b>Upload it</b><p>Go to <b>Import</b>, press <span class="tag">Upload a file</span> and choose your Excel file. You can also type straight into the table on that page, or paste cells copied from Excel.</p></div></li>
+<li><span class="n">4</span><div><b>Import it</b><p>Check the list, then press <span class="tag">Import</span>. If you see <i>Translate the empty languages with AI</i>, keep it on and choose the languages. Read the translated answers before you publish.</p></div></li>
+<li><span class="n">5</span><div><b>Publish it</b><p>Press <span class="tag">Review and publish</span> in the yellow bar at the top. Customers see the answers only after this.</p></div></li>
+</ol>
+<div class="end">Done. The bot now answers from your new entries.</div>
+<p class="sub" style="margin-top:18px">Tip: a new merchant's bot starts by <b>listening</b> (it is silent and learns from staff replies and old chats). Check <b>Answers, Learning</b>, add the good learned answers to the Knowledge base, publish, and an admin presses <b>Start answering</b>.</p>
 </body></html>

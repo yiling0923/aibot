@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { LANGS, slug, type Entry } from '../model';
+import { LANGS, entryProblems, slug, type Entry } from '../model';
 import { Modal } from '../ui';
 import { parseTable } from '../model';
 import { readXlsx, writeXlsx } from '../xlsx';
@@ -10,6 +11,7 @@ import { CHAT_EXAMPLE_ROWS, CHAT_WIDTHS } from '../importSamples';
 interface Group { key: string; kind: 'covered' | 'topic' | 'text'; label: string; topic: string | null; intent: string | null; count: number; withReply: number; customers: { text: string; n: number }[]; replies: { text: string; n: number }[] }
 interface Learn { mode: 'listening' | 'answering'; since: string | null; days: number | null; pairs: number; chats: number; withReply: number; groups: Group[] }
 const MONTH = 30;
+const MIN_READY = 10;                                          // the same number as the merchant setup checklist
 
 interface Msg { chat: string; from: 'customer' | 'staff'; text: string; at?: string }
 const CUSTOMER = /^(visitor|customer|user|client|guest|member|buyer|顾客|客户|访客)$/i, STAFF = /^(operator|agent|staff|admin|human|support|bot|assistant|cs|service|客服)$/i;
@@ -41,7 +43,7 @@ export function readChats(rows: string[][]): { messages: Msg[]; chats: number; c
 
 /** The first weeks of a merchant in LiveChat: the bot only listens, then staff review what it learned and an admin switches it to answering. */
 export default function Learning() {
-  const p = usePanel(); const [d, setD] = useState<Learn | null>(null); const [err, setErr] = useState(''); const [ask, setAsk] = useState<'listening' | 'answering' | null>(null); const [busy, setBusy] = useState(false);
+  const p = usePanel(); const nav = useNavigate(); const [d, setD] = useState<Learn | null>(null); const [err, setErr] = useState(''); const [ask, setAsk] = useState<'listening' | 'answering' | null>(null); const [busy, setBusy] = useState(false);
   const load = () => api<Learn>('/api/admin/learning?merchant=' + encodeURIComponent(p.merchant));
   useEffect(() => { let alive = true; setErr(''); setD(null); load().then((x) => { if (alive) setD(x); }).catch((e: Error) => { if (alive) setErr(e.message); }); return () => { alive = false; }; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [p.merchant]);
 
@@ -65,6 +67,17 @@ export default function Learning() {
   };
   const mine = p.draft.kb.filter((e) => e.merchant === p.merchant);
   const liveCount = mine.filter((e) => e.status === 'live').length;
+  /* the start-answering checklist: the first three must be done, the last one is only a hint */
+  const ready = mine.filter((e) => e.status === 'live' && entryProblems(e).length === 0).length;
+  const toWrite = mine.filter((e) => Object.values(e.translations as Record<string, { answer_text?: string }>).some((t) => /^\s*TO WRITE:/i.test(t?.answer_text ?? ''))).length;
+  const unpublished = p.changes.length;
+  const toCheck = (d?.groups ?? []).filter((g) => g.kind !== 'covered' && !(mine.some((e) => e.category === 'Learned' && ((e.translations as Record<string, { question_examples?: string[] }>).en?.question_examples ?? []).includes(g.customers[0]?.text ?? '\u0000')))).length;
+  const steps: { key: string; ok: boolean; must: boolean; title: string; detail: string; to?: string }[] = [
+    { key: 'ready', ok: ready >= MIN_READY, must: true, title: 'Enough live answers', detail: `${ready} of ${MIN_READY} ready (live, with example questions). Add the learned answers below, check them and set them live.`, to: '/admin/kb' },
+    { key: 'towrite', ok: toWrite === 0, must: true, title: 'No "TO WRITE" left', detail: toWrite ? `${toWrite} ${toWrite === 1 ? 'entry still says' : 'entries still say'} TO WRITE. Write the real answer or delete it.` : 'Every answer is written.', to: '/admin/kb' },
+    { key: 'published', ok: unpublished === 0, must: true, title: 'Everything is published', detail: unpublished ? `${unpublished} change${unpublished === 1 ? ' is' : 's are'} only in your draft. The bot answers from what is published: press Publish.` : 'Nothing waits in the draft.' },
+    { key: 'learned', ok: toCheck === 0, must: false, title: 'Learned questions checked', detail: toCheck ? `${toCheck} group${toCheck === 1 ? '' : 's'} of questions the bot learned ${toCheck === 1 ? 'is' : 'are'} not in the Knowledge base yet. Only a hint: you may leave some out.` : 'Every learned group is covered or added.' }];
+  const unmet = steps.filter((x) => x.must && !x.ok);
   const switchTo = async (mode: 'listening' | 'answering') => {
     setBusy(true);
     try { await api('/api/admin/merchants/' + encodeURIComponent(p.merchant) + '/mode', { mode }); setD(await load()); await p.refreshMerchants(); setAsk(null);
@@ -105,11 +118,19 @@ export default function Learning() {
           </div>
           {p.isAdmin
             ? <div className="tools">{listening
-              ? <button className="btn pri" type="button" onClick={() => setAsk('answering')}>Start answering</button>
+              ? <><button className="btn pri" type="button" disabled={unmet.length > 0} title={unmet.length ? 'Finish the checklist first: ' + unmet.map((x) => x.title).join(', ') : undefined} onClick={() => setAsk('answering')}>Start answering</button>
+                {unmet.length > 0 && <button className="btn ghost" type="button" onClick={() => setAsk('answering')}>Start anyway</button>}</>
               : <button className="btn" type="button" onClick={() => setAsk('listening')}>Go back to listening only</button>}</div>
             : <div className="sub">Only an admin can change this.</div>}
         </div>}
       </div>
+
+      {d && listening && <div className="card" aria-label="Before the bot starts answering"><h3 style={{ margin: 0 }}>Before the bot starts answering</h3>
+        <div className="sub" style={{ marginBottom: 8 }}>{unmet.length ? 'Three things must be done first. The Start answering button turns on when they are.' : 'Ready. You can start answering.'}</div>
+        <ul className="checklist">{steps.map((x) => <li key={x.key} className={'chk ' + (x.ok ? 'done' : x.must ? 'todo' : 'optional')}>
+          <span className={'cdot ' + (x.ok ? 'done' : x.must ? 'todo' : 'optional')} aria-hidden="true">{x.ok ? '✓' : x.must ? '' : '–'}</span>
+          <div className="cbody"><b>{x.title}{!x.must && <span className="sub"> (optional)</span>}</b><div className="sub">{x.detail}</div></div>
+          {!x.ok && x.to && <button className="btn sm" type="button" onClick={() => nav(x.to!)}>Open Knowledge base</button>}</li>)}</ul></div>}
 
       {d && <div className="card"><h3 style={{ margin: 0 }}>Learn from old conversations</h3>
         <div className="sub" style={{ marginBottom: 8 }}>Have an export of past chats? Add it here and the bot learns from it before it goes live. One row for each message, with the columns <span className="mono">chat_id</span>, <span className="mono">sender</span> (customer or staff), <span className="mono">text</span> and, if you have it, <span className="mono">time</span>. An Excel or CSV file works. Phone and bank numbers, emails and links are hidden when it is saved.</div>
@@ -138,7 +159,7 @@ export default function Learning() {
         <div className="head"><h2>{ask === 'answering' ? 'Start answering?' : 'Go back to listening only?'}</h2></div>
         {ask === 'answering'
           ? <><p style={{ margin: '8px 0' }}>From now on the bot replies to customers in LiveChat, from the live answers in the Knowledge base ({liveCount} now).</p>
-            {liveCount < 10 && <div className="note" style={{ background: 'var(--warnbg)' }}>Only {liveCount} live answer{liveCount === 1 ? '' : 's'}. Add and publish the answers you checked first, or the bot will pass most questions to a person.</div>}
+            {unmet.length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>Not ready yet:</b><ul className="plain">{unmet.map((x) => <li key={x.key}>{x.title}: {x.detail}</li>)}</ul>The bot will pass many questions to a person until this is done.</div>}
             <div className="sub">LiveChat may keep an earlier silent reply for the same words for up to two hours, so a few questions can stay unanswered for a while.</div></>
           : <p style={{ margin: '8px 0' }}>The bot goes silent again and only saves conversations. Staff answer every customer.</p>}
         <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={() => void switchTo(ask)}>{ask === 'answering' ? 'Start answering' : 'Listen only'}</button></div></Modal>}

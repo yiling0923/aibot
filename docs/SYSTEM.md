@@ -4,6 +4,11 @@ How the system works, what it is built with, how the database is designed, and h
 
 *Written 5 November 2026. This describes the code in the repository `yiling0923/aibot`.*
 
+> **Update, November 2026.** This document was written before these changes; where it disagrees, the README is current.
+> - **The bot reads no customer information.** A question about the customer's own balance, deposit, withdrawal or points goes to a person. There is no account lookup, no Account tools, no Account data step and no "Account answers in LiveChat" switch. The bot only notes whether the customer is a logged-in **member** (the member id LiveChat sends) or a **visitor**; every answer carries `customer`, and a handover carries it for staff.
+> - **Listening first.** A new merchant starts in listening mode: the bot is silent, staff answer, and the bot saves each question with the staff reply (from LiveChat's `history`) and can import an export of old chats. Staff review the grouped questions on the Learning screen and add the good ones to the Knowledge base; an admin presses Start answering after a short checklist. The bot never sends a saved staff reply by itself.
+> - **Import** takes an Excel-like table or an Excel file, and the AI can translate the empty languages. The panel has a Learning screen, a Human Handoff step, a folding menu, a merchant picker in the top bar and a Publish reminder.
+
 ---
 
 ## Contents
@@ -33,7 +38,7 @@ What the bot does:
 - Finds the matching answer in **that merchant's own knowledge base** and replies in the customer's language and the merchant's tone (friendly or formal).
 - When a message is not clear, **asks again once** with buttons. If it still does not understand, it **hands the chat to a human**.
 - When a customer is rude, it **replies kindly first** and closes the chat only if the customer keeps being rude (default after 3 rude messages, set per merchant).
-- Can look up a logged-in customer's **own** balance, transactions or points, but only through a signed login token. It **never shows** passwords, OTP codes or full bank, card or ID numbers.
+- Does **not** read a customer's own balance, transactions or points (those questions go to a person). It **never shows** passwords, OTP codes or full bank, card or ID numbers.
 - Never moves money. For amounts (for example "wd 500") it only checks the merchant's limits and explains the steps.
 
 The system has two parts:
@@ -177,9 +182,7 @@ The engine is a plain TypeScript class (`src/engine/engine.ts`). It receives the
 
 **Account questions**
 
-- Balance, transactions and points are answered only when the merchant has switched that tool on **and** the website sent a valid signed customer token.
-- The customer id comes only from the signed token, never from what the customer types, so nobody can ask about another customer.
-- The data comes from the merchant API (fake JSON data in this version).
+- Balance, transactions and points are **not** answered by the bot any more: the question goes to a person, for members and visitors alike. (Earlier versions read them from the merchant API with a signed token; that is switched off.)
 
 **Replies**
 
@@ -832,7 +835,7 @@ Your LiveChat already knows how to talk to an AI bot: it calls `POST {bot addres
 - **Memory is in the database.** What the bot remembers about a chat (how many times it asked again, rude messages, the choices on offer, handed over or closed) is saved in the merchant's own database, so a restart loses nothing.
 - **Repeated requests.** LiveChat sends no message id and tries again when it hears nothing. A repeated request gets the same answer, and the chat does not move twice.
 - **Never silent.** If the bot is slow (more than 8 seconds, adjustable) or fails, the chat is handed to a person.
-- **Who the customer is.** The question can carry the member (id, name, rank). With a member the bot can answer account questions; without one it says it cannot see the account and offers an agent. LiveChat does not send the member today, so account answers need LiveChat to add it.
+- **Who the customer is.** The question can carry the member (id, name, rank). The bot only notes it: a member id means a logged-in member, none means a visitor, and staff see it in a handover. It reads no account data either way. LiveChat does not send the member today, so every customer shows as a visitor until it does.
 - **Saved as live traffic.** What the customer writes goes to the keywords and the Report as real (live) traffic, separate from the Test chat.
 
 **Status:** built and tested with the same kind of requests LiveChat makes, including its "Test AI Chat" call and a restart in the middle of a chat. **Not yet tested against your staging LiveChat.**
@@ -843,9 +846,9 @@ Your LiveChat already knows how to talk to an AI bot: it calls `POST {bot addres
 
 | Item | State |
 |---|---|
-| **LiveChat connection** | The bot side is built (section 11). Not yet tested against your staging LiveChat. The bot needs an address that LiveChat can reach (HTTPS), and LiveChat must send the member if account answers are wanted. |
+| **LiveChat connection** | The bot side is built (section 11). Not yet tested against your staging LiveChat. The bot needs an address that LiveChat can reach (HTTPS), and LiveChat must send the member if the bot should tell members from visitors. |
 | **AI with real keys** | Built and tested only on a fake network. Real wording quality and speed are untested. |
-| **Merchant API** | Account data is fake JSON. Each merchant's real API still has to be connected. |
+| **Merchant API** | Switched off: the bot does not read account data. The code stays in the repository, unused. |
 | **Demo data** | The merchants, entries, accounts, the keyword history in the ranking and the two weeks of traffic in the Report are fake sample data. |
 | **Chat memory** | Chat state is kept in the server's memory, so a restart ends running chats. The chat log is saved in the database. |
 | **HTTPS** | Not built in. For real use, run it behind HTTPS (the cookie must then be marked secure). |

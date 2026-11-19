@@ -546,11 +546,15 @@ describe('Control panel', () => {
     expect(document.querySelector('.vchip.warn')?.textContent).toMatch(/Listening/);                            // also in the top bar, on every page
     await userEvent.click(screen.getByRole('button', { name: 'Add to Knowledge base' }));
     expect(screen.getByText('Added as a draft')).toBeTruthy(); expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);
-    await userEvent.click(screen.getByRole('button', { name: 'Start answering' }));
+    const list = screen.getByLabelText('Before the bot starts answering');                                  // the checklist: 11 live answers in the fixture, but a draft change waits to be published
+    expect(within(list).getByText('Enough live answers')).toBeTruthy(); expect(within(list).getByText(/Everything is published/)).toBeTruthy();
+    expect(within(list).getByText(/1 change is only in your draft/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Start answering' }) as HTMLButtonElement).disabled).toBe(true);   // one required step is not done
+    await userEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
     const dlg = await screen.findByRole('dialog', { name: 'Change what the bot does' });
-    expect(dlg.textContent).toMatch(/replies to customers in LiveChat/);
+    expect(dlg.textContent).toMatch(/replies to customers in LiveChat/); expect(dlg.textContent).toMatch(/Not ready yet/);
     await userEvent.click(within(dlg).getByRole('button', { name: 'Cancel' })); expect(botMode).toBe('listening');   // Cancel changes nothing
-    await userEvent.click(screen.getByRole('button', { name: 'Start answering' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Start anyway' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Change what the bot does' })).getByRole('button', { name: 'Start answering' }));
     expect(await screen.findByText(/Answering: the bot replies to customers/)).toBeTruthy(); expect(botMode).toBe('answering');
   });
@@ -570,6 +574,16 @@ describe('Control panel', () => {
     await userEvent.upload(await screen.findByLabelText('Choose a file of old chats'), new File(['id,msg\n1,hello'], 'bad.csv', { type: 'text/csv' }));
     expect(await screen.findByText(/Missing column: chat_id, sender, text/)).toBeTruthy();
     expect(screen.queryByRole('button', { name: 'Learn from this file' })).toBeNull();
+  });
+  it('Learning: the checklist shows what is ready, what still says TO WRITE, and marks the learned-questions step as only a hint', async () => {
+    botMode = 'listening'; withKb = true;
+    open('staff', '/admin/learn');                                                                         // the fixture entries belong to the staff merchant
+    const list = await screen.findByLabelText('Before the bot starts answering');
+    expect(within(list).getByText(/Enough live answers/)).toBeTruthy(); expect(within(list).getByText(/Learned questions checked/)).toBeTruthy();
+    expect(within(list).getByText(/\(optional\)/)).toBeTruthy();
+    expect(within(list).getByText(/of 10 ready/)).toBeTruthy();
+    expect(within(list).getByText(/1 entry still says TO WRITE/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Start answering' })).toBeNull();                          // staff cannot start it
   });
   it('Learning: staff can read it but cannot switch the mode', async () => {
     open('staff', '/admin/learn');

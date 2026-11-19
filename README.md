@@ -96,7 +96,7 @@ Put the keys in `.env` (see `.env.example`) and restart. Without keys nothing ch
 * `npm run eval:report` runs all ~3,000 sample customer messages (English, Malay, Chinese, Vietnamese, Thai, Filipino, slang and short forms) through the engine and lists every one that gets a different result than expected.
   Add a message by adding an entry to `eval_cases` in `data/kb_seed.json`.
 
-The six fake merchants differ on purpose (tone, main language, limits, which entries and account tools they have), so a message can be answered by one merchant and handed to a human by another.
+The six fake merchants differ on purpose (tone, main language, limits, which entries they have), so a message can be answered by one merchant and handed to a human by another.
 
 ## How it is organised
 
@@ -114,7 +114,7 @@ test/          acceptance cases + database tests
 
 1. Rude words, rule-change attempts, other merchants, secret requests (guards).
 2. Greetings, thanks, call-outs and filler-only messages (never sent to a human).
-3. Account data (balance, transactions, points), only when the merchant turned the tool on.
+3. Nothing about the customer's account: the bot reads no account data.
 4. Keywords: the topic word and the question type are found anywhere in the sentence.
 5. Amounts such as `cash 500`.
 6. Buttons when the question is not clear, then similarity to example questions, then a human.
@@ -165,7 +165,7 @@ curl -X POST http://localhost:3000/api/v1/ai/ask -H "Authorization: Bearer aib_.
 
 The bot understands and answers in **English (en), Malay (ms), Chinese (zh), Vietnamese (vi), Thai (th) and Filipino (tl)**. It reads the language from the message itself (script and words), so a customer may switch language mid-chat; the reply follows the last message. `tl` is the code LiveChat uses for Filipino.
 
-* **Replies.** Every fixed sentence of the bot (greetings, choices, account answers, refusals, kind replies to rude customers, "contact an agent") exists in all six languages and both tones: `src/bot/texts.ts` and `src/bot/texts_extra.ts`. A test fails if one is missing.
+* **Replies.** Every fixed sentence of the bot (greetings, choices, refusals, kind replies to rude customers, "contact an agent") exists in all six languages and both tones: `src/bot/texts.ts` and `src/bot/texts_extra.ts`. A test fails if one is missing.
 * **Words.** Topic words, question words, greetings, rude words, secret / rule-change / "talk to a person" phrases and filler words for the new languages are in `data/kb_seed.json`, and appear under the same screens as the others (Topics, Keywords, Keyword ranking), with a language filter.
 * **Vietnamese accents.** Customers often type without accents (`nap tien` for `nạp tiền`). The bot ignores accents when it compares words, so one entry matches both. For the same reason the word lists avoid rude words that become everyday words without accents (for example `cặc` and `các`).
 * **Thai.** Thai has no spaces, so Thai words are found as pieces of the sentence, and the sentence is cut into words (with the Node `Intl.Segmenter`) for the similarity check. Polite endings (ค่ะ ครับ นะ) are ignored. Keep Thai entries long enough not to sit inside other words.
@@ -239,38 +239,15 @@ On **Merchant settings**, under *Handoff rules*, every on/off setting is a switc
 
 ## Merchant settings in tabs
 
-The Merchant settings page is grouped in tabs under the four tiles: **General** (name, domain, monthly AI token limit, keep conversations for N days, languages; saved at once with *Save basics*, which turns green when something changed), **Replies** (tone, match levels, the choices the bot offers, rude customers), **Handoff** (handoff rules, trigger phrases, human group, and a link to the handoff number), **AI help** (bot instructions and presets), **Messages** (fixed messages per language) and **Account tools**. The page remembers the last tab. Everything except the General tab goes to the draft; when you change something a dark bar at the bottom shows how many unsaved changes there are and which groups (for example "Complaint or dispute · Trigger phrases") with **Discard** and **Save to draft**.
+The Merchant settings page is grouped in tabs under the four tiles: **General** (name, domain, monthly AI token limit, keep conversations for N days, languages; saved at once with *Save basics*, which turns green when something changed), **Replies** (tone, match levels, the choices the bot offers, rude customers), **Handoff** (handoff rules, trigger phrases, human group, and a link to the Human Handoff number on the merchant page), **AI help** (bot instructions and presets), **Messages** (fixed messages per language). The page remembers the last tab. Everything except the General tab goes to the draft; when you change something a dark bar at the bottom shows how many unsaved changes there are and which groups (for example "Complaint or dispute · Trigger phrases") with **Discard** and **Save to draft**.
 
 ## LiveChat test (a chat window through LiveChat)
 
 **Check → LiveChat test** (admin only) is a chat window whose messages go through a LiveChat, the way its website widget sends them: the bot server starts (or continues) a chat in LiveChat with the same calls as `deploy/local-livechat/chat.ps1`, waits until the bot has answered, and shows the whole chat as bubbles. It tests the real link, with the bot as published. *Settings* holds the LiveChat address (default `http://localhost:8080`, the local setup) and the tenant id (default `1`); they are remembered in the browser. *New chat* starts a fresh visitor. If LiveChat does not answer within about 15 seconds the page says so; press Send with an empty box to look again. The bot server makes the calls, so the address must be reachable from the computer that runs the bot.
 
-## Merchant API (a customer's balance, points, deposits and withdrawals)
+## Merchant API (switched off)
 
-When a **logged-in** customer asks "check my balance", "where is my deposit" and similar, the bot reads the account from the merchant's own system. Connect it on the merchant page, **Account data** card (admin only): the API address, the API key, and a customer id to try. **Try it** shows what the API sent without saving anything; **Connect** saves it (the key is stored encrypted, only its last 4 characters are shown again). A merchant with nothing connected uses the built-in sample customers (`data/fake_accounts.json`), which is only for the demo.
-
-**What the merchant's API must provide.** One read-only call:
-
-```
-GET {address}/customers/{customer id}/account
-Authorization: Bearer {key}
-```
-
-- `200` with JSON, `404` when there is no such customer. Any other answer, no answer within 4 seconds, or something that is not JSON counts as "could not ask": the bot then says it cannot look right now and offers a person, it never says "no account found".
-- The customer id is the one the website signs into the chat token (`customer_id`). The bot never takes it from what the customer types.
-- The JSON (a wrapper `{"account": {...}}` or `{"data": {...}}` is accepted). Every field is optional, unknown fields are ignored:
-
-```json
-{ "name": "Tom Lee", "balance": 1250.50, "points": 320, "level": "Gold",
-  "deposits":     [{ "ref": "D-20931", "amount": 100, "status": "pending",   "created_at": "2026-11-16T14:02:00+08:00" }],
-  "withdrawals":  [{ "ref": "W-5512",  "amount": 200, "status": "processing", "created_at": "2026-11-16T09:30:00+08:00" }],
-  "transactions": [{ "ref": "T-1", "type": "deposit", "amount": 100, "status": "completed", "created_at": "2026-11-15T21:15:00+08:00" }] }
-```
-
-  Statuses are understood in many spellings (`pending`, `processing`, `success`/`completed`/`paid`, `failed`/`rejected`/`cancelled` ...). A number is shown with the merchant's money sign (see Merchant settings). A row without a reference or amount is skipped. At most 20 rows of each list are read.
-- It is used for logged-in customers on the website chat and the panel's chat page. In LiveChat it is **off by default**: LiveChat keeps replies by the words of the question, for every customer, so the bot hands account questions to staff. A merchant's admin can switch **Account answers in LiveChat** on (Merchant settings, General). Then a logged-in member (LiveChat must send the member id) gets their own balance, points, deposits and withdrawals; a guest never does; every reply to that member is marked `cacheable: false` so LiveChat must not keep it. Switch it on only after the LiveChat team has made the cache change (`docs/REQUEST_TO_LIVECHAT_TEAM.md`).
-- The answer is kept for 30 seconds per customer, so a busy chat does not call the merchant for every message. A failed call is tried again at once.
-- The code: `src/bot/merchantApi.ts` (the call and the reading), `src/bot/merchantApiHttp.ts` (saved settings and the live API), `src/admin/merchantApiRoutes.ts` (the panel's routes), table `merchant_api` (`db/migrations/018_merchant_api.sql`). If a merchant's real API looks different, only `parseAccount` and the URL in `fetchAccount` need to change.
+This section used to describe how the bot read a logged-in customer's balance, points, deposits and withdrawals from the merchant's own system. **The bot no longer does this** (see "Who the customer is, and no account data" below): the panel has no Account data step, no Account tools tab and no account switch, and a balance or deposit question goes to a person. The code is still in the repository (`src/bot/merchantApi.ts`, `src/bot/merchantApiHttp.ts`, `src/admin/merchantApiRoutes.ts`) but nothing in the bot calls it.
 
 ## Pictures in the LiveChat test page
 
@@ -291,7 +268,9 @@ Each has example questions in English and Malay.
 - Entries that need a person (complaint, rule violation, ads, free credit request, and so on) are type **needs staff** and hand over to an agent.
 - The seven named promotions and VIP belong to **LuckyPay** only. When LuckyPay is the chosen merchant, Import also shows **Load the LuckyPay promotions** (8 draft entries, English and Malay, answers say `TO WRITE`). Other merchants do not see it.
 
-### Make LiveChat send the member to the bot (needed for account answers)
+### Make LiveChat send the member to the bot (so the bot can tell a member from a visitor)
+
+The bot uses the member only to note whether a customer is a logged-in member or a visitor (it reads no account data). The text below was written for account answers; the patch itself is unchanged.
 
 LiveChat's call to the bot carries only `question`, `history` and `session_id`, so the bot sees every customer as a guest. The patch `deploy/local-livechat/patches/001-member-to-bot.patch` makes LiveChat add `member: { id, name, rank }` (from the chat's customer, when they signed in with a member id) and skip its answer cache for that member's chats. Apply it to your LiveChat folder (Windows, PowerShell, in the bot folder), then rebuild and restart LiveChat. The second command builds LiveChat again and starts the API and the worker:
 
@@ -327,9 +306,9 @@ What the customer sees: the bot gives the answer and asks question 1; each reply
 | Answers | at least 10 live entries are *ready* (a real answer, not `TO WRITE`, and at least 3 example questions; a "needs staff" entry needs only the examples) | Open Import (no entries yet) or Open the knowledge base |
 | No "TO WRITE" left | no entry still says `TO WRITE:` (shown only when it applies) | Open the knowledge base |
 | Tried it | at least one chat exists (a test or a real customer) | Open LiveChat test |
-| Account data (optional) | the merchant's own API is connected | Open Account data |
+| Bot is listening / answering | done when the bot answers; a merchant that only listens shows this step as to do | Open Learning |
 
-Account data is not counted in the progress. It shows a warning when **Account answers in LiveChat** is on but no real API is connected (members would get the built-in demo balances). The checklist is part of the merchant page's data (`GET /api/admin/merchants/:code/connection`, field `setup`); the rules are in `src/admin/setup.ts` and the card is `SetupChecklist` in `web/src/admin/screens/MerchantPage.tsx`. Tests: `test/setup.test.ts`.
+The last step is counted: a new merchant starts by listening, so the checklist stays incomplete until an admin presses **Start answering** on the Learning page.
 
 ## A local LiveChat with several merchants
 
@@ -448,3 +427,7 @@ A merchant put in LiveChat can first only **listen**. In the panel: **Answers �
 - **Learn from old conversations:** on the Learning page, **Learn from old conversations** takes an Excel or CSV export of past chats, one row for each message, with the columns `chat_id`, `sender` (customer or staff; visitor, user and client count as customer, and operator, agent and bot as staff), `text` and, if available, `time`. The page first shows how many chats and messages it found and how many rows it leaves out. The file is read in the panel and sent in batches of up to 2000 messages. It works in either mode, and the same file twice saves nothing twice. A small Excel example can be downloaded there. What is learned is the same as in listening mode: the questions and the staff replies, with phone and bank numbers, emails and links hidden, and the same review (Add to Knowledge base as a draft) before the bot uses anything.
 
 The **Merchant** picker is in the top bar, on the left (not in the menu), so it stays there when the left menu is folded.
+
+### The checklist before the bot starts answering
+
+On the Learning page, while a merchant listens, a card **Before the bot starts answering** has four lines. Three must be done: **Enough live answers** (at least 10 that are live and ready), **No "TO WRITE" left**, and **Everything is published** (the bot answers from what is published, so draft changes must be published first). The fourth, **Learned questions checked**, is only a hint. The **Start answering** button is off until the three are done. An admin can still press **Start anyway**; the question then lists what is not ready.

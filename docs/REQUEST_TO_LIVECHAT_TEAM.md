@@ -43,10 +43,10 @@ In `internal/automation/answer_cache.go` and `ai_reply.go`, LiveChat keeps every
 - So if customer A asks "my money not in" and the bot answers with a question and choices, customer B's identical words get A's cached reply and the bot is never asked.
 - A customer who answers the choices with "2" would get the answer that the *previous* customer's "2" produced.
 - A customer who repeats "blah" would get the same "please explain" for 2 hours and never reach a person, because the bot never sees the second message.
-- A reply that contains one customer's own details (balance, name) would reach the next customer who types the same words.
+- A reply that contains one customer's own details would reach the next customer who types the same words. (The bot no longer reads account data at all, so it never writes such a reply.)
 
 What the bot does about it already (nothing for you to do for these):
-1. It **never writes personal account data** in a LiveChat reply (it hands those chats to staff).
+1. It **never reads or writes personal account data**: a question about a balance, deposit or withdrawal goes to staff.
 2. Every reply has `"cacheable": true|false`. Only a plain answer that depends on nothing but the question words is `true`. Menus, replies to menus, anything read together with an earlier message, and hand-overs are `false`, and their `confidence` is kept at **0.8 or less** so they never reach the 7-day layer.
 
 What is still needed (the first layer ignores confidence):
@@ -72,6 +72,13 @@ Until one of these is in place, do not turn the AI bot on for real customers: cl
 The numbered list stays in `answer`, and the bot understands "2", "the second one" and words from the choice. Older widgets keep working. The bot needs **no change** for this feature.
 
 ## Other items we also need from LiveChat (separate from the buttons)
-1. **Member details on every ask call** (a ready patch for LiveChat is in `deploy/local-livechat/patches/001-member-to-bot.patch`; it also keeps a member's chat out of the answer cache): send `member: { id, name, rank }` (LiveChat already holds `externalId`, name and rank), so the bot can answer account questions for a signed-in member.
+1. **Member details on every ask call** (a ready patch for LiveChat is in `deploy/local-livechat/patches/001-member-to-bot.patch`): send `member: { id, name, rank }` (LiveChat already holds `externalId`, name and rank). The bot uses it only to tell a logged-in member from a visitor, and shows it to staff in the handover. It reads no account data. Without it every customer is a visitor.
 2. **Handoff number (built on the bot side, please confirm):** the bot keeps `ai_handoff_prompt_after_replies` the same as LiveChat. It uses the calls we already know: `POST /login` (email + password of the merchant), `GET /merchant/automation` (must return `ai_handoff_prompt_after_replies`) and `PATCH /merchant/automation`. Please confirm that `GET /merchant/automation` returns that field, and give us a dedicated read/write login or token per merchant (we store it encrypted) so we do not use a person's password.
 3. **The bot's address on staging:** where it should be reachable (for example `http://ai-bot:3000` inside your network, or an https address), and who sets the base URL and the key in each merchant's AI Bot page.
+
+## Two questions for listening mode (a merchant first only listens, then starts answering)
+
+In listening mode the bot answers every question with an empty reply and `should_escalate: false`, and saves the question and the staff replies from `history`.
+
+1. **Is the bot still called after a person has taken a chat?** `humanHandoffActive` in `ai_reply.go` suggests it is not when the status is `human_requested` or `human_taken`. If a staff reply moves the chat to `human_taken`, we see only the replies that come before the next customer message. If the bot is still called (or LiveChat can send the history of a closed chat), we learn more. Please tell us which.
+2. **The reply cache:** an empty reply is kept by the words of the question for up to two hours (`L1`). That means a repeated question may not reach the bot in that time, and a silent reply can still be served after the merchant is switched to answering. Can the cache skip a reply with an empty answer, or can it be cleared for a merchant when we ask?

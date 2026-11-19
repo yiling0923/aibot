@@ -124,13 +124,14 @@
     <thead><tr><th>Screen</th><th>What it is for</th></tr></thead>
     <tbody>
       <tr><td><b>Knowledge base</b></td><td>The answers. A list, a table you edit in place, and bulk "set live".</td></tr>
-      <tr><td><b>Import</b></td><td>Load a starter pack or a file. "Import and publish" in two clicks.</td></tr>
-      <tr><td><b>Topics and Keywords</b></td><td>The words the bot knows. New words customers type arrive by themselves.</td></tr>
+      <tr><td><b>Import</b></td><td>Type in an Excel-like table, or upload an Excel or CSV file. English is enough: the AI can translate the other languages. A short <b>Import guide</b> shows the steps.</td></tr>
+      <tr><td><b>Learning</b></td><td>While a merchant only listens, the bot is silent and saves questions with the staff replies. Staff review them, import old chats, and an admin presses "Start answering".</td></tr>
+      <tr><td><b>Topics and Keywords</b></td><td>Topics: the words the bot knows (a flowchart or a list). Keywords: what customers type, to look at only.</td></tr>
       <tr><td><b>Report</b></td><td>How many messages were answered, not understood or handed over. Wrong answers.</td></tr>
-      <tr><td><b>LiveChat test</b></td><td>Chat as a visitor or a member to try the bot.</td></tr>
+      <tr><td><b>LiveChat test</b></td><td>Chat through LiveChat to try the link (admins). It shows whether the customer is a member or a visitor.</td></tr>
       <tr><td><b>Merchant settings</b></td><td>Tone, languages, hand-over rules, instructions.</td></tr>
       <tr><td><b>History</b></td><td>Go back to an earlier version of the answers.</td></tr>
-      <tr><td><b>Merchants &amp; logins, Usage &amp; billing</b></td><td>For admins only: add merchants and logins, see the AI cost.</td></tr>
+      <tr><td><b>Merchants &amp; logins, Usage &amp; billing</b></td><td>For admins only: add merchants and logins (a new merchant starts by listening), see the AI cost.</td></tr>
     </tbody></table></div>
 </section>
 
@@ -138,15 +139,15 @@
   <h2><span class="num">8</span>Starting a new merchant</h2>
   <ol class="steps">
     <li><div><b>Create the merchant in LiveChat.</b><br><span class="muted">LiveChat and the bot keep separate lists of merchants.</span></div></li>
-    <li><div><b>Add it in the bot panel.</b><br><span class="muted">Name, main language, tone, and a staff login. It starts with no answers.</span></div></li>
+    <li><div><b>Add it in the bot panel.</b><br><span class="muted">Name, main language, tone, and a staff login. It starts with no answers, and it starts by <b>listening</b>: the bot is silent.</span></div></li>
     <li><div><b>Make the bot key</b> and put it, with the bot address, into that merchant's AI Bot page in LiveChat.</div></li>
     <li><div><b>Check the settings.</b> The defaults already work.</div></li>
-    <li><div><b>Write the answers.</b> Load the starter pack, then replace every <span class="tag">TO WRITE:</span> text with the real answer. The bot ignores an entry until it is written.</div></li>
-    <li><div><b>Test as a customer</b>, as a visitor and as a member.</div></li>
-    <li><div><b>Go live.</b> Switch the AI bot on for that merchant in LiveChat.</div></li>
+    <li><div><b>Let it listen.</b> Switch the AI bot on in LiveChat. Staff answer as usual, and the bot saves each question with the staff reply. Old chats can be imported too (Learning).</div></li>
+    <li><div><b>Write the answers.</b> Turn the learned questions into draft answers, load the starter pack if you like, and replace every <span class="tag">TO WRITE:</span> text with the real answer. The bot ignores an entry until it is written and live.</div></li>
+    <li><div><b>Start answering.</b> When the checklist on the Learning page is done (enough live answers, no TO WRITE, everything published), an admin presses <b>Start answering</b>.</div></li>
     <li><div><b>Improve every week</b> from the Report: write the missing answers, then publish.</div></li>
   </ol>
-  <p class="muted">A <b>Setup checklist</b> on the merchant's page turns each line green as it is done.</p>
+  <p class="muted">A <b>Setup checklist</b> on the merchant's page turns each line green as it is done, and the Learning page has its own short checklist for starting to answer.</p>
 </section>
 
 <section>
@@ -177,6 +178,8 @@
     <div class="item ok"><h3>Works with LiveChat as it is</h3><ul>
       <li>Answers, choices and hand-over</li>
       <li>Guided answers (amount, username, phone, short reply)</li>
+      <li><b>Listening first:</b> a new merchant's bot is silent and learns from staff replies and from imported old chats (a staff reply is seen when the customer writes again)</li>
+      <li>Who the customer is: a logged-in member (member id) or a visitor, shown to staff in a handover</li>
       <li>The whole panel, many merchants, six languages</li></ul></div>
     <div class="item ask"><h3>Needs other people</h3><ul>
       <li>A public <b>https address</b> for the bot</li>
@@ -184,7 +187,7 @@
       <li>A first test with a real AI key</li></ul></div>
   </div>
   <div class="item bad" style="margin-top:12px"><h3>Not in this phase</h3><ul>
-    <li><b>Account answers (balance, deposits).</b> LiveChat does not tell the bot who the customer is, and the account data in the test setup is demo data. These questions go to a person. They need the merchant's real API and a way to check the customer is who they say.</li>
+    <li><b>Account answers (balance, deposits).</b> By design the bot does not read customer information: it only notes whether the customer is a logged-in member or a visitor, and passes these questions to a person.</li>
     <li><b>Pictures.</b> LiveChat sends them straight to the agents.</li>
     <li><b>Alerts when the bot is down.</b> If the bot server is down, customers get no bot reply, and agents still see the chat.</li></ul></div>
 </section>
@@ -193,7 +196,7 @@
   <h2><span class="num">12</span>Pilot plan and decisions needed</h2>
   <ol class="steps">
     <li><div>Pick <b>one merchant</b> for the pilot.</div></li>
-    <li><div>Give it a bot key, load the starter pack, write the real answers, test, and go live.</div></li>
+    <li><div>Give it a bot key and let it <b>listen</b> for about a month. Turn what it learned into answers, check them, then start answering.</div></li>
     <li><div>Watch the first chats. Review the Report every week.</div></li>
     <li><div>Add the next merchants the same way, using the setup checklist.</div></li>
   </ol>
@@ -203,7 +206,7 @@
     <li>Who writes and approves the answers.</li>
     <li>A public address for the bot.</li>
     <li>Asking the LiveChat team about the answer memory.</li>
-    <li>Whether to ask for each merchant's real API, for account answers in a later phase.</li>
+    <li>How long the listening period lasts for the pilot merchant (about a month is a good start).</li>
   </ul>
 </section>
 
@@ -211,7 +214,7 @@
   <h2>Questions you may be asked</h2>
   <p><b>Will it make mistakes?</b> It can pick the wrong answer. Wrong answers are marked in the Report and fixed. When it is unsure, it hands over.</p>
   <p><b>Does it replace agents?</b> No. It takes the repeated questions. Anything unclear goes to a person.</p>
-  <p><b>Is the data safe?</b> Each merchant's data is in its own database. Account data, when connected later, is read live and never saved.</p>
+  <p><b>Is the data safe?</b> Each merchant's data is in its own database. The bot does not read account data. While it listens it saves customer questions and staff replies, with phone and bank numbers, emails and links hidden.</p>
   <p><b>What does it cost?</b> The rules cost nothing. Only the optional AI costs money. The panel shows the cost per merchant, with a limit you can set.</p>
   <p><b>What if a merchant wants a different answer?</b> They edit it in the panel and press Publish. It is live within seconds.</p>
 </section>

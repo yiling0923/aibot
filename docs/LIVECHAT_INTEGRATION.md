@@ -97,13 +97,24 @@ Every message goes through three steps, and the bot reports each one in the repl
 - The same request sent twice within 10 minutes gets the same answer and the chat moves only once.
 - If the bot needs more than `ASK_TIMEOUT_MS` (default 8 seconds) or fails, it answers with the hand-off text and `should_escalate: true`; the customer is never left in silence.
 - After a hand-off or close the bot stays silent.
-- Optional `member` object (`id`, `name`, `rank`) lets the bot answer account questions for a signed-in member.
+- Optional `member` object (`id`, `name`, `rank`): the bot only notes who the customer is. A member id means a logged-in member, none means a visitor. Every answer carries `customer: { type: "member" | "visitor", member_id, name, rank }`, and a handover carries it in `metadata.customer` so the person who takes the chat sees it. The bot reads **no account data**: a question about a balance, deposit or withdrawal of this customer goes to a person, for members and visitors alike. The member id is taken as sent; it is not checked.
+- **Listening mode** (see below): the reply is silent (`decision: "silent"`, empty `answer`, no handover).
 
 ## Needs the LiveChat team
 
-1. Send the member id, name and rank on every `ask` call (LiveChat's widget already holds `externalId`, name and rank).
+1. Send the member id, name and rank on every `ask` call, if you want the bot and the staff to see who is a logged-in member (LiveChat's widget already holds `externalId`, name and rank). Without it every customer shows as a visitor.
 2. Send `session_id` back on each call (LiveChat already does).
 3. A way for the bot to read/write the merchant's "prompt for a person after N replies" so the two stay the same. Today the number is set only inside LiveChat.
+
+## Listening mode: learning before answering
+
+A merchant can first only **listen** (a new merchant starts this way; an admin switches it in the panel under Answers → Learning):
+
+- `ask` returns an empty answer with `decision: "silent"` and `should_escalate: false`. LiveChat writes no message and does not hand the chat over, so staff answer as usual.
+- The bot saves each customer question and the staff reply that followed it, read from the `history` LiveChat sends with every message. While the bot is silent, every `bot` message in that history is a person (LiveChat gives an operator the role `bot`). Emails, links and long numbers are masked before saving.
+- An admin can also import an export of old chats (Excel or CSV) on the Learning page.
+- Staff review the grouped questions and add the good ones to the Knowledge base as drafts. When the checklist on the Learning page is done (enough live answers, no "TO WRITE", everything published), the admin presses **Start answering**. The bot then answers only from the live Knowledge base; it never sends a saved staff reply by itself.
+- Limits: a staff reply is saved when LiveChat next calls the bot in that chat. LiveChat keeps a reply by the words of the question for up to two hours (`answer_cache.go`), so a repeated question may not reach the bot, and a silent reply can linger a little after the switch to answering.
 
 ## Still to do on the bot side
 
