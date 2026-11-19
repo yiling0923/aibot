@@ -8,3 +8,11 @@ export const EXAMPLE_ROWS: string[][] = [HEAD_ROW,
   ['forgot_password', 'password', 'en', 'forgot password | cannot login | reset my password', 'Tap "Forgot password" on the login page and follow the steps. A reset link is sent to your registered phone.'],
   ['bonus_claim', 'promotion', 'en', 'how to claim bonus | bonus not received | where is my bonus', 'Bonuses are added to your wallet within 10 minutes after your first deposit. Check Wallet > History.']];
 export const BLANK_ROWS: string[][] = [HEAD_ROW, ['example_entry', 'deposit', 'en', 'first example question | second example question | third example question', 'The answer the bot may use. Facts only.']];
+
+/** An export of past chats: one row for each message. The bot learns the questions customers asked and the replies staff gave. */
+export const CHAT_HEAD = ['chat_id', 'sender', 'text', 'time'];
+export const CHAT_WIDTHS = [14, 12, 80, 20];
+export const CHAT_EXAMPLE_ROWS: string[][] = [CHAT_HEAD,
+  ['c1001', 'customer', 'deposit not in yet', '2026-10-01 10:02'], ['c1001', 'staff', 'Please send your receipt. We will check within 5 minutes.', '2026-10-01 10:03'], ['c1001', 'customer', 'ok sent', '2026-10-01 10:04'], ['c1001', 'staff', 'Thank you, it is credited now.', '2026-10-01 10:09'],
+  ['c1002', 'customer', 'how long does withdraw take', '2026-10-01 11:15'], ['c1002', 'staff', 'Withdrawals are processed within 30 minutes.', '2026-10-01 11:16'],
+  ['c1003', 'customer', 'forgot password', '2026-10-02 09:40'], ['c1003', 'staff', 'Tap Forgot password on the login page and follow the steps.', '2026-10-02 09:41']];

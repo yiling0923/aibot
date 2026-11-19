@@ -3,10 +3,41 @@ import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { LANGS, slug, type Entry } from '../model';
 import { Modal } from '../ui';
+import { parseTable } from '../model';
+import { readXlsx, writeXlsx } from '../xlsx';
+import { CHAT_EXAMPLE_ROWS, CHAT_WIDTHS } from '../importSamples';
 
 interface Group { key: string; kind: 'covered' | 'topic' | 'text'; label: string; topic: string | null; intent: string | null; count: number; withReply: number; customers: { text: string; n: number }[]; replies: { text: string; n: number }[] }
 interface Learn { mode: 'listening' | 'answering'; since: string | null; days: number | null; pairs: number; chats: number; withReply: number; groups: Group[] }
 const MONTH = 30;
+
+interface Msg { chat: string; from: 'customer' | 'staff'; text: string; at?: string }
+const CUSTOMER = /^(visitor|customer|user|client|guest|member|buyer|顾客|客户|访客)$/i, STAFF = /^(operator|agent|staff|admin|human|support|bot|assistant|cs|service|客服)$/i;
+const COLS: Record<'chat' | 'from' | 'text' | 'at', string[]> = { chat: ['chat_id', 'chat', 'conversation', 'conversation_id', 'session', 'session_id'], from: ['sender', 'from', 'role', 'sender_type', 'author', 'who'], text: ['text', 'message', 'body', 'content'], at: ['time', 'created_at', 'date', 'at', 'timestamp'] };
+
+/** An export of past chats (rows of text, from Excel or CSV) as messages. Rows of a chat are put in time order when every one has a time, else the file order is kept. */
+export function readChats(rows: string[][]): { messages: Msg[]; chats: number; customer: number; staff: number; skipped: number; error: string } {
+  const none = { messages: [] as Msg[], chats: 0, customer: 0, staff: 0, skipped: 0 };
+  if (rows.length < 2) return { ...none, error: 'The file needs a header row and at least one message.' };
+  const head = rows[0].map((h) => h.trim().toLowerCase()); const at = (k: keyof typeof COLS) => head.findIndex((h) => COLS[k].includes(h));
+  const ix = { chat: at('chat'), from: at('from'), text: at('text'), at: at('at') };
+  const miss = (['chat', 'from', 'text'] as const).filter((k) => ix[k] < 0);
+  if (miss.length) return { ...none, error: 'Missing column: ' + miss.map((k) => COLS[k][0]).join(', ') + '. Found: ' + head.join(', ') };
+  const by = new Map<string, { m: Msg; t: number }[]>(); let skipped = 0;
+  for (const r of rows.slice(1)) {
+    const text = (r[ix.text] ?? '').trim(); const who = (r[ix.from] ?? '').trim(); const chat = (r[ix.chat] ?? '').trim();
+    if (!text || !chat) { if (text || chat) skipped++; continue; }
+    const from = CUSTOMER.test(who) ? 'customer' : STAFF.test(who) ? 'staff' : null; if (!from) { skipped++; continue; }
+    const time = ix.at >= 0 ? (r[ix.at] ?? '').trim() : ''; const t = time ? Date.parse(time) : NaN;
+    const list = by.get(chat) ?? []; list.push({ m: { chat, from, text: text.slice(0, 1000), ...(time ? { at: time } : {}) }, t }); by.set(chat, list);
+  }
+  const messages: Msg[] = []; let customer = 0, staff = 0;
+  for (const list of by.values()) {
+    const ordered = list.every((x) => !Number.isNaN(x.t)) ? [...list].sort((a, b) => a.t - b.t) : list;
+    for (const x of ordered) { messages.push(x.m); if (x.m.from === 'customer') customer++; else staff++; }
+  }
+  return { messages, chats: by.size, customer, staff, skipped, error: '' };
+}
 
 /** The first weeks of a merchant in LiveChat: the bot only listens, then staff review what it learned and an admin switches it to answering. */
 export default function Learning() {
@@ -14,6 +45,24 @@ export default function Learning() {
   const load = () => api<Learn>('/api/admin/learning?merchant=' + encodeURIComponent(p.merchant));
   useEffect(() => { let alive = true; setErr(''); setD(null); load().then((x) => { if (alive) setD(x); }).catch((e: Error) => { if (alive) setErr(e.message); }); return () => { alive = false; }; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [p.merchant]);
 
+  const [file, setFile] = useState<{ name: string; r: ReturnType<typeof readChats> } | null>(null); const [importing, setImporting] = useState(false); const [fileKey, setFileKey] = useState(0);
+  const pick = (f: File | undefined) => {
+    if (!f) return; setFile(null);
+    const done = (rows: string[][]) => setFile({ name: f.name, r: readChats(rows) });
+    if (/\.xlsx$/i.test(f.name)) { const fr = new FileReader(); fr.onload = () => { try { done(readXlsx(new Uint8Array(fr.result as ArrayBuffer))); } catch (e) { setFile({ name: f.name, r: { messages: [], chats: 0, customer: 0, staff: 0, skipped: 0, error: (e as Error).message } }); } }; fr.readAsArrayBuffer(f); }
+    else { const fr = new FileReader(); fr.onload = () => done(parseTable(String(fr.result))); fr.readAsText(f, 'utf-8'); }
+  };
+  const runImport = async () => {
+    if (!file || file.r.error || !file.r.messages.length) return; setImporting(true);
+    try {
+      let chats = 0, pairs = 0, withReply = 0; const all = file.r.messages; let batch: Msg[] = [];
+      const flush = async () => { if (!batch.length) return; const r = await api<{ chats: number; pairs: number; withReply: number }>('/api/admin/learning/import', { merchant: p.merchant, messages: batch }); chats += r.chats; pairs += r.pairs; withReply += r.withReply; batch = []; };
+      let lastChat = ''; for (const m of all) { if (batch.length >= 2000 && m.chat !== lastChat) await flush(); batch.push(m); lastChat = m.chat; }
+      await flush();
+      setD(await load()); setFile(null); setFileKey((k) => k + 1); p.toast(`Learned from ${chats} old chat${chats === 1 ? '' : 's'}: ${pairs} question${pairs === 1 ? '' : 's'}, ${withReply} with a staff reply.`);
+    } catch (e) { p.toast((e as Error).message); }
+    setImporting(false);
+  };
   const mine = p.draft.kb.filter((e) => e.merchant === p.merchant);
   const liveCount = mine.filter((e) => e.status === 'live').length;
   const switchTo = async (mode: 'listening' | 'answering') => {
@@ -61,6 +110,15 @@ export default function Learning() {
             : <div className="sub">Only an admin can change this.</div>}
         </div>}
       </div>
+
+      {d && <div className="card"><h3 style={{ margin: 0 }}>Learn from old conversations</h3>
+        <div className="sub" style={{ marginBottom: 8 }}>Have an export of past chats? Add it here and the bot learns from it before it goes live. One row for each message, with the columns <span className="mono">chat_id</span>, <span className="mono">sender</span> (customer or staff), <span className="mono">text</span> and, if you have it, <span className="mono">time</span>. An Excel or CSV file works. Phone and bank numbers, emails and links are hidden when it is saved.</div>
+        <div className="tools"><input key={fileKey} type="file" accept=".xlsx,.csv,.tsv,.txt" aria-label="Choose a file of old chats" onChange={(e) => pick(e.target.files?.[0])} />
+          <button className="btn sm ghost" type="button" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([writeXlsx(CHAT_EXAMPLE_ROWS, CHAT_WIDTHS, 'Chats') as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'old_chats_example.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }}>Download Excel example</button></div>
+        {file && (file.r.error ? <div className="note" style={{ background: 'var(--badbg)', marginTop: 8 }}>{file.r.error}</div>
+          : <div className="note" role="status" style={{ marginTop: 8 }}><b>{file.name}</b>: {file.r.chats} chat{file.r.chats === 1 ? '' : 's'}, {file.r.customer} customer message{file.r.customer === 1 ? '' : 's'} and {file.r.staff} staff message{file.r.staff === 1 ? '' : 's'}.{file.r.skipped ? ` ${file.r.skipped} row${file.r.skipped === 1 ? ' was' : 's were'} left out (empty, or a sender that is not a customer or staff).` : ''}
+            <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={importing || !file.r.customer} onClick={() => void runImport()}>{importing ? 'Learning…' : 'Learn from this file'}</button><button className="btn" type="button" disabled={importing} onClick={() => { setFile(null); setFileKey((k) => k + 1); }}>Clear</button></div></div>)}
+      </div>}
 
       {d && <div className="card"><h3 style={{ margin: 0 }}>What customers asked</h3>
         <div className="sub" style={{ marginBottom: 8 }}>Grouped by meaning, most asked first, with the reply staff gave most often. The bot never uses a past reply by itself: you check it and add it to the Knowledge base, and the bot answers only from what is live there. Phone and bank numbers, emails and links are hidden in what is saved.</div>

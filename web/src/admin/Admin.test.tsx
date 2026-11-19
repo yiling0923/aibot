@@ -25,6 +25,7 @@ const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolve
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
 const REPORT = { chatsBy: { members: 12, visitors: 30 }, from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let botMode: 'listening' | 'answering' = 'answering';
+let importedMsgs: { chat: string; from: string; text: string }[] = [];
 const LEARN = () => ({ mode: botMode, since: '2026-11-01T00:00:00Z', days: 12, pairs: 40, chats: 18, withReply: 31, groups: [
   { key: 'topic:deposit', kind: 'topic', label: 'deposit', topic: 'deposit', intent: null, count: 14, withReply: 12, customers: [{ text: 'deposit not in yet', n: 6 }, { text: 'depo pending', n: 3 }], replies: [{ text: 'Please send your receipt, we check in 5 min.', n: 9 }] },
   { key: 'kb:withdraw_time', kind: 'covered', label: 'withdraw_time', topic: 'withdraw', intent: 'withdraw_time', count: 5, withReply: 5, customers: [{ text: 'how long withdraw', n: 5 }], replies: [{ text: 'About 30 minutes.', n: 5 }] }] });
@@ -64,6 +65,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? (peopleBig ? BIG_PEOPLE : { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] })
+    : url === '/api/admin/learning/import' ? ((importedMsgs = JSON.parse(String(init?.body)).messages), { chats: 2, pairs: 3, withReply: 2 })
     : url.startsWith('/api/admin/learning') ? LEARN()
     : /\/merchants\/[^/]+\/mode/.test(url) ? ((botMode = JSON.parse(String(init?.body)).mode), { ok: true })
     : url.startsWith('/api/admin/report') ? REPORT
@@ -551,6 +553,23 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Start answering' }));
     await userEvent.click(within(await screen.findByRole('dialog', { name: 'Change what the bot does' })).getByRole('button', { name: 'Start answering' }));
     expect(await screen.findByText(/Answering: the bot replies to customers/)).toBeTruthy(); expect(botMode).toBe('answering');
+  });
+  it('Learning: learns from a file of old chats: shows what is in it first, leaves out unknown senders, then sends it', async () => {
+    open('staff', '/admin/learn');
+    const csv = 'chat_id,sender,text,time\nc1,customer,deposit not in yet,2026-10-01 10:00\nc1,staff,Please send your receipt,2026-10-01 10:01\nc2,Visitor,how long withdraw,2026-10-01 11:00\nc2,Operator,30 minutes,2026-10-01 11:02\nc2,robot,ignored line,2026-10-01 11:03\nc2,staff,Anything else?,2026-10-01 11:03';
+    await userEvent.upload(await screen.findByLabelText('Choose a file of old chats'), new File([csv], 'chats.csv', { type: 'text/csv' }));
+    const note = await screen.findByText(/2 chats, 2 customer messages and 3 staff messages/);
+    expect(note.textContent).toMatch(/1 row was left out/);
+    await userEvent.click(screen.getByRole('button', { name: 'Learn from this file' }));
+    expect(await screen.findByText(/Learned from 2 old chats: 3 questions, 2 with a staff reply/)).toBeTruthy();
+    expect(importedMsgs.length).toBe(5); expect(importedMsgs[2]).toMatchObject({ chat: 'c2', from: 'customer', text: 'how long withdraw' });    // "Visitor" is a customer, "Operator" is staff
+    expect(screen.queryByRole('button', { name: 'Learn from this file' })).toBeNull();                      // the file was learned: the card is clear again
+  });
+  it('Learning: a file without the needed columns says which are missing', async () => {
+    open('staff', '/admin/learn');
+    await userEvent.upload(await screen.findByLabelText('Choose a file of old chats'), new File(['id,msg\n1,hello'], 'bad.csv', { type: 'text/csv' }));
+    expect(await screen.findByText(/Missing column: chat_id, sender, text/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Learn from this file' })).toBeNull();
   });
   it('Learning: staff can read it but cannot switch the mode', async () => {
     open('staff', '/admin/learn');

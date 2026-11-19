@@ -62,7 +62,7 @@ export function peopleRoutes(app: FastifyInstance, ctx: PeopleCtx) {
     const asText = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v));
 
     try {
-      await pool.query('INSERT INTO merchants(code, name, default_language, livechat_group_id, handoff_group_id) VALUES(?,?,?,?,?)', [code, name, language, group(b.livechatGroup), group(b.handoffGroup)]);
+      await pool.query('INSERT INTO merchants(code, name, default_language, livechat_group_id, handoff_group_id, bot_mode, listening_since) VALUES(?,?,?,?,?,\'listening\',NOW())', [code, name, language, group(b.livechatGroup), group(b.handoffGroup)]);   // a new merchant starts by listening: the bot is silent and learns until an admin starts it
     } catch (e) {
       if ((e as { code?: string }).code === 'ER_DUP_ENTRY') return fail(reply, 409, `A merchant with the code ${code} already exists.`);
       throw e;

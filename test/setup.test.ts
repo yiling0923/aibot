@@ -38,15 +38,15 @@ describe('how many answers are ready', () => {
 describe('the setup checklist', () => {
   it('a brand new merchant has nothing done, and says what to do first', () => {
     const r = checklist(empty);
-    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'todo'], ['key', 'todo'], ['livechat', 'todo'], ['answers', 'todo'], ['tried', 'todo']]);
-    expect(r).toMatchObject({ done: 0, total: 5 });
+    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'todo'], ['key', 'todo'], ['livechat', 'todo'], ['answers', 'todo'], ['tried', 'todo'], ['mode', 'done']]);
+    expect(r).toMatchObject({ done: 1, total: 6 });
     expect(by(r, 'answers').detail).toMatch(/No answers yet.*every question to a person.*starter pack/); expect(by(r, 'answers').action).toEqual({ to: 'imp', label: 'Open Import' });
     expect(by(r, 'livechat').detail).toMatch(/Make the bot key first/); expect(by(r, 'key').action?.to).toBe('key');
   });
   it('shows each step done when it is, ', () => {
     const r = checklist({ ...empty, logins: 1, activeKeys: 1, keyLastUsed: '2026-11-17T04:27:00.000Z', ...many(MIN_READY_ANSWERS), chats: 3 });
-    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'done'], ['key', 'done'], ['livechat', 'done'], ['answers', 'done'], ['towrite', 'done'], ['tried', 'done']]);
-    expect(r).toMatchObject({ done: 6, total: 6 }); expect(by(r, 'livechat').detail).toContain('2026-11-17 04:27');
+    expect(r.items.map((x) => [x.key, x.state])).toEqual([['login', 'done'], ['key', 'done'], ['livechat', 'done'], ['answers', 'done'], ['towrite', 'done'], ['tried', 'done'], ['mode', 'done']]);
+    expect(r).toMatchObject({ done: 7, total: 7 }); expect(by(r, 'livechat').detail).toContain('2026-11-17 04:27');
   });
   it('asks for more answers below the minimum, and tells how many are drafts', () => {
     const m = many(3); m.entries[2].status = 'draft';
@@ -58,7 +58,12 @@ describe('the setup checklist', () => {
   });
   it('has no account step: the bot does not read customer information', () => {
     expect(checklist(empty).items.map((x) => x.key)).not.toContain('account');
-    expect(checklist(empty).total).toBe(5);
+    expect(checklist(empty).total).toBe(6);
+  });
+  it('a merchant that only listens has a step to start answering', () => {
+    const m = by(checklist({ ...empty, listening: true }), 'mode');
+    expect(m).toMatchObject({ state: 'todo', title: 'Bot is listening', action: { to: 'learn', label: 'Open Learning' } });
+    expect(by(checklist(empty), 'mode')).toMatchObject({ state: 'done', title: 'Bot is answering' });
   });
 });
 
@@ -80,7 +85,7 @@ describe.skipIf(!reachable)('the checklist on the merchant page, step by step fo
   it('follows a new merchant from nothing to set up', async () => {
     expect((await call('POST', '/api/admin/merchants', { code: 'NEWCO', name: 'NewCo' })).statusCode).toBe(200);
     let s = await setup('NEWCO');
-    expect(s.items.map((x) => x.state)).toEqual(['todo', 'todo', 'todo', 'todo', 'todo']); expect(s).toMatchObject({ done: 0, total: 5 });
+    expect(s.items.map((x) => x.state)).toEqual(['todo', 'todo', 'todo', 'todo', 'todo', 'todo']); expect(s).toMatchObject({ done: 0, total: 6 });      // the last one: the new merchant starts by listening
 
     expect((await call('POST', '/api/admin/users', { username: 'newco', password: 'secret123', role: 'staff', merchant: 'NEWCO' })).statusCode).toBe(200);
     const key = (await call('POST', '/api/admin/merchants/NEWCO/bot-key', {})).json().key as string;
@@ -96,7 +101,8 @@ describe.skipIf(!reachable)('the checklist on the merchant page, step by step fo
     const { resolveKey } = await import('../src/connector/keys'); expect(await resolveKey(pool!, 'Bearer ' + key)).toBe('NEWCO');
     await ask({ pool: pool!, bot, store: new Store(pool!) }, 'NEWCO', { question: 'how long deposit take' });
     s = await setup('NEWCO'); expect(st(s, 'livechat')).toBe('done'); expect(st(s, 'tried')).toBe('done'); expect(st(s, 'login')).toBe('done');
-    expect(s.done).toBe(5); expect(s.total).toBe(6);                                              // everything but the "TO WRITE" step
+    expect(s.done).toBe(5); expect(s.total).toBe(7);                                              // everything but the "TO WRITE" step and the switch to answering
+    expect(st(s, 'mode')).toBe('todo'); expect(s.items.find((x) => x.key === 'tried')!.detail).toMatch(/1 chat so far/);   // a chat the bot only listened to counts
   });
 
   it('is for admins only', async () => {

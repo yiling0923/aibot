@@ -78,5 +78,40 @@ describe.skipIf(!reachable)('a merchant that listens first, then answers (needs 
     expect(r.decision).toBe('answer'); expect(r.answer).not.toBe('');
   });
 
+  it('learns from an export of old chats: pairs customer questions with staff replies, masks personal details, and counts them on the Learning screen', async () => {
+    const before = (await as(admin, 'GET', '/api/admin/learning?merchant=MERCH_A')).json();
+    const messages = [
+      { chat: 'c1', from: 'customer', text: 'refund how long' }, { chat: 'c1', from: 'staff', text: 'Refunds take 3 days. Call 0123456789 if late.' },
+      { chat: 'c1', from: 'customer', text: 'ok' },
+      { chat: 'c2', from: 'customer', text: 'refund how long', at: '2026-10-01 10:00' }, { chat: 'c2', from: 'staff', text: 'Refunds take 3 days.', at: '2026-10-01 10:02' },
+      { chat: 'c3', from: 'robot', text: 'ignored: not a customer or staff' }, { chat: '', from: 'customer', text: 'ignored: no chat' }];
+    const r = await as(admin, 'POST', '/api/admin/learning/import', { merchant: 'MERCH_A', messages });
+    expect(r.json()).toEqual({ chats: 2, pairs: 3, withReply: 2 });
+    const after = (await as(admin, 'GET', '/api/admin/learning?merchant=MERCH_A')).json();
+    expect(after.chats).toBe(before.chats + 2); expect(after.withReply).toBe(before.withReply + 2);
+    const g = after.groups.find((x: { customers: { text: string }[] }) => x.customers.some((c) => c.text === 'refund how long'));
+    expect(g.count).toBe(2); expect(g.replies[0].text).toBe('Refunds take 3 days.');
+    const [rows] = await pool!.query<import('mysql2/promise').RowDataPacket[]>('SELECT staff_text FROM `' + (await dbOf('MERCH_A')) + '`.learned_pairs WHERE staff_text LIKE ?', ['Refunds take 3 days. Call%']);
+    expect(rows[0].staff_text).toBe('Refunds take 3 days. Call [number] if late.');
+    const again = await as(admin, 'POST', '/api/admin/learning/import', { merchant: 'MERCH_A', messages });          // the same file twice saves nothing twice
+    expect(again.json().pairs).toBe(3); expect((await as(admin, 'GET', '/api/admin/learning?merchant=MERCH_A')).json().pairs).toBe(after.pairs);
+  });
+
+  it('refuses an import with no messages, too many, or for another merchant', async () => {
+    expect((await as(admin, 'POST', '/api/admin/learning/import', { merchant: 'MERCH_A', messages: [] })).statusCode).toBe(400);
+    expect((await as(admin, 'POST', '/api/admin/learning/import', { merchant: 'MERCH_A', messages: Array.from({ length: 3001 }, () => ({ chat: 'x', from: 'customer', text: 'hi' })) })).statusCode).toBe(400);
+    expect((await as(staff, 'POST', '/api/admin/learning/import', { merchant: 'MERCH_B', messages: [{ chat: 'x', from: 'customer', text: 'hi' }] })).statusCode).toBe(403);
+    expect((await as(staff, 'POST', '/api/admin/learning/import', { merchant: 'MERCH_A', messages: [{ chat: 'x', from: 'customer', text: 'hi' }] })).statusCode).toBe(200);   // staff may import for their own merchant
+  });
+
+  it('a merchant created from now on starts by listening', async () => {
+    const r = await as(admin, 'POST', '/api/admin/merchants', { name: 'Fresh Pay', code: 'FRESH1', language: 'en' });
+    expect([200, 201]).toContain(r.statusCode);
+    const [m] = await pool!.query<import('mysql2/promise').RowDataPacket[]>('SELECT bot_mode, listening_since FROM merchants WHERE code = ?', ['FRESH1']);
+    expect(m[0].bot_mode).toBe('listening'); expect(m[0].listening_since).not.toBeNull();
+    const [old] = await pool!.query<import('mysql2/promise').RowDataPacket[]>("SELECT bot_mode FROM merchants WHERE code = 'MERCH_B'");
+    expect(old[0].bot_mode).toBe('answering');                                                           // the seeded merchants are unchanged
+  });
+
   async function dbOf(code: string) { const [r] = await pool!.query<import('mysql2/promise').RowDataPacket[]>('SELECT db_name FROM merchants WHERE code = ?', [code]); return String(r[0].db_name); }
 });

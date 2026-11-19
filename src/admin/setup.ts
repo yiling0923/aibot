@@ -5,15 +5,16 @@ export const MIN_READY_ANSWERS = 10;
 
 export type CheckState = 'done' | 'todo' | 'optional' | 'warn';
 /** Where a button of the checklist leads: another screen, or a part of the merchant page. */
-export type CheckTo = 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'api' | 'lchat';
+export type CheckTo = 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'api' | 'lchat' | 'learn';
 export interface CheckItem { key: string; title: string; state: CheckState; detail: string; action?: { to: CheckTo; label: string } }
 
 export interface SetupInput {
   logins: number; activeKeys: number; keyLastUsed: string | null;
   entries: { id: number; status: string; type: string }[];
   translations: { kb_id: number; question_examples: unknown; answer_text: string }[];
-  /** The host of the merchant's own API, or null when none is connected. */
   chats: number;
+  /** True while the merchant only listens (the bot is silent and learns). */
+  listening?: boolean;
 }
 
 const TO_WRITE = /^\s*TO WRITE:/i;
@@ -53,5 +54,8 @@ export function checklist(i: SetupInput): { items: CheckItem[]; done: number; to
   items.push(i.chats > 0
     ? { key: 'tried', title: 'Tried it', state: 'done', detail: `${i.chats} chat${i.chats === 1 ? '' : 's'} so far (tests and real customers).` }
     : { key: 'tried', title: 'Tried it', state: 'todo', detail: 'Nobody has chatted with the bot yet. Try it in LiveChat test.', action: { to: 'lchat', label: 'Open LiveChat test' } });
+  items.push(i.listening
+    ? { key: 'mode', title: 'Bot is listening', state: 'todo', detail: 'The bot is silent and only learns from conversations. When its answers are ready, switch it to answering.', action: { to: 'learn', label: 'Open Learning' } }
+    : { key: 'mode', title: 'Bot is answering', state: 'done', detail: 'The bot replies to customers from the live answers.' });
   return { items, done: items.filter((x) => x.state === 'done').length, total: items.length };
 }

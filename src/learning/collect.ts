@@ -49,7 +49,7 @@ export async function recordPairs(pool: Pool, db: string, sessionKey: string, pa
     const customer = maskPersonal(p.customer); if (!customer) continue;
     const staff = p.staff ? maskPersonal(p.staff).slice(0, 2000) : null;
     const [r] = await pool.query(`INSERT INTO ${T} (session_key, pair_hash, customer_text, staff_text, lang, customer_at) VALUES (?, ?, ?, ?, ?, ?)
-      ON DUPLICATE KEY UPDATE staff_text = COALESCE(staff_text, VALUES(staff_text))`, [sessionKey.slice(0, 80), hash(p.customer), customer, staff, lang, p.at ? new Date(p.at) : null]);
+      ON DUPLICATE KEY UPDATE staff_text = COALESCE(staff_text, VALUES(staff_text))`, [sessionKey.slice(0, 80), hash(p.customer), customer, staff, lang, (() => { const d = p.at ? new Date(p.at) : null; return d && !Number.isNaN(d.getTime()) ? d : null; })()]);
     n += (r as { affectedRows: number }).affectedRows > 0 ? 1 : 0;
   }
   return n;

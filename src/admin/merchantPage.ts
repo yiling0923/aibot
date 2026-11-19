@@ -32,7 +32,7 @@ export function merchantPageRoutes(app: FastifyInstance, ctx: MerchantPageCtx) {
   app.get<{ Params: { code: string } }>(`${A}/connection`, async (req, reply) => {
     if (!adminOnly(req, reply)) return;
     const t = await known(req.params.code); if (!t) return reply.code(404).send({ error: 'There is no such merchant.' });
-    const [m] = await q(pool, 'SELECT code, name, default_language FROM merchants WHERE code = ?', [t.code]);
+    const [m] = await q(pool, 'SELECT code, name, default_language, bot_mode FROM merchants WHERE code = ?', [t.code]);
     const [st] = await q(pool, `SELECT tone FROM ${tbl(t.db, 'settings')} WHERE id = 1`);
     const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
     const liveSql = `SELECT COUNT(*) AS n, MAX(started_at) AS last FROM ${tbl(t.db, 'chat_sessions')} WHERE source = 'live' AND started_at > DATE_SUB(NOW(), INTERVAL 7 DAY)`;
@@ -44,12 +44,12 @@ export function merchantPageRoutes(app: FastifyInstance, ctx: MerchantPageCtx) {
     // The setup checklist: what is done and what is still to do for this merchant.
     const [kbRows, trRows, chats] = await Promise.all([
       q(pool, `SELECT id, status, entry_type FROM ${tbl(t.db, 'kb_entries')}`), q(pool, `SELECT kb_id, question_examples, answer_text FROM ${tbl(t.db, 'kb_translations')}`),
-      q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'chat_sessions')}`).catch(() => [{ n: 0 }]),
+      q(pool, `SELECT (SELECT COUNT(*) FROM ${tbl(t.db, 'chat_sessions')}) + (SELECT COUNT(DISTINCT session_key) FROM ${tbl(t.db, 'learned_pairs')}) AS n`).catch(() => [{ n: 0 }]),     // chats the bot answered, plus chats it only listened to
     ]);
     const activeKeys = keys.filter((k) => !k.revokedAt), lastUsed = activeKeys.map((k) => (k.lastUsedAt ? new Date(k.lastUsedAt as string | Date).toISOString() : '')).filter(Boolean).sort().pop() ?? null;
     const setup = checklist({ logins: logins.length, activeKeys: activeKeys.length, keyLastUsed: lastUsed,
       entries: kbRows.map((e) => ({ id: Number(e.id), status: String(e.status), type: String(e.entry_type ?? 'answer') })), translations: trRows as never,
-      chats: Number(chats[0]?.n ?? 0) });
+      chats: Number(chats[0]?.n ?? 0), listening: m.bot_mode === 'listening' });
     return {
       merchant: { code: m.code, name: m.name, language: m.default_language, tone: st?.tone ?? 'friendly', entries: Number(n?.n ?? 0), logins },
       setup,

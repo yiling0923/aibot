@@ -6,7 +6,7 @@ import { Pill } from '../ui';
 
 interface KeyRow { id: number; prefix: string; createdBy: string | null; createdAt: string; lastUsedAt: string | null }
 interface AiRow { provider: 'anthropic' | 'openai'; configured: boolean; last4: string | null; updatedAt: string | null; updatedBy: string | null; using: 'merchant' | 'shared' | 'none' }
-interface CheckItem { key: string; title: string; state: 'done' | 'todo' | 'optional' | 'warn'; detail: string; action?: { to: 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'lchat'; label: string } }
+interface CheckItem { key: string; title: string; state: 'done' | 'todo' | 'optional' | 'warn'; detail: string; action?: { to: 'users' | 'key' | 'livechat' | 'imp' | 'kb' | 'lchat' | 'learn'; label: string } }
 interface Setup { items: CheckItem[]; done: number; total: number }
 interface Conn {
   setup: Setup;
@@ -120,7 +120,7 @@ function SetupChecklist({ s, code, onMakeKey }: { s: Setup; code: string; onMake
     if (to === 'users') nav('/admin/users');
     else if (to === 'key') onMakeKey();
     else if (to === 'livechat') scroll('mstep-1');
-    else { p.setMerchant(code); nav(to === 'imp' ? '/admin/imp' : to === 'kb' ? '/admin/kb' : '/admin/lchat'); }
+    else { p.setMerchant(code); nav(to === 'imp' ? '/admin/imp' : to === 'kb' ? '/admin/kb' : to === 'learn' ? '/admin/learn' : '/admin/lchat'); }
   };
   const icon = (st: CheckItem['state']) => (st === 'done' ? '✓' : st === 'warn' ? '!' : st === 'optional' ? '–' : '');
   const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;

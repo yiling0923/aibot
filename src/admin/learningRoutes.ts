@@ -4,6 +4,7 @@ import type { Pool, RowDataPacket } from 'mysql2/promise';
 import { Tenants, tbl } from '../db/tenants';
 import { loadKnowledge } from '../db/loadKnowledge';
 import { Engine } from '../engine/engine';
+import { extractPairs, recordPairs } from '../learning/collect';
 
 const q = async (pool: Pool, sql: string, p: unknown[] = []) => (await pool.query<RowDataPacket[]>(sql, p))[0];
 const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
@@ -55,5 +56,28 @@ export function learningRoutes(app: FastifyInstance, ctx: { pool: Pool }) {
     if (mode === 'listening') await ctx.pool.query('UPDATE merchants SET bot_mode = ?, listening_since = COALESCE(listening_since, NOW()) WHERE code = ?', [mode, req.params.code]);
     else await ctx.pool.query('UPDATE merchants SET bot_mode = ? WHERE code = ?', [mode, req.params.code]);
     return { ok: true, mode };
+  });
+
+  /**
+   * Old conversations (an export of past chats): the same learning as listening, but from a file, so a merchant can start learning before going live.
+   * The panel reads the file and sends the messages in batches; each message says which chat it belongs to and whether a customer or a person wrote it.
+   */
+  app.post<{ Body: { merchant?: string; messages?: { chat?: unknown; from?: unknown; text?: unknown; at?: unknown }[] } }>('/api/admin/learning/import', async (req, reply) => {
+    const code = String(req.body?.merchant ?? ''); if (!mayUse(req, code)) return reply.code(403).send({ error: 'You cannot change this merchant.' });
+    const t = await new Tenants(ctx.pool).get(code); if (!t) return reply.code(404).send({ error: 'There is no such merchant.' });
+    const msgs = req.body?.messages; if (!Array.isArray(msgs) || !msgs.length) return reply.code(400).send({ error: 'There are no messages to import.' });
+    if (msgs.length > 3000) return reply.code(400).send({ error: 'Send at most 3000 messages at a time.' });
+    const chats = new Map<string, { role: string; text: string; created_at?: string }[]>();
+    for (const m of msgs) {
+      const chat = String(m.chat ?? '').trim().slice(0, 70), text = String(m.text ?? '').trim().slice(0, 2000);
+      if (!chat || !text || (m.from !== 'customer' && m.from !== 'staff')) continue;
+      const list = chats.get(chat) ?? []; list.push({ role: m.from === 'customer' ? 'user' : 'bot', text, ...(typeof m.at === 'string' && m.at ? { created_at: m.at } : {}) }); chats.set(chat, list);
+    }
+    let pairs = 0, withReply = 0;
+    for (const [chat, history] of chats) {
+      const ps = extractPairs(history, ''); pairs += ps.length; withReply += ps.filter((p) => p.staff).length;
+      await recordPairs(ctx.pool, t.db, 'imp-' + chat, ps, null);
+    }
+    return { chats: chats.size, pairs, withReply };
   });
 }
