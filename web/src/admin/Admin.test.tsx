@@ -627,6 +627,14 @@ describe('Control panel', () => {
     expect(screen.getByPlaceholderText('搜索条目或答案')).toBeTruthy(); expect(screen.getByText('答案（英文）')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: the Report page is translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    open('admin', '/admin/report');
+    expect(await screen.findByText(/报告 · LuckyPay/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '最近 7 天' })).toBeTruthy(); expect(screen.getByRole('button', { name: '下载 CSV' })).toBeTruthy();
+    expect(await screen.findByText('每天的消息数')).toBeTruthy(); expect(screen.getByText('聊天转给真人的原因')).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
