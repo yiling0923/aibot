@@ -899,3 +899,5 @@ details.moreopt{background:none;padding:0}
 .side .nav{flex:1 1 auto;min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin;padding-right:2px}
 .side .side-foot{flex:none}
 @media (max-width:820px){.side{overflow:visible}.side .nav{overflow:visible}}
+.stcell{display:flex;align-items:center;gap:6px 8px;flex-wrap:wrap}
+.stcell .pill{margin:0}
