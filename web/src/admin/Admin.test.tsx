@@ -662,7 +662,7 @@ describe('Control panel', () => {
     unmount(); const k = open('admin', '/admin/store');
     expect(await screen.findByText(/Keywords · LuckyPay/)).toBeTruthy(); expect(screen.getByText('听到的词')).toBeTruthy(); expect(screen.getByPlaceholderText('搜索词')).toBeTruthy();
     k.unmount(); open('admin', '/admin/rank');
-    expect(await screen.findByText(/Keyword ranking · LuckyPay/)).toBeTruthy(); expect(screen.getByText('本周')).toBeTruthy();
+    expect(await screen.findByText(/Keywords 排行 · LuckyPay/)).toBeTruthy(); expect(screen.getByText('本周')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
   it('Chinese: Merchant settings and History are translated', async () => {

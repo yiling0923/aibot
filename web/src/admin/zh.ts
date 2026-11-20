@@ -3,7 +3,7 @@ export const ZH: Record<string, string> = {
   // menu and top bar
   'Answers': '答案', 'Words': '词库', 'Check': '检查', 'Setup': '设置', 'Connect': '连接', 'Admin': '管理',
   'Knowledge base': 'Knowledge base', 'Import': '导入', 'Import guide': '导入指南', 'Learning': '学习',
-  'Topics': 'Topics', 'Keywords': 'Keywords', 'Keyword ranking': 'Keyword ranking',
+  'Topics': 'Topics', 'Keywords': 'Keywords', 'Keyword ranking': 'Keywords 排行',
   'Report': '报告', 'Merchant settings': '商户设置', 'History': '历史版本', 'LiveChat test': 'LiveChat 测试',
   'Merchants & logins': '商户与登录', 'Usage & billing': '用量与账单',
   'Bot Control Panel': '机器人控制面板', 'LiveChat AI bot': 'LiveChat AI 机器人',
