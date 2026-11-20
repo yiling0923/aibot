@@ -644,6 +644,16 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: '保存到草稿' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: the Import page is translated, also the check messages', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    open('admin', '/admin/imp');
+    expect(await screen.findByText(/导入 · LuckyPay/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '上传文件' })).toBeTruthy(); expect(screen.getByText('添加你的条目')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '下载 Excel 示例' })).toBeTruthy(); expect(screen.getByRole('button', { name: '清空表格' })).toBeTruthy();
+    await userEvent.type(screen.getByLabelText('条目名称，第 1 行'), 'abc');
+    expect(await screen.findByText('必须有英文答案')).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
