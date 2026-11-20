@@ -676,6 +676,15 @@ describe('Control panel', () => {
     expect(await screen.findByText(/历史版本 · LuckyPay/)).toBeTruthy();
     localStorage.removeItem('panelLang'); localStorage.removeItem('settingsTab');
   });
+  it('Chinese: Merchants & logins and the Merchant page are translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    const { unmount } = open('admin', '/admin/users');
+    expect(await screen.findByText('每个商户都有自己的答案、词库和设置。打开商户可连接 LiveChat 并设置它的 AI 密钥。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: /添加商户/ })).toBeTruthy(); expect(screen.getByRole('columnheader', { name: '员工登录' })).toBeTruthy();
+    unmount(); open('admin', '/admin/merchants/A');
+    expect(await screen.findByLabelText('设置清单')).toBeTruthy(); expect(await screen.findByText('LiveChat 连接')).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

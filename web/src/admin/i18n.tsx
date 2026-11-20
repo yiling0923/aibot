@@ -8,14 +8,16 @@ import { ZH } from './zh';
 export type PanelLang = 'en' | 'zh';
 interface I18n { lang: PanelLang; setLang: (l: PanelLang) => void; t: (en: string, vars?: Record<string, string | number>) => string }
 
+/** A text can end with `|context` ("Admin|role") to be told apart from the same English word used elsewhere. The context is never shown. */
+const bare = (s: string) => s.replace(/\|[a-z]+$/, '');
 const fill = (s: string, v?: Record<string, string | number>) => (v ? s.replace(/\{(\w+)\}/g, (_, k: string) => String(v[k] ?? '{' + k + '}')) : s);
-const Ctx = createContext<I18n>({ lang: 'en', setLang: () => undefined, t: (s, v) => fill(s, v) });
+const Ctx = createContext<I18n>({ lang: 'en', setLang: () => undefined, t: (s, v) => fill(bare(s), v) });
 
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [lang, setLangState] = useState<PanelLang>(() => { try { return localStorage.getItem('panelLang') === 'zh' ? 'zh' : 'en'; } catch { return 'en'; } });
   const setLang = (l: PanelLang) => { setLangState(l); try { localStorage.setItem('panelLang', l); } catch { /* the choice is only not remembered */ } };
   useEffect(() => { document.documentElement.lang = lang === 'zh' ? 'zh-CN' : 'en'; }, [lang]);
-  const value = useMemo<I18n>(() => ({ lang, setLang, t: (en, v) => fill(lang === 'zh' ? (ZH[en] ?? en) : en, v) }), [lang]);
+  const value = useMemo<I18n>(() => ({ lang, setLang, t: (en, v) => fill(lang === 'zh' ? (ZH[en] ?? bare(en)) : bare(en), v) }), [lang]);
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 export const useT = () => useContext(Ctx);
