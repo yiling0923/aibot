@@ -665,6 +665,17 @@ describe('Control panel', () => {
     expect(await screen.findByText(/Keyword ranking · LuckyPay/)).toBeTruthy(); expect(screen.getByText('本周')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: Merchant settings and History are translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    const { unmount } = open('admin', '/admin/set');
+    expect(await screen.findByText(/商户设置 · LuckyPay/)).toBeTruthy();
+    expect(screen.getByRole('tab', { name: '转人工' })).toBeTruthy(); expect(screen.getByRole('button', { name: '保存到草稿' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('tab', { name: '转人工' }));
+    expect(await screen.findByText('客户要求真人')).toBeTruthy();
+    unmount(); open('admin', '/admin/hist');
+    expect(await screen.findByText(/历史版本 · LuckyPay/)).toBeTruthy();
+    localStorage.removeItem('panelLang'); localStorage.removeItem('settingsTab');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
