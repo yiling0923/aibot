@@ -108,6 +108,12 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   const [busy, setBusy] = useState(false);
 
   /** Asks the AI to translate the English answer and examples into other languages. The result is only a draft in the editor: nothing is saved until "Save to draft". */
+  /** The one button on the English tab: translates Malay and Chinese, but only the ones that are still empty. */
+  const translateEmpty = () => {
+    const empty = ['ms', 'zh'].filter((l) => !trOf(ed, l).answer_text.trim());
+    if (!empty.length) return p.toast('Malay and Chinese already have an answer. Open a language tab to translate that one again.');
+    void translateTo(empty);
+  };
   const translateTo = async (langs: string[]) => {
     const en = trOf(ed, 'en');
     if (!en.answer_text.trim()) return p.toast('Write the English answer first, then translate it.');
@@ -187,10 +193,9 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <label className="fld"><span>Answer in {LN[ed.tab]} (facts only; the bot adds the tone)</span><textarea lang={ed.tab} value={t.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
       <div className="tools" style={{ marginTop: -4 }}>
         {ed.tab === 'en'
-          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['ms', 'zh'])}>{busy ? 'Translating…' : 'Translate to Malay and Chinese'}</button>
+          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? 'Fills Malay and Chinese when they are empty. Open another language tab to translate that one.' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateEmpty()}>{busy ? 'Translating…' : 'Translate the empty languages with AI'}</button>
           : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo([ed.tab])}>{busy ? 'Translating…' : `Translate from English to ${LN[ed.tab]}`}</button>}
-        {ed.tab === 'en' && <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo(['vi', 'th', 'tl'])}>{busy ? 'Translating…' : 'Translate to Vietnamese, Thai and Filipino'}</button>}
-        <span className="sub">{p.ai.translate ? 'The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.' : 'Translating needs the AI. Add the Anthropic key to .env.'}</span>
+        <span className="sub">{p.ai.translate ? (ed.tab === 'en' ? 'Fills Malay and Chinese when they are empty, never over text you wrote. For Vietnamese, Thai or Filipino open that tab. ' : '') + 'The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.' : 'Translating needs the AI. Add the Anthropic key to .env.'}</span>
       </div>
       <div className="kbsec"><b>4</b> How customers ask for it</div>
       <div><h3>Example questions ({t.question_examples.length}) <span className={'pill ' + (t.question_examples.length >= 3 ? 'ok' : 'warn')}>{t.question_examples.length >= 3 ? 'enough' : 'add ' + (3 - t.question_examples.length) + ' more'}</span> <span className="sub">at least 3, include slang</span></h3>

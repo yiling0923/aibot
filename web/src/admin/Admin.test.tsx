@@ -118,14 +118,18 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
     const answer = document.querySelector('.pane textarea') as HTMLTextAreaElement;
     await userEvent.type(answer, 'Go to Wallet > Deposit.');
-    await userEvent.click(screen.getByRole('button', { name: 'Translate to Malay and Chinese' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
     expect(await screen.findByText(/Translated to MS and ZH/)).toBeTruthy();
     await userEvent.click(screen.getByRole('tab', { name: /^MS/ }));
     expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');
     expect(screen.getByText('depo macam mana')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /Translate to Vietnamese/ })).toBeNull();               // one button on the English tab, not two
+    await userEvent.click(screen.getByRole('tab', { name: /^EN/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
+    expect(await screen.findByText(/Malay and Chinese already have an answer/)).toBeTruthy();         // nothing is translated over text that is there
     cleanup(); open('admin', '/admin/kb', false);
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
-    expect((screen.getByRole('button', { name: 'Translate to Malay and Chinese' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Translate the empty languages with AI' }) as HTMLButtonElement).disabled).toBe(true);
   });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');
