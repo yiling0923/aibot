@@ -603,6 +603,22 @@ describe('Control panel', () => {
     unmount(); open('staff', '/admin/kw'); await screen.findByRole('button', { name: 'Report' });
     const s = (await groups()).map((x) => x[0]); expect(s).toContain('Setup'); expect(s).not.toContain('Connect'); expect(s).not.toContain('Admin');
   });
+  it('Chinese: a switch in the top bar changes the menu, the top bar and the pages, remembers the choice, and a text that is not translated stays English', async () => {
+    botMode = 'listening';
+    const { unmount } = open('admin', '/admin/learn');
+    expect(await screen.findByText('Learning · LuckyPay')).toBeTruthy();                                   // English by default
+    expect(document.documentElement.lang).toBe('en');
+    await userEvent.click(within(screen.getByRole('group', { name: 'Panel language' })).getByRole('button', { name: '中文' }));
+    expect(await screen.findByText('学习 · LuckyPay')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '知识库' })).toBeTruthy(); expect(screen.getByText('商户设置')).toBeTruthy();   // the menu
+    expect(screen.getByText('已发布 v3')).toBeTruthy(); expect(screen.getByRole('button', { name: '发布' })).toBeTruthy();   // the top bar
+    expect(screen.getByText('监听中：机器人不回复')).toBeTruthy(); expect(screen.getByText('客户问了什么')).toBeTruthy();   // the page
+    expect(document.documentElement.lang).toBe('zh-CN'); expect(localStorage.getItem('panelLang')).toBe('zh');
+    unmount(); open('admin', '/admin/learn');
+    expect(await screen.findByText('学习 · LuckyPay')).toBeTruthy();                                       // still Chinese after a reload
+    await userEvent.click(within(screen.getByRole('group', { name: 'Panel language' })).getByRole('button', { name: 'EN' }));
+    expect(await screen.findByText('Learning · LuckyPay')).toBeTruthy();
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

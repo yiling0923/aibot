@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import '../styles/admin.css';
 import { api } from '../lib/api';
 import { PanelProvider, usePanel } from './store';
+import { I18nProvider, useT } from './i18n';
 import { entryProblems, snapshotOf } from './model';
 import { Modal, NavIcon } from './ui';
 import Kb from './screens/Kb';
@@ -34,15 +35,17 @@ export default function Admin() {
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const toast = useCallback((t: string) => { setToastText(t); clearTimeout(timer.current); timer.current = setTimeout(() => setToastText(''), 2600); }, []);
   return (
-    <PanelProvider onToast={toast}>
-      <Shell />
-      <div className="toast" hidden={!toastText} role="status">{toastText}</div>
-    </PanelProvider>
+    <I18nProvider>
+      <PanelProvider onToast={toast}>
+        <Shell />
+        <div className="toast" hidden={!toastText} role="status">{toastText}</div>
+      </PanelProvider>
+    </I18nProvider>
   );
 }
 
 function Shell() {
-  const p = usePanel();
+  const p = usePanel(); const { t, lang, setLang } = useT();
   const nav = useNavigate();
   const view = useLocation().pathname.split('/')[2] || 'kb';
   const [dialog, setDialog] = useState<'publish' | null>(null);
@@ -54,51 +57,52 @@ function Shell() {
   const [showWhat, setShowWhat] = useState(false);
   const [folded, setFoldedState] = useState(() => { try { return localStorage.getItem('sideFolded') === '1'; } catch { return false; } });   // the left menu can fold to icons
   const setFolded = (v: boolean) => { setFoldedState(v); try { localStorage.setItem('sideFolded', v ? '1' : '0'); } catch { /* ignore */ } };
-  useEffect(() => { document.title = (n ? '(' + n + ') Not published · ' : '') + 'LiveChat AI bot, control panel'; }, [n]);
+  useEffect(() => { document.title = (n ? '(' + n + ') ' + (lang === 'zh' ? '未发布' : 'Not published') + ' · ' : '') + (lang === 'zh' ? 'LiveChat AI 机器人控制面板' : 'LiveChat AI bot, control panel'); }, [n, lang]);
 
   return (
     <div className={'shell' + (folded ? ' folded' : '')}>
       <aside className="side">
         <div className="brandwrap">{folded
-          ? <button type="button" className="logo logobtn" aria-label="Show the menu" aria-expanded={false} title="Show the menu" onClick={() => setFolded(false)}><svg className="lg-a" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg><svg className="lg-b" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg></button>
-          : <span className="logo" aria-hidden="true"><svg className="lg-a" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg></span>}<div className="brand">Bot Control Panel<small>LiveChat AI bot</small></div>{!folded && <button type="button" className="sidetoggle" aria-label="Hide the menu" aria-expanded={true} title="Hide the menu" onClick={() => setFolded(true)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg></button>}</div>
+          ? <button type="button" className="logo logobtn" aria-label={t('Show the menu')} aria-expanded={false} title={t('Show the menu')} onClick={() => setFolded(false)}><svg className="lg-a" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg><svg className="lg-b" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg></button>
+          : <span className="logo" aria-hidden="true"><svg className="lg-a" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z" /><path d="M9 11h6M9 14h4" /></svg></span>}<div className="brand">{t('Bot Control Panel')}<small>{t('LiveChat AI bot')}</small></div>{!folded && <button type="button" className="sidetoggle" aria-label={t('Hide the menu')} aria-expanded={true} title={t('Hide the menu')} onClick={() => setFolded(true)}><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M9 4v16" /></svg></button>}</div>
         <nav className="nav" aria-label="Sections">
           {NAV_GROUPS.map(([g, all]) => [g, all.filter(([k]) => ((k !== 'users' && k !== 'billing' && k !== 'lchat') || p.isAdmin))] as const).filter(([, items]) => items.length > 0).map(([g, items]) => (
-            <div className="grp" key={g}><div className="gl">{g}</div>
+            <div className="grp" key={g}><div className="gl">{t(g)}</div>
               {items.map(([k, l]) => (
-                <button key={k} type="button" title={folded ? l : undefined} aria-label={folded ? l : undefined} aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
-                  <NavIcon name={k} /><span>{l}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
+                <button key={k} type="button" title={folded ? t(l) : undefined} aria-label={folded ? t(l) : undefined} aria-current={k === view || (k === 'users' && view === 'merchants') ? 'page' : undefined} onClick={() => nav('/admin/' + k)}>
+                  <NavIcon name={k} /><span>{t(l)}</span>{k === 'store' && unassigned ? <span className="cnt">{unassigned}</span> : null}
                 </button>
               ))}
             </div>
           ))}
         </nav>
         <div className="side-foot">
-          <div className="whoami"><div><b>{p.me.username}</b><small>{p.isAdmin ? 'Admin · all merchants' : 'Staff · ' + p.M.name}</small></div><button className="btn sm" type="button" onClick={signOut}>Sign out</button></div>
-          <label className="switch" title="Show options most staff do not need, such as question types"><input type="checkbox" checked={p.adv} onChange={(e) => p.setAdv(e.target.checked)} /><span className="track"><span className="thumb" /></span><span className="swl">Advanced options</span></label>
+          <div className="whoami"><div><b>{p.me.username}</b><small>{p.isAdmin ? t('Admin · all merchants') : t('Staff · {name}', { name: p.M.name })}</small></div><button className="btn sm" type="button" onClick={signOut}>{t('Sign out')}</button></div>
+          <label className="switch" title={t('Show options most staff do not need, such as question types')}><input type="checkbox" checked={p.adv} onChange={(e) => p.setAdv(e.target.checked)} /><span className="track"><span className="thumb" /></span><span className="swl">{t('Advanced options')}</span></label>
         </div>
-        {folded && <button type="button" className="sidetoggle" title="Sign out" aria-label="Sign out" onClick={signOut}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg></button>}
+        {folded && <button type="button" className="sidetoggle" title={t('Sign out')} aria-label={t('Sign out')} onClick={signOut}><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><path d="m16 17 5-5-5-5" /><path d="M21 12H9" /></svg></button>}
       </aside>
       <div className="content">
         <header className="topbar">
-          <label className="merchtop"><span>Merchant</span>
+          <label className="merchtop"><span>{t('Merchant')}</span>
             {p.isAdmin
               ? <select id="merchant" value={p.merchant} onChange={(e) => p.setMerchant(e.target.value)}>{p.merchants.map((m) => <option key={m.code} value={m.code}>{m.name}</option>)}</select>
               : <div className="merch-fixed">{p.M.name}</div>}
           </label>
-          <div className="vers"><span className="vchip"><i />Live v{p.ver}</span>
-            {p.M.bot_mode === 'listening' ? <span className="vchip warn" title="The bot is only listening: it saves conversations and does not reply. Open Learning."><i />Listening · bot silent</span> : null}{n ? <><span className="vchip warn">Draft · {n} change{n > 1 ? 's' : ''}</span><button className="btn sm ghost" type="button" onClick={p.discard}>Discard</button></> : null}
+          <div className="vers"><span className="vchip"><i />{t('Live v{v}', { v: p.ver })}</span>
+            {p.M.bot_mode === 'listening' ? <span className="vchip warn" title={t('The bot is only listening: it saves conversations and does not reply. Open Learning.')}><i />{t('Listening · bot silent')}</span> : null}{n ? <><span className="vchip warn">{t(n > 1 ? 'Draft · {n} changes' : 'Draft · {n} change', { n })}</span><button className="btn sm ghost" type="button" onClick={p.discard}>{t('Discard')}</button></> : null}
           </div>
-          <button className="btn pri" id="publish" type="button" disabled={!n} onClick={() => setDialog('publish')}>Publish{n ? <span className="badge">{n}</span> : null}</button>
+          <div className="langsw" role="group" aria-label="Panel language"><button type="button" aria-pressed={lang === 'en'} onClick={() => setLang('en')}>EN</button><button type="button" aria-pressed={lang === 'zh'} onClick={() => setLang('zh')}>中文</button></div>
+          <button className="btn pri" id="publish" type="button" disabled={!n} onClick={() => setDialog('publish')}>{t('Publish')}{n ? <span className="badge">{n}</span> : null}</button>
         </header>
         <main className="main">
           {n ? (
             <div className="pubbar" role="status" aria-label="Not published yet">
               <div className="pubbar-row">
-                <span><b>Not live yet.</b> {n} change{n > 1 ? 's are' : ' is'} only in your draft. Customers still get the old answers until you publish.</span>
+                <span><b>{t('Not live yet.')}</b> {t(n > 1 ? '{n} changes are only in your draft. Customers still get the old answers until you publish.' : '{n} change is only in your draft. Customers still get the old answers until you publish.', { n })}</span>
                 <span className="pubbar-btns">
-                  <button className="btn sm ghost" type="button" aria-expanded={showWhat} onClick={() => setShowWhat((v) => !v)}>{showWhat ? 'Hide changes' : 'What changed'}</button>
-                  <button className="btn sm pri" type="button" onClick={() => setDialog('publish')}>Review and publish</button>
+                  <button className="btn sm ghost" type="button" aria-expanded={showWhat} onClick={() => setShowWhat((v) => !v)}>{showWhat ? t('Hide changes') : t('What changed')}</button>
+                  <button className="btn sm pri" type="button" onClick={() => setDialog('publish')}>{t('Review and publish')}</button>
                 </span>
               </div>
               {showWhat ? <ul className="pubbar-list">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul> : null}
@@ -112,11 +116,11 @@ function Shell() {
             <Route path="store" element={<Keywords />} />
             <Route path="rank" element={<Ranking />} />
             <Route path="report" element={<Report />} />
-            <Route path="lchat" element={p.isAdmin ? <LiveChatTest /> : <div className="card"><h2>LiveChat test</h2><div className="sub">Only an admin can use this screen.</div></div>} />
+            <Route path="lchat" element={p.isAdmin ? <LiveChatTest /> : <div className="card"><h2>{t('LiveChat test')}</h2><div className="sub">{t('Only an admin can use this screen.')}</div></div>} />
             <Route path="set" element={<Settings />} />
-            <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>Merchants &amp; logins</h2><div className="sub">Only an admin can use this screen.</div></div>} />
-            <Route path="merchants/:code" element={p.isAdmin ? <MerchantPage /> : <div className="card"><h2>Merchant</h2><div className="sub">Only an admin can use this screen.</div></div>} />
-            <Route path="billing" element={p.isAdmin ? <Billing /> : <div className="card"><h2>Usage &amp; billing</h2><div className="sub">Only an admin can use this screen.</div></div>} />
+            <Route path="users" element={p.isAdmin ? <People /> : <div className="card"><h2>{t('Merchants & logins')}</h2><div className="sub">{t('Only an admin can use this screen.')}</div></div>} />
+            <Route path="merchants/:code" element={p.isAdmin ? <MerchantPage /> : <div className="card"><h2>{t('Merchant')}</h2><div className="sub">{t('Only an admin can use this screen.')}</div></div>} />
+            <Route path="billing" element={p.isAdmin ? <Billing /> : <div className="card"><h2>{t('Usage & billing')}</h2><div className="sub">{t('Only an admin can use this screen.')}</div></div>} />
             <Route path="guide" element={<Guide />} />
             <Route path="learn" element={<Learning />} />
             <Route path="hist" element={<History />} />
@@ -131,12 +135,12 @@ function Shell() {
 
 /** Runs the sample messages on the draft, shows the result, then publishes. */
 function PublishDialog({ onClose }: { onClose: () => void }) {
-  const p = usePanel();
+  const p = usePanel(); const { t } = useT();
   const [res, setRes] = useState<{ pass: number; total: number; results: { message: string; merchant: string; expected: string; got: string; ok: boolean }[] } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
-    p.runTests().then((r) => { if (alive) setRes(r); }).catch((e: Error) => { if (alive) { p.toast('Could not run the tests: ' + e.message); onClose(); } });
+    p.runTests().then((r) => { if (alive) setRes(r); }).catch((e: Error) => { if (alive) { p.toast(t('Could not run the tests: {e}', { e: e.message })); onClose(); } });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -146,23 +150,23 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
       const r = await api<{ published: { scope: string; code?: string; ver: number }[] }>('/api/admin/publish', { snapshot: snapshotOf(p.draft), changes: p.changes });
       const name = (c?: string) => p.merchants.find((m) => m.code === c)?.name ?? c;
       onClose();
-      p.toast(r.published.length ? 'Published: ' + r.published.map((x) => (x.scope === 'shared' ? 'shared words' : name(x.code)) + ' v' + x.ver).join(', ') : 'Nothing was different, so nothing was published');
+      p.toast(r.published.length ? t('Published: {list}', { list: r.published.map((x) => (x.scope === 'shared' ? t('shared words') : name(x.code)) + ' v' + x.ver).join(', ') }) : t('Nothing was different, so nothing was published'));
       await p.reloadAll();
-    } catch (e) { setBusy(false); p.toast('Publish failed: ' + (e as Error).message); }
+    } catch (e) { setBusy(false); p.toast(t('Publish failed: {e}', { e: (e as Error).message })); }
   };
-  if (!res) return <Modal small label="Publish" onClose={onClose}><h2>Checking your changes…</h2><div className="note">Running the sample customer messages on your draft.</div></Modal>;
+  if (!res) return <Modal small label="Publish" onClose={onClose}><h2>{t('Checking your changes…')}</h2><div className="note">{t('Running the sample customer messages on your draft.')}</div></Modal>;
   const fails = res.total - res.pass; const n = p.changes.length;
   const risky = p.draft.kb.filter((e) => e.dirty).map((e) => ({ e, why: entryProblems(e) })).filter((x) => x.why.length);   // answers changed in this draft that the bot cannot use yet
   return (
     <Modal small label="Publish" onClose={onClose}>
-      <h2>Publish {n} change{n > 1 ? 's' : ''}?</h2>
+      <h2>{t(n > 1 ? 'Publish {n} changes?' : 'Publish {n} change?', { n })}</h2>
       <ul className="plain">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
-      {risky.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>Check these answers first:</b>
+      {risky.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>{t('Check these answers first:')}</b>
         <ul className="plain">{risky.map(({ e, why }) => <li key={e.merchant + e.id}><b>{e.intent_key}</b> ({p.merchants.find((m) => m.code === e.merchant)?.name ?? e.merchant}): {why[0]}</li>)}</ul>
-        <div className="sub">You can still publish, but the bot will not use these answers well yet. Choose Cancel, then open Knowledge base to fix them.</div></div>}
-      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>Tests on the draft: <b>{res.pass} of {res.total} passed</b>{fails ? `. ${fails} failed (listed below). You can still publish.` : '.'} The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.</div>
-      {fails > 0 && <ul className="plain" aria-label="Failed tests">{res.results.filter((t) => !t.ok).slice(0, 6).map((t, i) => <li key={i}><b>{p.merchants.find((m) => m.code === t.merchant)?.name ?? t.merchant}</b>: “{t.message}” should be {t.expected}, the bot gave {t.got}</li>)}{fails > 6 && <li className="sub">and {fails - 6} more</li>}</ul>}
-      <div className="head"><button className="btn" type="button" onClick={onClose}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? 'Publishing…' : 'Publish'}</button></div>
+        <div className="sub">{t('You can still publish, but the bot will not use these answers well yet. Choose Cancel, then open Knowledge base to fix them.')}</div></div>}
+      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>{t('Tests on the draft:')} <b>{t('{pass} of {total} passed', { pass: res.pass, total: res.total })}</b>{fails ? t('. {n} failed (listed below). You can still publish.', { n: fails }) : '.'} {t('The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.')}</div>
+      {fails > 0 && <ul className="plain" aria-label="Failed tests">{res.results.filter((t) => !t.ok).slice(0, 6).map((t, i) => <li key={i}><b>{p.merchants.find((m) => m.code === t.merchant)?.name ?? t.merchant}</b>: “{t.message}” should be {t.expected}, the bot gave {t.got}</li>)}{fails > 6 && <li className="sub">{t('and {n} more', { n: fails - 6 })}</li>}</ul>}
+      <div className="head"><button className="btn" type="button" onClick={onClose}>{t('Cancel')}</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? t('Publishing…') : t('Publish')}</button></div>
     </Modal>
   );
 }

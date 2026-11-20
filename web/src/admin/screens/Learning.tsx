@@ -4,6 +4,7 @@ import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { LANGS, entryProblems, slug, type Entry } from '../model';
 import { Modal } from '../ui';
+import { useT } from '../i18n';
 import { parseTable } from '../model';
 import { readXlsx, writeXlsx } from '../xlsx';
 import { CHAT_EXAMPLE_ROWS, CHAT_WIDTHS } from '../importSamples';
@@ -43,7 +44,7 @@ export function readChats(rows: string[][]): { messages: Msg[]; chats: number; c
 
 /** The first weeks of a merchant in LiveChat: the bot only listens, then staff review what it learned and an admin switches it to answering. */
 export default function Learning() {
-  const p = usePanel(); const nav = useNavigate(); const [d, setD] = useState<Learn | null>(null); const [err, setErr] = useState(''); const [ask, setAsk] = useState<'listening' | 'answering' | null>(null); const [busy, setBusy] = useState(false);
+  const p = usePanel(); const nav = useNavigate(); const { t, lang } = useT(); const zh = lang === 'zh'; const [d, setD] = useState<Learn | null>(null); const [err, setErr] = useState(''); const [ask, setAsk] = useState<'listening' | 'answering' | null>(null); const [busy, setBusy] = useState(false);
   const load = () => api<Learn>('/api/admin/learning?merchant=' + encodeURIComponent(p.merchant));
   useEffect(() => { let alive = true; setErr(''); setD(null); load().then((x) => { if (alive) setD(x); }).catch((e: Error) => { if (alive) setErr(e.message); }); return () => { alive = false; }; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [p.merchant]);
 
@@ -61,7 +62,7 @@ export default function Learning() {
       const flush = async () => { if (!batch.length) return; const r = await api<{ chats: number; pairs: number; withReply: number }>('/api/admin/learning/import', { merchant: p.merchant, messages: batch }); chats += r.chats; pairs += r.pairs; withReply += r.withReply; batch = []; };
       let lastChat = ''; for (const m of all) { if (batch.length >= 2000 && m.chat !== lastChat) await flush(); batch.push(m); lastChat = m.chat; }
       await flush();
-      setD(await load()); setFile(null); setFileKey((k) => k + 1); p.toast(`Learned from ${chats} old chat${chats === 1 ? '' : 's'}: ${pairs} question${pairs === 1 ? '' : 's'}, ${withReply} with a staff reply.`);
+      setD(await load()); setFile(null); setFileKey((k) => k + 1); p.toast(t('Learned from {chats} old chats: {pairs} questions, {withReply} with a staff reply.', { chats, pairs, withReply }).replace(/ (\d+) old chats/, (m, n) => (n === '1' ? ' 1 old chat' : m)));
     } catch (e) { p.toast((e as Error).message); }
     setImporting(false);
   };
@@ -73,15 +74,15 @@ export default function Learning() {
   const unpublished = p.changes.length;
   const toCheck = (d?.groups ?? []).filter((g) => g.kind !== 'covered' && !(mine.some((e) => e.category === 'Learned' && ((e.translations as Record<string, { question_examples?: string[] }>).en?.question_examples ?? []).includes(g.customers[0]?.text ?? '\u0000')))).length;
   const steps: { key: string; ok: boolean; must: boolean; title: string; detail: string; to?: string }[] = [
-    { key: 'ready', ok: ready >= MIN_READY, must: true, title: 'Enough live answers', detail: `${ready} of ${MIN_READY} ready (live, with example questions). Add the learned answers below, check them and set them live.`, to: '/admin/kb' },
-    { key: 'towrite', ok: toWrite === 0, must: true, title: 'No "TO WRITE" left', detail: toWrite ? `${toWrite} ${toWrite === 1 ? 'entry still says' : 'entries still say'} TO WRITE. Write the real answer or delete it.` : 'Every answer is written.', to: '/admin/kb' },
-    { key: 'published', ok: unpublished === 0, must: true, title: 'Everything is published', detail: unpublished ? `${unpublished} change${unpublished === 1 ? ' is' : 's are'} only in your draft. The bot answers from what is published: press Publish.` : 'Nothing waits in the draft.' },
-    { key: 'learned', ok: toCheck === 0, must: false, title: 'Learned questions checked', detail: toCheck ? `${toCheck} group${toCheck === 1 ? '' : 's'} of questions the bot learned ${toCheck === 1 ? 'is' : 'are'} not in the Knowledge base yet. Only a hint: you may leave some out.` : 'Every learned group is covered or added.' }];
+    { key: 'ready', ok: ready >= MIN_READY, must: true, title: t('Enough live answers'), detail: t('{n} of {m} ready (live, with example questions). Add the learned answers below, check them and set them live.', { n: ready, m: MIN_READY }), to: '/admin/kb' },
+    { key: 'towrite', ok: toWrite === 0, must: true, title: t('No "TO WRITE" left'), detail: toWrite ? t(toWrite === 1 ? '{n} entry still says TO WRITE. Write the real answer or delete it.' : '{n} entries still say TO WRITE. Write the real answer or delete it.', { n: toWrite }) : t('Every answer is written.'), to: '/admin/kb' },
+    { key: 'published', ok: unpublished === 0, must: true, title: t('Everything is published'), detail: unpublished ? t(unpublished === 1 ? '{n} change is only in your draft. The bot answers from what is published: press Publish.' : '{n} changes are only in your draft. The bot answers from what is published: press Publish.', { n: unpublished }) : t('Nothing waits in the draft.') },
+    { key: 'learned', ok: toCheck === 0, must: false, title: t('Learned questions checked'), detail: toCheck ? t(toCheck === 1 ? '{n} group of questions the bot learned is not in the Knowledge base yet. Only a hint: you may leave some out.' : '{n} groups of questions the bot learned are not in the Knowledge base yet. Only a hint: you may leave some out.', { n: toCheck }) : t('Every learned group is covered or added.') }];
   const unmet = steps.filter((x) => x.must && !x.ok);
   const switchTo = async (mode: 'listening' | 'answering') => {
     setBusy(true);
     try { await api('/api/admin/merchants/' + encodeURIComponent(p.merchant) + '/mode', { mode }); setD(await load()); await p.refreshMerchants(); setAsk(null);
-      p.toast(mode === 'answering' ? 'The bot now answers customers in LiveChat.' : 'The bot now only listens. Staff answer customers.'); }
+      p.toast(mode === 'answering' ? t('The bot now answers customers in LiveChat.') : t('The bot now only listens. Staff answer customers.')); }
     catch (e) { p.toast((e as Error).message); }
     setBusy(false);
   };
@@ -95,74 +96,74 @@ export default function Learning() {
       const ne: Entry = { id: Math.max(0, ...dr.kb.map((x) => x.id)) + 1, merchant: p.merchant, category: 'Learned', intent_key: unique, topic: g.topic || '', aspect: null, topic_optional: false, translations: tl as Entry['translations'], status: 'draft', dirty: true, updated: 'just now' };
       dr.kb.push(ne); note(`Added "${unique}" from what the bot learned (${p.M.name})`);
     });
-    p.toast('Added “' + unique + '” to the Knowledge base as a draft. Check the answer, set it live, then press Publish.');
+    p.toast(t('Added “{key}” to the Knowledge base as a draft. Check the answer, set it live, then press Publish.', { key: unique }));
   };
 
   const listening = d?.mode === 'listening';
   const day = d?.days ?? 0;
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Learning · {p.M.name}</h2><div className="sub">When a merchant is first put in LiveChat, the bot can only listen: it stays silent, staff answer as usual, and the bot saves each question with the staff reply. Then you check what it learned and switch it to answering.</div></div></div>
+      <div className="card"><div className="head"><div><h2>{t('Learning')} · {p.M.name}</h2><div className="sub">{t('When a merchant is first put in LiveChat, the bot can only listen: it stays silent, staff answer as usual, and the bot saves each question with the staff reply. Then you check what it learned and switch it to answering.')}</div></div></div>
         {err && <div className="note" style={{ background: 'var(--badbg)' }}>{err}</div>}
         {d && <div className="lrn">
           <div className="lrnstat">
-            <span className={'vchip ' + (listening ? 'warn' : '')}><i />{listening ? 'Listening: the bot is silent' : 'Answering: the bot replies to customers'}</span>
-            {listening && d.since && <div className="lrnprog" role="progressbar" aria-label="Days listening" aria-valuenow={Math.min(day, MONTH)} aria-valuemax={MONTH}><i style={{ width: Math.min(100, Math.round((day / MONTH) * 100)) + '%' }} /></div>}
-            {listening && d.since && <span className="sub">Day {day + 1} of about {MONTH}. {day >= MONTH ? 'A month has passed: you can start answering when you are ready.' : ''}</span>}
+            <span className={'vchip ' + (listening ? 'warn' : '')}><i />{listening ? t('Listening: the bot is silent') : t('Answering: the bot replies to customers')}</span>
+            {listening && d.since && <div className="lrnprog" role="progressbar" aria-label={t('Days listening')} aria-valuenow={Math.min(day, MONTH)} aria-valuemax={MONTH}><i style={{ width: Math.min(100, Math.round((day / MONTH) * 100)) + '%' }} /></div>}
+            {listening && d.since && <span className="sub">{t('Day {n} of about {m}.', { n: day + 1, m: MONTH })} {day >= MONTH ? t('A month has passed: you can start answering when you are ready.') : ''}</span>}
           </div>
           <div className="lrntiles">
-            <div className="lrntile"><b>{d.chats}</b><span>chats seen</span></div>
-            <div className="lrntile"><b>{d.pairs}</b><span>questions saved</span></div>
-            <div className="lrntile"><b>{d.withReply}</b><span>with a staff reply</span></div>
-            <div className="lrntile"><b>{liveCount}</b><span>live answers in the Knowledge base</span></div>
+            <div className="lrntile"><b>{d.chats}</b><span>{t('chats seen')}</span></div>
+            <div className="lrntile"><b>{d.pairs}</b><span>{t('questions saved')}</span></div>
+            <div className="lrntile"><b>{d.withReply}</b><span>{t('with a staff reply')}</span></div>
+            <div className="lrntile"><b>{liveCount}</b><span>{t('live answers in the Knowledge base')}</span></div>
           </div>
           {p.isAdmin
             ? <div className="tools">{listening
-              ? <><button className="btn pri" type="button" disabled={unmet.length > 0} title={unmet.length ? 'Finish the checklist first: ' + unmet.map((x) => x.title).join(', ') : undefined} onClick={() => setAsk('answering')}>Start answering</button>
-                {unmet.length > 0 && <button className="btn ghost" type="button" onClick={() => setAsk('answering')}>Start anyway</button>}</>
-              : <button className="btn" type="button" onClick={() => setAsk('listening')}>Go back to listening only</button>}</div>
-            : <div className="sub">Only an admin can change this.</div>}
+              ? <><button className="btn pri" type="button" disabled={unmet.length > 0} title={unmet.length ? t('Finish the checklist first: {list}', { list: unmet.map((x) => x.title).join(', ') }) : undefined} onClick={() => setAsk('answering')}>{t('Start answering')}</button>
+                {unmet.length > 0 && <button className="btn ghost" type="button" onClick={() => setAsk('answering')}>{t('Start anyway')}</button>}</>
+              : <button className="btn" type="button" onClick={() => setAsk('listening')}>{t('Go back to listening only')}</button>}</div>
+            : <div className="sub">{t('Only an admin can change this.')}</div>}
         </div>}
       </div>
 
-      {d && listening && <div className="card" aria-label="Before the bot starts answering"><h3 style={{ margin: 0 }}>Before the bot starts answering</h3>
-        <div className="sub" style={{ marginBottom: 8 }}>{unmet.length ? 'Three things must be done first. The Start answering button turns on when they are.' : 'Ready. You can start answering.'}</div>
+      {d && listening && <div className="card" aria-label="Before the bot starts answering"><h3 style={{ margin: 0 }}>{t('Before the bot starts answering')}</h3>
+        <div className="sub" style={{ marginBottom: 8 }}>{unmet.length ? t('Three things must be done first. The Start answering button turns on when they are.') : t('Ready. You can start answering.')}</div>
         <ul className="checklist">{steps.map((x) => <li key={x.key} className={'chk ' + (x.ok ? 'done' : x.must ? 'todo' : 'optional')}>
           <span className={'cdot ' + (x.ok ? 'done' : x.must ? 'todo' : 'optional')} aria-hidden="true">{x.ok ? '✓' : x.must ? '' : '–'}</span>
-          <div className="cbody"><b>{x.title}{!x.must && <span className="sub"> (optional)</span>}</b><div className="sub">{x.detail}</div></div>
-          {!x.ok && x.to && <button className="btn sm" type="button" onClick={() => nav(x.to!)}>Open Knowledge base</button>}</li>)}</ul></div>}
+          <div className="cbody"><b>{x.title}{!x.must && <span className="sub"> {t('(optional)')}</span>}</b><div className="sub">{x.detail}</div></div>
+          {!x.ok && x.to && <button className="btn sm" type="button" onClick={() => nav(x.to!)}>{t('Open Knowledge base')}</button>}</li>)}</ul></div>}
 
-      {d && <div className="card"><h3 style={{ margin: 0 }}>Learn from old conversations</h3>
-        <div className="sub" style={{ marginBottom: 8 }}>Have an export of past chats? Add it here and the bot learns from it before it goes live. One row for each message, with the columns <span className="mono">chat_id</span>, <span className="mono">sender</span> (customer or staff), <span className="mono">text</span> and, if you have it, <span className="mono">time</span>. An Excel or CSV file works. Phone and bank numbers, emails and links are hidden when it is saved.</div>
-        <div className="tools"><input key={fileKey} type="file" accept=".xlsx,.csv,.tsv,.txt" aria-label="Choose a file of old chats" onChange={(e) => pick(e.target.files?.[0])} />
-          <button className="btn sm ghost" type="button" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([writeXlsx(CHAT_EXAMPLE_ROWS, CHAT_WIDTHS, 'Chats') as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'old_chats_example.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }}>Download Excel example</button></div>
+      {d && <div className="card"><h3 style={{ margin: 0 }}>{t('Learn from old conversations')}</h3>
+        <div className="sub" style={{ marginBottom: 8 }}>{zh ? <>有过去聊天的导出文件吗？在这里添加，机器人会在上线前先从中学习。每条消息一行，列名为 <span className="mono">chat_id</span>、<span className="mono">sender</span>（customer 或 staff）、<span className="mono">text</span>，如果有的话还有 <span className="mono">time</span>。Excel 或 CSV 文件都可以。保存时，电话和银行号码、电子邮件和链接会被隐藏。</> : <>Have an export of past chats? Add it here and the bot learns from it before it goes live. One row for each message, with the columns <span className="mono">chat_id</span>, <span className="mono">sender</span> (customer or staff), <span className="mono">text</span> and, if you have it, <span className="mono">time</span>. An Excel or CSV file works. Phone and bank numbers, emails and links are hidden when it is saved.</>}</div>
+        <div className="tools"><input key={fileKey} type="file" accept=".xlsx,.csv,.tsv,.txt" aria-label={t('Choose a file of old chats')} onChange={(e) => pick(e.target.files?.[0])} />
+          <button className="btn sm ghost" type="button" onClick={() => { const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([writeXlsx(CHAT_EXAMPLE_ROWS, CHAT_WIDTHS, 'Chats') as BlobPart], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })); a.download = 'old_chats_example.xlsx'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000); }}>{t('Download Excel example')}</button></div>
         {file && (file.r.error ? <div className="note" style={{ background: 'var(--badbg)', marginTop: 8 }}>{file.r.error}</div>
-          : <div className="note" role="status" style={{ marginTop: 8 }}><b>{file.name}</b>: {file.r.chats} chat{file.r.chats === 1 ? '' : 's'}, {file.r.customer} customer message{file.r.customer === 1 ? '' : 's'} and {file.r.staff} staff message{file.r.staff === 1 ? '' : 's'}.{file.r.skipped ? ` ${file.r.skipped} row${file.r.skipped === 1 ? ' was' : 's were'} left out (empty, or a sender that is not a customer or staff).` : ''}
-            <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={importing || !file.r.customer} onClick={() => void runImport()}>{importing ? 'Learning…' : 'Learn from this file'}</button><button className="btn" type="button" disabled={importing} onClick={() => { setFile(null); setFileKey((k) => k + 1); }}>Clear</button></div></div>)}
+          : <div className="note" role="status" style={{ marginTop: 8 }}><b>{file.name}</b>: {t('{chats} chats, {c} customer messages and {s} staff messages.', { chats: file.r.chats, c: file.r.customer, s: file.r.staff }).replace(/^1 chats/, '1 chat').replace(/ 1 customer messages/, ' 1 customer message').replace(/ 1 staff messages/, ' 1 staff message')}{file.r.skipped ? ' ' + t(file.r.skipped === 1 ? '{n} row was left out (empty, or a sender that is not a customer or staff).' : '{n} rows were left out (empty, or a sender that is not a customer or staff).', { n: file.r.skipped }) : ''}
+            <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={importing || !file.r.customer} onClick={() => void runImport()}>{importing ? t('Learning…') : t('Learn from this file')}</button><button className="btn" type="button" disabled={importing} onClick={() => { setFile(null); setFileKey((k) => k + 1); }}>{t('Clear')}</button></div></div>)}
       </div>}
 
-      {d && <div className="card"><h3 style={{ margin: 0 }}>What customers asked</h3>
-        <div className="sub" style={{ marginBottom: 8 }}>Grouped by meaning, most asked first, with the reply staff gave most often. The bot never uses a past reply by itself: you check it and add it to the Knowledge base, and the bot answers only from what is live there. Phone and bank numbers, emails and links are hidden in what is saved.</div>
-        {!d.groups.length ? <div className="sub">Nothing saved yet. {listening ? 'Once LiveChat sends customer messages to the bot, they show up here.' : 'Put the merchant in listening mode to collect conversations.'}</div>
-          : <div className="scroll"><table className="lrntable"><thead><tr><th className="num">Asked</th><th>What customers wrote</th><th>What staff usually replied</th><th /></tr></thead><tbody>
+      {d && <div className="card"><h3 style={{ margin: 0 }}>{t('What customers asked')}</h3>
+        <div className="sub" style={{ marginBottom: 8 }}>{t('Grouped by meaning, most asked first, with the reply staff gave most often. The bot never uses a past reply by itself: you check it and add it to the Knowledge base, and the bot answers only from what is live there. Phone and bank numbers, emails and links are hidden in what is saved.')}</div>
+        {!d.groups.length ? <div className="sub">{t('Nothing saved yet.')} {listening ? t('Once LiveChat sends customer messages to the bot, they show up here.') : t('Put the merchant in listening mode to collect conversations.')}</div>
+          : <div className="scroll"><table className="lrntable"><thead><tr><th className="num">{t('Asked')}</th><th>{t('What customers wrote')}</th><th>{t('What staff usually replied')}</th><th /></tr></thead><tbody>
             {d.groups.map((g) => <tr key={g.key}>
-              <td className="num"><b>{g.count}</b>{g.withReply < g.count && <div className="sub">{g.withReply} replied</div>}</td>
-              <td><div className="kwchips">{g.customers.map((c) => <span className="kwchip" key={c.text}>{c.text}{c.n > 1 && <small>{c.n}</small>}</span>)}</div>{g.topic && g.kind !== 'covered' && <div className="sub" style={{ marginTop: 4 }}>Topic: {g.topic}</div>}</td>
-              <td>{g.replies.length ? <><div className="clamp2">{g.replies[0].text}</div>{g.replies[0].n > 1 && <div className="sub">given {g.replies[0].n} times</div>}</> : <span className="sub">No staff reply seen yet</span>}</td>
-              <td className="lrnact">{g.kind === 'covered' ? <span className="ltag ok" title="The knowledge base already answers this">Already answered: {g.intent}</span>
-                : added(g) ? <span className="ltag ai">Added as a draft</span>
-                : <button className="btn sm pri" type="button" onClick={() => add(g)}>Add to Knowledge base</button>}</td></tr>)}
+              <td className="num"><b>{g.count}</b>{g.withReply < g.count && <div className="sub">{t('{n} replied', { n: g.withReply })}</div>}</td>
+              <td><div className="kwchips">{g.customers.map((c) => <span className="kwchip" key={c.text}>{c.text}{c.n > 1 && <small>{c.n}</small>}</span>)}</div>{g.topic && g.kind !== 'covered' && <div className="sub" style={{ marginTop: 4 }}>{t('Topic:')} {g.topic}</div>}</td>
+              <td>{g.replies.length ? <><div className="clamp2">{g.replies[0].text}</div>{g.replies[0].n > 1 && <div className="sub">{t('given {n} times', { n: g.replies[0].n })}</div>}</> : <span className="sub">{t('No staff reply seen yet')}</span>}</td>
+              <td className="lrnact">{g.kind === 'covered' ? <span className="ltag ok" title={t('The knowledge base already answers this')}>{t('Already answered:')} {g.intent}</span>
+                : added(g) ? <span className="ltag ai">{t('Added as a draft')}</span>
+                : <button className="btn sm pri" type="button" onClick={() => add(g)}>{t('Add to Knowledge base')}</button>}</td></tr>)}
           </tbody></table></div>}
       </div>}
 
       {ask && <Modal label="Change what the bot does" small onClose={() => setAsk(null)}>
-        <div className="head"><h2>{ask === 'answering' ? 'Start answering?' : 'Go back to listening only?'}</h2></div>
+        <div className="head"><h2>{ask === 'answering' ? t('Start answering?') : t('Go back to listening only?')}</h2></div>
         {ask === 'answering'
-          ? <><p style={{ margin: '8px 0' }}>From now on the bot replies to customers in LiveChat, from the live answers in the Knowledge base ({liveCount} now).</p>
-            {unmet.length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>Not ready yet:</b><ul className="plain">{unmet.map((x) => <li key={x.key}>{x.title}: {x.detail}</li>)}</ul>The bot will pass many questions to a person until this is done.</div>}
-            <div className="sub">LiveChat may keep an earlier silent reply for the same words for up to two hours, so a few questions can stay unanswered for a while.</div></>
-          : <p style={{ margin: '8px 0' }}>The bot goes silent again and only saves conversations. Staff answer every customer.</p>}
-        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>Cancel</button><button className="btn pri" type="button" disabled={busy} onClick={() => void switchTo(ask)}>{ask === 'answering' ? 'Start answering' : 'Listen only'}</button></div></Modal>}
+          ? <><p style={{ margin: '8px 0' }}>{t('From now on the bot replies to customers in LiveChat, from the live answers in the Knowledge base ({n} now).', { n: liveCount })}</p>
+            {unmet.length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>{t('Not ready yet:')}</b><ul className="plain">{unmet.map((x) => <li key={x.key}>{x.title}: {x.detail}</li>)}</ul>{t('The bot will pass many questions to a person until this is done.')}</div>}
+            <div className="sub">{t('LiveChat may keep an earlier silent reply for the same words for up to two hours, so a few questions can stay unanswered for a while.')}</div></>
+          : <p style={{ margin: '8px 0' }}>{t('The bot goes silent again and only saves conversations. Staff answer every customer.')}</p>}
+        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>{t('Cancel')}</button><button className="btn pri" type="button" disabled={busy} onClick={() => void switchTo(ask)}>{ask === 'answering' ? t('Start answering') : t('Listen only')}</button></div></Modal>}
     </>
   );
 }
