@@ -8,6 +8,7 @@ How the system works, what it is built with, how the database is designed, and h
 > - **The bot reads no customer information.** A question about the customer's own balance, deposit, withdrawal or points goes to a person. There is no account lookup, no Account tools, no Account data step and no "Account answers in LiveChat" switch. The bot only notes whether the customer is a logged-in **member** (the member id LiveChat sends) or a **visitor**; every answer carries `customer`, and a handover carries it for staff.
 > - **Listening first.** A new merchant starts in listening mode: the bot is silent, staff answer, and the bot saves each question with the staff reply (from LiveChat's `history`) and can import an export of old chats. Staff review the grouped questions on the Learning screen and add the good ones to the Knowledge base; an admin presses Start answering after a short checklist. The bot never sends a saved staff reply by itself.
 > - **Import** takes an Excel-like table or an Excel file, and the AI can translate the empty languages. The panel has a Learning screen, a Human Handoff step, a folding menu, a merchant picker in the top bar and a Publish reminder.
+> - **Chinese panel.** A 中文/EN switch in the top bar shows the whole panel in Simplified Chinese (知识库, 主题, 关键词 for Knowledge base, Topics, Keywords). The words are in `web/src/admin/zh.ts`; a text without Chinese stays English. See the README, "Chinese panel".
 
 ---
 

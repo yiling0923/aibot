@@ -390,6 +390,16 @@ The Flowchart is now the first tab and what opens by default (the List is the se
 
 The Keywords page only shows what customers typed (counts, groups under each topic, the Ignored list, search and language filter). It has no Add keyword button, no action buttons (Make a main keyword, Add under one, Ignore, Restore), no tick boxes and no AI describe button. A click on a word opens the chats that used it. Words are added and sorted on the Topics page. The layout: four summary tiles (words heard, under a topic, not under a topic, ignored), one toolbar, a card for each topic (closed except the first; open it to see short forms, slang, same meaning and other languages as chips with counts), and a side column with the most-typed words that have no topic and the words with another job. The four word groups keep one colour each: short forms blue, slang orange, same meaning green, other languages purple.
 
+### Chinese panel (中文)
+
+The whole control panel can be shown in Simplified Chinese. Press **中文** (or **EN**) in the top bar; the choice is remembered in the browser for each person (`localStorage` key `panelLang`) and sets the page language (`zh-CN`). The default is English, so nothing changes for people who do not press it.
+
+- The words are in `web/src/admin/zh.ts`. A text is written in English in the code, `t('Save to draft')`, and looked up there; a text with no Chinese yet stays English, so the panel never shows a hole. `{name}` in a text is filled from the second argument, and singular and plural are two separate texts. A text may end with `|context` (for example `Admin|role`) to tell apart the same English word used in two ways; the context is never shown.
+- Written in Chinese: Knowledge base is **知识库**, Topics **主题**, Keywords **关键词**.
+- The lines of "What changed" and of the Publish window are written in English when a change is made (and kept that way in History); `web/src/admin/changes.ts` turns them into Chinese when they are shown.
+- Not translated on purpose: the merchant's own data (answers, entry names, keywords, sample chats), the bot's word lists, technical names (`chat_id`, `.env`), the reading-aid labels for screen readers, and error text that comes from the server.
+- To add or fix a Chinese text: find the English text in `zh.ts` and change the Chinese after it. `npx vitest run web/src/admin` checks that the pages still show the Chinese texts.
+
 ### Folding the left menu
 
 The small arrow button next to the logo folds the left menu to a rail of icons (the name of an item shows when the mouse is over it, and the yellow dot on Keywords still shows words that have no topic). Press the arrow again to open it. The choice is remembered in the browser. The merchant picker and the Advanced options switch are in the open menu. On a phone the menu is always open.
