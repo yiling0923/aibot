@@ -610,7 +610,7 @@ describe('Control panel', () => {
     expect(document.documentElement.lang).toBe('en');
     await userEvent.click(within(screen.getByRole('group', { name: 'Panel language' })).getByRole('button', { name: '中文' }));
     expect(await screen.findByText('学习 · LuckyPay')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '知识库' })).toBeTruthy(); expect(screen.getByText('商户设置')).toBeTruthy();   // the menu
+    expect(screen.getByRole('button', { name: 'Knowledge base' })).toBeTruthy(); expect(screen.getByText('商户设置')).toBeTruthy();   // the menu
     expect(screen.getByText('已发布 v3')).toBeTruthy(); expect(screen.getByRole('button', { name: '发布' })).toBeTruthy();   // the top bar
     expect(screen.getByText('监听中：机器人不回复')).toBeTruthy(); expect(screen.getByText('客户问了什么')).toBeTruthy();   // the page
     expect(document.documentElement.lang).toBe('zh-CN'); expect(localStorage.getItem('panelLang')).toBe('zh');
@@ -622,7 +622,7 @@ describe('Control panel', () => {
   it('Chinese: the Knowledge base list is translated', async () => {
     localStorage.setItem('panelLang', 'zh');
     open('admin', '/admin/kb');
-    expect(await screen.findByText(/知识库 · LuckyPay/)).toBeTruthy();
+    expect(await screen.findByText(/Knowledge base · LuckyPay/)).toBeTruthy();
     expect(screen.getByRole('button', { name: '添加条目' })).toBeTruthy(); expect(screen.getByRole('button', { name: '表格编辑' })).toBeTruthy();
     expect(screen.getByPlaceholderText('搜索条目或答案')).toBeTruthy(); expect(screen.getByText('答案（英文）')).toBeTruthy();
     localStorage.removeItem('panelLang');
