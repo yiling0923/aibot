@@ -27,3 +27,9 @@ export const tStatus = (t: I18n['t'], s: string): string => {
   const m = s.match(/^(Topic|Question word|Greeting list): (.*?)( \(this merchant\))?$/);
   return m ? t(m[1]) + ': ' + m[2] + (m[3] ? ' ' + t('(this merchant)') : '') : t(s);
 };
+
+/** "5 min ago", "2 days ago" written by the server, in the panel language. */
+export const tAgo = (t: I18n['t'], s: string): string => {
+  const m = s.match(/^(\d+) (min|hours|days) ago$/);
+  return m ? t(m[2] === 'min' ? '{n} min ago' : m[2] === 'hours' ? '{n} hours ago' : '{n} days ago', { n: m[1] }) : t(s);
+};

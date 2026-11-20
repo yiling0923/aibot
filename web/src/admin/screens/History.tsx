@@ -1,6 +1,6 @@
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { useT } from '../i18n';
+import { useT, tAgo } from '../i18n';
 
 /** Versions of the merchant that is open, and (for an admin) of the word lists shared by all merchants. Each is rolled back on its own. */
 export default function History() {
@@ -18,7 +18,7 @@ export default function History() {
       <div style={{ marginTop: 6 }}>{rows.map((h) => {
         const shared = h.kind === 'shared'; const live = newest(h) === h.version;
         return (
-          <div className="q" key={(h.merchant ?? 'shared') + h.version}><div><div className="t"><span className="mono">v{h.version}</span> · {h.summary}{shared ? <> <span className="pill info">{T('shared words')}</span></> : null}</div><div className="sub">{h.actor} · {h.ago}</div></div>
+          <div className="q" key={(h.merchant ?? 'shared') + h.version}><div><div className="t"><span className="mono">v{h.version}</span> · {h.summary}{shared ? <> <span className="pill info">{T('shared words')}</span></> : null}</div><div className="sub">{h.actor} · {tAgo(T, h.ago)}</div></div>
             <div className="acts">{live ? <span className="pill ok">{T('live')}</span> : <button className="btn sm" type="button" onClick={() => roll(h.merchant, h.version, (shared ? T('the shared words') : p.M.name) + ' ' + T('to v{v}', { v: h.version }))}>{T('Roll back to this')}</button>}</div></div>);
       })}
       {!rows.length && <div className="sub">{T('No versions yet.')}</div>}</div></div>

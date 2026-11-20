@@ -167,7 +167,7 @@ export default function Report() {
             <BarList color={COL.kw} empty={t('No messages yet.')} rows={r.languages.map((l) => ({ label: t(LANG_NAME[l.lang] ?? l.lang), n: l.n, tip: t('{l}: {n} messages ({p}%), {u}% not understood', { l: t(LANG_NAME[l.lang] ?? l.lang), n: l.n, p: pct(l.n, r.total), u: pct(l.notUnderstood, l.n) }) }))} />
             {(() => { const w = r.languages.filter((l) => l.n >= 10 && l.notUnderstood > 0).sort((x, y) => y.notUnderstood / y.n - x.notUnderstood / x.n)[0]; return w ? <div className="sub" style={{ marginTop: 6 }}>{t('Not understood most in')} <b>{t(LANG_NAME[w.lang] ?? w.lang)}</b> ({t('{p}% of its messages', { p: pct(w.notUnderstood, w.n) })}).</div> : null; })()}</div>
           <div className="card"><h3 style={{ margin: 0 }}>{t('Why chats went to a person')}</h3><div className="sub" style={{ marginBottom: 6 }}>{t('The reason the bot wrote down.')}</div>
-            <BarList color={COL.hand} empty={t('No chat went to a person in this period.')} rows={r.reasons.map((x) => ({ label: x.reason, n: x.n, tip: `${x.reason}: ${x.n}` }))} /></div>
+            <BarList color={COL.hand} empty={t('No chat went to a person in this period.')} rows={r.reasons.map((x) => ({ label: t(x.reason), n: x.n, tip: `${t(x.reason)}: ${x.n}` }))} /></div>
         </div>
 
       </>}

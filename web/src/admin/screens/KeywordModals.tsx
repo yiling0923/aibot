@@ -70,7 +70,7 @@ export function KeywordDrawer({ word, count, share, onClose, onSet }: { word: st
   return (
     <Modal label={T('Keyword chats')} onClose={onClose}>
       <div className="head"><h2>“{word}”</h2><button className="btn sm" type="button" onClick={onClose}>{T('Close')}</button></div>
-      <div className="kv"><Pill c={ty[1]}>{T(ty[0])}</Pill><Pill c={st.c}>{tStatus(T, st.t)}</Pill><span className="sub">{count} {T('times')}{share !== undefined ? ' · ' + share.toFixed(2) + '%' : ''}</span></div><div className="sub">{h}</div>
+      <div className="kv"><Pill c={ty[1]}>{T(ty[0])}</Pill><Pill c={st.c}>{tStatus(T, st.t)}</Pill><span className="sub">{count} {T('times')}{share !== undefined ? ' · ' + share.toFixed(2) + '%' : ''}</span></div><div className="sub">{tStatus(T, h)}</div>
       <div><h3>{T('Recent chats with this word (sample)')}</h3>
         {samples.map((s, i) => <div className="q" key={i}><div className="t">“{s}”</div><span className="sub">{T('Customer {n}', { n: i + 1 })} · {T(['Today', 'Today', 'Yesterday', '2 days ago'][i % 4])}</span></div>)}</div>
       {onSet && <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{T('Tell the bot what this word is.')}</span><button className="btn pri" type="button" onClick={onSet}>{T('Set…')}</button></div>}
