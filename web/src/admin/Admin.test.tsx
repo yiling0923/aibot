@@ -610,7 +610,7 @@ describe('Control panel', () => {
     expect(document.documentElement.lang).toBe('en');
     await userEvent.click(within(screen.getByRole('group', { name: 'Panel language' })).getByRole('button', { name: '中文' }));
     expect(await screen.findByText('学习 · LuckyPay')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Knowledge base' })).toBeTruthy(); expect(screen.getByText('商户设置')).toBeTruthy();   // the menu
+    expect(screen.getByRole('button', { name: '知识库' })).toBeTruthy(); expect(screen.getByText('商户设置')).toBeTruthy();   // the menu
     expect(screen.getByText('已发布 v3')).toBeTruthy(); expect(screen.getByRole('button', { name: '发布' })).toBeTruthy();   // the top bar
     expect(screen.getByText('监听中：机器人不回复')).toBeTruthy(); expect(screen.getByText('客户问了什么')).toBeTruthy();   // the page
     expect(document.documentElement.lang).toBe('zh-CN'); expect(localStorage.getItem('panelLang')).toBe('zh');
@@ -622,7 +622,7 @@ describe('Control panel', () => {
   it('Chinese: the Knowledge base list is translated', async () => {
     localStorage.setItem('panelLang', 'zh');
     open('admin', '/admin/kb');
-    expect(await screen.findByText(/Knowledge base · LuckyPay/)).toBeTruthy();
+    expect(await screen.findByText(/知识库 · LuckyPay/)).toBeTruthy();
     expect(screen.getByRole('button', { name: '添加条目' })).toBeTruthy(); expect(screen.getByRole('button', { name: '表格编辑' })).toBeTruthy();
     expect(screen.getByPlaceholderText('搜索条目或答案')).toBeTruthy(); expect(screen.getByText('答案（英文）')).toBeTruthy();
     localStorage.removeItem('panelLang');
@@ -640,7 +640,7 @@ describe('Control panel', () => {
     open('admin', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: '添加条目' }));
     expect(await screen.findByRole('heading', { name: '新条目' })).toBeTruthy();
-    expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('Topic（必填）')).toBeTruthy(); expect(screen.getByText('机器人用每种语言说什么')).toBeTruthy();
+    expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('主题（必填）')).toBeTruthy(); expect(screen.getByText('机器人用每种语言说什么')).toBeTruthy();
     expect(screen.getByRole('button', { name: '保存到草稿' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
@@ -657,12 +657,12 @@ describe('Control panel', () => {
   it('Chinese: the Topics, Keywords and Keyword ranking pages are translated', async () => {
     localStorage.setItem('panelLang', 'zh');
     const { unmount } = open('admin', '/admin/kw');
-    expect(await screen.findByText(/Topics · LuckyPay/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: /添加 Topic 或 Keyword/ })).toBeTruthy(); expect(screen.getByRole('tab', { name: /疑问词|问候语/ })).toBeTruthy();
+    expect(await screen.findByText(/主题 · LuckyPay/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /添加主题或关键词/ })).toBeTruthy(); expect(screen.getByRole('tab', { name: /疑问词|问候语/ })).toBeTruthy();
     unmount(); const k = open('admin', '/admin/store');
-    expect(await screen.findByText(/Keywords · LuckyPay/)).toBeTruthy(); expect(screen.getByText('听到的词')).toBeTruthy(); expect(screen.getByPlaceholderText('搜索词')).toBeTruthy();
+    expect(await screen.findByText(/关键词 · LuckyPay/)).toBeTruthy(); expect(screen.getByText('听到的词')).toBeTruthy(); expect(screen.getByPlaceholderText('搜索词')).toBeTruthy();
     k.unmount(); open('admin', '/admin/rank');
-    expect(await screen.findByText(/Keywords 排行 · LuckyPay/)).toBeTruthy(); expect(screen.getByText('本周')).toBeTruthy();
+    expect(await screen.findByText(/关键词排行 · LuckyPay/)).toBeTruthy(); expect(screen.getByText('本周')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
   it('Chinese: Merchant settings and History are translated', async () => {
@@ -702,7 +702,7 @@ describe('Control panel', () => {
     expect(await screen.findByLabelText('表格编辑器')).toBeTruthy(); expect(screen.getByText('示例问题（英文）', { exact: false })).toBeTruthy();
     const { tChange } = await import('./changes');
     expect(tChange('zh', 'Set 3 entries live (LuckyPay)')).toBe('已把 3 个条目设为启用（LuckyPay）');
-    expect(tChange('zh', 'Added keyword "dp" to topic "deposit" (LuckyPay)')).toBe('已把 Keyword“dp”添加到 Topic“deposit”（LuckyPay）');
+    expect(tChange('zh', 'Added keyword "dp" to topic "deposit" (LuckyPay)')).toBe('已把关键词“dp”添加到主题“deposit”（LuckyPay）');
     expect(tChange('en', 'Set 3 entries live (LuckyPay)')).toBe('Set 3 entries live (LuckyPay)');
     expect(tChange('zh', 'Something new')).toBe('Something new');
     localStorage.removeItem('panelLang'); localStorage.removeItem('kbView');
