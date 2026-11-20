@@ -695,6 +695,18 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: '新聊天' })).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: the Table edit view and the change-log lines are translated', async () => {
+    localStorage.setItem('panelLang', 'zh'); withKb = true;
+    open('admin', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: '表格编辑' }));
+    expect(await screen.findByLabelText('表格编辑器')).toBeTruthy(); expect(screen.getByText('示例问题（英文）', { exact: false })).toBeTruthy();
+    const { tChange } = await import('./changes');
+    expect(tChange('zh', 'Set 3 entries live (LuckyPay)')).toBe('已把 3 个条目设为启用（LuckyPay）');
+    expect(tChange('zh', 'Added keyword "dp" to topic "deposit" (LuckyPay)')).toBe('已把 Keyword“dp”添加到 Topic“deposit”（LuckyPay）');
+    expect(tChange('en', 'Set 3 entries live (LuckyPay)')).toBe('Set 3 entries live (LuckyPay)');
+    expect(tChange('zh', 'Something new')).toBe('Something new');
+    localStorage.removeItem('panelLang'); localStorage.removeItem('kbView');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

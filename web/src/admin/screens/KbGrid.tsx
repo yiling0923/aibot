@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePanel } from '../store';
 import { LANGS, LN, type Entry } from '../model';
+import { useT } from '../i18n';
 
 type Tr = { question_examples: string[]; answer_text: string };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
@@ -29,7 +30,7 @@ function Cell({ value, label, row, col, onCommit, invalid, placeholder }: { valu
 
 /** The Knowledge base as a table you edit in place: the answers in each language and the English example questions, one row per entry. */
 export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: Entry) => void }) {
-  const p = usePanel();
+  const p = usePanel(); const { t: T, lang } = useT(); const zh = lang === 'zh';
   const [shown, setShown] = useState<Set<string>>(() => new Set(['ms', 'zh']));
   const cols = ['en', ...COLS.filter((l) => shown.has(l))];
   const mark = useRef<string>('');                                         // the entry last edited, for the "Saved to the draft" line
@@ -49,26 +50,26 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
   const unwritten = list.filter((e) => /^\s*TO WRITE:/i.test(trOf(e, 'en').answer_text)).length;
 
   return (
-    <div className="card" aria-label="Table editor">
-      <div className="gtools"><span className="sub">Type in a cell and leave it (Tab or a click elsewhere) to save it to the draft. <b>Ctrl+Enter</b> saves and goes down one row. <b>Esc</b> puts the old text back. Press Publish when you are done.</span>
-        <span className="gcols" role="group" aria-label="Languages shown">{COLS.map((l) => <button key={l} type="button" className="btn sm" aria-pressed={shown.has(l)} onClick={() => setShown((s) => { const n = new Set(s); if (n.has(l)) n.delete(l); else n.add(l); return n; })}>{LN[l]}</button>)}</span></div>
-      {unwritten > 0 && <div className="note" style={{ marginTop: 8 }}><b>{unwritten}</b> {unwritten === 1 ? 'entry still says' : 'entries still say'} <span className="mono">TO WRITE</span> (shown in red). The bot ignores {unwritten === 1 ? 'it' : 'them'} until the answer is written.</div>}
+    <div className="card" aria-label={T('Table editor')}>
+      <div className="gtools"><span className="sub">{zh ? <>在单元格里输入，离开它（按 Tab 或点击别处）就会保存到草稿。<b>Ctrl+Enter</b> 保存并下移一行。<b>Esc</b> 恢复原来的文字。完成后按“发布”。</> : <>Type in a cell and leave it (Tab or a click elsewhere) to save it to the draft. <b>Ctrl+Enter</b> saves and goes down one row. <b>Esc</b> puts the old text back. Press Publish when you are done.</>}</span>
+        <span className="gcols" role="group" aria-label={T('Languages shown')}>{COLS.map((l) => <button key={l} type="button" className="btn sm" aria-pressed={shown.has(l)} onClick={() => setShown((s) => { const n = new Set(s); if (n.has(l)) n.delete(l); else n.add(l); return n; })}>{LN[l]}</button>)}</span></div>
+      {unwritten > 0 && <div className="note" style={{ marginTop: 8 }}>{zh ? <><b>{unwritten}</b> 个条目仍写着 <span className="mono">TO WRITE</span>（红色显示）。在写好答案之前，机器人会忽略它们。</> : <><b>{unwritten}</b> {unwritten === 1 ? 'entry still says' : 'entries still say'} <span className="mono">TO WRITE</span> (shown in red). The bot ignores {unwritten === 1 ? 'it' : 'them'} until the answer is written.</>}</div>}
       <div className="scroll" style={{ marginTop: 10 }}>
-        <table className="kbgrid"><thead><tr><th className="gname">Entry</th><th className="glive">Live</th>{cols.map((l) => <th key={l}>Answer {LN[l]}</th>)}<th>Example questions EN <span className="sub">(one per line)</span></th></tr></thead>
+        <table className="kbgrid"><thead><tr><th className="gname">{T('Entry')}</th><th className="glive">{T('Live')}</th>{cols.map((l) => <th key={l}>{T('Answer')} {LN[l]}</th>)}<th>{T('Example questions EN')} <span className="sub">{T('(one per line)')}</span></th></tr></thead>
           <tbody>
             {list.map((e, r) => {
               const en = trOf(e, 'en').answer_text;
               return (
                 <tr key={e.id}>
-                  <td className="gname"><button type="button" className="linklike" title="Open the full editor" onClick={() => onOpen(e)}>{e.intent_key}</button><div className="sub">{e.topic || 'no topic'}</div></td>
-                  <td className="glive"><input type="checkbox" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /></td>
-                  {cols.map((l) => <td key={l}><Cell value={trOf(e, l).answer_text} label={`Answer ${LN[l]} for ${e.intent_key}`} row={r} col={l} invalid={l === 'en' && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={l === 'en' ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional'} onCommit={(v) => setAnswer(e.id, l, v)} /></td>)}
-                  <td><Cell value={trOf(e, 'en').question_examples.join('\n')} label={`Example questions for ${e.intent_key}`} row={r} col="ex" invalid={trOf(e, 'en').question_examples.length < 3} placeholder="At least 3, with slang" onCommit={(v) => setExamples(e.id, v)} /></td>
+                  <td className="gname"><button type="button" className="linklike" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><div className="sub">{e.topic || T('no topic')}</div></td>
+                  <td className="glive"><input type="checkbox" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /></td>
+                  {cols.map((l) => <td key={l}><Cell value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === 'en' && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={T(l === 'en' ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} /></td>)}
+                  <td><Cell value={trOf(e, 'en').question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, 'en').question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
                 </tr>);
             })}
-            {!list.length && <tr><td colSpan={cols.length + 3} className="sub">No entries match.</td></tr>}
+            {!list.length && <tr><td colSpan={cols.length + 3} className="sub">{T('No entries match.')}</td></tr>}
           </tbody></table></div>
-      {saved && <div className="sub" role="status" style={{ marginTop: 8 }}>Saved to the draft: {saved}. Press Publish to make the changes live.</div>}
+      {saved && <div className="sub" role="status" style={{ marginTop: 8 }}>{T('Saved to the draft: {k}. Press Publish to make the changes live.', { k: saved })}</div>}
     </div>
   );
 }

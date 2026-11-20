@@ -3,6 +3,7 @@ import { Navigate, Route, Routes, useLocation, useNavigate } from 'react-router-
 import '../styles/admin.css';
 import { api } from '../lib/api';
 import { PanelProvider, usePanel } from './store';
+import { tChange } from './changes';
 import { I18nProvider, useT } from './i18n';
 import { entryProblems, snapshotOf } from './model';
 import { Modal, NavIcon } from './ui';
@@ -105,7 +106,7 @@ function Shell() {
                   <button className="btn sm pri" type="button" onClick={() => setDialog('publish')}>{t('Review and publish')}</button>
                 </span>
               </div>
-              {showWhat ? <ul className="pubbar-list">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul> : null}
+              {showWhat ? <ul className="pubbar-list">{p.changes.map((c, i) => <li key={i}>{tChange(lang, c)}</li>)}</ul> : null}
             </div>
           ) : null}
           <Routes>
@@ -135,7 +136,7 @@ function Shell() {
 
 /** Runs the sample messages on the draft, shows the result, then publishes. */
 function PublishDialog({ onClose }: { onClose: () => void }) {
-  const p = usePanel(); const { t } = useT();
+  const p = usePanel(); const { t, lang } = useT();
   const [res, setRes] = useState<{ pass: number; total: number; results: { message: string; merchant: string; expected: string; got: string; ok: boolean }[] } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
@@ -160,7 +161,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
   return (
     <Modal small label="Publish" onClose={onClose}>
       <h2>{t(n > 1 ? 'Publish {n} changes?' : 'Publish {n} change?', { n })}</h2>
-      <ul className="plain">{p.changes.map((c, i) => <li key={i}>{c}</li>)}</ul>
+      <ul className="plain">{p.changes.map((c, i) => <li key={i}>{tChange(lang, c)}</li>)}</ul>
       {risky.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>{t('Check these answers first:')}</b>
         <ul className="plain">{risky.map(({ e, why }) => <li key={e.merchant + e.id}><b>{e.intent_key}</b> ({p.merchants.find((m) => m.code === e.merchant)?.name ?? e.merchant}): {why[0]}</li>)}</ul>
         <div className="sub">{t('You can still publish, but the bot will not use these answers well yet. Choose Cancel, then open Knowledge base to fix them.')}</div></div>}
