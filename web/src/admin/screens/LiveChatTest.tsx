@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { IconBtn } from '../ui';
+import { useT } from '../i18n';
 
 interface Attachment { kind: string; name: string; url: string; mimeType: string; size: number | null }
 interface Line { from: 'customer' | 'bot' | 'agent' | 'system'; sender: string; text: string; attachment?: Attachment }
@@ -10,12 +11,13 @@ const Clip = () => <svg viewBox="0 0 24 24" width="14" height="14" fill="none" s
 const kb = (n: number | null) => (n === null ? '' : n < 1024 ? n + ' B' : n < 1048576 ? Math.round(n / 1024) + ' KB' : (n / 1048576).toFixed(1) + ' MB');
 /** A file in a message: a picture is shown (click to open it big), anything else is a link with its name. */
 function Attached({ a }: { a: Attachment }) {
+  const { t: T } = useT();
   const [bad, setBad] = useState(false);
   const isImg = (a.kind === 'image' || a.mimeType.startsWith('image/')) && !bad;
   return isImg
-    ? <a className="lcpic" href={a.url} target="_blank" rel="noreferrer" title={'Open ' + a.name}><img src={a.url} alt={a.name} loading="lazy" onError={() => setBad(true)} /><span className="sub">{a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span></a>
+    ? <a className="lcpic" href={a.url} target="_blank" rel="noreferrer" title={T('Open {n}', { n: a.name })}><img src={a.url} alt={a.name} loading="lazy" onError={() => setBad(true)} /><span className="sub">{a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span></a>
     : !a.url ? <span className="lcfile"><Clip /> {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}</span>
-    : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer"><Clip /> {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' (the picture could not be loaded here)' : ''}</a>;
+    : <a className="lcfile" href={a.url} target="_blank" rel="noreferrer"><Clip /> {a.name}{a.size !== null ? ' · ' + kb(a.size) : ''}{bad ? ' ' + T('(the picture could not be loaded here)') : ''}</a>;
 }
 interface Result { conversationId: string | null; status: string | null; handoff: string | null; messages: Line[]; replied: boolean }
 /** The LiveChat merchant number the demo merchants have in the local LiveChat (add-merchants.ps1): MERCH_A is 1, MERCH_B is 2 ... MERCH_F is 6. Others are typed once and remembered. */
@@ -30,7 +32,7 @@ const newVisitor = () => 'vis-panel-' + Math.random().toString(36).slice(2, 10);
  * The bot server makes the calls (the browser cannot reach LiveChat from another address). Admin only.
  */
 export default function LiveChatTest() {
-  const p = usePanel();
+  const p = usePanel(); const { t: T, lang } = useT(); const zh = lang === 'zh';
   const [base, setBase] = useState(() => store('lcBase', 'http://localhost:8080')); const [tenant, setTenant] = useState(() => store('lcTenant:' + p.merchant, demoTenant(p.merchant) ?? store('lcTenant', '1')));   // LiveChat picks the bot's merchant by this number, so it is remembered for each merchant
   const [visitor, setVisitor] = useState(() => store('lcVisitor', newVisitor()));
   const [who, setWho] = useState(() => store('lcWho', 'member')); const [mid, setMid] = useState(() => { const v = store('lcMid', '8841'); return v === 'tom8841' ? '8841' : v; });
@@ -47,7 +49,7 @@ export default function LiveChatTest() {
     try {
       const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor: v, text: t, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
-      if (t && !r.replied) setErr('LiveChat has not answered yet. The bot may be slow, or the bot link is off. Press Send with an empty box to look again.');
+      if (t && !r.replied) setErr(T('LiveChat has not answered yet. The bot may be slow, or the bot link is off. Press Send with an empty box to look again.'));
     } catch (e) { setErr((e as Error).message); } finally { setBusy(false); }
   };
   useEffect(() => { void call(''); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);     // show the chat that is already open for this visitor
@@ -67,11 +69,11 @@ export default function LiveChatTest() {
   const MAX_FILE = 10 * 1024 * 1024; const OK_TYPE = /^(image\/(jpeg|png)|video\/(mp4|quicktime)|application\/pdf)$/;
   const choose = (f: File | null | undefined) => {
     if (!f) return;
-    if (f.size > MAX_FILE) { setErr('That file is too big (the most is 10 MB).'); return; }
-    if (!OK_TYPE.test(f.type)) { setErr('This kind of file is not allowed here. LiveChat takes JPEG or PNG pictures, MP4 or MOV videos and PDF files from a customer.'); return; }
+    if (f.size > MAX_FILE) { setErr(T('That file is too big (the most is 10 MB).')); return; }
+    if (!OK_TYPE.test(f.type)) { setErr(T('This kind of file is not allowed here. LiveChat takes JPEG or PNG pictures, MP4 or MOV videos and PDF files from a customer.')); return; }
     setErr(''); setPick(f);
   };
-  const toBase64 = (f: File) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error('Could not read the file.')); r.readAsDataURL(f); });
+  const toBase64 = (f: File) => new Promise<string>((ok, no) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] ?? ''); r.onerror = () => no(new Error(T('Could not read the file.'))); r.readAsDataURL(f); });
   const sendFile = async () => {
     const f = pick; if (busy || !f) return; const caption = text.trim();
     keep('lcBase', base); keep('lcTenant', tenant); keep('lcTenant:' + p.merchant, tenant); keep('lcVisitor', visitor);
@@ -80,7 +82,7 @@ export default function LiveChatTest() {
     try {
       const r = await api<Result>('/api/admin/livechat-chat', { baseUrl: base, tenant, visitor, text: caption, file: { name: f.name, type: f.type, data: await toBase64(f) }, member: who === 'guest' ? null : { id: mid.trim() || 'm-100', name: mname.trim(), rank: mrank.trim() } });
       setLines(r.messages); setInfo({ status: r.status, handoff: r.handoff });
-      if (!r.replied) setNote('The picture or file went to LiveChat. If the picture patch is in LiveChat (deploy/local-livechat/patches/002-picture-to-bot.patch) the bot answers in a moment and this page refreshes by itself. Without it LiveChat does not ask the bot about a picture, so your team takes it.');
+      if (!r.replied) setNote(T('The picture or file went to LiveChat. If the picture patch is in LiveChat (deploy/local-livechat/patches/002-picture-to-bot.patch) the bot answers in a moment and this page refreshes by itself. Without it LiveChat does not ask the bot about a picture, so your team takes it.'));
     } catch (e) { const m = (e as Error).message; setErr(m); if (/refused this file/.test(m)) void checkFiles(true); } finally { setBusy(false); }      // refused: ask LiveChat at once which kinds it takes
   };
   const send = () => {
@@ -99,40 +101,40 @@ export default function LiveChatTest() {
     setTenant(store('lcTenant:' + p.merchant, demoTenant(p.merchant) ?? store('lcTenant', '1')));
     const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); setNote('');
   }, [p.merchant]);
-  const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); setNote(''); p.toast('New chat started'); };
+  const fresh = () => { const v = newVisitor(); setVisitor(v); keep('lcVisitor', v); setLines([]); setInfo({ status: null, handoff: null }); setErr(''); setNote(''); p.toast(T('New chat started')); };
 
   return (
-    <div className="card lcpage"><div className="head"><div><h2>LiveChat test</h2><div className="sub">Chat as a customer through a LiveChat. Your message goes to LiveChat, LiveChat asks your bot, and the reply comes back the same way. It tests the real link.</div></div>
-      <span className="lcbtns"><button className="btn sm" type="button" onClick={() => setShowSet((s) => !s)}>{showSet ? 'Hide settings' : 'Settings'}</button><button className="btn sm" type="button" onClick={fresh}>New chat</button></span></div>
-      {showSet && <div className="form lcset"><label className="fld"><span>LiveChat address</span><input value={base} onChange={(e) => setBase(e.target.value)} placeholder="http://localhost:8080" /></label>
-        <label className="fld"><span>Tenant id (the LiveChat merchant number)</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ width: 110 }} /><span className="lock">LiveChat picks the bot's merchant by this number, not by the merchant chosen in the sidebar. For {p.M.name} use the number of {p.M.name} in LiveChat: pick it there and read tenant_id= in the address bar.</span></label>
-        <label className="fld"><span>The customer is</span><select aria-label="The customer is" value={who} onChange={(e) => { setWho(e.target.value); keep('lcWho', e.target.value); fresh(); }}><option value="member">Logged in (a member)</option><option value="guest">Not logged in (a guest)</option></select></label>
-        {who === 'member' && <><label className="fld"><span>Member id</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /><span className="lock">Sample members: 8841 (Tom), 9120 (Mary)</span></label>
-          <label className="fld"><span>Name</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
-          <label className="fld"><span>Rank</span><input value={mrank} onChange={(e) => { setMrank(e.target.value); keep('lcMrank', e.target.value); }} style={{ width: 110 }} /></label></>}
-        <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={() => void checkFiles()}>{probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts'}</button>
-          <span className="sub"> Sends one tiny sample of each kind into a new test chat in LiveChat.</span>
-          {probe && <ul className="plain" aria-label="Files LiveChat accepts" style={{ marginTop: 6 }}>{probe.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused, “{r.answer}”</span>}</li>)}</ul>}</div>
-        <div className="sub full">Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. The bot notes whether the customer is a logged-in member (with the member id) or a visitor, and a person who takes the chat can see it. The bot reads no account data: "check my balance" goes to a person for both (patch for a local LiveChat: deploy/local-livechat/patches/001-member-to-bot.patch).</div>
-        <div className="sub full">The local setup uses <span className="mono">http://localhost:8080</span> and tenant <span className="mono">1</span>. This is the address the bot server uses, so it must be reachable from the computer that runs the bot.</div></div>}
+    <div className="card lcpage"><div className="head"><div><h2>{T('LiveChat test')}</h2><div className="sub">{T('Chat as a customer through a LiveChat. Your message goes to LiveChat, LiveChat asks your bot, and the reply comes back the same way. It tests the real link.')}</div></div>
+      <span className="lcbtns"><button className="btn sm" type="button" onClick={() => setShowSet((s) => !s)}>{T(showSet ? 'Hide settings' : 'Settings')}</button><button className="btn sm" type="button" onClick={fresh}>{T('New chat')}</button></span></div>
+      {showSet && <div className="form lcset"><label className="fld"><span>{T('LiveChat address')}</span><input value={base} onChange={(e) => setBase(e.target.value)} placeholder="http://localhost:8080" /></label>
+        <label className="fld"><span>{T('Tenant id (the LiveChat merchant number)')}</span><input value={tenant} onChange={(e) => setTenant(e.target.value)} style={{ width: 110 }} /><span className="lock">{T("LiveChat picks the bot's merchant by this number, not by the merchant chosen in the sidebar. For {m} use the number of {m} in LiveChat: pick it there and read tenant_id= in the address bar.", { m: p.M.name })}</span></label>
+        <label className="fld"><span>{T('The customer is')}</span><select aria-label={T('The customer is')} value={who} onChange={(e) => { setWho(e.target.value); keep('lcWho', e.target.value); fresh(); }}><option value="member">{T('Logged in (a member)')}</option><option value="guest">{T('Not logged in (a guest)')}</option></select></label>
+        {who === 'member' && <><label className="fld"><span>{T('Member id')}</span><input value={mid} onChange={(e) => { setMid(e.target.value); keep('lcMid', e.target.value); }} style={{ width: 150 }} /><span className="lock">{T('Sample members: 8841 (Tom), 9120 (Mary)')}</span></label>
+          <label className="fld"><span>{T('Name')}</span><input value={mname} onChange={(e) => { setMname(e.target.value); keep('lcMname', e.target.value); }} style={{ width: 150 }} /></label>
+          <label className="fld"><span>{T('Rank')}</span><input value={mrank} onChange={(e) => { setMrank(e.target.value); keep('lcMrank', e.target.value); }} style={{ width: 110 }} /></label></>}
+        <div className="full"><button className="btn sm" type="button" disabled={probing} onClick={() => void checkFiles()}>{T(probing ? 'Asking LiveChat…' : 'Check which files LiveChat accepts')}</button>
+          <span className="sub"> {T('Sends one tiny sample of each kind into a new test chat in LiveChat.')}</span>
+          {probe && <ul className="plain" aria-label={T('Files LiveChat accepts')} style={{ marginTop: 6 }}>{probe.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>{T('accepted')}</span> : <span style={{ color: 'var(--bad)' }}>{T('refused')}, “{r.answer}”</span>}</li>)}</ul>}</div>
+        <div className="sub full">{T('Changing who the customer is starts a new chat, because LiveChat fixes the customer when a chat starts. The bot notes whether the customer is a logged-in member (with the member id) or a visitor, and a person who takes the chat can see it. The bot reads no account data: "check my balance" goes to a person for both (patch for a local LiveChat: deploy/local-livechat/patches/001-member-to-bot.patch).')}</div>
+        <div className="sub full">{zh ? <>本地设置使用 <span className="mono">http://localhost:8080</span> 和 tenant <span className="mono">1</span>。这是机器人服务器使用的地址，所以运行机器人的电脑必须能访问到它。</> : <>The local setup uses <span className="mono">http://localhost:8080</span> and tenant <span className="mono">1</span>. This is the address the bot server uses, so it must be reachable from the computer that runs the bot.</>}</div></div>}
       <div className="lcbox" aria-live="polite">
-        {!lines.length && !busy && <div className="sub lcempty">No messages yet. Write something a customer would ask, for example “how to deposit”.</div>}
-        {lines.map((m, i) => <div key={i} className={'lcmsg ' + m.from}>{m.from !== 'customer' && <small>{m.from === 'bot' ? 'Bot' : m.from === 'agent' ? 'Agent' : 'System'}</small>}<div className="lcbub">{m.attachment ? <Attached a={m.attachment} /> : m.text}</div></div>)}
-        {busy && <div className="lcmsg bot"><small>Bot</small><div className="lcbub lcwait">…</div></div>}
+        {!lines.length && !busy && <div className="sub lcempty">{T('No messages yet. Write something a customer would ask, for example “how to deposit”.')}</div>}
+        {lines.map((m, i) => <div key={i} className={'lcmsg ' + m.from}>{m.from !== 'customer' && <small>{T(m.from === 'bot' ? 'Bot' : m.from === 'agent' ? 'Agent' : 'System')}</small>}<div className="lcbub">{m.attachment ? <Attached a={m.attachment} /> : m.text}</div></div>)}
+        {busy && <div className="lcmsg bot"><small>{T('Bot')}</small><div className="lcbub lcwait">…</div></div>}
         <div ref={end} />
       </div>
       {err && <div className="note" style={{ background: 'var(--badbg)', marginTop: 8 }}>{err}</div>}
-      {note && !err && <div className="note" style={{ marginTop: 8 }} aria-label="About the file">{note}</div>}
-      {(probing || probe) && !showSet && <div className="note" style={{ marginTop: 8 }} aria-label="Files LiveChat accepts, checked now">{probing ? 'Asking LiveChat which kinds of file it takes…' : <><b>What LiveChat takes from a customer:</b>
-        <ul className="plain">{probe!.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>accepted</span> : <span style={{ color: 'var(--bad)' }}>refused</span>}</li>)}</ul>
-        <div className="sub">Send one of the accepted kinds. A test chat was made in LiveChat for this check.</div></>}</div>}
-      <div className="lcstat sub">{'LiveChat merchant #' + tenant + ' · '}{who === 'guest' ? 'Customer: not logged in · ' : 'Customer: ' + (mname || mid) + ' (' + mid + ') · '}{info.status ? 'Chat status: ' + info.status : 'No chat yet'}{info.handoff ? ' · handoff: ' + info.handoff : ''} · visitor <span className="mono">{visitor}</span></div>
+      {note && !err && <div className="note" style={{ marginTop: 8 }} aria-label={T('About the file')}>{note}</div>}
+      {(probing || probe) && !showSet && <div className="note" style={{ marginTop: 8 }} aria-label={T('Files LiveChat accepts, checked now')}>{probing ? T('Asking LiveChat which kinds of file it takes…') : <><b>{T('What LiveChat takes from a customer:')}</b>
+        <ul className="plain">{probe!.map((r) => <li key={r.label}><b>{r.label}</b>: {r.ok ? <span style={{ color: 'var(--ok)' }}>{T('accepted')}</span> : <span style={{ color: 'var(--bad)' }}>{T('refused')}</span>}</li>)}</ul>
+        <div className="sub">{T('Send one of the accepted kinds. A test chat was made in LiveChat for this check.')}</div></>}</div>}
+      <div className="lcstat sub">{T('LiveChat merchant #{n}', { n: tenant }) + ' · '}{who === 'guest' ? T('Customer: not logged in') + ' · ' : T('Customer: {n}', { n: (mname || mid) + ' (' + mid + ')' }) + ' · '}{info.status ? T('Chat status: {s}', { s: info.status }) : T('No chat yet')}{info.handoff ? ' · ' + T('handoff: {h}', { h: info.handoff }) : ''} · {T('visitor')} <span className="mono">{visitor}</span></div>
       <form className="lcin" onSubmit={(e) => { e.preventDefault(); send(); }}>
-        <input ref={fileIn} type="file" hidden aria-label="Choose a picture or file" accept="image/jpeg,image/png,video/mp4,video/quicktime,application/pdf,.mov" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
-        <IconBtn tip="Attach a picture or file" onClick={() => { if (!busy) fileIn.current?.click(); }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></IconBtn>
-        <input aria-label="Message" value={text} placeholder={pick ? 'Add a line to go with it (optional)' : 'Type a customer message'} onChange={(e) => setText(e.target.value)} disabled={busy} />
-        <button className="btn pri" type="submit" disabled={busy || (!text.trim() && !pick)}>{busy ? 'Waiting…' : 'Send'}</button></form>
-      {pick && <div className="lcpick"><span><Clip /> {pick.name} · {kb(pick.size)}</span><button type="button" className="x" aria-label="Remove the file" onClick={() => setPick(null)}>×</button></div>}
+        <input ref={fileIn} type="file" hidden aria-label={T('Choose a picture or file')} accept="image/jpeg,image/png,video/mp4,video/quicktime,application/pdf,.mov" onChange={(e) => { choose(e.target.files?.[0]); e.target.value = ''; }} />
+        <IconBtn tip={T('Attach a picture or file')} onClick={() => { if (!busy) fileIn.current?.click(); }}><path d="m21 11-8.6 8.6a5.5 5.5 0 0 1-7.8-7.8l8.8-8.8a3.7 3.7 0 0 1 5.2 5.2l-8.8 8.8a1.8 1.8 0 0 1-2.6-2.6l8-8" /></IconBtn>
+        <input aria-label={T('Message')} value={text} placeholder={T(pick ? 'Add a line to go with it (optional)' : 'Type a customer message')} onChange={(e) => setText(e.target.value)} disabled={busy} />
+        <button className="btn pri" type="submit" disabled={busy || (!text.trim() && !pick)}>{T(busy ? 'Waiting…' : 'Send')}</button></form>
+      {pick && <div className="lcpick"><span><Clip /> {pick.name} · {kb(pick.size)}</span><button type="button" className="x" aria-label={T('Remove the file')} onClick={() => setPick(null)}>×</button></div>}
     </div>
   );
 }

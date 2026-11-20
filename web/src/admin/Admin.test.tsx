@@ -685,6 +685,16 @@ describe('Control panel', () => {
     expect(await screen.findByLabelText('设置清单')).toBeTruthy(); expect(await screen.findByText('LiveChat 连接')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: Usage & billing and LiveChat test are translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    const { unmount } = open('admin', '/admin/billing');
+    expect(await screen.findByRole('button', { name: '本月' })).toBeTruthy();
+    expect(await screen.findByText('定价')).toBeTruthy();
+    unmount(); open('admin', '/admin/lchat');
+    expect(await screen.findByText('通过 LiveChat 以客户身份聊天。你的消息发到 LiveChat，LiveChat 询问你的机器人，回复再按原路返回。这测试的是真实的连接。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '新聊天' })).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
