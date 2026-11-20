@@ -635,6 +635,15 @@ describe('Control panel', () => {
     expect(await screen.findByText('每天的消息数')).toBeTruthy(); expect(screen.getByText('聊天转给真人的原因')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: the Knowledge base entry editor is translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    open('admin', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: '添加条目' }));
+    expect(await screen.findByRole('heading', { name: '新条目' })).toBeTruthy();
+    expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('Topic（必填）')).toBeTruthy(); expect(screen.getByText('机器人用每种语言说什么')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '保存到草稿' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

@@ -13,6 +13,11 @@ const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this t
 /** What a guided answer can ask the customer for after the answer. */
 const STEP_KINDS: [string, string][] = [['receipt', 'A receipt picture'], ['amount', 'An amount'], ['username', 'The username'], ['phone', 'A phone number'], ['text', 'A short reply']];
 const STEP_LANGS = ['en', 'ms', 'zh'] as const;
+/** A problem text from entryProblems(), in the panel language. The one with a number is written out for both singular and plural. */
+const tProblem = (t: (s: string, v?: Record<string, string | number>) => string, x: string) => {
+  const m = x.match(/^Only (\d+) example questions?\. /);
+  return m ? t(m[1] === '1' ? 'Only 1 example question. Add at least 3, with slang, so the bot finds it more often.' : 'Only {n} example questions. Add at least 3, with slang, so the bot finds it more often.', { n: m[1] }) : t(x);
+};
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
 export default function Kb() {
@@ -79,7 +84,7 @@ export default function Kb() {
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
             <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
-            <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).join(' ')}>{t('needs work')}</span> : null}</td>
+            <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).map((x) => tProblem(t, x)).join(' ')}>{t('needs work')}</span> : null}</td>
             <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">{t('missing')}</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' ' + t('(alone)') : ''}</Pill></> : null}</td>
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${t(s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty')}`}>{LN[l]}</span>; })}</div></td>
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={t(n < 3 ? 'Add at least 3 example questions' : 'Example questions in English')}>{n}</span>; })()}</td>
@@ -92,7 +97,7 @@ export default function Kb() {
       {ask && <Modal label={t('Change the status')} small onClose={() => setAsk(null)}>
         <div className="head"><h2>{t(ask.to === 'draft' ? 'Set “{k}” to draft?' : 'Set “{k}” live?', { k: ask.e.intent_key })}</h2></div>
         <p style={{ margin: '8px 0' }}>{t(ask.to === 'draft' ? 'The bot will ignore this answer after you publish. Questions about it will not get this answer.' : 'The bot will start using this answer after you publish.')}</p>
-        {ask.to === 'live' && entryProblems({ ...ask.e, status: 'live' }).length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>{t('It is not ready yet:')}</b><ul className="plain">{entryProblems({ ...ask.e, status: 'live' }).map((x, i) => <li key={i}>{t(x)}</li>)}</ul></div>}
+        {ask.to === 'live' && entryProblems({ ...ask.e, status: 'live' }).length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>{t('It is not ready yet:')}</b><ul className="plain">{entryProblems({ ...ask.e, status: 'live' }).map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div>}
         <div className="sub">{t('The change goes into the draft. Customers see it only after you press Publish.')}</div>
         <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>{t('Cancel')}</button><button className="btn pri" type="button" onClick={flipOne}>{t(ask.to === 'draft' ? 'Set to draft' : 'Set live')}</button></div></Modal>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
@@ -103,7 +108,7 @@ export default function Kb() {
 function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClose: () => void }) {
   const p = usePanel();
   const set = (patch: Partial<Ed>) => setEd({ ...ed, ...patch });
-  const t = trOf(ed, ed.tab);
+  const tx = trOf(ed, ed.tab); const { t } = useT();
   const setTr = (patch: Partial<Tr>, lang = ed.tab) => setEd({ ...ed, translations: { ...ed.translations, [lang]: { ...trOf(ed, lang), ...patch } } });
   const sug = ed.sug[ed.tab] || [];
   const [busy, setBusy] = useState(false);
@@ -112,17 +117,17 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   /** The one button on the English tab: translates Malay and Chinese, but only the ones that are still empty. */
   const translateEmpty = () => {
     const empty = ['ms', 'zh'].filter((l) => !trOf(ed, l).answer_text.trim());
-    if (!empty.length) return p.toast('Malay and Chinese already have an answer. Open a language tab to translate that one again.');
+    if (!empty.length) return p.toast(t('Malay and Chinese already have an answer. Open a language tab to translate that one again.'));
     void translateTo(empty);
   };
   const translateTo = async (langs: string[]) => {
     const en = trOf(ed, 'en');
-    if (!en.answer_text.trim()) return p.toast('Write the English answer first, then translate it.');
+    if (!en.answer_text.trim()) return p.toast(t('Write the English answer first, then translate it.'));
     setBusy(true);
     let next = { ...ed.translations } as Record<string, Tr>; const done: string[] = [], failed: string[] = [];
     for (const l of langs) {
       const cur = trOf({ ...ed, translations: next as Entry['translations'] }, l);
-      if (cur.answer_text.trim() && !confirm(`Replace the current ${LN[l]} answer with a new translation?`)) continue;
+      if (cur.answer_text.trim() && !confirm(t('Replace the current {l} answer with a new translation?', { l: LN[l] }))) continue;
       try {
         const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: l, answer: en.answer_text, examples: en.question_examples, style: p.draft.settings[p.merchant]?.ai_instructions ?? '' });
         const have = new Set(cur.question_examples.map((x) => x.toLowerCase()));
@@ -132,27 +137,27 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
     }
     setEd({ ...ed, translations: next as Entry['translations'] }); setBusy(false);
     if (failed.length) p.toast(failed[0]);
-    else if (done.length) p.toast(`Translated to ${done.join(' and ')}. Please check the wording, then save.`);
+    else if (done.length) p.toast(t('Translated to {l}. Please check the wording, then save.', { l: done.join(t(' and ')) }));
   };
 
-  const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...t, question_examples: [...t.question_examples, v] } } }); };
+  const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, v] } } }); };
   const suggest = () => {
-    const base = t.question_examples[0] || (ed.intent_key || 'question').replace(/_/g, ' ');
+    const base = tx.question_examples[0] || (ed.intent_key || 'question').replace(/_/g, ' ');
     const sfx = ({ en: ['pls', 'boss', 'ya'], ms: ['tolong', 'boss', 'lah'], zh: ['请问', '老板', '呀'], vi: ['nhé', 'shop', 'giúp mình'], th: ['ค่ะ', 'ครับ', 'หน่อย'], tl: ['po', 'boss', 'naman'] } as Record<string, string[]>)[ed.tab];
     const out = ed.tab === 'zh' ? [sfx[0] + base, base + sfx[2], sfx[1] + base] : [base + ' ' + sfx[0], sfx[1] + ' ' + base, base + ' ' + sfx[2]];
     set({ sug: { ...ed.sug, [ed.tab]: out } });
   };
 
   const save = () => {
-    if (!ed.intent_key.trim()) return p.toast('Give the entry a name first');
-    if (!trOf(ed, 'en').answer_text.trim()) return p.toast('Add the English answer first');
+    if (!ed.intent_key.trim()) return p.toast(t('Give the entry a name first'));
+    if (!trOf(ed, 'en').answer_text.trim()) return p.toast(t('Add the English answer first'));
     let topic = ed.topic; let newTopic = '';
-    if (topic === '__new') { newTopic = slug(ed.newTopic); if (!newTopic) return p.toast('Type a name for the new topic'); topic = newTopic; }
-    if (!topic) return p.toast('Choose a topic first. It is required.');
-    if (ed.useAspect && !ed.aspect) return p.toast('Choose a question type, or untick "Add a question type".');
+    if (topic === '__new') { newTopic = slug(ed.newTopic); if (!newTopic) return p.toast(t('Type a name for the new topic')); topic = newTopic; }
+    if (!topic) return p.toast(t('Choose a topic first. It is required.'));
+    if (ed.useAspect && !ed.aspect) return p.toast(t('Choose a question type, or untick "Add a question type".'));
     const { useAspect, tab, sug: _s, newTopic: _n, newTopicW, newEx: _e, ...rest } = ed; void tab;
     const steps = (ed.steps ?? []).map((x) => ({ kind: x.kind, ask: Object.fromEntries(Object.entries(x.ask ?? {}).map(([l, v]) => [l, (v ?? '').trim()]).filter(([, v]) => v)) as Record<string, string> })).filter((x) => x.ask.en || Object.keys(x.ask).length);
-    if (steps.some((x) => !x.ask.en)) return p.toast('Write the English text of each question to the customer (section 5), or remove it');
+    if (steps.some((x) => !x.ask.en)) return p.toast(t('Write the English text of each question to the customer (section 5), or remove it'));
     const clean: Entry = { ...rest, steps: steps.length ? steps : undefined, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
     p.edit((d, note) => {
       if (newTopic && !topicNames(d, p.merchant).includes(newTopic)) {                 // a topic made here belongs to this merchant (the plan: each client owns its topic list)
@@ -161,7 +166,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
       else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
     });
-    onClose(); const left = entryProblems(clean); p.toast(left.length ? 'Saved to draft, but the bot cannot use it yet: ' + left[0] : 'Saved to draft. Press Publish to make it live.');
+    onClose(); const left = entryProblems(clean); p.toast(left.length ? t('Saved to draft, but the bot cannot use it yet: ') + tProblem(t, left[0]) : t('Saved to draft. Press Publish to make it live.'));
   };
   const del = () => {
     p.edit((d, note) => { d.kb = d.kb.filter((e) => e.id !== ed.id); note('Deleted entry "' + ed.intent_key + '" (' + p.M.name + ')'); });
@@ -169,55 +174,55 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   };
 
   return (
-    <Modal label="Edit entry" onClose={onClose}>
-      <div className="head"><h2>{ed.id ? 'Edit entry' : 'New entry'}</h2><button className="btn sm" type="button" onClick={onClose}>Close</button></div>
-      <div className="kbsec"><b>1</b> About this entry</div>
+    <Modal label={t('Edit entry')} onClose={onClose}>
+      <div className="head"><h2>{t(ed.id ? 'Edit entry' : 'New entry')}</h2><button className="btn sm" type="button" onClick={onClose}>{t('Close')}</button></div>
+      <div className="kbsec"><b>1</b> {t('About this entry')}</div>
       <div className="form">
-        <label className="fld"><span>Entry name</span><input type="text" value={ed.intent_key} onChange={(e) => set({ intent_key: e.target.value })} placeholder="e.g. daily_withdraw_limit" /></label>
-        <label className="fld"><span>Status</span><select value={ed.status} onChange={(e) => set({ status: e.target.value as Entry['status'] })}><option value="live">Live</option><option value="draft">Draft (bot ignores it)</option></select></label>
-        <label className="fld"><span>Type</span><select value={ed.entry_type || 'answer'} onChange={(e) => set({ entry_type: e.target.value as Entry['entry_type'] })}><option value="answer">Answer</option><option value="needs_staff">Needs staff</option><option value="promotion">Promotion</option></select></label>
-        <label className="fld"><span>End date (optional)</span><input type="date" value={ed.ends_on || ''} onChange={(e) => set({ ends_on: e.target.value || null })} /></label>
-        <div className="sub full" style={{ marginTop: -4 }}>{TYPE_NOTE[ed.entry_type || 'answer']}{ed.ends_on ? ' The entry is used until the end of ' + ed.ends_on + ', then it hides itself.' : ''}</div>
-        <div className="kbsec full"><b>2</b> When the bot uses it</div>
-        <label className="fld"><span>Topic (required)</span><select value={ed.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">Choose a topic word…</option>{topicList(p.draft, p.merchant).map((x) => <option key={x}>{x}</option>)}<option value="__new">+ New topic…</option></select></label>
+        <label className="fld"><span>{t('Entry name')}</span><input type="text" value={ed.intent_key} onChange={(e) => set({ intent_key: e.target.value })} placeholder={t('e.g. daily_withdraw_limit')} /></label>
+        <label className="fld"><span>{t('Status')}</span><select value={ed.status} onChange={(e) => set({ status: e.target.value as Entry['status'] })}><option value="live">{t('Live')}</option><option value="draft">{t('Draft (bot ignores it)')}</option></select></label>
+        <label className="fld"><span>{t('Type')}</span><select value={ed.entry_type || 'answer'} onChange={(e) => set({ entry_type: e.target.value as Entry['entry_type'] })}><option value="answer">{t('Answer')}</option><option value="needs_staff">{t('Needs staff')}</option><option value="promotion">{t('Promotion')}</option></select></label>
+        <label className="fld"><span>{t('End date (optional)')}</span><input type="date" value={ed.ends_on || ''} onChange={(e) => set({ ends_on: e.target.value || null })} /></label>
+        <div className="sub full" style={{ marginTop: -4 }}>{t(TYPE_NOTE[ed.entry_type || 'answer'])}{ed.ends_on ? ' ' + t('The entry is used until the end of {d}, then it hides itself.', { d: ed.ends_on }) : ''}</div>
+        <div className="kbsec full"><b>2</b> {t('When the bot uses it')}</div>
+        <label className="fld"><span>{t('Topic (required)')}</span><select value={ed.topic} onChange={(e) => set({ topic: e.target.value })}><option value="">{t('Choose a topic word…')}</option>{topicList(p.draft, p.merchant).map((x) => <option key={x}>{x}</option>)}<option value="__new">{t('+ New topic…')}</option></select></label>
         {ed.topic === '__new' && <>
-          <label className="fld"><span>Name of the new topic</span><input type="text" placeholder="e.g. refund" value={ed.newTopic} onChange={(e) => set({ newTopic: e.target.value })} /></label>
-          <label className="fld full"><span>Keywords for it (comma separated, any language, optional)</span><input type="text" placeholder="e.g. refunds, bayaran balik, 退款" value={ed.newTopicW} onChange={(e) => set({ newTopicW: e.target.value })} /></label></>}
-        <label className="tog full" style={{ alignItems: 'flex-start' }}><input type="checkbox" checked={ed.useAspect} onChange={(e) => set({ useAspect: e.target.checked })} style={{ marginTop: 3 }} /><span><b>Add a question type</b><br /><span className="sub">Tick this only if the topic has more than one entry, for example deposit: how to, how long, limit. The question type tells the bot which one the customer means.</span></span></label>
+          <label className="fld"><span>{t('Name of the new topic')}</span><input type="text" placeholder={t('e.g. refund')} value={ed.newTopic} onChange={(e) => set({ newTopic: e.target.value })} /></label>
+          <label className="fld full"><span>{t('Keywords for it (comma separated, any language, optional)')}</span><input type="text" placeholder="e.g. refunds, bayaran balik, 退款" value={ed.newTopicW} onChange={(e) => set({ newTopicW: e.target.value })} /></label></>}
+        <label className="tog full" style={{ alignItems: 'flex-start' }}><input type="checkbox" checked={ed.useAspect} onChange={(e) => set({ useAspect: e.target.checked })} style={{ marginTop: 3 }} /><span><b>{t('Add a question type')}</b><br /><span className="sub">{t('Tick this only if the topic has more than one entry, for example deposit: how to, how long, limit. The question type tells the bot which one the customer means.')}</span></span></label>
         {ed.useAspect && <>
-          <label className="fld"><span>Question type</span><select value={ed.aspect || ''} onChange={(e) => set({ aspect: e.target.value || null })}><option value="">Choose a question type…</option>{Object.keys(p.draft.aspects).filter((x) => !['problem', 'help'].includes(x)).map((x) => <option key={x} value={x}>{ASPECT_LABEL[x] || x}</option>)}</select></label>
-          {p.adv && <label className="tog full"><input type="checkbox" checked={ed.topic_optional} onChange={(e) => set({ topic_optional: e.target.checked })} /> The question type alone is enough (no topic word needed), for example opening hours</label>}</>}
+          <label className="fld"><span>{t('Question type')}</span><select value={ed.aspect || ''} onChange={(e) => set({ aspect: e.target.value || null })}><option value="">{t('Choose a question type…')}</option>{Object.keys(p.draft.aspects).filter((x) => !['problem', 'help'].includes(x)).map((x) => <option key={x} value={x}>{ASPECT_LABEL[x] ? t(ASPECT_LABEL[x]) : x}</option>)}</select></label>
+          {p.adv && <label className="tog full"><input type="checkbox" checked={ed.topic_optional} onChange={(e) => set({ topic_optional: e.target.checked })} /> {t('The question type alone is enough (no topic word needed), for example opening hours')}</label>}</>}
       </div>
-      <div className="note">The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.</div>
-      <div className="kbsec"><b>3</b> What the bot says, in each language</div>
+      <div className="note">{t("The bot looks for the topic word anywhere in the customer's sentence and then gives this answer. If one topic has several entries, the customer is shown buttons to choose.")}</div>
+      <div className="kbsec"><b>3</b> {t('What the bot says, in each language')}</div>
       <div className="tabs" role="tablist">{LANGS.map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
-      <label className="fld"><span>Answer in {LN[ed.tab]} (facts only; the bot adds the tone)</span><textarea lang={ed.tab} value={t.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
+      <label className="fld"><span>{t('Answer in {l} (facts only; the bot adds the tone)', { l: LN[ed.tab] })}</span><textarea lang={ed.tab} value={tx.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
       <div className="tools" style={{ marginTop: -4 }}>
         {ed.tab === 'en'
-          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? 'Fills Malay and Chinese when they are empty. Open another language tab to translate that one.' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateEmpty()}>{busy ? 'Translating…' : 'Translate the empty languages with AI'}</button>
-          : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : 'The AI is off. Add the Anthropic key to .env.'} onClick={() => translateTo([ed.tab])}>{busy ? 'Translating…' : `Translate from English to ${LN[ed.tab]}`}</button>}
-        <span className="sub">{p.ai.translate ? (ed.tab === 'en' ? 'Fills Malay and Chinese when they are empty, never over text you wrote. For Vietnamese, Thai or Filipino open that tab. ' : '') + 'The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.' : 'Translating needs the AI. Add the Anthropic key to .env.'}</span>
+          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={t(p.ai.translate ? 'Fills Malay and Chinese when they are empty. Open another language tab to translate that one.' : 'The AI is off. Add the Anthropic key to .env.')} onClick={() => translateEmpty()}>{t(busy ? 'Translating…' : 'Translate the empty languages with AI')}</button>
+          : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : t('The AI is off. Add the Anthropic key to .env.')} onClick={() => translateTo([ed.tab])}>{busy ? t('Translating…') : t('Translate from English to {l}', { l: LN[ed.tab] })}</button>}
+        <span className="sub">{p.ai.translate ? (ed.tab === 'en' ? t('Fills Malay and Chinese when they are empty, never over text you wrote. For Vietnamese, Thai or Filipino open that tab. ') : '') + t('The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.') : t('Translating needs the AI. Add the Anthropic key to .env.')}</span>
       </div>
-      <div className="kbsec"><b>4</b> How customers ask for it</div>
-      <div><h3>Example questions ({t.question_examples.length}) <span className={'pill ' + (t.question_examples.length >= 3 ? 'ok' : 'warn')}>{t.question_examples.length >= 3 ? 'enough' : 'add ' + (3 - t.question_examples.length) + ' more'}</span> <span className="sub">at least 3, include slang</span></h3>
-        <div className="chips">{t.question_examples.map((x, i) => <span className="chip" key={i}>{x}<button type="button" aria-label="Remove" onClick={() => setTr({ question_examples: t.question_examples.filter((_, j) => j !== i) })}>×</button></span>)}{!t.question_examples.length && <span className="sub">None yet</span>}</div>
-        <div className="addrow"><input type="text" placeholder="Add an example, then press Enter" style={{ flex: 1, minWidth: 180 }} value={ed.newEx} onChange={(e) => set({ newEx: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEx(); } }} /><button className="btn sm" type="button" onClick={addEx}>Add</button><button className="btn sm" type="button" onClick={suggest}>Suggest with AI</button></div></div>
-      {sug.length > 0 && <div className="sug"><b style={{ fontSize: 12.5 }}>AI suggestions · need your approval</b>{sug.map((x, i) => (
+      <div className="kbsec"><b>4</b> {t('How customers ask for it')}</div>
+      <div><h3>{t('Example questions')} ({tx.question_examples.length}) <span className={'pill ' + (tx.question_examples.length >= 3 ? 'ok' : 'warn')}>{tx.question_examples.length >= 3 ? t('enough') : t('add {n} more', { n: 3 - tx.question_examples.length })}</span> <span className="sub">{t('at least 3, include slang')}</span></h3>
+        <div className="chips">{tx.question_examples.map((x, i) => <span className="chip" key={i}>{x}<button type="button" aria-label={t('Remove')} onClick={() => setTr({ question_examples: tx.question_examples.filter((_, j) => j !== i) })}>×</button></span>)}{!tx.question_examples.length && <span className="sub">{t('None yet')}</span>}</div>
+        <div className="addrow"><input type="text" placeholder={t('Add an example, then press Enter')} style={{ flex: 1, minWidth: 180 }} value={ed.newEx} onChange={(e) => set({ newEx: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEx(); } }} /><button className="btn sm" type="button" onClick={addEx}>{t('Add')}</button><button className="btn sm" type="button" onClick={suggest}>{t('Suggest with AI')}</button></div></div>
+      {sug.length > 0 && <div className="sug"><b style={{ fontSize: 12.5 }}>{t('AI suggestions · need your approval')}</b>{sug.map((x, i) => (
         <div className="it" key={i}><span>{x}</span><span>
-          <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) }, translations: { ...ed.translations, [ed.tab]: { ...t, question_examples: [...t.question_examples, x] } } })}>Approve</button>{' '}
-          <button className="btn sm" type="button" onClick={() => set({ sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) } })}>Dismiss</button></span></div>))}</div>}
-      <div className="kbsec"><b>5</b> After the answer: ask for details (optional)</div>
-      <div className="sub" style={{ marginTop: -4 }}>For a topic that needs more from the customer, for example a deposit that is not in: the bot gives the answer, asks up to 3 questions one by one, then passes the chat to a person with the details as a note. A picture of a receipt only works when LiveChat sends pictures to the bot (patch 002). The customer can type "skip" at any question. A language left empty uses the English question.</div>
+          <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) }, translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, x] } } })}>{t('Approve')}</button>{' '}
+          <button className="btn sm" type="button" onClick={() => set({ sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) } })}>{t('Dismiss')}</button></span></div>))}</div>}
+      <div className="kbsec"><b>5</b> {t('After the answer: ask for details (optional)')}</div>
+      <div className="sub" style={{ marginTop: -4 }}>{t('For a topic that needs more from the customer, for example a deposit that is not in: the bot gives the answer, asks up to 3 questions one by one, then passes the chat to a person with the details as a note. A picture of a receipt only works when LiveChat sends pictures to the bot (patch 002). The customer can type "skip" at any question. A language left empty uses the English question.')}</div>
       {(ed.steps ?? []).map((st, i) => (
-        <div className="stepbox" key={i} aria-label={'Question ' + (i + 1)}>
-          <div className="head"><b>Question {i + 1}</b><span className="tools">
-            <label className="fld" style={{ margin: 0 }}><select aria-label={'Question ' + (i + 1) + ' asks for'} value={st.kind} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, kind: e.target.value as typeof st.kind } : x)) })}>{STEP_KINDS.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-            <button className="btn sm" type="button" aria-label={'Remove question ' + (i + 1)} onClick={() => set({ steps: (ed.steps ?? []).filter((_, j) => j !== i) })}>Remove</button></span></div>
-          <div className="form">{STEP_LANGS.map((l) => <label className="fld" key={l}><span>{LN[l]}{l === 'en' ? ' (required)' : ' (optional)'}</span><input type="text" lang={l} aria-label={'Question ' + (i + 1) + ' in ' + LN[l]} value={st.ask?.[l] ?? ''} placeholder={l === 'en' ? (st.kind === 'receipt' ? 'e.g. Please send a picture of your receipt.' : st.kind === 'amount' ? 'e.g. How much did you deposit?' : 'Write the question') : ''} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, ask: { ...x.ask, [l]: e.target.value } } : x)) })} /></label>)}</div>
+        <div className="stepbox" key={i} aria-label={t('Question {n}', { n: i + 1 })}>
+          <div className="head"><b>{t('Question {n}', { n: i + 1 })}</b><span className="tools">
+            <label className="fld" style={{ margin: 0 }}><select aria-label={t('Question {n} asks for', { n: i + 1 })} value={st.kind} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, kind: e.target.value as typeof st.kind } : x)) })}>{STEP_KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></label>
+            <button className="btn sm" type="button" aria-label={t('Remove question {n}', { n: i + 1 })} onClick={() => set({ steps: (ed.steps ?? []).filter((_, j) => j !== i) })}>{t('Remove')}</button></span></div>
+          <div className="form">{STEP_LANGS.map((l) => <label className="fld" key={l}><span>{LN[l]} {t(l === 'en' ? '(required)' : '(optional)')}</span><input type="text" lang={l} aria-label={t('Question {n} in {l}', { n: i + 1, l: LN[l] })} value={st.ask?.[l] ?? ''} placeholder={l === 'en' ? t(st.kind === 'receipt' ? 'e.g. Please send a picture of your receipt.' : st.kind === 'amount' ? 'e.g. How much did you deposit?' : 'Write the question') : ''} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, ask: { ...x.ask, [l]: e.target.value } } : x)) })} /></label>)}</div>
         </div>))}
-      <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>+ Add a question{(ed.steps ?? []).length >= 3 ? ' (the most is 3)' : ''}</button></div>
-      {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>Before the bot can use this answer:</b><ul className="plain">{pr.map((x, i) => <li key={i}>{x}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>✓ Ready: Live, with an answer and example questions. Save it, then Publish.</div>; })()}
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">Saved as a draft change until you publish.</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>Delete</button> : null}<button className="btn pri" type="button" onClick={save}>Save to draft</button></span></div>
+      <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
+      {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>{t('Before the bot can use this answer:')}</b><ul className="plain">{pr.map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>{t('✓ Ready: Live, with an answer and example questions. Save it, then Publish.')}</div>; })()}
+      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn pri" type="button" onClick={save}>{t('Save to draft')}</button></span></div>
     </Modal>
   );
 }
