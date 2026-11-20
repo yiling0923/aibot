@@ -4,6 +4,7 @@ import { usePanel } from '../store';
 import KbGrid from './KbGrid';
 import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
+import { useT } from '../i18n';
 
 type Tr = { question_examples: string[]; answer_text: string };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
@@ -15,7 +16,7 @@ const STEP_LANGS = ['en', 'ms', 'zh'] as const;
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
 export default function Kb() {
-  const p = usePanel();
+  const p = usePanel(); const { t } = useT();
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [topicF, setTopicF] = useState('all');
   const [ed, setEd] = useState<Ed | null>(null);
   const [view, setViewState] = useState<'list' | 'table'>(() => { try { return localStorage.getItem('kbView') === 'table' ? 'table' : 'list'; } catch { return 'list'; } });
@@ -35,18 +36,18 @@ export default function Kb() {
   /** A draft the bot could use if it were live: it has an answer and at least 3 example questions (no "TO WRITE", no other problem). */
   const readyDrafts = all.filter((e) => e.status === 'draft' && entryProblems({ ...e, status: 'live' }).length === 0);
   const setStatusOf = (ids: Set<number>, to: 'live' | 'draft') => {
-    const n = all.filter((e) => ids.has(e.id) && e.status !== to).length; if (!n) return p.toast('Nothing to change: they are already ' + to);
+    const n = all.filter((e) => ids.has(e.id) && e.status !== to).length; if (!n) return p.toast(t('Nothing to change: they are already ' + to));
     p.edit((d, note) => { d.kb.forEach((e) => { if (ids.has(e.id) && e.merchant === p.merchant && e.status !== to) { e.status = to; e.dirty = true; } }); note(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} (${p.M.name})`); });
-    setSel(new Set()); p.toast(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} in the draft. ${to === 'live' ? 'Press Publish to make them live for customers.' : 'Press Publish to take them off.'}`);
+    setSel(new Set()); p.toast(t(n === 1 ? `Set 1 entry ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}` : `Set {n} entries ${to} in the draft. ${to === 'live' ? 'Press Publish to make them live for customers.' : 'Press Publish to take them off.'}`, { n }));
   };
   const [ask, setAsk] = useState<{ e: Entry; to: 'live' | 'draft' } | null>(null);          // the on/off switch of one entry asks first
   const flipOne = () => {
     if (!ask) return; const { e, to } = ask; setAsk(null);
     p.edit((d, note) => { const x = d.kb.find((k) => k.id === e.id && k.merchant === p.merchant); if (x && x.status !== to) { x.status = to; x.dirty = true; note(`Set "${e.intent_key}" ${to} (${p.M.name})`); } });
-    p.toast(`“${e.intent_key}” is ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}`);
+    p.toast(t(`“{k}” is ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}`, { k: e.intent_key }));
   };
   const deleteSel = () => {
-    if (!picked.length || !window.confirm(`Delete ${picked.length} entr${picked.length === 1 ? 'y' : 'ies'}? You can still go back by not publishing, or from History.`)) return;
+    if (!picked.length || !window.confirm(t(picked.length === 1 ? 'Delete 1 entry? You can still go back by not publishing, or from History.' : 'Delete {n} entries? You can still go back by not publishing, or from History.', { n: picked.length }))) return;
     const ids = new Set(picked.map((e) => e.id));
     p.edit((d, note) => { d.kb = d.kb.filter((e) => !(ids.has(e.id) && e.merchant === p.merchant)); note(`Deleted ${ids.size} entr${ids.size === 1 ? 'y' : 'ies'} (${p.M.name})`); });
     setSel(new Set());
@@ -59,41 +60,41 @@ export default function Kb() {
   };
   return (
     <>
-      <div className="card"><div className="head"><div><h2>Knowledge base · {p.M.name}</h2><div className="sub">What the bot may answer for this merchant. Only live entries are used.</div></div>
-        <span className="tools"><span className="segs" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>List</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title="Edit the answers and example questions in a table">Table edit</button></span>
-        <button className="btn pri" type="button" onClick={() => open(null)}>Add entry</button></span></div>
-        {miss ? <div className="kwstats"><span className="st dim" title="Entries missing an answer or 3+ examples in a main language">{miss} missing a language or examples</span></div> : null}
+      <div className="card"><div className="head"><div><h2>{t('Knowledge base')} · {p.M.name}</h2><div className="sub">{t('What the bot may answer for this merchant. Only live entries are used.')}</div></div>
+        <span className="tools"><span className="segs" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table edit')}</button></span>
+        <button className="btn pri" type="button" onClick={() => open(null)}>{t('Add entry')}</button></span></div>
+        {miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
         <div className="filt-row" style={{ marginTop: 12 }}>
-          <div className="segs" role="group" aria-label="Show">{([['all', 'All', all.length], ['live', 'Live', live], ['draft', 'Draft', drafts], ['needs', 'Needs work', needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
-          <input type="search" placeholder="Search entries or answers" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" style={{ minWidth: 220 }} />
-          <select aria-label="Topic" value={topicF} onChange={(e) => setTopicF(e.target.value)}><option value="all">All topics</option>{topicsIn.map((x) => <option key={x} value={x}>{x}</option>)}</select>
-          <span className="sub">{list.length} shown</span>
-          {readyDrafts.length > 0 && <button className="btn sm pri" type="button" title="Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts." onClick={() => setStatusOf(new Set(readyDrafts.map((e) => e.id)), 'live')}>Set {readyDrafts.length} ready draft{readyDrafts.length === 1 ? '' : 's'} live</button>}</div></div>
-      {view === 'list' && picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} selected</b>
-        <button className="btn sm pri" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'live')}>Set live</button>
-        <button className="btn sm" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'draft')}>Set draft</button>
-        <button className="btn sm bad" type="button" onClick={deleteSel}>Delete</button>
-        <button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>Clear</button></div>}
-      {view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>Entry</th><th>Topic{p.adv ? ' · question' : ''}</th><th>Languages</th><th>Questions</th><th>Answer (English)</th><th>Status</th></tr></thead><tbody>
+          <div className="segs" role="group" aria-label="Show">{([['all', t('All'), all.length], ['live', t('Live'), live], ['draft', t('Draft'), drafts], ['needs', t('Needs work'), needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
+          <input type="search" placeholder={t('Search entries or answers')} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" style={{ minWidth: 220 }} />
+          <select aria-label="Topic" value={topicF} onChange={(e) => setTopicF(e.target.value)}><option value="all">{t('All topics')}</option>{topicsIn.map((x) => <option key={x} value={x}>{x}</option>)}</select>
+          <span className="sub">{list.length} {t('shown')}</span>
+          {readyDrafts.length > 0 && <button className="btn sm pri" type="button" title={t('Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts.')} onClick={() => setStatusOf(new Set(readyDrafts.map((e) => e.id)), 'live')}>{t(readyDrafts.length === 1 ? 'Set 1 ready draft live' : 'Set {n} ready drafts live', { n: readyDrafts.length })}</button>}</div></div>
+      {view === 'list' && picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} {t('selected')}</b>
+        <button className="btn sm pri" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'live')}>{t('Set live')}</button>
+        <button className="btn sm" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'draft')}>{t('Set draft')}</button>
+        <button className="btn sm bad" type="button" onClick={deleteSel}>{t('Delete')}</button>
+        <button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>{t('Clear')}</button></div>}
+      {view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>{t('Entry')}</th><th>{t('Topic')}{p.adv ? ' · ' + t('question') : ''}</th><th>{t('Languages')}</th><th>{t('Questions')}</th><th>{t('Answer (English)')}</th><th>{t('Status')}</th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
             <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
-            <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).join(' ')}>needs work</span> : null}</td>
-            <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">missing</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' (alone)' : ''}</Pill></> : null}</td>
-            <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty'}`}>{LN[l]}</span>; })}</div></td>
-            <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={n < 3 ? 'Add at least 3 example questions' : 'Example questions in English'}>{n}</span>; })()}</td>
+            <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).join(' ')}>{t('needs work')}</span> : null}</td>
+            <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">{t('missing')}</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' ' + t('(alone)') : ''}</Pill></> : null}</td>
+            <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${t(s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty')}`}>{LN[l]}</span>; })}</div></td>
+            <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={t(n < 3 ? 'Add at least 3 example questions' : 'Example questions in English')}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
-            <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={e.status === 'live' ? 'Live: the bot uses this answer. Switch off to make it a draft.' : 'Draft: the bot ignores this answer. Switch on to make it live.'}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => setAsk({ e, to: e.status === 'live' ? 'draft' : 'live' })} /><span className="track"><span className="thumb" /></span><span className="kbswt">{e.status === 'live' ? 'Live' : 'Draft'}</span></label>{e.steps?.length ? <> <Pill c="info" >asks {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion'}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended ' : 'until '}{e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">edited</Pill></> : null}</div></td>
+            <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={t(e.status === 'live' ? 'Live: the bot uses this answer. Switch off to make it a draft.' : 'Draft: the bot ignores this answer. Switch on to make it live.')}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => setAsk({ e, to: e.status === 'live' ? 'draft' : 'live' })} /><span className="track"><span className="thumb" /></span><span className="kbswt">{t(e.status === 'live' ? 'Live' : 'Draft')}</span></label>{e.steps?.length ? <> <Pill c="info">{t('asks')} {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{t(e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion')}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{t(e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended' : 'until')} {e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">{t('edited')}</Pill></> : null}</div></td>
           </tr>
         ))}
-        {!list.length && <tr><td colSpan={7} className="sub">No entries match.</td></tr>}
+        {!list.length && <tr><td colSpan={7} className="sub">{t('No entries match.')}</td></tr>}
       </tbody></table></div>}
-      {ask && <Modal label="Change the status" small onClose={() => setAsk(null)}>
-        <div className="head"><h2>{ask.to === 'draft' ? 'Set “' + ask.e.intent_key + '” to draft?' : 'Set “' + ask.e.intent_key + '” live?'}</h2></div>
-        <p style={{ margin: '8px 0' }}>{ask.to === 'draft' ? 'The bot will ignore this answer after you publish. Questions about it will not get this answer.' : 'The bot will start using this answer after you publish.'}</p>
-        {ask.to === 'live' && entryProblems({ ...ask.e, status: 'live' }).length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>It is not ready yet:</b><ul className="plain">{entryProblems({ ...ask.e, status: 'live' }).map((x, i) => <li key={i}>{x}</li>)}</ul></div>}
-        <div className="sub">The change goes into the draft. Customers see it only after you press Publish.</div>
-        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>Cancel</button><button className="btn pri" type="button" onClick={flipOne}>{ask.to === 'draft' ? 'Set to draft' : 'Set live'}</button></div></Modal>}
+      {ask && <Modal label={t('Change the status')} small onClose={() => setAsk(null)}>
+        <div className="head"><h2>{t(ask.to === 'draft' ? 'Set “{k}” to draft?' : 'Set “{k}” live?', { k: ask.e.intent_key })}</h2></div>
+        <p style={{ margin: '8px 0' }}>{t(ask.to === 'draft' ? 'The bot will ignore this answer after you publish. Questions about it will not get this answer.' : 'The bot will start using this answer after you publish.')}</p>
+        {ask.to === 'live' && entryProblems({ ...ask.e, status: 'live' }).length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>{t('It is not ready yet:')}</b><ul className="plain">{entryProblems({ ...ask.e, status: 'live' }).map((x, i) => <li key={i}>{t(x)}</li>)}</ul></div>}
+        <div className="sub">{t('The change goes into the draft. Customers see it only after you press Publish.')}</div>
+        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>{t('Cancel')}</button><button className="btn pri" type="button" onClick={flipOne}>{t(ask.to === 'draft' ? 'Set to draft' : 'Set live')}</button></div></Modal>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
     </>
   );

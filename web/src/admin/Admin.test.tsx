@@ -619,6 +619,14 @@ describe('Control panel', () => {
     await userEvent.click(within(screen.getByRole('group', { name: 'Panel language' })).getByRole('button', { name: 'EN' }));
     expect(await screen.findByText('Learning · LuckyPay')).toBeTruthy();
   });
+  it('Chinese: the Knowledge base list is translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    open('admin', '/admin/kb');
+    expect(await screen.findByText(/知识库 · LuckyPay/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: '添加条目' })).toBeTruthy(); expect(screen.getByRole('button', { name: '表格编辑' })).toBeTruthy();
+    expect(screen.getByPlaceholderText('搜索条目或答案')).toBeTruthy(); expect(screen.getByText('答案（英文）')).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
