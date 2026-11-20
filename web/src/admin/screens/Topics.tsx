@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { usePanel } from '../store';
 import TopicFlow from './TopicFlow';
 import { Modal } from '../ui';
+import { useT } from '../i18n';
 import { KW_PICK, LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, groupKeywords, guessLang, slug, topicNames } from '../model';
 
 const FOLD = 12;                                                              // words shown per group before "+N more"
@@ -32,22 +33,23 @@ type Outcome = { title: string; desc: string; tone: 'ok' | 'warn' | 'bad' | 'inf
 
 /** A read-only picture of what each list does: the lists on the left, what the bot does with them on the right. Click a list to open it. */
 function HowItWorks({ outcomes, onOpen }: { outcomes: Outcome[]; onOpen: (id: string) => void }) {
+  const { t: T } = useT();
   return (
-    <div className="how" aria-label="How it works">
+    <div className="how" aria-label={T('How it works')}>
       {outcomes.map((o) => (
         <div className="howlane" key={o.title}>
           <div className="howin">{o.lists.map((l) => (
-            <button key={l.id} type="button" className="hbox" onClick={() => onOpen(l.id)} title="Open this list">
-              <b>{l.name}</b><span>{l.n} word{l.n === 1 ? '' : 's'}</span>{l.sample.length > 0 && <em>{l.sample.join(' · ')}</em>}</button>))}</div>
+            <button key={l.id} type="button" className="hbox" onClick={() => onOpen(l.id)} title={T('Open this list')}>
+              <b>{T(l.name)}</b><span>{l.n} {T(l.n === 1 ? 'word' : 'words')}</span>{l.sample.length > 0 && <em>{l.sample.join(' · ')}</em>}</button>))}</div>
           <svg className="harrow" viewBox="0 0 48 24" width="48" height="24" aria-hidden="true"><path d="M2 12h38M32 5l8 7-8 7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
-          <div className={'hout ' + o.tone}><b>{o.title}</b><span>{o.desc}</span></div>
+          <div className={'hout ' + o.tone}><b>{T(o.title)}</b><span>{T(o.desc)}</span></div>
         </div>))}
     </div>
   );
 }
 
 export default function Topics() {
-  const p = usePanel();
+  const p = usePanel(); const { t: T } = useT();
   const [tab, setTab] = useState('short'); const [q, setQ] = useState(''); const [lang, setLang] = useState('all');
   const [just, setJust] = useState<string[]>([]); const [fresh, setFresh] = useState<Set<string>>(new Set());
   const listRef = useRef<HTMLDivElement>(null); const scroll = useRef(false);
@@ -74,7 +76,7 @@ export default function Topics() {
     if (cur === 'filler') return [{ title: 'Dropped before matching', desc: 'These words carry no meaning, so the bot ignores them and finds the topic from the words that are left.', tone: 'info',
       lists: [{ id: 'filler-filler', name: 'Filler words', n: flatCount(d.fillers), sample: sample(d.fillers) }] }];
     return [
-      { title: 'Reply kindly, close if it continues', desc: stopAfter ? `The chat is closed after ${stopAfter} rude message${stopAfter === 1 ? '' : 's'} (Merchant settings).` : 'The chat is never closed (Merchant settings).', tone: 'warn', lists: ['abuse', 'abuse_soft'].map(gd) },
+      { title: 'Reply kindly, close if it continues', desc: stopAfter ? T(stopAfter === 1 ? 'The chat is closed after 1 rude message (Merchant settings).' : 'The chat is closed after {n} rude messages (Merchant settings).', { n: stopAfter }) : 'The chat is never closed (Merchant settings).', tone: 'warn', lists: ['abuse', 'abuse_soft'].map(gd) },
       { title: 'Hand to a person', desc: 'The customer asked for a person, or tried to change the bot\'s rules. A person takes over at once.', tone: 'bad', lists: ['human_request', 'injection'].map(gd) },
       { title: 'Hand to a person with the amount', desc: 'Asking for the deposit bank account or PayNow QR. A person gives the latest one; the amount is repeated for them.', tone: 'bad', lists: ['pay_method', 'pay_ask', 'pay_deposit'].map(gd) },
       { title: 'Answered as normal', desc: 'These words show it is a question, not a request for the account, so the bot answers.', tone: 'ok', lists: ['pay_except'].map(gd) },
@@ -92,9 +94,9 @@ export default function Topics() {
   const toggleExp = (k: string) => setExp((x) => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const done = (msg: string, chip: string, word?: string) => {
     if (word) setFresh((s) => new Set(s).add(word.toLowerCase()));
-    scroll.current = true; setJust((j) => [chip, ...j].slice(0, 8)); setQ(''); setLang('all'); p.toast(msg + ' Press Publish to make it live.');
+    scroll.current = true; setJust((j) => [chip, ...j].slice(0, 8)); setQ(''); setLang('all'); p.toast(msg + ' ' + T('Press Publish to make it live.'));
   };
-  const dup = (v: string) => { const w = findDup(d, p.merchant, p.M.name, v); if (w.length) { p.toast('"' + v + '" is already ' + w[0] + '. Nothing was added.'); return true; } return false; };
+  const dup = (v: string) => { const w = findDup(d, p.merchant, p.M.name, v); if (w.length) { p.toast(T('"{v}" is already {w}. Nothing was added.', { v, w: w[0] })); return true; } return false; };
 
   const matchQ = (w: string, extra?: string) => { const s = q.trim().toLowerCase(); return !s || w.toLowerCase().includes(s) || (!!extra && extra.toLowerCase().includes(s)); };
   const langOk = (l: string) => lang === 'all' || lang === l;
@@ -103,9 +105,9 @@ export default function Topics() {
     {LANGS.filter((l) => byl[l] && langOk(l)).map((l) => {
       const items = byl[l].map((w, i) => [w, i] as const).filter(([w]) => matchQ(w, extra)); if (!items.length) return null;
       return <div style={{ marginBottom: 6 }} key={l}><span className="lang">{LN[l]}</span><div className="chips" style={{ display: 'inline-flex' }}>
-        {items.map(([w, i]) => <span key={i} className={'chip ' + (ro ? 'ro ' : '') + (fresh.has(w.toLowerCase()) ? 'new' : '')}>{w}{!ro && <button type="button" aria-label="Remove" onClick={() => remove(kind, k, l, i)}>×</button>}</span>)}</div></div>;
+        {items.map(([w, i]) => <span key={i} className={'chip ' + (ro ? 'ro ' : '') + (fresh.has(w.toLowerCase()) ? 'new' : '')}>{w}{!ro && <button type="button" aria-label={T('Remove')} onClick={() => remove(kind, k, l, i)}>×</button>}</span>)}</div></div>;
     })}</>;
-  const Group = ({ title, sub, n, gid, children }: { title: string; sub: string; n?: number; gid?: string; children: ReactNode }) => children ? <div className="group" id={gid ? 'grp-' + gid : undefined}><div className="lbl"><b>{title}</b>{n ? <span className="wc">{n} words</span> : null}<span className="lock">{sub}</span></div><div>{children}</div></div> : null;
+  const Group = ({ title, sub, n, gid, children }: { title: string; sub: string; n?: number; gid?: string; children: ReactNode }) => children ? <div className="group" id={gid ? 'grp-' + gid : undefined}><div className="lbl"><b>{title}</b>{n ? <span className="wc">{n} {T('words')}</span> : null}<span className="lock">{sub}</span></div><div>{children}</div></div> : null;
 
   const remove = (kind: string, k: string, l: string, i: number) => p.edit((x, note) => {
     if (kind === 'alias') note('Removed short form "' + x.aliases[k][l].splice(i, 1)[0] + '" → ' + k);
@@ -128,45 +130,45 @@ export default function Topics() {
         const sh: W[] = LANGS.flatMap((l) => (shared[l] || []).map((w, i) => ({ variant: w, language: l, own: false, i, l })));
         const groups = groupKeywords(k, [...own, ...sh].filter((w) => langOk(w.language) && matchQ(w.variant, k)));
         if (!groups.length) return null;
-        return <div className="kgroups">{groups.map((g) => <div className="kgroup" key={g.kind}><span className="klabel">{g.label}</span>
-          <div className="chips">{(q.trim() || exp.has(k + g.kind) ? g.items : g.items.slice(0, FOLD)).map((w) => <span key={(w.own ? 'o' : 's') + w.l + w.i} className={'chip ' + (w.own ? 'mine ' : '') + (!w.own && lock ? 'ro ' : '') + (fresh.has(w.variant.toLowerCase()) ? 'new' : '')} title={w.own ? p.M.name + ' only' : 'Shared by all merchants'}>
+        return <div className="kgroups">{groups.map((g) => <div className="kgroup" key={g.kind}><span className="klabel">{T(g.label)}</span>
+          <div className="chips">{(q.trim() || exp.has(k + g.kind) ? g.items : g.items.slice(0, FOLD)).map((w) => <span key={(w.own ? 'o' : 's') + w.l + w.i} className={'chip ' + (w.own ? 'mine ' : '') + (!w.own && lock ? 'ro ' : '') + (fresh.has(w.variant.toLowerCase()) ? 'new' : '')} title={w.own ? T('{m} only', { m: p.M.name }) : T('Shared by all merchants')}>
             {w.variant}{g.kind === 'lang' && <span className="lang" style={{ marginLeft: 6 }}>{LN[w.language] ?? w.language}</span>}
-            {(w.own || !lock) && <button type="button" aria-label="Remove" onClick={() => (w.own ? remove('malias', '', '', w.i) : remove('alias', k, w.l, w.i))}>×</button>}</span>)}
-            {!q.trim() && g.items.length > FOLD && <button type="button" className="chip more" onClick={() => toggleExp(k + g.kind)}>{exp.has(k + g.kind) ? 'show fewer' : '+' + (g.items.length - FOLD) + ' more'}</button>}</div></div>)}</div>;
+            {(w.own || !lock) && <button type="button" aria-label={T('Remove')} onClick={() => (w.own ? remove('malias', '', '', w.i) : remove('alias', k, w.l, w.i))}>×</button>}</span>)}
+            {!q.trim() && g.items.length > FOLD && <button type="button" className="chip more" onClick={() => toggleExp(k + g.kind)}>{exp.has(k + g.kind) ? T('show fewer') : T('+{n} more', { n: g.items.length - FOLD })}</button>}</div></div>)}</div>;
       };
-      Object.entries(d.aliases).forEach(([k, byl]) => { const inner = under(k, byl); if (inner) out.push(<Group key={k} title={k} n={Object.values(byl).flat().length + mine.filter(([a]) => a.canonical === k).length} sub={'main keyword · ' + (lock ? 'global · admin only' : 'global · all merchants')}>{inner}</Group>); });
+      Object.entries(d.aliases).forEach(([k, byl]) => { const inner = under(k, byl); if (inner) out.push(<Group key={k} title={k} n={Object.values(byl).flat().length + mine.filter(([a]) => a.canonical === k).length} sub={T('main keyword') + ' · ' + T(lock ? 'global · admin only' : 'global · all merchants')}>{inner}</Group>); });
       // the topics this merchant made itself: its own keywords under a topic name that is not in the shared template
       [...new Set(mine.filter(([a]) => !known.includes(a.canonical)).map(([a]) => a.canonical))].forEach((topic) => {
-        const inner = under(topic, {}); if (inner) out.push(<Group key={'own-' + topic} title={topic} sub={'main keyword · this merchant only · ' + p.M.name + "'s own topic"}>{inner}</Group>);
+        const inner = under(topic, {}); if (inner) out.push(<Group key={'own-' + topic} title={topic} sub={T('main keyword · this merchant only · {m}\'s own topic', { m: p.M.name })}>{inner}</Group>);
       });
     }
     const chipBlock = (kind: string, k: string, byl: Words, title: string, sub: string, extra?: string) => {
       const has = LANGS.some((l) => byl[l] && langOk(l) && byl[l].some((w) => matchQ(w, extra)));
       if (has) out.push(<Group key={kind + k} gid={kind + '-' + k} title={title} sub={sub}><Chips byl={byl} kind={kind} k={k} extra={extra} ro={lock} /></Group>);
     };
-    if (cur === 'aspect') Object.entries(d.aspects).forEach(([k, byl]) => chipBlock('aspect', k, byl, k, (ASPECT_NAMES[k] || '') + (lock ? ' · admin only' : ''), k));
-    if (cur === 'small') Object.entries(d.smalltalk).forEach(([k, byl]) => chipBlock('small', k, byl, SMALL_NAMES[k] || k, lock ? 'global · admin only' : 'global', SMALL_NAMES[k]));
-    if (cur === 'filler') chipBlock('filler', 'filler', d.fillers, 'Filler words', 'Words with no meaning of their own' + (lock ? ' · admin only' : ''));
-    if (cur === 'block') BLOCK_GROUPS.forEach(([k, t, desc]) => chipBlock('guard', k, d.guard[k] || {}, t, desc, t));
-    return out.length ? out : <div className="sub">Nothing matches the filter.</div>;
+    if (cur === 'aspect') Object.entries(d.aspects).forEach(([k, byl]) => chipBlock('aspect', k, byl, k, (ASPECT_NAMES[k] ? T(ASPECT_NAMES[k]) : '') + (lock ? ' · ' + T('admin only') : ''), k));
+    if (cur === 'small') Object.entries(d.smalltalk).forEach(([k, byl]) => chipBlock('small', k, byl, T(SMALL_NAMES[k] || k), T(lock ? 'global · admin only' : 'global'), SMALL_NAMES[k]));
+    if (cur === 'filler') chipBlock('filler', 'filler', d.fillers, T('Filler words'), T('Words with no meaning of their own') + (lock ? ' · ' + T('admin only') : ''));
+    if (cur === 'block') BLOCK_GROUPS.forEach(([k, t, desc]) => chipBlock('guard', k, d.guard[k] || {}, T(t), T(desc), t));
+    return out.length ? out : <div className="sub">{T('Nothing matches the filter.')}</div>;
   };
 
   return (
-    <div className="card"><div className="head"><div><h2>Topics · {p.M.name}</h2><div className="sub">Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.</div></div><button className="btn pri" type="button" aria-haspopup="dialog" onClick={() => setAdding(true)}>＋ Add a topic or keyword</button></div>
-      <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{l}<span className="tn">{tabCount(k)}</span></button>)}</div>
-      {lock && <div className="note" style={{ margin: '8px 0' }}>You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.</div>}
+    <div className="card"><div className="head"><div><h2>{T('Topics')} · {p.M.name}</h2><div className="sub">{T("Each topic has the keywords that mean it. The bot looks for them anywhere in the customer's sentence.")}</div></div><button className="btn pri" type="button" aria-haspopup="dialog" onClick={() => setAdding(true)}>＋ {T('Add a topic or keyword')}</button></div>
+      <div className="tabs" role="tablist" style={{ marginTop: 8 }}>{TABS.filter(([k]) => p.adv || k !== 'aspect').map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => { setTab(k); setQ(''); setJust([]); setFresh(new Set()); }}>{T(l)}<span className="tn">{tabCount(k)}</span></button>)}</div>
+      {lock && <div className="note" style={{ margin: '8px 0' }}>{T('You are signed in as staff: global lists are read-only. You can add short forms for your own merchant.')}</div>}
       <div className="tbar">
-        {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['flow', 'Flowchart'], ['list', 'List']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{l}</button>)}</div>}
-        {(cur === 'small' || cur === 'filler' || cur === 'block') && <div className="segs" role="group" aria-label="View">{([[false, 'List'], [true, 'How it works']] as const).map(([k, l]) => <button key={l} type="button" aria-pressed={how === k} className={how === k ? 'on' : ''} onClick={() => setHow(k)}>{l}</button>)}</div>}
-        {!flow && !showHow && <div className="filt"><input type="search" placeholder="Filter words" aria-label="Filter words" value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-          <span className="sub">{shown} words shown</span></div>}
+        {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['flow', 'Flowchart'], ['list', 'List']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{T(l)}</button>)}</div>}
+        {(cur === 'small' || cur === 'filler' || cur === 'block') && <div className="segs" role="group" aria-label="View">{([[false, 'List'], [true, 'How it works']] as const).map(([k, l]) => <button key={l} type="button" aria-pressed={how === k} className={how === k ? 'on' : ''} onClick={() => setHow(k)}>{T(l)}</button>)}</div>}
+        {!flow && !showHow && <div className="filt"><input type="search" placeholder={T('Filter words')} aria-label={T('Filter words')} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
+          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
+          <span className="sub">{shown} {T('words shown')}</span></div>}
       </div>
-      {adding && <Modal label="Add a topic or keyword" small wide onClose={() => setAdding(false)}>
-        <div className="head"><h2>Add a topic or keyword</h2><button className="btn sm" type="button" onClick={() => setAdding(false)}>Close</button></div>
+      {adding && <Modal label={T('Add a topic or keyword')} small wide onClose={() => setAdding(false)}>
+        <div className="head"><h2>{T('Add a topic or keyword')}</h2><button className="btn sm" type="button" onClick={() => setAdding(false)}>{T('Close')}</button></div>
         <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={(msg, chip, word) => { done(msg, chip, word); setAdding(false); }} /></div></Modal>}
       {flow ? <div style={{ marginTop: 10 }}><TopicFlow /></div> : showHow ? <div style={{ marginTop: 10 }}><HowItWorks outcomes={outcomes()} onOpen={openList} /></div> : <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>Just added to the draft:</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
+        {just.length > 0 && <div className="note" style={{ background: 'var(--okbg)' }}><b>{T('Just added to the draft:')}</b> {just.map((x, i) => <span key={i}><span className="chip new ro">{x}</span> </span>)}</div>}
         <div id="kwlists" ref={listRef}>{lists()}</div>
       </div>}</div>
   );
@@ -174,36 +176,36 @@ export default function Topics() {
 
 /** The "add" forms, one per tab. Enter in any box presses the main button. */
 function AddBox({ tab, dup, done }: { tab: string; dup: (v: string) => boolean; done: (msg: string, chip: string, word?: string) => void }) {
-  const p = usePanel(); const d = p.draft; const lock = !p.isAdmin;
+  const p = usePanel(); const { t: T } = useT(); const d = p.draft; const lock = !p.isAdmin;
   const [f, setF] = useState<Record<string, string>>({});
   const v = (k: string, dflt = '') => f[k] ?? dflt; const on = (k: string) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   const first = (o: object) => Object.keys(o)[0] || '';
   const row = (children: ReactNode, go: () => void) => <div className="addrow" style={{ marginTop: 0 }} onKeyDown={(e) => { if (e.key === 'Enter' && (e.target as HTMLElement).tagName === 'INPUT') { e.preventDefault(); go(); } }}>{children}</div>;
-  const langSel = (k: string) => <label className="fld"><span>Language</span><select value={v(k, 'en')} onChange={on(k)}>{LANGS.map((l) => <option key={l} value={l}>{LN[l]}</option>)}</select></label>;
+  const langSel = (k: string) => <label className="fld"><span>{T('Language')}</span><select value={v(k, 'en')} onChange={on(k)}>{LANGS.map((l) => <option key={l} value={l}>{LN[l]}</option>)}</select></label>;
   const need = (val: string, msg: string) => { if (!val) { p.toast(msg); return true; } return false; };
   const clear = () => setF({});
 
   const addAlias = () => {
     const w = v('al_v').trim().toLowerCase(), k = v('al_k', (topicNames(d, p.merchant)[0] ?? '')), l = v('al_l', 'en'), sc = v('al_s', 'm'), kd = v('al_t', '');
-    if (need(w, 'Type the short form first') || dup(w)) return;
-    if (sc === 'g' && p.isAdmin && !d.aliases[k]) return p.toast('"' + k + '" is a topic of this merchant only, so a keyword cannot be added to all merchants.');
-    if (sc === 'g' && p.isAdmin) { p.edit((x, note) => { (x.aliases[k][l] = x.aliases[k][l] || []).push(w); note('Added global short form "' + w + '" → ' + k); }); done('Added "' + w + '" → ' + k + ' (all merchants).', w + ' → ' + k + ' · all merchants', w); }
-    else { p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: l, variant: w, canonical: k, ...(kd ? { kind: kd } : {}) }); note('Added short form "' + w + '" → ' + k + ' (' + p.M.name + ')'); }); done('Added "' + w + '" → ' + k + ' (' + p.M.name + ' only). It is in the "' + k + '" group, on the ' + p.M.name + ' line.', w + ' → ' + k + ' · ' + p.M.name + ' only', w); }
+    if (need(w, T('Type the short form first')) || dup(w)) return;
+    if (sc === 'g' && p.isAdmin && !d.aliases[k]) return p.toast(T('"{k}" is a topic of this merchant only, so a keyword cannot be added to all merchants.', { k }));
+    if (sc === 'g' && p.isAdmin) { p.edit((x, note) => { (x.aliases[k][l] = x.aliases[k][l] || []).push(w); note('Added global short form "' + w + '" → ' + k); }); done(T('Added "{w}" → {k} (all merchants).', { w, k }), w + ' → ' + k + ' · ' + T('all merchants'), w); }
+    else { p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: l, variant: w, canonical: k, ...(kd ? { kind: kd } : {}) }); note('Added short form "' + w + '" → ' + k + ' (' + p.M.name + ')'); }); done(T('Added "{w}" → {k} ({m} only). It is in the "{k}" group, on the {m} line.', { w, k, m: p.M.name }), w + ' → ' + k + ' · ' + T('{m} only', { m: p.M.name }), w); }
     clear();
   };
   const addTopic = () => {
-    const n = slug(v('tp_n')); if (need(n, 'Type a name first')) return;
+    const n = slug(v('tp_n')); if (need(n, T('Type a name first'))) return;
     const shared = v('tp_s', 'm') === 'g' && p.isAdmin;
-    if (topicNames(d, p.merchant).includes(n)) return p.toast('The topic "' + n + '" already exists');
+    if (topicNames(d, p.merchant).includes(n)) return p.toast(T('The topic "{n}" already exists', { n }));
     const words = v('tp_w').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
     if (shared) {                                                   // the template every merchant starts from (admin only)
       const byl: Record<string, string[]> = { ...emptyWords(), en: [n] };
       words.forEach((w) => { const l = guessLang(w); if (!byl[l].includes(w)) byl[l].push(w); });
       p.edit((x, note) => { x.aliases[n] = byl; note('Added topic "' + n + '" (all merchants)'); });
-      done('Topic "' + n + '" created for all merchants. You can now assign it to entries.', 'topic: ' + n + ' · all merchants');
+      done(T('Topic "{n}" created for all merchants. You can now assign it to entries.', { n }), T('topic') + ': ' + n + ' · ' + T('all merchants'));
     } else {                                                        // the usual case: the merchant owns its topic
       p.edit((x, note) => { addOwnTopic(x, p.merchant, n, words); note('Added topic "' + n + '" (' + p.M.name + ')'); });
-      done('Topic "' + n + '" created for ' + p.M.name + '. You can now assign it to entries.', 'topic: ' + n + ' · ' + p.M.name);
+      done(T('Topic "{n}" created for {m}. You can now assign it to entries.', { n, m: p.M.name }), T('topic') + ': ' + n + ' · ' + p.M.name);
     }
     clear();
   };
@@ -211,36 +213,36 @@ function AddBox({ tab, dup, done }: { tab: string; dup: (v: string) => boolean; 
     const pre = ({ filler: 'fl', aspect: 'as', small: 'sm', guard: 'gd' })[kind];
     const w = v(pre + '_v').trim().toLowerCase(), l = v(pre + '_l', 'en');
     const k = kind === 'aspect' ? v('as_k', first(d.aspects)) : kind === 'small' ? v('sm_k', first(d.smalltalk)) : kind === 'guard' ? v('gd_k', 'abuse') : '';
-    if (need(w, 'Type a word first') || dup(w)) return;
+    if (need(w, T('Type a word first')) || dup(w)) return;
     p.edit((x, note) => {
       if (kind === 'filler') { (x.fillers[l] = x.fillers[l] || []).push(w); note('Added filler word "' + w + '"'); }
       if (kind === 'aspect') { (x.aspects[k][l] = x.aspects[k][l] || []).push(w); note('Added question word "' + w + '" (' + k + ')'); }
       if (kind === 'small') { (x.smalltalk[k][l] = x.smalltalk[k][l] || []).push(w); note('Added greeting phrase "' + w + '"'); }
       if (kind === 'guard') { (x.guard[k][l] = x.guard[k][l] || []).push(w); note('Added to block list "' + w + '" (' + k + ')'); }
     });
-    if (kind === 'filler') done('Added filler word "' + w + '".', 'filler: ' + w, w);
-    if (kind === 'aspect') done('Added question word "' + w + '" (' + k + ').', 'question word: ' + w + ' · ' + k, w);
-    if (kind === 'small') done('Added greeting phrase "' + w + '".', 'greeting: ' + w + ' · ' + k, w);
-    if (kind === 'guard') done('Added "' + w + '" to the block list.', 'block list: ' + w + ' · ' + k, w);
+    if (kind === 'filler') done(T('Added filler word "{w}".', { w }), T('filler') + ': ' + w, w);
+    if (kind === 'aspect') done(T('Added question word "{w}" ({k}).', { w, k }), T('question word') + ': ' + w + ' · ' + k, w);
+    if (kind === 'small') done(T('Added greeting phrase "{w}".', { w }), T('greeting') + ': ' + w + ' · ' + k, w);
+    if (kind === 'guard') done(T('Added "{w}" to the block list.', { w }), T('block list') + ': ' + w + ' · ' + k, w);
     clear();
   };
 
   if (tab === 'short') return <>
-    <div className="group"><div className="lbl"><b>New topic</b><span className="lock">Each merchant owns its topics. A new topic belongs to {p.M.name}{lock ? '' : ' unless you choose all merchants'}.</span></div>{row(<>
-      <label className="fld"><span>Topic name (one word, lowercase)</span><input type="text" placeholder="e.g. refund" value={v('tp_n')} onChange={on('tp_n')} /></label>
-      <label className="fld w2"><span>Keywords (comma separated, any language)</span><input type="text" placeholder="e.g. refunds, bayaran balik, 退款" value={v('tp_w')} onChange={on('tp_w')} /></label>
-      {!lock && <label className="fld"><span>Applies to</span><select value={v('tp_s', 'm')} onChange={on('tp_s')}><option value="m">{p.M.name} only</option><option value="g">All merchants (template)</option></select></label>}
-      <button className="btn pri" type="button" onClick={addTopic}>Create topic</button></>, addTopic)}</div>
-    <div className="group"><div className="lbl"><b>Add a keyword</b><span className="lock">Pick the main keyword (topic), then the short form, slang or same-meaning word that points to it. For example dp → deposit.</span></div>{row(<>
-      <label className="fld"><span>Keyword</span><input type="text" placeholder="e.g. depoo" value={v('al_v')} onChange={on('al_v')} /></label>
-      <label className="fld"><span>Topic</span><select value={v('al_k', (topicNames(d, p.merchant)[0] ?? ''))} onChange={on('al_k')}>{topicNames(d, p.merchant).map((k) => <option key={k}>{k}</option>)}</select></label>{langSel('al_l')}
-      <label className="fld"><span>Kind</span><select value={v('al_t', '')} onChange={on('al_t')}>{KW_PICK.map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select></label>
-      <label className="fld"><span>Applies to</span><select value={v('al_s', 'm')} onChange={on('al_s')}><option value="m">{p.M.name} only</option>{!lock && <option value="g">All merchants</option>}</select></label>
-      <button className="btn pri" type="button" onClick={addAlias}>Add</button></>, addAlias)}</div></>;
-  if (lock) return <div className="lock">Global lists are read-only for staff. You can request new words from an admin, or add short forms for your own merchant on the Short forms tab.</div>;
-  if (tab === 'aspect') return row(<><label className="fld"><span>New word or phrase</span><input type="text" placeholder="e.g. cut off" value={v('as_v')} onChange={on('as_v')} /></label><label className="fld"><span>Question type</span><select value={v('as_k', first(d.aspects))} onChange={on('as_k')}>{Object.keys(d.aspects).map((k) => <option key={k}>{k}</option>)}</select></label>{langSel('as_l')}<button className="btn pri" type="button" onClick={() => addWord('aspect')}>Add</button></>, () => addWord('aspect'));
-  if (tab === 'small') return row(<><label className="fld"><span>New phrase</span><input type="text" placeholder="e.g. hi moi" value={v('sm_v')} onChange={on('sm_v')} /></label><label className="fld"><span>Type</span><select value={v('sm_k', first(d.smalltalk))} onChange={on('sm_k')}>{Object.keys(d.smalltalk).map((k) => <option key={k} value={k}>{SMALL_NAMES[k] || k}</option>)}</select></label>{langSel('sm_l')}<button className="btn pri" type="button" onClick={() => addWord('small')}>Add</button></>, () => addWord('small'));
-  if (tab === 'filler') return row(<><label className="fld"><span>New filler word</span><input type="text" placeholder="e.g. lh" value={v('fl_v')} onChange={on('fl_v')} /></label>{langSel('fl_l')}<button className="btn pri" type="button" onClick={() => addWord('filler')}>Add</button></>, () => addWord('filler'));
-  if (tab === 'block') return row(<><label className="fld"><span>New word</span><input type="text" placeholder="word or phrase" value={v('gd_v')} onChange={on('gd_v')} /></label><label className="fld"><span>List</span><select value={v('gd_k', 'abuse')} onChange={on('gd_k')}>{BLOCK_GROUPS.map(([k, t]) => <option key={k} value={k}>{t}</option>)}</select></label>{langSel('gd_l')}<button className="btn pri" type="button" onClick={() => addWord('guard')}>Add</button></>, () => addWord('guard'));
+    <div className="group"><div className="lbl"><b>{T('New topic')}</b><span className="lock">{T('Each merchant owns its topics. A new topic belongs to {m}{x}.', { m: p.M.name, x: lock ? '' : T(' unless you choose all merchants') })}</span></div>{row(<>
+      <label className="fld"><span>{T('Topic name (one word, lowercase)')}</span><input type="text" placeholder={T('e.g. refund')} value={v('tp_n')} onChange={on('tp_n')} /></label>
+      <label className="fld w2"><span>{T('Keywords (comma separated, any language)')}</span><input type="text" placeholder={T('e.g. refunds, bayaran balik, 退款')} value={v('tp_w')} onChange={on('tp_w')} /></label>
+      {!lock && <label className="fld"><span>{T('Applies to')}</span><select value={v('tp_s', 'm')} onChange={on('tp_s')}><option value="m">{T('{m} only', { m: p.M.name })}</option><option value="g">{T('All merchants (template)')}</option></select></label>}
+      <button className="btn pri" type="button" onClick={addTopic}>{T('Create topic')}</button></>, addTopic)}</div>
+    <div className="group"><div className="lbl"><b>{T('Add a keyword')}</b><span className="lock">{T('Pick the main keyword (topic), then the short form, slang or same-meaning word that points to it. For example dp → deposit.')}</span></div>{row(<>
+      <label className="fld"><span>{T('Keyword')}</span><input type="text" placeholder={T('e.g. depoo')} value={v('al_v')} onChange={on('al_v')} /></label>
+      <label className="fld"><span>{T('Topic')}</span><select value={v('al_k', (topicNames(d, p.merchant)[0] ?? ''))} onChange={on('al_k')}>{topicNames(d, p.merchant).map((k) => <option key={k}>{k}</option>)}</select></label>{langSel('al_l')}
+      <label className="fld"><span>{T('Kind')}</span><select value={v('al_t', '')} onChange={on('al_t')}>{KW_PICK.map(([k, l]) => <option key={k} value={k}>{T(l)}</option>)}</select></label>
+      <label className="fld"><span>{T('Applies to')}</span><select value={v('al_s', 'm')} onChange={on('al_s')}><option value="m">{T('{m} only', { m: p.M.name })}</option>{!lock && <option value="g">{T('All merchants')}</option>}</select></label>
+      <button className="btn pri" type="button" onClick={addAlias}>{T('Add')}</button></>, addAlias)}</div></>;
+  if (lock) return <div className="lock">{T('Global lists are read-only for staff. You can request new words from an admin, or add short forms for your own merchant on the Short forms tab.')}</div>;
+  if (tab === 'aspect') return row(<><label className="fld"><span>{T('New word or phrase')}</span><input type="text" placeholder={T('e.g. cut off')} value={v('as_v')} onChange={on('as_v')} /></label><label className="fld"><span>{T('Question type')}</span><select value={v('as_k', first(d.aspects))} onChange={on('as_k')}>{Object.keys(d.aspects).map((k) => <option key={k}>{k}</option>)}</select></label>{langSel('as_l')}<button className="btn pri" type="button" onClick={() => addWord('aspect')}>{T('Add')}</button></>, () => addWord('aspect'));
+  if (tab === 'small') return row(<><label className="fld"><span>{T('New phrase')}</span><input type="text" placeholder={T('e.g. hi moi')} value={v('sm_v')} onChange={on('sm_v')} /></label><label className="fld"><span>{T('Type')}</span><select value={v('sm_k', first(d.smalltalk))} onChange={on('sm_k')}>{Object.keys(d.smalltalk).map((k) => <option key={k} value={k}>{T(SMALL_NAMES[k] || k)}</option>)}</select></label>{langSel('sm_l')}<button className="btn pri" type="button" onClick={() => addWord('small')}>{T('Add')}</button></>, () => addWord('small'));
+  if (tab === 'filler') return row(<><label className="fld"><span>{T('New filler word')}</span><input type="text" placeholder={T('e.g. lh')} value={v('fl_v')} onChange={on('fl_v')} /></label>{langSel('fl_l')}<button className="btn pri" type="button" onClick={() => addWord('filler')}>{T('Add')}</button></>, () => addWord('filler'));
+  if (tab === 'block') return row(<><label className="fld"><span>{T('New word')}</span><input type="text" placeholder={T('word or phrase')} value={v('gd_v')} onChange={on('gd_v')} /></label><label className="fld"><span>{T('List')}</span><select value={v('gd_k', 'abuse')} onChange={on('gd_k')}>{BLOCK_GROUPS.map(([k, t]) => <option key={k} value={k}>{T(t)}</option>)}</select></label>{langSel('gd_l')}<button className="btn pri" type="button" onClick={() => addWord('guard')}>{T('Add')}</button></>, () => addWord('guard'));
   return null;
 }

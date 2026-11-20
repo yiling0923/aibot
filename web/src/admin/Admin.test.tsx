@@ -654,6 +654,17 @@ describe('Control panel', () => {
     expect(await screen.findByText('必须有英文答案')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
+  it('Chinese: the Topics, Keywords and Keyword ranking pages are translated', async () => {
+    localStorage.setItem('panelLang', 'zh');
+    const { unmount } = open('admin', '/admin/kw');
+    expect(await screen.findByText(/Topics · LuckyPay/)).toBeTruthy();
+    expect(screen.getByRole('button', { name: /添加 Topic 或 Keyword/ })).toBeTruthy(); expect(screen.getByRole('tab', { name: /疑问词|问候语/ })).toBeTruthy();
+    unmount(); const k = open('admin', '/admin/store');
+    expect(await screen.findByText(/Keywords · LuckyPay/)).toBeTruthy(); expect(screen.getByText('听到的词')).toBeTruthy(); expect(screen.getByPlaceholderText('搜索词')).toBeTruthy();
+    k.unmount(); open('admin', '/admin/rank');
+    expect(await screen.findByText(/Keyword ranking · LuckyPay/)).toBeTruthy(); expect(screen.getByText('本周')).toBeTruthy();
+    localStorage.removeItem('panelLang');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

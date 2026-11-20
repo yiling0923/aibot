@@ -19,3 +19,9 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }
 export const useT = () => useContext(Ctx);
+
+/** The status of a word ("Topic: deposit", "Filler", "Not set yet") in the panel language. The name after the colon stays as written. */
+export const tStatus = (t: I18n['t'], s: string): string => {
+  const m = s.match(/^(Topic|Question word|Greeting list): (.*?)( \(this merchant\))?$/);
+  return m ? t(m[1]) + ': ' + m[2] + (m[3] ? ' ' + t('(this merchant)') : '') : t(s);
+};
