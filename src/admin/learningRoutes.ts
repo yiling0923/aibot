@@ -49,6 +49,23 @@ export function learningRoutes(app: FastifyInstance, ctx: { pool: Pool }) {
   });
 
   /** Admin only: put a merchant into listening (the bot stays silent and learns) or answering. */
+  /** Suggestions from what customers chose: a message the rules could not place alone, and the answer the customer picked from the choices. Staff approve or dismiss each one. */
+  app.get<{ Querystring: { merchant: string } }>('/api/admin/learning/choices', async (req, reply) => {
+    const code = String(req.query.merchant ?? ''); if (!mayUse(req, code)) return reply.code(403).send({ error: 'You cannot see this merchant.' });
+    const t = await new Tenants(ctx.pool).get(code); if (!t) return reply.code(404).send({ error: 'There is no such merchant.' });
+    const rows = await q(ctx.pool, `SELECT id, customer_text, intent_key, hits FROM ${tbl(t.db, 'choice_hints')} WHERE status = 'open' ORDER BY hits DESC, last_seen DESC LIMIT 100`);
+    return rows.map((r) => ({ id: Number(r.id), text: String(r.customer_text), intent: String(r.intent_key), hits: Number(r.hits) }));
+  });
+  app.post<{ Body: { merchant?: string; ids?: number[]; action?: string } }>('/api/admin/learning/choices/resolve', async (req, reply) => {
+    const b = req.body ?? {}; const code = String(b.merchant ?? ''); if (!mayUse(req, code)) return reply.code(403).send({ error: 'You cannot change this merchant.' });
+    if (b.action !== 'added' && b.action !== 'dismissed') return reply.code(400).send({ error: 'action must be added or dismissed.' });
+    const ids = (Array.isArray(b.ids) ? b.ids : []).map(Number).filter((n) => Number.isInteger(n) && n > 0).slice(0, 200);
+    const t = await new Tenants(ctx.pool).get(code); if (!t) return reply.code(404).send({ error: 'There is no such merchant.' });
+    if (!ids.length) return { changed: 0 };
+    const [r] = await ctx.pool.query<import('mysql2/promise').ResultSetHeader>(`UPDATE ${tbl(t.db, 'choice_hints')} SET status = ? WHERE status = 'open' AND id IN (${ids.map(() => '?').join(',')})`, [b.action, ...ids]);
+    return { changed: r.affectedRows };
+  });
+
   app.post<{ Params: { code: string }; Body: { mode?: string } }>('/api/admin/merchants/:code/mode', async (req, reply) => {
     if (req.user?.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can do this.' });
     const mode = req.body?.mode; if (mode !== 'listening' && mode !== 'answering') return reply.code(400).send({ error: 'The mode is listening or answering.' });

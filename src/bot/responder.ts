@@ -19,6 +19,8 @@ export interface Session {
   draft: string | null; misses: number; abuseCount: number; lastTopic: string | null; clarifyCount: number; pending: string | null; closed: boolean; handed: boolean;
   /** What the bot last offered as choices, so the customer can answer with a word, a number or "the first one". */
   choices?: Button[] | null;
+  /** What the customer first wrote when the bot only asked which topic they mean (kept until they choose the answer, so the pick can be noted as a suggestion). */
+  meant?: string | null;
   /** The language of the last turn. */
   lang?: Lang | null;
   /** The kind of question the bot asked last, so it never asks twice: reask (not understood), clarify (two answers close), topics (two topics close), menu (which question about this topic). Null when nothing is open. */
@@ -173,6 +175,7 @@ export class Bot {
       const hit = matchChoice(typed, s.choices);
       if (hit) { const picked = this.pick(s, { kind: hit.kind, key: hit.key, amt: hit.amt, label: hit.label, lang: s.lang ?? this.cfg(s).defaultLanguage }); if (picked) { picked.trace = { ...picked.trace, typedReply: typed }; return picked; } }
     }
+    s.meant = null;                                          // a new typed question: what was meant before is dropped
     const turn = await this.messageCore(s, rawText);
     return turn && this.finish(s, turn, (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? this.cfg(s).defaultLanguage) as Lang);
   }
@@ -421,7 +424,14 @@ export class Bot {
       turn.trace = { ...turn.trace, acct: { chk: ac.chk, verified: ac.verified, call: ac.call, json: ac.json, rows: ac.rows } };
       say(ac.text); if (ac.agent) turn.buttons = this.buttons([], lang); return turn;
     }
+    /** What the customer meant by a message the rules could not place alone ("tng"): the answer they chose. Only noted when the rules had no keyword for it, so staff can approve it as a new example question. */
+    const learned = (k: string) => {
+      const text = (pending ?? s.meant ?? '').trim(); s.meant = null; if (!text || text.length < 2 || text.length > 120) return;
+      if (this.engine.analyze(text, s.merchant, 0).via === 'keywords') return;
+      turn.trace = { ...turn.trace, choiceLearned: { text, intent: k } };
+    };
     const intentAnswer = (k: string) => {
+      learned(k);
       if (this.engine.entry(s.merchant, k)?.entryType === 'needs_staff') { const h = this.handoff(s, lang); turn.messages.push(...h.messages); turn.status = h.status; turn.trace = { ...turn.trace, pickKind: 'intent', key: k, why: 'Marked "needs staff": a person answers this.' }; return; }
       const a = this.ans(s.merchant, k, lang); turn.trace = { ...turn.trace, pickKind: 'intent', key: k, extra: a }; say(this.wrap(s, a, lang)); this.startGuided(s, k, lang, turn); };
     if (kind === 'intent') { intentAnswer(key); return turn; }
@@ -433,6 +443,7 @@ export class Bot {
         const joined = this.engine.analyze(pending + ' ' + key, s.merchant, 0);
         if (joined.decision === 'ANSWER' && joined.via === 'keywords' && list.includes(joined.top.intent)) { turn.trace = { ...turn.trace, joinedWith: pending }; intentAnswer(joined.top.intent); return turn; }
       }
+      if (pending?.trim()) s.meant = pending.trim();                                       // the customer is about to choose the exact answer: remember what they first wrote
       const m = this.choiceMenu(s, key, lang); turn.messages.push(m.message); turn.buttons = m.buttons; s.askKind = 'menu';
       turn.trace = { ...turn.trace, extra: list.map((k) => this.label({ kind: 'intent', key: k }, lang)).join(' · ') + ' · ' + T.AGENT[lang] };
       return turn;

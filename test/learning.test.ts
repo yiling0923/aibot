@@ -6,6 +6,10 @@ import { migrate } from '../src/db/migrate';
 import { seed, DEMO_ADMIN, DEMO_STAFF_PASSWORD } from '../src/db/seed';
 import { buildApp } from '../src/server/app';
 import { extractPairs, maskPersonal } from '../src/learning/collect';
+import { saveChoiceHint } from '../src/learning/choices';
+import { Bot, newSession } from '../src/bot/responder';
+import { knowledgeFromSeed } from '../src/engine';
+import { seedJson, accountsJson } from './helpers';
 
 describe('what the bot saves while it only listens (no database)', () => {
   it('masks emails, links and long numbers, and keeps ordinary words', () => {
@@ -20,6 +24,34 @@ describe('what the bot saves while it only listens (no database)', () => {
       { customer: 'withdraw time?', staff: null, at: null }]);
     expect(extractPairs([], 'hi')).toEqual([{ customer: 'hi', staff: null, at: null }]);
     expect(extractPairs([{ role: 'user', text: 'hi' }], 'hi')).toEqual([{ customer: 'hi', staff: null, at: null }]);         // the question itself is not counted twice
+  });
+});
+
+describe('what the customer meant: a message the rules could not place, and the answer chosen (no database)', () => {
+  const bot = () => new Bot(knowledgeFromSeed(seedJson, accountsJson));
+  it('notes the message and the chosen answer when the rules had no keyword for it', () => {
+    const b = bot(); const s = newSession('c1', 'MERCH_A', null); s.pending = 'tng';
+    const t = b.pick(s, { kind: 'intent', key: 'deposit_how', label: 'How to deposit', lang: 'en' })!;
+    expect(t.trace.choiceLearned).toEqual({ text: 'tng', intent: 'deposit_how' });
+  });
+  it('works through the usual way: the bot asks, the customer taps, and for "which topic" first the exact answer is what counts', async () => {
+    const b = bot();
+    const s1 = newSession('c4', 'MERCH_A', null); const t1 = (await b.message(s1, 'how to fund account'))!;               // two answers are close: the bot shows them
+    expect(t1.trace.decision).toBe('CLARIFY');
+    expect(b.pick(s1, { kind: 'intent', key: 'deposit_how', label: 'How to deposit', lang: 'en' })!.trace.choiceLearned).toEqual({ text: 'how to fund account', intent: 'deposit_how' });
+    const s2 = newSession('c5', 'MERCH_A', null); expect((await b.message(s2, 'put money in'))!.trace.decision).toBe('REASK');   // not understood: topics are offered first
+    const menu = b.pick(s2, { kind: 'topic', key: 'deposit', label: 'Deposit', lang: 'en' })!;
+    expect(menu.trace.choiceLearned).toBeUndefined();                                                                      // a topic is not the answer yet
+    expect(b.pick(s2, { kind: 'intent', key: 'deposit_time', label: 'Deposit time', lang: 'en' })!.trace.choiceLearned).toEqual({ text: 'put money in', intent: 'deposit_time' });
+    const s3 = newSession('c6', 'MERCH_A', null); await b.message(s3, 'put money in'); b.pick(s3, { kind: 'topic', key: 'deposit', label: 'Deposit', lang: 'en' });
+    await b.message(s3, 'something else entirely');                                                                        // a new question instead of a tap: what was meant is dropped
+    expect(s3.meant ?? null).toBeNull();
+  });
+  it('does not note a message the keywords already understood, or a tap with nothing asked before it', () => {
+    const b = bot(); const s = newSession('c2', 'MERCH_A', null); s.pending = 'deposit';
+    expect(b.pick(s, { kind: 'intent', key: 'deposit_how', label: 'How to deposit', lang: 'en' })!.trace.choiceLearned).toBeUndefined();
+    const s2 = newSession('c3', 'MERCH_A', null);
+    expect(b.pick(s2, { kind: 'intent', key: 'deposit_how', label: 'How to deposit', lang: 'en' })!.trace.choiceLearned).toBeUndefined();
   });
 });
 
@@ -70,12 +102,38 @@ describe.skipIf(!reachable)('a merchant that listens first, then answers (needs 
     expect((await as(staff, 'GET', '/api/admin/learning?merchant=MERCH_B')).statusCode).toBe(403);
   });
 
+  it('suggestions from what customers chose: saved without personal details, counted, listed, and approved or dismissed by the merchant', async () => {
+    const db = await dbOf('MERCH_A');
+    expect(await saveChoiceHint(pool!, db, 'tng', 'deposit_how')).toBe(true);
+    expect(await saveChoiceHint(pool!, db, 'TNG', 'deposit_how')).toBe(true);                       // the same words again: counted, not repeated
+    expect(await saveChoiceHint(pool!, db, 'call 0123456789 now', 'deposit_how')).toBe(false);     // personal details: not saved at all
+    expect(await saveChoiceHint(pool!, db, '12', 'deposit_how')).toBe(false);                      // no letters
+    expect(await saveChoiceHint(pool!, db, 'sini', 'withdraw_how')).toBe(true);
+    const list = (await as(staff, 'GET', '/api/admin/learning/choices?merchant=MERCH_A')).json();
+    expect(list.map((x: { text: string; hits: number }) => [x.text, x.hits])).toEqual([['tng', 2], ['sini', 1]]);                // most chosen first
+    expect((await as(staff, 'GET', '/api/admin/learning/choices?merchant=MERCH_B')).statusCode).toBe(403);
+    const id = list[0].id;
+    expect((await as(staff, 'POST', '/api/admin/learning/choices/resolve', { merchant: 'MERCH_B', ids: [id], action: 'added' })).statusCode).toBe(403);
+    expect((await as(staff, 'POST', '/api/admin/learning/choices/resolve', { merchant: 'MERCH_A', ids: [id], action: 'whatever' })).statusCode).toBe(400);
+    expect((await as(staff, 'POST', '/api/admin/learning/choices/resolve', { merchant: 'MERCH_A', ids: [id], action: 'added' })).json()).toEqual({ changed: 1 });
+    expect((await as(staff, 'POST', '/api/admin/learning/choices/resolve', { merchant: 'MERCH_A', ids: [id], action: 'added' })).json()).toEqual({ changed: 0 });   // already dealt with
+    expect((await as(staff, 'GET', '/api/admin/learning/choices?merchant=MERCH_A')).json().map((x: { text: string }) => x.text)).toEqual(['sini']);
+  });
+
   it('after the admin switches to answering, the bot answers from the knowledge base again, and the merchant list says which mode it is in', async () => {
     const state = (await as(admin, 'GET', '/api/admin/state')).json();
     expect(state.merchants.find((m: { code: string }) => m.code === 'MERCH_A')).toMatchObject({ bot_mode: 'listening' });
     expect((await as(admin, 'POST', '/api/admin/merchants/MERCH_A/mode', { mode: 'answering' })).json().mode).toBe('answering');
     const r = (await ask({ question: 'how to deposit', session_id: 'l-3' })).json();
     expect(r.decision).toBe('answer'); expect(r.answer).not.toBe('');
+  });
+  it('through the connector: the customer chooses an answer for a message the rules could not place, and it becomes a suggestion', async () => {
+    const first = (await ask({ question: 'how to fund account', session_id: 'c-1' })).json();                           // two answers are close: the bot shows them
+    expect(first.decision).toBe('clarify');
+    const second = (await ask({ question: 'how to deposit', session_id: 'c-1' })).json();                                // the customer answers in their own words
+    expect(second.decision).toBe('answer');
+    const list = (await as(staff, 'GET', '/api/admin/learning/choices?merchant=MERCH_A')).json();
+    expect(list.find((x: { text: string; intent: string }) => x.text === 'how to fund account' && x.intent === 'deposit_how')).toBeTruthy();
   });
 
   it('learns from an export of old chats: pairs customer questions with staff replies, masks personal details, and counts them on the Learning screen', async () => {

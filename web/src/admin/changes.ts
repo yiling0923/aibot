@@ -9,6 +9,7 @@ const RULES: [RegExp, string][] = [
   [/^Deleted answer "(.*)" \((.*)\)$/, '已删除答案“$1”（$2）'], [/^Deleted topic "(.*)" \((.*)\)$/, '已删除主题“$1”（$2）'],
   [/^Deleted (\d+) entr(?:y|ies) \((.*)\)$/, '已删除 $1 个条目（$2）'],
   [/^Added filler word "(.*)"$/, '已添加填充词“$1”'], [/^Added greeting phrase "(.*)" \((.*)\)$/, '已添加问候语“$1”（$2）'], [/^Added greeting phrase "(.*)"$/, '已添加问候语“$1”'],
+  [/^Added example question "(.*)" to "(.*)" \((.*)\)$/, '已为“$2”添加示例问题“$1”（$3）'],
   [/^Added keyword "(.*)" to topic "(.*)" \((.*)\)$/, '已把关键词“$1”添加到主题“$2”（$3）'],
   [/^Added mild rude word "(.*)"$/, '已添加轻微粗鲁的词“$1”'], [/^Added rude word "(.*)"$/, '已添加粗鲁的词“$1”'],
   [/^Added question word "(.*)" \((.*)\)$/, '已添加疑问词“$1”（$2）'],

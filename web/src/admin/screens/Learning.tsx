@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
-import { LANGS, entryProblems, slug, type Entry } from '../model';
+import { LANGS, addOwnTopic, entryProblems, findDup, slug, type Entry } from '../model';
 import { Modal } from '../ui';
 import { useT } from '../i18n';
 import { parseTable } from '../model';
@@ -10,6 +10,7 @@ import { readXlsx, writeXlsx } from '../xlsx';
 import { CHAT_EXAMPLE_ROWS, CHAT_WIDTHS } from '../importSamples';
 
 interface Group { key: string; kind: 'covered' | 'topic' | 'text'; label: string; topic: string | null; intent: string | null; count: number; withReply: number; customers: { text: string; n: number }[]; replies: { text: string; n: number }[] }
+interface Hint { id: number; text: string; intent: string; hits: number }
 interface Learn { mode: 'listening' | 'answering'; since: string | null; days: number | null; pairs: number; chats: number; withReply: number; groups: Group[] }
 const MONTH = 30;
 const MIN_READY = 10;                                          // the same number as the merchant setup checklist
@@ -47,6 +48,26 @@ export default function Learning() {
   const p = usePanel(); const nav = useNavigate(); const { t, lang } = useT(); const zh = lang === 'zh'; const [d, setD] = useState<Learn | null>(null); const [err, setErr] = useState(''); const [ask, setAsk] = useState<'listening' | 'answering' | null>(null); const [busy, setBusy] = useState(false);
   const load = () => api<Learn>('/api/admin/learning?merchant=' + encodeURIComponent(p.merchant));
   useEffect(() => { let alive = true; setErr(''); setD(null); load().then((x) => { if (alive) setD(x); }).catch((e: Error) => { if (alive) setErr(e.message); }); return () => { alive = false; }; /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [p.merchant]);
+
+  /** What customers chose: a message the bot could not place alone ("tng") and the answer the customer picked. Approving adds it to that entry as an example question (and a one-word message also as a keyword of its topic). */
+  const [hints, setHints] = useState<Hint[]>([]);
+  useEffect(() => { let alive = true; setHints([]); api<Hint[]>('/api/admin/learning/choices?merchant=' + encodeURIComponent(p.merchant)).then((x) => { if (alive) setHints(x); }).catch(() => { /* the card just stays hidden */ }); return () => { alive = false; }; }, [p.merchant]);
+  const resolveHint = async (h: Hint, action: 'added' | 'dismissed') => {
+    try { await api('/api/admin/learning/choices/resolve', { merchant: p.merchant, ids: [h.id], action }); setHints((l) => l.filter((x) => x.id !== h.id)); } catch (e) { p.toast((e as Error).message); }
+  };
+  const approveHint = async (h: Hint) => {
+    const entry = p.draft.kb.find((e) => e.merchant === p.merchant && e.intent_key === h.intent);
+    if (!entry) { p.toast(t('That answer is not in the Knowledge base any more.')); return void resolveHint(h, 'dismissed'); }
+    const word = /^[\p{L}][\p{L}\p{N}_-]+$/u.test(h.text) && entry.topic && findDup(p.draft, p.merchant, p.M.name, h.text).length === 0 ? h.text.toLowerCase() : '';
+    p.edit((dr, note) => {
+      const e = dr.kb.find((x) => x.merchant === p.merchant && x.intent_key === h.intent); if (!e) return;
+      const tl = e.translations as Record<string, { question_examples: string[]; answer_text: string }>; const en = tl.en ?? { question_examples: [], answer_text: '' };
+      if (!en.question_examples.some((x) => x.toLowerCase() === h.text.toLowerCase())) { tl.en = { ...en, question_examples: [...en.question_examples, h.text] }; e.dirty = true; note(`Added example question "${h.text}" to "${h.intent}" (${p.M.name})`); }
+      if (word) { addOwnTopic(dr, p.merchant, e.topic, [word]); note(`Added keyword "${word}" to topic "${e.topic}" (${p.M.name})`); }
+    });
+    await resolveHint(h, 'added');
+    p.toast(word ? t('Added “{w}” to “{e}” as an example question and as a keyword. Press Publish to make it live.', { w: h.text, e: h.intent }) : t('Added “{w}” to “{e}” as an example question. Press Publish to make it live.', { w: h.text, e: h.intent }));
+  };
 
   const [file, setFile] = useState<{ name: string; r: ReturnType<typeof readChats> } | null>(null); const [importing, setImporting] = useState(false); const [fileKey, setFileKey] = useState(0);
   const pick = (f: File | undefined) => {
@@ -149,6 +170,14 @@ export default function Learning() {
           : <div className="note" role="status" style={{ marginTop: 8 }}><b>{file.name}</b>: {t('{chats} chats, {c} customer messages and {s} staff messages.', { chats: file.r.chats, c: file.r.customer, s: file.r.staff }).replace(/^1 chats/, '1 chat').replace(/ 1 customer messages/, ' 1 customer message').replace(/ 1 staff messages/, ' 1 staff message')}{file.r.skipped ? ' ' + t(file.r.skipped === 1 ? '{n} row was left out (empty, or a sender that is not a customer or staff).' : '{n} rows were left out (empty, or a sender that is not a customer or staff).', { n: file.r.skipped }) : ''}
             <div className="tools" style={{ marginTop: 8 }}><button className="btn pri" type="button" disabled={importing || !file.r.customer} onClick={() => void runImport()}>{importing ? t('Learning…') : t('Learn from this file')}</button><button className="btn" type="button" disabled={importing} onClick={() => { setFile(null); setFileKey((k) => k + 1); }}>{t('Clear')}</button></div></div>)}
       </div>}
+
+      {hints.length > 0 && <div className="card"><h3 style={{ margin: 0 }}>{t('Learned from what customers chose')}</h3>
+        <div className="sub" style={{ marginBottom: 8 }}>{t('When the bot was not sure what a message meant, it showed choices, and the customer picked one. Approve to add the message to that answer as an example question, so next time the bot answers straight away. Nothing is added until you press Approve.')}</div>
+        <div className="scroll"><table className="lrntable"><thead><tr><th>{t('What the customer wrote')}</th><th>{t('The answer they chose')}</th><th className="num">{t('Times')}</th><th /></tr></thead><tbody>
+          {hints.map((h) => { const e = p.draft.kb.find((x) => x.merchant === p.merchant && x.intent_key === h.intent); const a = (e?.translations as Record<string, { answer_text?: string }> | undefined)?.en?.answer_text ?? '';
+            return <tr key={h.id}><td><span className="kwchip">{h.text}</span></td><td><b>{h.intent}</b>{a && <div className="clamp2 sub">{a}</div>}</td><td className="num">{h.hits}</td>
+              <td className="lrnact"><div className="lrnbtns"><button className="btn sm pri" type="button" onClick={() => void approveHint(h)}>{t('Approve')}</button><button className="btn sm" type="button" onClick={() => void resolveHint(h, 'dismissed')}>{t('Dismiss')}</button></div></td></tr>; })}
+        </tbody></table></div></div>}
 
       {d && <div className="card"><h3 style={{ margin: 0 }}>{t('What customers asked')}</h3>
         <div className="sub" style={{ marginBottom: 8 }}>{t('Grouped by meaning, most asked first, with the reply staff gave most often. The bot never uses a past reply by itself: you check it and add it to the Knowledge base, and the bot answers only from what is live there. Phone and bank numbers, emails and links are hidden in what is saved.')}</div>

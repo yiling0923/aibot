@@ -30,6 +30,7 @@ let importedMsgs: { chat: string; from: string; text: string }[] = [];
 const LEARN = () => ({ mode: botMode, since: '2026-11-01T00:00:00Z', days: 12, pairs: 40, chats: 18, withReply: 31, groups: [
   { key: 'topic:deposit', kind: 'topic', label: 'deposit', topic: 'deposit', intent: null, count: 14, withReply: 12, customers: [{ text: 'deposit not in yet', n: 6 }, { text: 'depo pending', n: 3 }], replies: [{ text: 'Please send your receipt, we check in 5 min.', n: 9 }] },
   { key: 'kb:withdraw_time', kind: 'covered', label: 'withdraw_time', topic: 'withdraw', intent: 'withdraw_time', count: 5, withReply: 5, customers: [{ text: 'how long withdraw', n: 5 }], replies: [{ text: 'About 30 minutes.', n: 5 }] }] });
+const CHOICES = [{ id: 1, text: 'tng', intent: 'dep_how', hits: 3 }, { id: 2, text: 'put money in', intent: 'dep_time', hits: 1 }];
 let setupDone = false;
 const SETUP = () => (setupDone
   ? { done: 6, total: 6, items: [{ key: 'login', title: 'Staff login', state: 'done', detail: '1 staff login can sign in to the panel.' }] }
@@ -66,6 +67,8 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? (peopleBig ? BIG_PEOPLE : { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] })
+    : url.startsWith('/api/admin/learning/choices/resolve') ? { changed: 1 }
+    : url.startsWith('/api/admin/learning/choices') ? CHOICES
     : url === '/api/admin/learning/draft-answer' ? { answer: 'Deposits are usually credited within 5 minutes.' }
     : url === '/api/admin/learning/import' ? ((importedMsgs = JSON.parse(String(init?.body)).messages), { chats: 2, pairs: 3, withReply: 2 })
     : url.startsWith('/api/admin/learning') ? LEARN()
@@ -180,6 +183,22 @@ describe('Control panel', () => {
     cleanup(); open('admin', '/admin/learn', false);
     await screen.findByText('What customers asked');
     expect(screen.queryByRole('button', { name: 'Draft answer with AI' })).toBeNull();                    // no AI: no button
+  });
+  it('Learning: what customers chose is a suggestion; Approve adds it to the answer as an example question (a one-word message also as a keyword), Dismiss only hides it', async () => {
+    withKb = true;
+    open('staff', '/admin/learn');
+    const card = (await screen.findByText('Learned from what customers chose')).closest('.card') as HTMLElement;
+    expect(within(card).getByText('tng')).toBeTruthy(); expect(within(card).getByText('put money in')).toBeTruthy(); expect(within(card).getByText('3')).toBeTruthy();
+    const row = (w: string) => within(card).getByText(w).closest('tr') as HTMLElement;
+    await userEvent.click(within(row('tng')).getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText(/Added “tng” to “dep_how” as an example question and as a keyword/)).toBeTruthy();
+    expect(within(card).queryByText('tng')).toBeNull();
+    await userEvent.click(within(row('put money in')).getByRole('button', { name: 'Approve' }));
+    expect(await screen.findByText(/Added “put money in” to “dep_time” as an example question\. Press/)).toBeTruthy();      // not one word: no keyword
+    await userEvent.click(screen.getByRole('button', { name: /What changed/ }));
+    const lines = [...document.querySelectorAll('.pubbar-list li')].map((x) => x.textContent ?? '');
+    expect(lines).toContain('Added example question "tng" to "dep_how" (SwiftWallet)'); expect(lines.some((x) => /Added keyword "tng" to topic/.test(x))).toBe(true);
+    expect(lines.some((x) => /Added keyword "put money in"/.test(x))).toBe(false);
   });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');

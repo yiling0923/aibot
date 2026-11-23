@@ -1213,4 +1213,10 @@ export const ZH: Record<string, string> = {
   'Draft answer (edit it as you like)': '草稿答案（可以随意修改）', 'Draft answer': '草稿答案',
   'The AI used only what the staff replies say and may not add a number or link that they do not have. Still, read every fact. It is added as a draft: you set it live and publish.': 'AI 只使用员工回复里写的内容，不能加入回复里没有的数字或链接。但仍请检查每一个事实。它会作为草稿加入：由你设为启用并发布。',
   'Drafting answers from staff replies': '根据员工回复起草答案',
+  'That answer is not in the Knowledge base any more.': '这个答案已经不在知识库里了。',
+  'Added “{w}” to “{e}” as an example question and as a keyword. Press Publish to make it live.': '已把“{w}”加入“{e}”，作为示例问题和关键词。按“发布”后即启用。',
+  'Added “{w}” to “{e}” as an example question. Press Publish to make it live.': '已把“{w}”加入“{e}”，作为示例问题。按“发布”后即启用。',
+  'Learned from what customers chose': '从客户的选择中学到的',
+  'When the bot was not sure what a message meant, it showed choices, and the customer picked one. Approve to add the message to that answer as an example question, so next time the bot answers straight away. Nothing is added until you press Approve.': '当机器人不确定一条消息的意思时，它会显示选项，由客户选择其中一个。点击“批准”会把这条消息作为示例问题加到那个答案里，下次机器人就能直接回答。在你点击“批准”之前不会添加任何内容。',
+  'What the customer wrote': '客户写了什么', 'The answer they chose': '他们选择的答案', 'Times': '次数',
 };

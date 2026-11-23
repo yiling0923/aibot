@@ -1,4 +1,5 @@
 import { extractPairs, recordPairs } from '../learning/collect';
+import { saveChoiceHint } from '../learning/choices';
 import { createHash, randomUUID } from 'node:crypto';
 import type { RowDataPacket } from 'mysql2/promise';
 import type { Pool } from '../db/pool';
@@ -148,6 +149,8 @@ export async function ask(deps: AskDeps, merchant: string, body: Record<string, 
     const turn: Turn | null = await bot.message(s, question);
     s.fileNext = false;
     if (!turn) return fallback();
+    const cl = turn.trace.choiceLearned as { text?: string; intent?: string } | undefined;                          // the customer chose an answer for a message the rules could not place: a suggestion for staff
+    if (cl?.text && cl.intent) { try { await saveChoiceHint(pool, tenant.db, cl.text, cl.intent); } catch (e) { console.error('learning: could not save the choice', e); } }
 
     const lang = (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? s.lang ?? state.lang) as Lang | null; state.lang = lang;
     let answer = turn.messages.filter((m) => m.kind === 'bot').map((m) => m.text).join('\n\n');

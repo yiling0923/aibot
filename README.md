@@ -394,6 +394,12 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 On the English tab, **Translate the empty languages with AI** fills every language the merchant has switched on (Merchant settings → General → "Languages the bot answers in"), except English, but only the ones that are still empty and never over text that is there. A merchant that never chose its languages gets Malay and Chinese. On another language's tab, the button translates just that one language (and asks before it replaces an answer).
 
+### Learning from what customers choose
+
+When the bot is not sure what a message means (for example just `tng`) it shows choices, and the customer picks one. If the rules had **no keyword** for that message, the bot notes the message and the answer chosen as a **suggestion** in the merchant's own database (table `choice_hints`, migration `016_choice_hints.sql`). A message with personal details (phone or bank numbers, emails, links) is never saved, and the same message chosen again only raises its count. When the bot first showed **topics** and the customer then tapped the exact answer, the answer counts (the topic tap alone does not).
+
+On the **Learning** page the card **Learned from what customers chose** lists the suggestions, most chosen first. **Approve** adds the message to that entry as an example question (and a message of one word also as a keyword of the entry's topic, if no one has that word yet); it is a draft change that needs Publish. **Dismiss** hides it. The bot never uses a suggestion by itself. Server routes: `GET /api/admin/learning/choices`, `POST /api/admin/learning/choices/resolve`.
+
 ### AI draft answers in Learning
 
 On the **Learning** page, a group of customer questions that staff have replied to has a **Draft answer with AI** button next to **Add to Knowledge base**. Claude writes one clean answer **from the staff replies of that group only**: it may not add a fact, and the server refuses a draft that contains a number, link or menu path that no staff reply has. If the replies disagree (for example two different times) or say nothing useful, no draft is made and the page says so. The draft opens in a window next to the replies it comes from, where a person edits it, and **Add to Knowledge base** puts it in as a **draft entry** (so it still needs Set live and Publish). The bot never uses a past reply by itself. The calls count in **Usage & billing** ("Drafting answers from staff replies"). Server route: `POST /api/admin/learning/draft-answer`.
