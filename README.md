@@ -394,6 +394,10 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 On the English tab, **Translate the empty languages with AI** fills every language the merchant has switched on (Merchant settings → General → "Languages the bot answers in"), except English, but only the ones that are still empty and never over text that is there. A merchant that never chose its languages gets Malay and Chinese. On another language's tab, the button translates just that one language (and asks before it replaces an answer).
 
+### A sentence that names two topics
+
+When a message holds words of two topics (for example "referral" and "bonus" in "i want referral bonus"), the bot no longer offers only the entries of whichever topic comes first. If one entry's example questions are clearly the closest to the whole message (at least as close as the merchant's answer level and 0.8, and 0.12 ahead of the next), it answers that entry. Otherwise it shows choices with the **closest entries first**, so the entry the customer means is never cut off by the number of choices. A single topic word ("bonus", "referral") still asks which one.
+
 ### Learning from what customers choose
 
 When the bot is not sure what a message means (for example just `tng`) it shows choices, and the customer picks one. If the rules had **no keyword** for that message, the bot notes the message and the answer chosen as a **suggestion** in the merchant's own database (table `choice_hints`, migration `016_choice_hints.sql`). A message with personal details (phone or bank numbers, emails, links) is never saved, and the same message chosen again only raises its count. When the bot first showed **topics** and the customer then tapped the exact answer, the answer counts (the topic tap alone does not).

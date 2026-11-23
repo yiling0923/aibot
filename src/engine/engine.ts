@@ -347,7 +347,16 @@ export class Engine {
       const s = ks.strong.find((x) => x.id === top.id)!; decision = 'ANSWER'; via = 'similarity'; topic = s.topic;
       why = `Several answers share the topic "${s.topic}", but the message has the same words as the example "${top.example}", so the bot answers it.`;
     }
-    else if (ks.strong.length > 1) { decision = 'CHOICE'; via = 'keywords'; conf = 0.9; options = ks.strong.slice(0, 4).map((s): Option => ({ kind: 'intent', key: s.intent })); why = 'Several answers match the keywords in the sentence, so the customer picks one.'; }
+    else if (ks.strong.length > 1 && new Set(ks.strong.map((s) => s.topic)).size > 1 && ks.strong.some((s) => s.id === top.id) && top.score >= Math.max(m.answerThreshold, 0.8) && top.score - second.score >= 0.12) {
+      // The sentence names several topics ("referral" and "bonus"), but one entry's example questions are clearly the closest to the whole message: answer it,
+      // instead of offering the entries of whichever topic comes first.
+      const s = ks.strong.find((x) => x.id === top.id)!; decision = 'ANSWER'; via = 'similarity'; topic = s.topic;
+      why = `The sentence names several topics, but the example "${top.example}" is clearly the closest to the whole message, so the bot answers it.`;
+    }
+    else if (ks.strong.length > 1) {
+      // The closest entries come first (not the entries of whichever topic is first in the list), so the one the customer means is never cut off.
+      const score = new Map(cands.map((c) => [c.id, c.score] as const));
+      decision = 'CHOICE'; via = 'keywords'; conf = 0.9; options = [...ks.strong].sort((a, b) => (score.get(b.id) ?? 0) - (score.get(a.id) ?? 0)).slice(0, 4).map((s): Option => ({ kind: 'intent', key: s.intent })); why = 'Several answers match the keywords in the sentence, so the customer picks one.'; }
     else if (amt && Tav.length === 1 && ['deposit', 'withdraw'].includes(Tav[0]) && !past) {
       decision = 'AMOUNT'; via = 'keywords'; conf = 0.95; dir = Tav[0] as 'deposit' | 'withdraw';
       why = 'An amount and one clear action ("' + dir + '") were found. The bot checks the amount against the merchant\'s limits and gives the steps.';
