@@ -9,7 +9,7 @@ import '../auth/types';
 import { effectiveSnapshot, scopeSnapshot } from './scope';
 import type { SessionUser } from '../auth/session';
 import type { AiService } from '../ai/types';
-import { checkTranslation } from '../ai/validator';
+import { checkDraft, checkTranslation } from '../ai/validator';
 import { Store } from '../bot/store';
 import { knowledgeFromSnapshot, readMerchants, readSnapshot, writeSnapshot, type MerchantMeta, type Snapshot } from './snapshot';
 import { Tenants, tbl } from '../db/tenants';
@@ -91,7 +91,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const v = await versionState(pool, user, merchants.map((m) => m.code));
     const history = v.history.map((h) => ({ kind: h.kind, merchant: h.merchant, version: h.version, actor: h.actor, summary: h.summary, ago: ago(h.created_at) }));
     return { versions: v.versions, sharedVer: v.sharedVer, stamp: v.stamp, merchants, snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
-      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe, translate: ctx.ai.canTranslate, suggest: !!ctx.ai.canSuggest } };
+      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe, translate: ctx.ai.canTranslate, suggest: !!ctx.ai.canSuggest, draft: !!ctx.ai.canDraft } };
   });
 
   app.post<{ Body: { snapshot: Snapshot; includeDrafts?: boolean } }>(`${A}/tests`, async (req) => {
@@ -227,6 +227,24 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const questions = got.filter((x) => x.length >= 2 && x.length <= 120 && !/[<>]/.test(x) && !seen.has(x.toLowerCase()) && (seen.add(x.toLowerCase()), true)).slice(0, count);
     if (!questions.length) return reply.code(422).send({ error: 'The AI only gave questions the entry already has. Try again, or add your own.' });
     return { questions };
+  });
+
+  /** Drafts one clean answer from the replies staff gave to a group of questions (the Learning page). The draft may not contain a number, link or menu path that no staff reply has; a person edits and approves it before it is saved. */
+  app.post<{ Body: { merchant: string; questions?: string[]; replies?: string[] } }>(`${A}/learning/draft-answer`, async (req, reply) => {
+    const b = req.body ?? ({} as never);
+    if (!mayUse(req, b.merchant)) return forbidden(reply);
+    const clean = (v: unknown, n: number, len: number) => (Array.isArray(v) ? v : []).map((x) => String(x).replace(/\s+/g, ' ').trim().slice(0, len)).filter(Boolean).slice(0, n);
+    const questions = clean(b.questions, 10, 200), replies = clean(b.replies, 8, 600);
+    if (!replies.length) return reply.code(400).send({ error: 'There is no staff reply to write the answer from.' });
+    if (!ctx.ai.canDraft || !ctx.ai.draftAnswer) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });
+    const name = (await tenants.get(b.merchant))?.name ?? b.merchant;
+    const d = await ctx.ai.draftAnswer({ merchant: b.merchant, merchantName: name, questions, replies });
+    if (!d) return reply.code(502).send({ error: 'The AI could not write a draft. Try again in a moment.' });
+    if (d.conflict) return reply.code(422).send({ error: 'The staff replies do not agree with each other (for example two different times or amounts), so no draft was written. Decide the right answer and write it yourself.' });
+    if (!d.answer) return reply.code(422).send({ error: 'The staff replies do not contain an answer to these questions, so no draft was written.' });
+    const check = checkDraft(d.answer, replies);
+    if (!check.ok) return reply.code(422).send({ error: `The draft was refused because ${check.reason}. Try again, or write it yourself.` });
+    return { answer: d.answer };
   });
 
   /* ---------- messages the bot did not understand ---------- */

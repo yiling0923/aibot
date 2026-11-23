@@ -906,3 +906,7 @@ details.moreopt{background:none;padding:0}
 .langsw{display:inline-flex;border:1px solid var(--line);border-radius:99px;overflow:hidden;background:var(--surface);margin-left:8px}
 .langsw button{border:0;background:transparent;padding:3px 11px;font-weight:700;font-size:12px;color:var(--muted);cursor:pointer}
 .langsw button[aria-pressed=true]{background:var(--accent);color:var(--accentfg)}
+
+/* Learning: the two buttons of a group (Add to Knowledge base, Draft answer with AI) */
+.lrnbtns{display:flex;flex-direction:column;gap:6px;align-items:stretch}
+.lrnbtns .btn{white-space:nowrap}

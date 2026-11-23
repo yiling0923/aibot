@@ -29,6 +29,10 @@ export interface SuggestInput {
   intentKey: string; topic: string; answer: string; examples: string[]; count: number;
 }
 
+export interface DraftInput { style?: string; merchant?: string; merchantName: string; questions: string[]; replies: string[] }
+/** `answer` is null when the staff replies disagree (`conflict`) or give nothing a customer could be told. */
+export interface Draft { answer: string | null; conflict: boolean }
+
 export interface AiService {
   /** Claude can match a message to a knowledge base entry. */
   canPick: boolean;
@@ -40,12 +44,16 @@ export interface AiService {
   canTranslate: boolean;
   /** Claude can suggest more example questions for an entry (a person approves each one). */
   canSuggest?: boolean;
+  /** Claude can draft one clean answer from the replies staff gave to a group of questions (a person checks it before it is saved). */
+  canDraft?: boolean;
   pickEntry(input: PickInput): Promise<Pick | null>;
   writeReply(input: WriteInput): Promise<string | null>;
   describeWord(input: DescribeInput): Promise<WordNote | null>;
   translate(input: TranslateInput): Promise<Translation | null>;
   /** New example questions a real customer might type for this entry, none of them already in `examples`. Null when the AI is off or fails. */
   suggestQuestions?(input: SuggestInput): Promise<string[] | null>;
+  /** One clear answer written only from what the staff replies say. Null when the AI is off or fails. */
+  draftAnswer?(input: DraftInput): Promise<Draft | null>;
 }
 
 /** Claude's match must be at least this sure before the bot answers with it. */

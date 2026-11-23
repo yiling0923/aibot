@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dbNameFor, tbl } from '../src/db/tenants';
-import { createAi, checkReply, checkTranslation, type AiService, type PickInput, type SuggestInput, type TranslateInput } from '../src/ai';
+import { createAi, checkDraft, checkReply, checkTranslation, type AiService, type DraftInput, type PickInput, type SuggestInput, type TranslateInput } from '../src/ai';
 import { Bot, newSession } from '../src/bot/responder';
 import { knowledgeFromSeed } from '../src/engine';
 import { seedJson, accountsJson } from './helpers';
@@ -192,7 +192,8 @@ if (dbUrl) { pool = createPool(dbUrl, 4); try { await pool.query('select 1'); re
 describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', () => {
   const described: string[] = [];
   const ai: AiService = {
-    canPick: true, canWrite: false, canDescribe: true, canTranslate: true, canSuggest: true,
+    canPick: true, canWrite: false, canDescribe: true, canTranslate: true, canSuggest: true, canDraft: true,
+    draftAnswer: async (i) => (i.replies.some((x) => x.includes('CONFLICT')) ? { answer: null, conflict: true } : i.replies.some((x) => x.includes('NOTHING')) ? { answer: null, conflict: false } : i.replies.some((x) => x.includes('INVENT')) ? { answer: 'Deposits are credited within 99 minutes.', conflict: false } : { answer: 'Deposits are usually credited within 5 minutes.', conflict: false }),
     suggestQuestions: async (i) => (i.answer.includes('Wallet') ? [`[${i.lang}] how to top up`, i.examples[0] ?? 'dup', '[x] <script>', `[${i.lang}] how to top up`, `[${i.lang}] depo how ah`] : []),
     translate: async (i) => (i.answer.includes('Wallet') ? { answer: i.to === 'zh' ? '请到 Wallet > Deposit，选择付款方式，按步骤操作。最低 MYR 10。' : 'Pergi ke Wallet > Deposit, pilih kaedah bayaran. Minimum MYR 10.', examples: i.examples.map((x) => `[${i.to}] ${x}`) } : { answer: 'Minimum MYR 99', examples: [] }),
     pickEntry: async (i) => (i.text === 'apa tu' ? { intent: 'deposit_how', confidence: 0.9 } : null),
@@ -213,8 +214,8 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     await migrate(pool!, { reset: true }); await seed(pool!);
     app = await buildApp({ pool: pool!, logger: false, ai }); appOff = await buildApp({ pool: pool!, logger: false, ai: off });
     cookie = await signIn(app); cookieOff = await signIn(appOff);
-    expect(((await get(app, cookie, '/api/admin/state')).json()).ai).toEqual({ pick: true, write: false, describe: true, translate: true, suggest: true });
-    expect(((await get(appOff, cookieOff, '/api/admin/state')).json()).ai).toEqual({ pick: false, write: false, describe: false, translate: false, suggest: false });
+    expect(((await get(app, cookie, '/api/admin/state')).json()).ai).toEqual({ pick: true, write: false, describe: true, translate: true, suggest: true, draft: true });
+    expect(((await get(appOff, cookieOff, '/api/admin/state')).json()).ai).toEqual({ pick: false, write: false, describe: false, translate: false, suggest: false, draft: false });
   });
 
   it('Claude rescues a message through the chat endpoint', async () => {
@@ -245,6 +246,16 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     expect((await post(app, cookie, '/api/admin/suggest-questions', { merchant: 'MERCH_A', lang: 'xx', answer: 'x' })).statusCode).toBe(400);
     expect((await post(app, cookie, '/api/admin/suggest-questions', { merchant: 'MERCH_A', answer: 'Nothing about it.' })).statusCode).toBe(422);   // the AI gave nothing new
     expect((await post(appOff, cookieOff, '/api/admin/suggest-questions', { merchant: 'MERCH_A', answer: 'Go to Wallet.' })).statusCode).toBe(409);
+  });
+  it('drafts an answer from staff replies, refuses a made-up number, a conflict and an empty result, and says so when AI is off', async () => {
+    const ok = await post(app, cookie, '/api/admin/learning/draft-answer', { merchant: 'MERCH_A', questions: ['deposit not in yet'], replies: ['Usually within 5 minutes, please wait.', 'It takes about 5 minutes.'] });
+    expect(ok.statusCode).toBe(200); expect(ok.json().answer).toBe('Deposits are usually credited within 5 minutes.');
+    const made = await post(app, cookie, '/api/admin/learning/draft-answer', { merchant: 'MERCH_A', questions: ['q'], replies: ['INVENT: about 5 minutes'] });
+    expect(made.statusCode).toBe(422); expect(made.json().error).toMatch(/number 99/);                     // a number no staff reply has
+    expect((await post(app, cookie, '/api/admin/learning/draft-answer', { merchant: 'MERCH_A', questions: ['q'], replies: ['CONFLICT 5 minutes', '30 minutes'] })).json().error).toMatch(/do not agree/);
+    expect((await post(app, cookie, '/api/admin/learning/draft-answer', { merchant: 'MERCH_A', questions: ['q'], replies: ['NOTHING useful'] })).statusCode).toBe(422);
+    expect((await post(app, cookie, '/api/admin/learning/draft-answer', { merchant: 'MERCH_A', questions: ['q'], replies: [] })).statusCode).toBe(400);
+    expect((await post(appOff, cookieOff, '/api/admin/learning/draft-answer', { merchant: 'MERCH_A', questions: ['q'], replies: ['5 minutes'] })).statusCode).toBe(409);
   });
   it('translates an answer for the entry editor, refuses a changed number, and says so when AI is off', async () => {
     const ok = await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', from: 'en', to: 'ms', answer: 'Go to Wallet > Deposit. Minimum MYR 10.', examples: ['depo how'] });
@@ -320,5 +331,30 @@ describe('Claude suggested questions on a fake network', () => {
     expect(createAi({}).canSuggest).toBe(false);
     expect(await createAi({}).suggestQuestions!(input)).toBeNull();
     expect(await createAi({ anthropicKey: 'bad', fetch: fakeNet(() => json({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }, 401)).fetchImpl }).suggestQuestions!(input)).toBeNull();
+  });
+});
+
+describe('Claude answer drafts and their check', () => {
+  const input: DraftInput = { merchantName: 'LuckyPay', questions: ['deposit not in yet'], replies: ['Usually within 5 minutes, please wait.'] };
+  it('returns the draft, sends the questions and replies as data, and tells a conflict from an empty result', async () => {
+    const net = fakeNet(() => json(claudeReply('{"answer":" Deposits are usually credited within 5 minutes. ","conflict":false}')));
+    const ai = createAi({ anthropicKey: 'k', fetch: net.fetchImpl });
+    expect(ai.canDraft).toBe(true);
+    expect(await ai.draftAnswer!(input)).toEqual({ answer: 'Deposits are usually credited within 5 minutes.', conflict: false });
+    const sent = JSON.stringify(net.calls[0].body); expect(sent).toContain('<staff_replies>'); expect(sent).toContain('Usually within 5 minutes'); expect(sent).toContain('<customer_questions>');
+    expect(await createAi({ anthropicKey: 'k', fetch: fakeNet(() => json(claudeReply('{"answer":"Maybe 5 or 30 minutes","conflict":true}'))).fetchImpl }).draftAnswer!(input)).toEqual({ answer: null, conflict: true });
+    expect(await createAi({ anthropicKey: 'k', fetch: fakeNet(() => json(claudeReply('{"answer":null,"conflict":false}'))).fetchImpl }).draftAnswer!(input)).toEqual({ answer: null, conflict: false });
+  });
+  it('is off without a key and gives null when the service fails', async () => {
+    expect(createAi({}).canDraft).toBe(false); expect(await createAi({}).draftAnswer!(input)).toBeNull();
+    expect(await createAi({ anthropicKey: 'bad', fetch: fakeNet(() => json({ type: 'error', error: { type: 'authentication_error', message: 'x' } }, 401)).fetchImpl }).draftAnswer!(input)).toBeNull();
+  });
+  it('checkDraft: may leave details out, but no new number, link or menu path', () => {
+    const replies = ['Open Wallet > Deposit. Minimum MYR 10, it takes 5 minutes. See https://x.test/help'];
+    expect(checkDraft('Open Wallet > Deposit; it takes 5 minutes.', replies).ok).toBe(true);
+    expect(checkDraft('It takes 7 minutes.', replies).ok).toBe(false);
+    expect(checkDraft('See https://other.test', replies).ok).toBe(false);
+    expect(checkDraft('Open Menu > Payments.', replies).ok).toBe(false);
+    expect(checkDraft('   ', replies).ok).toBe(false);
   });
 });

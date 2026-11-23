@@ -87,18 +87,26 @@ export default function Learning() {
     setBusy(false);
   };
   const added = (g: Group) => mine.some((e) => e.category === 'Learned' && ((e.translations as Record<string, { question_examples?: string[] }>).en?.question_examples ?? []).includes(g.customers[0]?.text ?? '\u0000'));      // an entry made from this group already exists
-  const add = (g: Group) => {
+  const add = (g: Group, answer?: string) => {
     const key = slug(g.topic ? g.label + '_' + (g.customers[0]?.text ?? '') : g.customers[0]?.text ?? g.label).slice(0, 60) || 'learned_entry';
     const unique = (() => { let k = key, i = 2; while (mine.some((e) => e.intent_key === k)) k = key + '_' + i++; return k; })();
     p.edit((dr, note) => {
       const tl: Record<string, { question_examples: string[]; answer_text: string }> = {}; LANGS.forEach((l) => { tl[l] = { question_examples: [], answer_text: '' }; });
-      tl.en = { question_examples: g.customers.slice(0, 8).map((c) => c.text), answer_text: g.replies[0]?.text ?? '' };
+      tl.en = { question_examples: g.customers.slice(0, 8).map((c) => c.text), answer_text: answer ?? g.replies[0]?.text ?? '' };
       const ne: Entry = { id: Math.max(0, ...dr.kb.map((x) => x.id)) + 1, merchant: p.merchant, category: 'Learned', intent_key: unique, topic: g.topic || '', aspect: null, topic_optional: false, translations: tl as Entry['translations'], status: 'draft', dirty: true, updated: 'just now' };
       dr.kb.push(ne); note(`Added "${unique}" from what the bot learned (${p.M.name})`);
     });
     p.toast(t('Added “{key}” to the Knowledge base as a draft. Check the answer, set it live, then press Publish.', { key: unique }));
   };
 
+  /** The AI writes one clean answer from the staff replies of a group. It opens in a window where a person reads and edits it before it is added as a draft entry. */
+  const [drafting, setDrafting] = useState(''); const [draft, setDraft] = useState<{ g: Group; text: string } | null>(null);
+  const makeDraft = async (g: Group) => {
+    setDrafting(g.key);
+    try { const r = await api<{ answer: string }>('/api/admin/learning/draft-answer', { merchant: p.merchant, questions: g.customers.map((c) => c.text), replies: g.replies.map((x) => x.text) }); setDraft({ g, text: r.answer }); }
+    catch (e) { p.toast((e as Error).message); }
+    setDrafting('');
+  };
   const listening = d?.mode === 'listening';
   const day = d?.days ?? 0;
   return (
@@ -152,9 +160,18 @@ export default function Learning() {
               <td>{g.replies.length ? <><div className="clamp2">{g.replies[0].text}</div>{g.replies[0].n > 1 && <div className="sub">{t('given {n} times', { n: g.replies[0].n })}</div>}</> : <span className="sub">{t('No staff reply seen yet')}</span>}</td>
               <td className="lrnact">{g.kind === 'covered' ? <span className="ltag ok" title={t('The knowledge base already answers this')}>{t('Already answered:')} {g.intent}</span>
                 : added(g) ? <span className="ltag ai">{t('Added as a draft')}</span>
-                : <button className="btn sm pri" type="button" onClick={() => add(g)}>{t('Add to Knowledge base')}</button>}</td></tr>)}
+                : <div className="lrnbtns"><button className="btn sm pri" type="button" onClick={() => add(g)}>{t('Add to Knowledge base')}</button>
+                  {p.ai.draft && g.replies.length > 0 && <button className="btn sm" type="button" disabled={drafting === g.key} title={t('The AI writes one clean answer from what staff replied. You read and edit it before it is added.')} onClick={() => void makeDraft(g)}>{drafting === g.key ? t('Thinking…') : t('Draft answer with AI')}</button>}</div>}</td></tr>)}
           </tbody></table></div>}
       </div>}
+
+      {draft && <Modal label={t('AI draft answer')} wide onClose={() => setDraft(null)}>
+        <div className="head"><h2>{t('AI draft answer')}</h2><button className="btn sm" type="button" onClick={() => setDraft(null)}>{t('Close')}</button></div>
+        <div className="sub">{t('What customers wrote')}: {draft.g.customers.slice(0, 4).map((c) => '“' + c.text + '”').join(' · ')}</div>
+        <div className="note"><b>{t('What staff replied')}</b><ul className="plain">{draft.g.replies.slice(0, 4).map((x, i) => <li key={i}>{x.text}{x.n > 1 ? ' ' + t('(given {n} times)', { n: x.n }) : ''}</li>)}</ul></div>
+        <label className="fld"><span>{t('Draft answer (edit it as you like)')}</span><textarea aria-label={t('Draft answer')} rows={5} value={draft.text} onChange={(e) => setDraft({ ...draft, text: e.target.value })} /></label>
+        <div className="sub">{t('The AI used only what the staff replies say and may not add a number or link that they do not have. Still, read every fact. It is added as a draft: you set it live and publish.')}</div>
+        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setDraft(null)}>{t('Cancel')}</button><button className="btn pri" type="button" disabled={!draft.text.trim()} onClick={() => { add(draft.g, draft.text.trim()); setDraft(null); }}>{t('Add to Knowledge base')}</button></div></Modal>}
 
       {ask && <Modal label="Change what the bot does" small onClose={() => setAsk(null)}>
         <div className="head"><h2>{ask === 'answering' ? t('Start answering?') : t('Go back to listening only?')}</h2></div>

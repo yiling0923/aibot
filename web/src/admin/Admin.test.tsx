@@ -60,12 +60,13 @@ const lcReply = (init?: RequestInit) => {                                       
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (lcRefuse && url === '/api/admin/livechat-chat' && String(init?.body).includes('"file"')
-    ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate, suggest: translate } } : url.startsWith('/api/admin/suggest-questions') ? { questions: ['how to top up', 'depo how ah', 'cara deposit'] } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate, suggest: translate, draft: translate } } : url.startsWith('/api/admin/suggest-questions') ? { questions: ['how to top up', 'depo how ah', 'cara deposit'] } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
     : url.startsWith('/api/admin/unmatched') ? UNMATCHED
     : url.startsWith('/api/admin/people') ? (peopleBig ? BIG_PEOPLE : { merchants: [{ code: 'A', name: 'LuckyPay', tone: 'friendly', entries: 11, logins: ['luckypay'], link: { hasKey: false, lastUsedAt: null } }], users: [{ username: 'u', role: 'admin', merchant: null }, { username: 'amy', role: 'staff', merchant: 'B' }] })
+    : url === '/api/admin/learning/draft-answer' ? { answer: 'Deposits are usually credited within 5 minutes.' }
     : url === '/api/admin/learning/import' ? ((importedMsgs = JSON.parse(String(init?.body)).messages), { chats: 2, pairs: 3, withReply: 2 })
     : url.startsWith('/api/admin/learning') ? LEARN()
     : /\/merchants\/[^/]+\/mode/.test(url) ? ((botMode = JSON.parse(String(init?.body)).mode), { ok: true })
@@ -163,6 +164,22 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Suggest with AI' }));
     expect(await screen.findByText('AI suggestions · need your approval')).toBeTruthy();                    // the old simple variations
     expect(screen.getByText('daily limit pls')).toBeTruthy();
+  });
+  it('Learning: the AI drafts an answer from the staff replies, a person edits it, and it is added as a draft entry', async () => {
+    botMode = 'listening'; withKb = true;
+    open('admin', '/admin/learn');
+    await userEvent.click(await screen.findByRole('button', { name: 'Draft answer with AI' }));
+    const box = await screen.findByLabelText('Draft answer') as HTMLTextAreaElement;
+    expect(box.value).toBe('Deposits are usually credited within 5 minutes.');
+    expect(screen.getByText('Please send your receipt, we check in 5 min. (given 9 times)')).toBeTruthy();       // the staff reply the draft comes from
+    await userEvent.clear(box); await userEvent.type(box, 'Usually 5 minutes. Please wait.');
+    await userEvent.click(within(screen.getByRole('dialog', { name: 'AI draft answer' })).getByRole('button', { name: 'Add to Knowledge base' }));
+    expect(await screen.findByText(/Added “.*” to the Knowledge base as a draft/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /What changed/ }));
+    expect([...document.querySelectorAll('.pubbar-list li')].map((x) => x.textContent).join(' ')).toMatch(/from what the bot learned/);
+    cleanup(); open('admin', '/admin/learn', false);
+    await screen.findByText('What customers asked');
+    expect(screen.queryByRole('button', { name: 'Draft answer with AI' })).toBeNull();                    // no AI: no button
   });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');

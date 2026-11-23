@@ -1208,4 +1208,9 @@ export const ZH: Record<string, string> = {
   'The AI is off, so this only adds simple variations of the first example. Add the Anthropic key to .env for real suggestions.': 'AI 已关闭，所以这里只会加入第一个示例的简单变化。要得到真正的建议，请把 Anthropic 密钥加到 .env。',
   'Thinking…': '思考中…', 'Approve all': '全部批准',
   'Suggesting example questions': '建议示例问题',
+  'The AI writes one clean answer from what staff replied. You read and edit it before it is added.': 'AI 根据员工的回复写出一个清晰的答案。加入之前由你阅读和修改。',
+  'Draft answer with AI': '用 AI 起草答案', 'AI draft answer': 'AI 起草的答案', 'What staff replied': '员工的回复', '(given {n} times)': '（给过 {n} 次）',
+  'Draft answer (edit it as you like)': '草稿答案（可以随意修改）', 'Draft answer': '草稿答案',
+  'The AI used only what the staff replies say and may not add a number or link that they do not have. Still, read every fact. It is added as a draft: you set it live and publish.': 'AI 只使用员工回复里写的内容，不能加入回复里没有的数字或链接。但仍请检查每一个事实。它会作为草稿加入：由你设为启用并发布。',
+  'Drafting answers from staff replies': '根据员工回复起草答案',
 };

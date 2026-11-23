@@ -42,3 +42,18 @@ export function checkTranslation(translated: string, original: string): Check {
   for (const p of paths(original)) if (!lt.includes(norm(p))) return { ok: false, reason: `the translation changed the menu path ${p.trim()}` };
   return { ok: true };
 }
+
+/**
+ * Checks an answer the AI drafted from staff replies. It may leave details out, but it must not contain a number, link or menu path
+ * that is not in the replies, so nothing a customer is told can be made up.
+ */
+export function checkDraft(draft: string, replies: string[]): Check {
+  const d = draft.trim();
+  if (!d) return { ok: false, reason: 'the draft is empty' };
+  if (d.length > 1500) return { ok: false, reason: 'the draft is too long' };
+  const src = replies.join('\n'), have = numbers(src), f = norm(src);
+  for (const n of numbers(d)) if (!have.has(n)) return { ok: false, reason: `it has the number ${n}, which no staff reply says` };
+  for (const l of links(d)) if (!f.includes(norm(l))) return { ok: false, reason: `it has a link that no staff reply has: ${l}` };
+  for (const p of paths(d)) if (!f.includes(norm(p))) return { ok: false, reason: `it has a menu path that no staff reply has: ${p.trim()}` };
+  return { ok: true };
+}

@@ -3,7 +3,7 @@ import type { Pool } from '../db/pool';
 
 /** One AI call, as the AI service reports it. */
 export interface UsageEvent {
-  merchant?: string; provider: 'anthropic' | 'openai'; model: string; kind: 'pick' | 'describe' | 'translate' | 'write' | 'suggest';
+  merchant?: string; provider: 'anthropic' | 'openai'; model: string; kind: 'pick' | 'describe' | 'translate' | 'write' | 'suggest' | 'draft';
   inputTokens: number; outputTokens: number;
   /** true when the merchant's own key paid for it (the merchant pays the provider, not you). */
   own?: boolean;
