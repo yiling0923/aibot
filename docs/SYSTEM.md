@@ -2,7 +2,7 @@
 
 How the system works, what it is built with, how the database is designed, and how the screens are laid out.
 
-*Written 5 November 2026. This describes the code in the repository `yiling0923/aibot`.*
+*Written 5 November 2026, updated 23 November 2026 (new screens, listening first, the Chinese panel). This describes the code in the repository `yiling0923/aibot`.*
 
 > **Update, November 2026.** This document was written before these changes; where it disagrees, the README is current.
 > - **The bot reads no customer information.** A question about the customer's own balance, deposit, withdrawal or points goes to a person. There is no account lookup, no Account tools, no Account data step and no "Account answers in LiveChat" switch. The bot only notes whether the customer is a logged-in **member** (the member id LiveChat sends) or a **visitor**; every answer carries `customer`, and a handover carries it for staff.
@@ -53,7 +53,7 @@ The system has two parts:
 
 | Done | Not finished yet |
 |---|---|
-| Database, bot engine, test chat page, control panel, logins, merchants and users screen, AI layer (built, tested with a fake network) | Connection to the real LiveChat, testing the AI with real keys, hosting on a real server |
+| Database, bot engine, LiveChat connector, control panel (English and Chinese), logins, merchants and users screen, AI layer (built, tested with a fake network) | Connection to the real LiveChat, testing the AI with real keys, hosting on a real server |
 
 ---
 
@@ -73,7 +73,7 @@ The system has two parts:
 | **Storage helpers** | Load the knowledge from the database into memory, save the words customers type, write versions and logins. |
 | **MySQL databases** | A main database (merchant list, logins, shared words) and one database for each merchant (its knowledge base, keywords, chats, settings, versions). |
 | **Merchant API** | Where each merchant's account data lives (balance, transactions, points). Read only. Fake JSON data for now. |
-| **Browser pages** | The control panel, the test chat page and the login page (a React app, built by Vite). |
+| **Browser pages** | The control panel (with the LiveChat test page) and the login page (a React app, built by Vite). |
 
 Dashed boxes in the picture are not connected yet or are optional.
 
@@ -109,7 +109,7 @@ Dashed boxes in the picture are not connected yet or are optional.
 | Login | about 120 |
 | Database, migrations, server and helpers | about 1,100 |
 | Control panel front end (React, `web/src/admin`) | about 1,400 |
-| Test chat page, login page, shared code and style sheets (React, `web/src`) | about 900 |
+| Login page, shared code and style sheets (React, `web/src`) | about 900 |
 | Automatic tests (back end and front end) | about 1,100 |
 
 ---
@@ -750,12 +750,11 @@ Indexes: `version` (unique).
 
 The panel has **three areas**:
 
-1. **Left sidebar** (fixed, 248 px)
+1. **Left sidebar** (it can be folded to a rail of icons with the button next to the logo)
    - the logo and name,
-   - the **merchant**: a picker for admins, a fixed name for staff,
-   - the **menu in four groups**: *Answers*, *Words*, *Check* and *Setup*, each item with a small icon and a count badge where something needs attention,
+   - the **menu in six groups**: *Answers* (Knowledge base, Import, Import guide, Learning), *Words* (Topics, Keywords, Keyword ranking), *Check* (Report), *Setup* (Merchant settings, History), *Connect* (LiveChat test) and *Admin* (Merchants & logins, Usage & billing). Staff do not see the groups that are for admins only. A count badge shows where something needs attention (for example the words that have no topic yet),
    - at the bottom: who is signed in, **Sign out**, and the **Advanced options** switch. (Passwords are changed by an admin, with the key icon in the logins list.)
-2. **Top bar**: the live version of the open merchant (`Live v1`; every merchant counts its own versions), a draft chip with **Discard** when there are unpublished changes, and the **Publish** button.
+2. **Top bar**: the **merchant** (a picker for admins, a fixed name for staff), the live version of the open merchant (`Live v1`; every merchant counts its own versions), a **Listening · bot silent** chip while the merchant only listens, the **EN | 中文** language switch, a draft chip with **Discard** when there are unpublished changes, and the **Publish** button. A yellow bar under it says how many changes are only in the draft and lists them (**What changed**).
 3. **Content area**: uses the **full width**. Each screen is made of white cards on a light grey background, with one clear heading per card.
 
 Other design rules:
@@ -767,57 +766,71 @@ Other design rules:
 
 ![On a phone](img/panel-phone.png)
 
+### The panel in Chinese
+
+The **EN | 中文** switch in the top bar shows the whole panel in Simplified Chinese. The choice is remembered for each person in the browser. Knowledge base is **知识库**, Topics **主题** and Keywords **关键词**. A text that has no Chinese yet stays in English, so no screen is ever empty. The merchant's own data (answers, entry names, keywords, sample chats) and the bot's own word lists are shown as they were written.
+
+![The panel in Chinese](img/panel-chinese.png)
+
 ### The screens
 
 **Login**
 
 ![Login](img/login.png)
 
-**Knowledge base**: a table of entries with topic, language dots (EN, MS, ZH), the English answer and status. Click a row to edit. In the editor, the **Translate** button fills the Malay and Chinese answers and examples from the English ones (needs the AI key).
+**Knowledge base**: a table of entries with topic, language dots (EN, MS, ZH, VI, TH, TL), the number of example questions, the English answer and a **Live / Draft switch** (it asks before it changes). Filters: All, Live, Draft, Needs work, search and topic. Tick rows for bulk actions, or press **Table edit** to type answers and example questions straight into a table. Click a row to edit it. In the editor, one button translates the empty languages with the AI.
 
 ![Entry editor](img/panel-translate.png)
 
-**Import**: four numbered steps (merchant, add the file, check, import).
+**Import**: type in an Excel-like table, or upload an Excel or CSV file. English is enough: the AI translates the languages left empty. The check shows what is new, what updates an entry and what is blocked, before anything is imported. Starter packs and example files are under **Upload a file**. The short **Import guide** page next to it explains the steps for the marketing team.
 
 ![Import](img/panel-import.png)
 
-**Topics**: tabs for Topics, Question words (with Advanced on), Greetings, Fillers and Block lists. The add forms fold away until needed.
+![Import guide](img/panel-guide.png)
+
+**Learning**: a new merchant starts by **listening**. The bot is silent, staff answer as usual, and the bot saves each question with the staff reply. An old chat export (Excel or CSV) can be added. The page shows a checklist (enough live answers, nothing left to write, everything published), the questions customers asked grouped by meaning with the reply staff gave most often, and an **Add to Knowledge base** button for each group. An admin presses **Start answering** when ready. Phone and bank numbers, emails and links are hidden in what is saved.
+
+![Learning](img/panel-learning.png)
+
+**Topics**: tabs for Topics, Question words (with Advanced on), Greetings, Fillers and Block lists. The Topics tab opens as a **flowchart**: one lane for each topic with its keywords, its answers and an *If not clear* block. Drag a keyword or answer onto another topic to move it, search with the box on top, and add a topic or keyword with the button at the top right (a pop-up). The **List** view shows the same as grouped words.
 
 ![Topics](img/panel-topics.png)
 
-**Keywords**: every word typed, newest first, with tabs *All, Not assigned, Assigned, Ignored*.
+**Keywords**: every word customers typed, grouped under its topic (short forms, slang, same meaning, other languages), with how many times it was heard. The page only shows; to decide what a word is, use the Topics page. Click a word to see the chats that used it.
 
 ![Keywords](img/panel-keywords.png)
 
-**Report**: four numbers at the top (messages, answered by the bot, not understood, handed to a person, each as a percentage), a bar chart of messages per day, the answers used most, and the messages not understood most. Choose the last 7 or 30 days, and whether the test chat is counted (messages typed in the Test chat are marked as test, so real customers can be looked at alone once LiveChat is connected).
+**Report**: five numbers at the top (messages, answered by the bot, not understood, handed to a person, wrong-answer rate) with an arrow against the period before, a chart of messages per day, the topics and how well they are answered, the languages, and why chats went to a person. Choose the last 7 days, the last 30 days or custom dates, include or leave out the test chat, and download everything as CSV.
 
 ![Report](img/panel-report.png)
 
-
-**Keyword ranking**: the top 3 as gold, silver and bronze cards, then a table with trend and change. The week can be changed with the arrows. Click a keyword to see the chats it was in. This screen is for looking; to decide what a word is (topic, short form, filler, rude word), use the Keywords screen.
+**Keyword ranking**: the top 3 as gold, silver and bronze cards, then a table with trend and change. The week can be changed with the arrows. Click a keyword to see the chats it was in.
 
 ![Keyword ranking](img/panel-ranking.png)
 
-**Merchant settings**
+**Merchant settings**: tabs for General (name, limit, money sign, how long chats are kept, languages), Replies, Handoff, AI help and Messages.
 
 ![Merchant settings](img/panel-settings.png)
 
-**Merchants and logins** (admin only): the merchants with their logins, and the list of logins. Each login has two small icon buttons: a key (reset password) and a bin (remove the login). The words show when the mouse is over an icon.
+**LiveChat test** (admin only): a chat window that sends messages through a real or local LiveChat, the same way the website widget does, so the whole link is tested.
+
+![LiveChat test](img/panel-lchat.png)
+
+**Merchants and logins** (admin only): the merchants with their logins and LiveChat link, and the list of logins. Each login has two small icon buttons: a key (reset password) and a bin (remove the login).
 
 ![Merchants and logins](img/panel-merchants.png)
 
-**History**
+**The merchant page** (admin only): a setup checklist, then the LiveChat connection (bot address and key), a test of the link, **Human Handoff** (the number of bot replies after which a person is offered, kept in sync with LiveChat) and the merchant's own AI keys.
+
+![The merchant page](img/panel-merchant-page.png)
+
+**Usage & billing** (admin only): what each merchant used the AI for, the cost, the markup and the prices per model, with a CSV download.
+
+![Usage and billing](img/panel-billing.png)
+
+**History**: every published version of the merchant, who made it and when. Each can be rolled back on its own.
 
 ![History](img/panel-history.png)
-
-
-### The chat page (`/chat`)
-
-![Chat page](img/chat-page.png)
-
-- **Merchant drop-down** (top left): choose which merchant to talk to. Each merchant has its own accent colour.
-- **Left column**: *Website sends with the chat* (choose a fake customer: Tom, Mary, "Tom, ID edited", or not logged in, and see whether the signature is valid), the **chat window** (greeting, messages, buttons), and a **New chat** button with a line saying how many words and unclear messages were saved.
-- **Right column**: **What the bot did with the last message**, step by step: guard rules, normalising, keywords found, the decision as data, the reason, and the reply. If Claude or ChatGPT was used, that step is shown too.
 
 ---
 
@@ -851,7 +864,6 @@ Your LiveChat already knows how to talk to an AI bot: it calls `POST {bot addres
 | **AI with real keys** | Built and tested only on a fake network. Real wording quality and speed are untested. |
 | **Merchant API** | Switched off: the bot does not read account data. The code stays in the repository, unused. |
 | **Demo data** | The merchants, entries, accounts, the keyword history in the ranking and the two weeks of traffic in the Report are fake sample data. |
-| **Chat memory** | Chat state is kept in the server's memory, so a restart ends running chats. The chat log is saved in the database. |
 | **HTTPS** | Not built in. For real use, run it behind HTTPS (the cookie must then be marked secure). |
 | **Hardening** | Login has a lockout, but the chat API has no speed limit yet. No automatic backups. |
 | **Two admins at once** | Each publish saves a new version of the merchants that changed, so if two admins edit the same merchant at the same time, the later publish wins. |
@@ -860,4 +872,4 @@ Your LiveChat already knows how to talk to an AI bot: it calls `POST {bot addres
 | **"Suggest with AI" button** | A placeholder: it only adds simple variations of the first example question. It does not call an AI. |
 | **Production start** | The back end runs through `tsx` (TypeScript is run directly). That is fine on your own computer; for a server it should be compiled to JavaScript first. Not done. |
 | **Many merchants** | Every merchant has its own database, so backups, upgrades and monitoring must handle many databases. `npm run db:migrate` updates all of them. No automatic backups yet. |
-| **Languages in the panel** | The control panel is in English only. |
+| **Languages in the panel** | The control panel is in English and Simplified Chinese (the Chinese was not checked by a native speaker). No other panel language. |
