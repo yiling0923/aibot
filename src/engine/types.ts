@@ -38,7 +38,7 @@ export interface MerchantCfg {
   closing: Partial<Record<Lang, string>>; handoff: Partial<Record<Lang, string>>;
   /** How many times the bot asks again when it does not understand a message, before a person takes over (0 to 3). Missing: 1, the plan's rule. */
   reaskTimes?: number;
-  maxChoices: number; moreHelpOn: boolean; moreHelp: Partial<Record<Lang, string>>;   // choices shown at once (1-3), and the line after them
+  maxChoices: number; moreHelpOn: boolean; moreHelp: Partial<Record<Lang, string>>;   // choices shown at once (1-5), and the line after them
   abuseCloseAfter: number; answerThreshold: number; clarifyThreshold: number; kindReply: Partial<Record<Lang, string>>;
   aliases: { language: string; variant: string; canonical: string; kind?: string | null }[];   // merchant-only keywords (kind: short | slang | meaning, only for the panel)
   tools: string[];                                                      // enabled account tools

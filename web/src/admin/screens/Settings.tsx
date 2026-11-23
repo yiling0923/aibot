@@ -56,7 +56,7 @@ function Form() {
   const save = () => {
     p.edit((d, note) => {
       const t = d.settings[p.merchant]; t.ai_instructions = (s.ai_instructions ?? '').slice(0, MAX_INSTRUCTIONS); t.trigger_phrases = s.trigger_phrases ?? ''; t.tone = s.tone; t.kind = s.kind; t.closing = s.closing; t.handoff = s.handoff; t.more_help = s.more_help; t.more_help_on = s.more_help_on;
-      if (p.isAdmin) { t.handoff_complaint = s.handoff_complaint !== false; t.handoff_account = s.handoff_account !== false; t.handoff_group = s.handoff_group; t.answer = s.answer; t.clarify = s.clarify; t.tools = s.tools; t.abuse_close_after = Math.max(0, Math.min(10, +s.abuse_close_after || 0)); t.reask_times = Math.max(0, Math.min(3, Math.round(Number(s.reask_times ?? 1)))); t.max_choices = Math.max(1, Math.min(3, Math.round(+s.max_choices || 3))); }
+      if (p.isAdmin) { t.handoff_complaint = s.handoff_complaint !== false; t.handoff_account = s.handoff_account !== false; t.handoff_group = s.handoff_group; t.answer = s.answer; t.clarify = s.clarify; t.tools = s.tools; t.abuse_close_after = Math.max(0, Math.min(10, +s.abuse_close_after || 0)); t.reask_times = Math.max(0, Math.min(3, Math.round(Number(s.reask_times ?? 1)))); t.max_choices = Math.max(1, Math.min(5, Math.round(+s.max_choices || 3))); }
       note('Changed settings for ' + p.M.name);
     });
     base.current = clone(s); p.toast(T('Saved to draft'));
@@ -99,7 +99,7 @@ function Form() {
         </div></div>
       <div className="card"><h3>{T('Choices the bot offers')}</h3><div className="sub">{T('When the bot is not sure, it offers a few choices. Keep them short so the customer is not lost. "Talk to an agent" is always added and is not counted.')}</div>
         <div className="form" style={{ marginTop: 8 }}>
-          <label className="fld"><span>{T('Most choices shown at once')} {lock ? T('(admin only)') : ''}</span><select value={s.max_choices} disabled={lock} onChange={(e) => up({ max_choices: +e.target.value })}><option value={1}>1</option><option value={2}>2</option><option value={3}>{T('3 (recommended)')}</option></select></label>
+          <label className="fld"><span>{T('Most choices shown at once')} {lock ? T('(admin only)') : ''}</span><select value={s.max_choices} disabled={lock} onChange={(e) => up({ max_choices: +e.target.value })}><option value={1}>1</option><option value={2}>2</option><option value={3}>{T('3 (recommended)')}</option><option value={4}>4</option><option value={5}>5</option></select></label>
           <div className="full"><SRow title={'Add a line after the choices'} sub={'Such as “If you need other help, you can contact an agent.” Reword it per language under Fixed messages.'} checked={s.more_help_on} onChange={(v) => up({ more_help_on: v })} /></div>
         </div></div>
       <div className="card"><h3>{T('When the bot does not understand')}</h3><div className="sub">{T('If a message has no topic or question word the bot knows, it asks the customer to say more (with the topics to choose from). After the number of times below, a person takes over. A message that names a topic this merchant has no answer for goes to a person at once.')}</div>

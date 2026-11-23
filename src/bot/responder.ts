@@ -185,7 +185,7 @@ export class Bot {
     s.lang = lang; s.choices = null;
     if (turn.buttons?.length && s.noPersonal) turn.buttons = turn.buttons.filter((b) => b.kind !== 'status' && !(b.kind === 'amt' && b.key === 'check'));     // no account checks in a channel that remembers replies
     if (!turn.buttons?.length) { turn.buttons = null; return turn; }
-    const c = this.cfg(s), max = Math.max(1, Math.min(3, Math.round(c.maxChoices || 3)));
+    const c = this.cfg(s), max = Math.max(1, Math.min(5, Math.round(c.maxChoices || 3)));
     const agent = turn.buttons.filter((b) => b.kind === 'agent'), opts = turn.buttons.filter((b) => b.kind !== 'agent');
     let kept = opts;
     if (opts.length > max) {                                  // an account check ("where is my deposit") keeps its place; the rest are cut from the end

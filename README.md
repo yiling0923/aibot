@@ -187,7 +187,7 @@ This follows the team plan ("AI Bot: Plan, Gap Study and Knowledge Base"). Every
 **The clarify rule**
 
 * A clear question is answered straight away, with no choices.
-* An unclear one (two topics score close, nothing is sure) gets **one** question with up to 3 choices, plus the agent. Example: "my money not in" has money words and a question about time but no topic, so the bot asks "deposits or withdrawals?".
+* An unclear one (two topics score close, nothing is sure) gets **one** question with up to 3 choices (the merchant can set 1 to 5 in Merchant settings → Replies → "Most choices shown at once"), plus the agent. Example: "my money not in" has money words and a question about time but no topic, so the bot asks "deposits or withdrawals?".
 * The customer may answer in their own words: "deposit", "depo", "1", "the first one". The bot reads that as an answer, and if the first message already said what was wanted (not in = how long it takes), it answers at once instead of asking a second question.
 * If it is still unclear, a person takes over. The bot never asks twice. (A menu of questions about a known topic is part of the answer, not a clarifying question, but showing the same menu twice is.)
 

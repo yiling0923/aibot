@@ -12,7 +12,7 @@ afterEach(() => { cfg.maxChoices = original.maxChoices; cfg.moreHelpOn = origina
 const say = async (text: string, token: string | null = null) => (await bot.message(newSession('c-' + text + token, 'MERCH_A', token), text))!;
 const options = (t: { buttons: { kind: string; key: string }[] | null }) => (t.buttons ?? []).filter((b) => b.kind !== 'agent');
 
-describe('Part E: at most 3 choices, and a line after them', () => {
+describe('Part E: at most 5 choices (3 by default), and a line after them', () => {
   it('shows at most 3 choices by default and always adds "Talk to an agent" on top', async () => {
     const t = await say('xyzzy qwerty');                                   // not understood: the bot asks again with the topics (4 exist)
     expect(t.trace.decision).toBe('REASK');
@@ -21,10 +21,12 @@ describe('Part E: at most 3 choices, and a line after them', () => {
     expect(t.trace.choicesCut).toEqual({ shown: 3, had: 4, max: 3 });
   });
 
-  it('a merchant can lower the number of choices, but never go above 3', async () => {
+  it('a merchant can set the number of choices from 1 to 5; more than 5 is read as 5 and 0 as the default 3', async () => {
     cfg.maxChoices = 1; expect(options(await say('xyzzy qwerty'))).toHaveLength(1);
     cfg.maxChoices = 2; expect(options(await say('xyzzy qwerty'))).toHaveLength(2);
-    cfg.maxChoices = 9; expect(options(await say('xyzzy qwerty'))).toHaveLength(3);      // 9 is read as 3
+    cfg.maxChoices = 4; expect(options(await say('xyzzy qwerty'))).toHaveLength(4);      // all four that the bot has
+    cfg.maxChoices = 5; expect(options(await say('xyzzy qwerty'))).toHaveLength(4);      // 5 is allowed; only four exist here
+    cfg.maxChoices = 9; expect((await say('xyzzy qwerty')).trace.choicesCut).toBeUndefined();   // 9 is read as 5: nothing is cut
     cfg.maxChoices = 0; expect(options(await say('xyzzy qwerty'))).toHaveLength(3);      // 0 is read as the default
   });
 

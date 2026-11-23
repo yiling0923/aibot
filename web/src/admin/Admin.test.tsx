@@ -200,6 +200,14 @@ describe('Control panel', () => {
     expect(lines).toContain('Added example question "tng" to "dep_how" (SwiftWallet)'); expect(lines.some((x) => /Added keyword "tng" to topic/.test(x))).toBe(true);
     expect(lines.some((x) => /Added keyword "put money in"/.test(x))).toBe(false);
   });
+  it('Merchant settings: the number of choices can be set from 1 to 5', async () => {
+    open('admin', '/admin/set'); localStorage.setItem('settingsTab', 'replies');
+    cleanup(); open('admin', '/admin/set');
+    const sel = await screen.findByLabelText(/Most choices shown at once/) as HTMLSelectElement;
+    expect([...sel.options].map((o) => o.value)).toEqual(['1', '2', '3', '4', '5']);
+    await userEvent.selectOptions(sel, '5'); expect(sel.value).toBe('5');
+    localStorage.removeItem('settingsTab');
+  });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');
     expect(await screen.findByText('70%')).toBeTruthy();                          // answered by the bot
