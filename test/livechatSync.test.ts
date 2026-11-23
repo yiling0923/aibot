@@ -86,4 +86,15 @@ describe.skipIf(!reachable)('handoff number kept the same in LiveChat and the bo
     expect((await link.info('MERCH_A')).error).toBeTruthy(); expect((await link.info('MERCH_A')).handoffAfterReplies).toBe(5);       // keeps the last known number
     expect((await as(admin, P + '/livechat/remove', {})).json().removed).toBe(true); expect((await link.info('MERCH_A')).configured).toBe(false);
   });
+  it('finds the number wherever LiveChat keeps it, and says what LiveChat sent when it is not there', async () => {
+    const make = (body: unknown) => new LiveChatLink(pool!, (async (u: string | URL | Request) => {
+      const path = String(u);
+      if (path.endsWith('/login')) return new Response('{}', { status: 200, headers: { 'set-cookie': 'sid=1; Path=/' } });
+      return new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as typeof fetch);
+    expect((await make({ data: { automation: { aiHandoffPromptAfterReplies: 7 } } }).connect('MERCH_A', 'http://lc.test', 'a@b.test', 'x', 'admin')).handoffAfterReplies).toBe(7);   // nested and written in camelCase
+    expect((await make({ merchant: { ai_handoff_prompt_after_replies: '4' } }).connect('MERCH_A', 'http://lc.test', 'a@b.test', 'x', 'admin')).handoffAfterReplies).toBe(4);
+    await expect(make({ ai_bot_enabled: true, tone: 'x' }).connect('MERCH_A', 'http://lc.test', 'a@b.test', 'x', 'admin')).rejects.toThrow(/It sent these fields: ai_bot_enabled, tone/);
+    await link.disconnect('MERCH_A');
+  });
 });

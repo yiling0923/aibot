@@ -27,9 +27,17 @@ export class LiveChatLink {
     if (!cookie) throw new Error('LiveChat accepted the login but sent no session.');
     return cookie;
   }
+  /** Finds the number wherever LiveChat keeps it: at the top, inside "automation", "data" or "merchant", or written like aiHandoffPromptAfterReplies. */
   private readNumber(j: Record<string, unknown>): number {
-    const v = j.ai_handoff_prompt_after_replies ?? (j.automation as Record<string, unknown> | undefined)?.ai_handoff_prompt_after_replies;
-    if (v === undefined || v === null || Number.isNaN(Number(v))) throw new Error('LiveChat did not return ai_handoff_prompt_after_replies.');
+    const norm = (k: string) => k.toLowerCase().replace(/[^a-z]/g, '');
+    const find = (o: unknown, depth: number): unknown => {
+      if (!o || typeof o !== 'object' || depth > 4) return undefined;
+      for (const [k, v] of Object.entries(o as Record<string, unknown>)) if (norm(k) === 'aihandoffpromptafterreplies' && v !== null && v !== undefined && v !== '' && !Number.isNaN(Number(v))) return v;
+      for (const v of Object.values(o as Record<string, unknown>)) { const x = find(v, depth + 1); if (x !== undefined) return x; }
+      return undefined;
+    };
+    const v = find(j, 0);
+    if (v === undefined) throw new Error('LiveChat did not return ai_handoff_prompt_after_replies. It sent these fields: ' + (Object.keys(j).slice(0, 25).join(', ') || '(nothing)') + '.');
     return clampN(v);
   }
   private async row(code: string) {
