@@ -143,7 +143,19 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   };
 
   const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, v] } } }); };
-  const suggest = () => {
+  const [sBusy, setSBusy] = useState(false);
+  /** The "Suggest with AI" button: the AI writes new example questions for this entry in the language of the open tab. They go to the list below, and nothing is added until a person approves. Without the AI it adds a few simple variations of the first example. */
+  const suggest = async () => {
+    if (p.ai.suggest) {
+      const ans = tx.answer_text.trim() || trOf(ed, 'en').answer_text.trim();
+      if (!ans) return p.toast(t('Write the answer first: the AI writes questions that this answer fits.'));
+      setSBusy(true);
+      try {
+        const r = await api<{ questions: string[] }>('/api/admin/suggest-questions', { merchant: p.merchant, lang: ed.tab, intentKey: ed.intent_key, topic: ed.topic === '__new' ? ed.newTopic : ed.topic, answer: ans, examples: tx.question_examples, count: 6 });
+        set({ sug: { ...ed.sug, [ed.tab]: r.questions } });
+      } catch (e) { p.toast((e as Error).message); } finally { setSBusy(false); }
+      return;
+    }
     const base = tx.question_examples[0] || (ed.intent_key || 'question').replace(/_/g, ' ');
     const sfx = ({ en: ['pls', 'boss', 'ya'], ms: ['tolong', 'boss', 'lah'], zh: ['请问', '老板', '呀'], vi: ['nhé', 'shop', 'giúp mình'], th: ['ค่ะ', 'ครับ', 'หน่อย'], tl: ['po', 'boss', 'naman'] } as Record<string, string[]>)[ed.tab];
     const out = ed.tab === 'zh' ? [sfx[0] + base, base + sfx[2], sfx[1] + base] : [base + ' ' + sfx[0], sfx[1] + ' ' + base, base + ' ' + sfx[2]];
@@ -208,8 +220,8 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <div className="kbsec"><b>4</b> {t('How customers ask for it')}</div>
       <div><h3>{t('Example questions')} ({tx.question_examples.length}) <span className={'pill ' + (tx.question_examples.length >= 3 ? 'ok' : 'warn')}>{tx.question_examples.length >= 3 ? t('enough') : t('add {n} more', { n: 3 - tx.question_examples.length })}</span> <span className="sub">{t('at least 3, include slang')}</span></h3>
         <div className="chips">{tx.question_examples.map((x, i) => <span className="chip" key={i}>{x}<button type="button" aria-label={t('Remove')} onClick={() => setTr({ question_examples: tx.question_examples.filter((_, j) => j !== i) })}>×</button></span>)}{!tx.question_examples.length && <span className="sub">{t('None yet')}</span>}</div>
-        <div className="addrow"><input type="text" placeholder={t('Add an example, then press Enter')} style={{ flex: 1, minWidth: 180 }} value={ed.newEx} onChange={(e) => set({ newEx: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEx(); } }} /><button className="btn sm" type="button" onClick={addEx}>{t('Add')}</button><button className="btn sm" type="button" onClick={suggest}>{t('Suggest with AI')}</button></div></div>
-      {sug.length > 0 && <div className="sug"><b style={{ fontSize: 12.5 }}>{t('AI suggestions · need your approval')}</b>{sug.map((x, i) => (
+        <div className="addrow"><input type="text" placeholder={t('Add an example, then press Enter')} style={{ flex: 1, minWidth: 180 }} value={ed.newEx} onChange={(e) => set({ newEx: e.target.value })} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEx(); } }} /><button className="btn sm" type="button" onClick={addEx}>{t('Add')}</button><button className="btn sm" type="button" disabled={sBusy} title={p.ai.suggest ? t('The AI writes new example questions for this entry. You approve each one.') : t('The AI is off, so this only adds simple variations of the first example. Add the Anthropic key to .env for real suggestions.')} onClick={() => void suggest()}>{sBusy ? t('Thinking…') : t('Suggest with AI')}</button></div></div>
+      {sug.length > 0 && <div className="sug"><b style={{ fontSize: 12.5 }}>{t('AI suggestions · need your approval')}</b> <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: [] }, translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, ...sug.filter((x) => !tx.question_examples.some((e) => e.toLowerCase() === x.toLowerCase()))] } } })}>{t('Approve all')}</button>{sug.map((x, i) => (
         <div className="it" key={i}><span>{x}</span><span>
           <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) }, translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, x] } } })}>{t('Approve')}</button>{' '}
           <button className="btn sm" type="button" onClick={() => set({ sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) } })}>{t('Dismiss')}</button></span></div>))}</div>}

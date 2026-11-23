@@ -20,7 +20,7 @@ interface Report {
   unpricedModels: { provider: string; model: string; calls: number; tokens: number }[]; prices: Price[];
 }
 
-const KIND: Record<string, string> = { pick: 'Finding the right answer', describe: 'Describing new keywords', translate: 'Translating answers', write: 'Rewording replies' };
+const KIND: Record<string, string> = { pick: 'Finding the right answer', describe: 'Describing new keywords', translate: 'Translating answers', suggest: 'Suggesting example questions', write: 'Rewording replies' };
 const PROVIDER: Record<string, string> = { anthropic: 'Claude', openai: 'ChatGPT' };
 const n0 = (n: number) => n.toLocaleString('en-US');
 const calls = (n: number, T: (s: string, v?: Record<string, string | number>) => string) => T(n === 1 ? '{n} call' : '{n} calls', { n: n0(n) });

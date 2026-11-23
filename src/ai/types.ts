@@ -23,6 +23,12 @@ export type TranslateLang = 'en' | 'ms' | 'zh' | 'vi' | 'th' | 'tl';
 export interface TranslateInput { style?: string; merchant?: string; merchantName: string; from: TranslateLang; to: TranslateLang; answer: string; examples: string[] }
 export interface Translation { answer: string; examples: string[] }
 
+export interface SuggestInput {
+  style?: string; merchant?: string; merchantName: string; lang: TranslateLang;
+  /** The entry the questions are for: its name, topic, answer (in this language, else English) and the example questions it already has. */
+  intentKey: string; topic: string; answer: string; examples: string[]; count: number;
+}
+
 export interface AiService {
   /** Claude can match a message to a knowledge base entry. */
   canPick: boolean;
@@ -32,10 +38,14 @@ export interface AiService {
   canDescribe: boolean;
   /** Claude can translate an answer and its example questions into another language (always checked by a person afterwards). */
   canTranslate: boolean;
+  /** Claude can suggest more example questions for an entry (a person approves each one). */
+  canSuggest?: boolean;
   pickEntry(input: PickInput): Promise<Pick | null>;
   writeReply(input: WriteInput): Promise<string | null>;
   describeWord(input: DescribeInput): Promise<WordNote | null>;
   translate(input: TranslateInput): Promise<Translation | null>;
+  /** New example questions a real customer might type for this entry, none of them already in `examples`. Null when the AI is off or fails. */
+  suggestQuestions?(input: SuggestInput): Promise<string[] | null>;
 }
 
 /** Claude's match must be at least this sure before the bot answers with it. */

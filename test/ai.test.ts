@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { dbNameFor, tbl } from '../src/db/tenants';
-import { createAi, checkReply, checkTranslation, type AiService, type PickInput, type TranslateInput } from '../src/ai';
+import { createAi, checkReply, checkTranslation, type AiService, type PickInput, type SuggestInput, type TranslateInput } from '../src/ai';
 import { Bot, newSession } from '../src/bot/responder';
 import { knowledgeFromSeed } from '../src/engine';
 import { seedJson, accountsJson } from './helpers';
@@ -192,7 +192,8 @@ if (dbUrl) { pool = createPool(dbUrl, 4); try { await pool.query('select 1'); re
 describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', () => {
   const described: string[] = [];
   const ai: AiService = {
-    canPick: true, canWrite: false, canDescribe: true, canTranslate: true,
+    canPick: true, canWrite: false, canDescribe: true, canTranslate: true, canSuggest: true,
+    suggestQuestions: async (i) => (i.answer.includes('Wallet') ? [`[${i.lang}] how to top up`, i.examples[0] ?? 'dup', '[x] <script>', `[${i.lang}] how to top up`, `[${i.lang}] depo how ah`] : []),
     translate: async (i) => (i.answer.includes('Wallet') ? { answer: i.to === 'zh' ? '请到 Wallet > Deposit，选择付款方式，按步骤操作。最低 MYR 10。' : 'Pergi ke Wallet > Deposit, pilih kaedah bayaran. Minimum MYR 10.', examples: i.examples.map((x) => `[${i.to}] ${x}`) } : { answer: 'Minimum MYR 99', examples: [] }),
     pickEntry: async (i) => (i.text === 'apa tu' ? { intent: 'deposit_how', confidence: 0.9 } : null),
     writeReply: async () => null,
@@ -212,8 +213,8 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     await migrate(pool!, { reset: true }); await seed(pool!);
     app = await buildApp({ pool: pool!, logger: false, ai }); appOff = await buildApp({ pool: pool!, logger: false, ai: off });
     cookie = await signIn(app); cookieOff = await signIn(appOff);
-    expect(((await get(app, cookie, '/api/admin/state')).json()).ai).toEqual({ pick: true, write: false, describe: true, translate: true });
-    expect(((await get(appOff, cookieOff, '/api/admin/state')).json()).ai).toEqual({ pick: false, write: false, describe: false, translate: false });
+    expect(((await get(app, cookie, '/api/admin/state')).json()).ai).toEqual({ pick: true, write: false, describe: true, translate: true, suggest: true });
+    expect(((await get(appOff, cookieOff, '/api/admin/state')).json()).ai).toEqual({ pick: false, write: false, describe: false, translate: false, suggest: false });
   });
 
   it('Claude rescues a message through the chat endpoint', async () => {
@@ -236,6 +237,15 @@ describe.skipIf(!reachable)('AI through the server (needs TEST_DATABASE_URL)', (
     expect(rows.find((k: { w: string }) => k.w === 'lh').h).toBe('"lah", a particle');       // a note someone wrote is never replaced
   });
 
+  it('suggests example questions: new ones only, cleaned, for the right language, and says so when AI is off', async () => {
+    const ok = await post(app, cookie, '/api/admin/suggest-questions', { merchant: 'MERCH_A', lang: 'ms', intentKey: 'deposit_how', topic: 'deposit', answer: 'Go to Wallet > Deposit.', examples: ['how to deposit'], count: 6 });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().questions).toEqual(['[ms] how to top up', '[ms] depo how ah']);                       // not the example it already has, no markup, no repeats
+    expect((await post(app, cookie, '/api/admin/suggest-questions', { merchant: 'MERCH_A', answer: '  ' })).statusCode).toBe(400);
+    expect((await post(app, cookie, '/api/admin/suggest-questions', { merchant: 'MERCH_A', lang: 'xx', answer: 'x' })).statusCode).toBe(400);
+    expect((await post(app, cookie, '/api/admin/suggest-questions', { merchant: 'MERCH_A', answer: 'Nothing about it.' })).statusCode).toBe(422);   // the AI gave nothing new
+    expect((await post(appOff, cookieOff, '/api/admin/suggest-questions', { merchant: 'MERCH_A', answer: 'Go to Wallet.' })).statusCode).toBe(409);
+  });
   it('translates an answer for the entry editor, refuses a changed number, and says so when AI is off', async () => {
     const ok = await post(app, cookie, '/api/admin/translate', { merchant: 'MERCH_A', from: 'en', to: 'ms', answer: 'Go to Wallet > Deposit. Minimum MYR 10.', examples: ['depo how'] });
     expect(ok.statusCode).toBe(200); expect(ok.json()).toEqual({ answer: 'Pergi ke Wallet > Deposit, pilih kaedah bayaran. Minimum MYR 10.', examples: ['[ms] depo how'] });
@@ -293,5 +303,22 @@ describe('Claude translation on a fake network', () => {
   it('gives null for an empty answer or a failing service', async () => {
     expect(await createAi({ anthropicKey: 'k', fetch: fakeNet(() => json(claudeReply('{"answer":"  ","examples":[]}'))).fetchImpl }).translate(input)).toBeNull();
     expect(await createAi({ anthropicKey: 'bad', fetch: fakeNet(() => json({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }, 401)).fetchImpl }).translate(input)).toBeNull();
+  });
+});
+
+describe('Claude suggested questions on a fake network', () => {
+  const input: SuggestInput = { merchantName: 'LuckyPay', lang: 'ms', intentKey: 'deposit_time', topic: 'deposit', answer: 'Deposits are credited within 5 minutes.', examples: ['how long deposit take'], count: 4 };
+  it('returns the questions, and sends the entry as data with the language and the existing examples', async () => {
+    const net = fakeNet(() => json(claudeReply('{"questions":["berapa lama depo masuk","  depo lambat   la ","",""]}')));
+    const ai = createAi({ anthropicKey: 'k', fetch: net.fetchImpl });
+    expect(ai.canSuggest).toBe(true);
+    expect(await ai.suggestQuestions!(input)).toEqual(['berapa lama depo masuk', 'depo lambat la']);
+    const sent = JSON.stringify(net.calls[0].body);
+    expect(sent).toContain('<answer>Deposits are credited'); expect(sent).toContain('Bahasa Melayu'); expect(sent).toContain('how long deposit take'); expect(sent).toContain('How many: 4');
+  });
+  it('is off without a key and gives null when the service fails', async () => {
+    expect(createAi({}).canSuggest).toBe(false);
+    expect(await createAi({}).suggestQuestions!(input)).toBeNull();
+    expect(await createAi({ anthropicKey: 'bad', fetch: fakeNet(() => json({ type: 'error', error: { type: 'authentication_error', message: 'invalid x-api-key' } }, 401)).fetchImpl }).suggestQuestions!(input)).toBeNull();
   });
 });

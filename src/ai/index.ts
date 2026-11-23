@@ -1,10 +1,10 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import type OpenAI from 'openai';
-import { claudeDescribe, claudePick, claudeTranslate, makeAnthropic } from './claude';
+import { claudeDescribe, claudePick, claudeSuggest, claudeTranslate, makeAnthropic } from './claude';
 import { makeOpenAI, openaiWrite } from './openai';
 import type { UsageEvent } from './usage';
 import type { MerchantAiKeys } from './merchantKeys';
-import type { AiService, DescribeInput, PickInput, TranslateInput, WriteInput } from './types';
+import type { AiService, DescribeInput, PickInput, SuggestInput, TranslateInput, WriteInput } from './types';
 
 export * from './types';
 import type { MerchantLimits } from './limits';
@@ -51,9 +51,10 @@ export function createAi(o: AiOptions): AiService {
   };
 
   return {
-    canPick: !!claude, canWrite: !!gpt, canDescribe: !!claude, canTranslate: !!claude,
+    canPick: !!claude, canWrite: !!gpt, canDescribe: !!claude, canTranslate: !!claude, canSuggest: !!claude,
     pickEntry: (i: PickInput) => (claude ? run('claude pick', () => claudePick(claude, claudeModel, i, report('anthropic', claudeModel, 'pick', i.merchant))) : Promise.resolve(null)),
     describeWord: (i: DescribeInput) => (claude ? run('claude describe', () => claudeDescribe(claude, claudeModel, i, report('anthropic', claudeModel, 'describe', i.merchant))) : Promise.resolve(null)),
+    suggestQuestions: (i: SuggestInput) => (claude ? run('claude suggest', () => claudeSuggest(claude, claudeModel, i, report('anthropic', claudeModel, 'suggest', i.merchant))) : Promise.resolve(null)),
     translate: (i: TranslateInput) => (claude ? run('claude translate', () => claudeTranslate(claude, claudeModel, i, report('anthropic', claudeModel, 'translate', i.merchant))) : Promise.resolve(null)),
     writeReply: (i: WriteInput) => (gpt ? run('chatgpt write', () => openaiWrite(gpt, o.openaiModel!, i, report('openai', o.openaiModel!, 'write', i.merchant))) : Promise.resolve(null)),
   };
@@ -80,10 +81,12 @@ export function createRoutedAi(base: AiOptions, keys: MerchantAiKeys, gate?: Mer
     get canWrite() { return shared.canWrite || (keys.anyHas.openai && !!base.openaiModel); },
     get canDescribe() { return shared.canDescribe || keys.anyHas.anthropic; },
     get canTranslate() { return shared.canTranslate || keys.anyHas.anthropic; },
+    get canSuggest() { return !!shared.canSuggest || keys.anyHas.anthropic; },
     // a merchant over its monthly token limit gets no AI help (the bot goes on from the knowledge base); the style rules are added to the wording jobs
     pickEntry: async (i: PickInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).pickEntry(i)),
     writeReply: async (i: WriteInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).writeReply({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) })),
     describeWord: async (i: DescribeInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).describeWord({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) })),
+    suggestQuestions: async (i: SuggestInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).suggestQuestions?.({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) }) ?? null),
     translate: async (i: TranslateInput) => (i.merchant && gate && !(await gate.allow(i.merchant)) ? null : (await forMerchant(i.merchant)).translate({ ...i, style: i.style ?? (i.merchant && gate ? await gate.style(i.merchant) : undefined) })),
   };
 }

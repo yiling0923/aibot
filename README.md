@@ -394,6 +394,10 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 On the English tab, **Translate the empty languages with AI** fills every language the merchant has switched on (Merchant settings → General → "Languages the bot answers in"), except English, but only the ones that are still empty and never over text that is there. A merchant that never chose its languages gets Malay and Chinese. On another language's tab, the button translates just that one language (and asks before it replaces an answer).
 
+### Suggest with AI (example questions)
+
+In the entry editor, **Suggest with AI** (section 4) asks Claude for up to 6 new example questions for the open language tab. It sends the entry name, the topic, the answer (in that language, else the English one) and the examples the entry already has, and the merchant's bot instructions. The questions come back as a list under the examples: **Approve** adds one, **Dismiss** drops it, **Approve all** adds the rest. Nothing is added without a person pressing a button, questions the entry already has are never offered again, and the AI is told to write only questions this answer really answers and to add no facts. The calls count in **Usage & billing** ("Suggesting example questions"), under the merchant's own key if it has one, and stop when the merchant's monthly token limit is reached. Without a Claude key the button only adds a few simple variations of the first example, as before. Server route: `POST /api/admin/suggest-questions`.
+
 ### Chinese panel (中文)
 
 The whole control panel can be shown in Simplified Chinese. Press **中文** (or **EN**) in the top bar; the choice is remembered in the browser for each person (`localStorage` key `panelLang`) and sets the page language (`zh-CN`). The default is English, so nothing changes for people who do not press it.

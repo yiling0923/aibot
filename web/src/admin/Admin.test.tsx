@@ -15,7 +15,7 @@ const kbEntry = (id: number, key: string, status: 'live' | 'draft', answer: stri
 const kbList = () => (withKb ? [kbEntry(1, 'dep_how', 'live', 'Go to Wallet.'), kbEntry(2, 'dep_time', 'live', 'Five minutes.'), kbEntry(3, 'dep_limit', 'draft', 'RM30 to RM30,000.'), kbEntry(4, 'dep_bonus', 'draft', 'TO WRITE: the bonus rules')] : []);
 const state = (role: 'admin' | 'staff') => ({
   versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode, languages: langsA }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
-  history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
+  history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true, suggest: true },
   snapshot: {
     kb: kbList(), aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
     settings: { A: SET(), B: SET() },
@@ -60,7 +60,7 @@ const lcReply = (init?: RequestInit) => {                                       
 const json = (body: unknown) => Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'content-type': 'application/json' } }));
 const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) => {
   vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => (lcRefuse && url === '/api/admin/livechat-chat' && String(init?.body).includes('"file"')
-    ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate } } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
+    ? Promise.resolve(new Response(JSON.stringify({ error: 'LiveChat refused this file: "Unsupported attachment type." It received a.png.' }), { status: 502, headers: { 'content-type': 'application/json' } })) : json(url.startsWith('/api/admin/livechat-chat/probe') ? { rows: [{ label: 'JPG picture', ok: true, answer: 'accepted' }, { label: 'WebP picture', ok: false, answer: 'Unsupported attachment type.' }] } : url.startsWith('/api/admin/livechat-chat') ? lcReply(init) : url.startsWith('/api/admin/billing') ? (url.includes('/price') || url.includes('/markup') ? { saved: true } : BILL()) : url.includes('/connection') ? CONN() : url.includes('/bot-key') ? { key: 'aib_FRESHKEY1234567890' } : url.startsWith('/api/admin/state') ? { ...state(role), ai: { ...state(role).ai, translate, suggest: translate } } : url.startsWith('/api/admin/suggest-questions') ? { questions: ['how to top up', 'depo how ah', 'cara deposit'] } : url.startsWith('/api/admin/translate') ? { answer: 'Pergi ke Wallet > Deposit.', examples: ['depo macam mana'] }
     : /\/merchants\/[^/]+\/basics/.test(url) ? BASICS
     : /\/merchants\/[^/]+\/livechat/.test(url) ? { configured: true, baseUrl: 'http://lc.test', email: 'a@b.test', handoffAfterReplies: 4, syncedAt: '2026-11-12T08:00:00Z', error: null }
     : url.startsWith('/api/admin/unmatched/resolve') ? { ok: true, changed: 1 }
@@ -143,6 +143,26 @@ describe('Control panel', () => {
       await userEvent.click(screen.getByRole('tab', { name: /^ZH/ }));
       expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('');
     } finally { langsA = null; }
+  });
+  it('Suggest with AI: the AI writes example questions, each needs approval, Approve all adds the rest; without the AI it adds simple variations', async () => {
+    open('admin', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Suggest with AI' }));
+    expect(await screen.findByText('Write the answer first: the AI writes questions that this answer fits.')).toBeTruthy();      // it needs an answer to write questions for
+    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
+    await userEvent.click(screen.getByRole('button', { name: 'Suggest with AI' }));
+    expect(await screen.findByText('how to top up')).toBeTruthy(); expect(screen.getByText('AI suggestions · need your approval')).toBeTruthy();
+    expect(screen.queryByText(/Example questions \(1\)/)).toBeNull();                                      // nothing is added before approval
+    await userEvent.click(within(screen.getByText('how to top up').closest('.it') as HTMLElement).getByRole('button', { name: 'Approve' }));
+    expect(screen.getByText(/Example questions \(1\)/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Approve all' }));
+    expect(screen.getByText(/Example questions \(3\)/)).toBeTruthy(); expect(screen.queryByText('AI suggestions · need your approval')).toBeNull();
+    cleanup(); open('admin', '/admin/kb', false);
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'daily_limit');
+    await userEvent.click(screen.getByRole('button', { name: 'Suggest with AI' }));
+    expect(await screen.findByText('AI suggestions · need your approval')).toBeTruthy();                    // the old simple variations
+    expect(screen.getByText('daily limit pls')).toBeTruthy();
   });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');

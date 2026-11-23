@@ -1203,4 +1203,9 @@ export const ZH: Record<string, string> = {
   'Fills the languages this merchant uses when they are empty. Open a language tab to translate just that one.': '会填写这个商户使用的、还是空的语言。要只翻译某一种，请打开该语言的标签。',
   'Fills the languages this merchant uses (Merchant settings → General) when they are empty, never over text you wrote. Without a choice there, it fills Malay and Chinese. ': '会填写这个商户使用的（商户设置 → 常规）、还是空的语言，不会覆盖你写的内容。如果那里没有选择，则填写马来文和中文。',
   'Clear the whole table?': '清空整个表格吗？',
+  'Write the answer first: the AI writes questions that this answer fits.': '请先写答案：AI 会写出适合这个答案的问题。',
+  'The AI writes new example questions for this entry. You approve each one.': 'AI 会为这个条目写出新的示例问题。每一个都需要你批准。',
+  'The AI is off, so this only adds simple variations of the first example. Add the Anthropic key to .env for real suggestions.': 'AI 已关闭，所以这里只会加入第一个示例的简单变化。要得到真正的建议，请把 Anthropic 密钥加到 .env。',
+  'Thinking…': '思考中…', 'Approve all': '全部批准',
+  'Suggesting example questions': '建议示例问题',
 };

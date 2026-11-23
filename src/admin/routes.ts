@@ -91,7 +91,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const v = await versionState(pool, user, merchants.map((m) => m.code));
     const history = v.history.map((h) => ({ kind: h.kind, merchant: h.merchant, version: h.version, actor: h.actor, summary: h.summary, ago: ago(h.created_at) }));
     return { versions: v.versions, sharedVer: v.sharedVer, stamp: v.stamp, merchants, snapshot: scopeSnapshot(user, await readSnapshot(pool)), history,
-      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe, translate: ctx.ai.canTranslate } };
+      user: { username: user.username, role: user.role, merchant: user.merchant }, ai: { pick: ctx.ai.canPick, write: ctx.ai.canWrite, describe: ctx.ai.canDescribe, translate: ctx.ai.canTranslate, suggest: !!ctx.ai.canSuggest } };
   });
 
   app.post<{ Body: { snapshot: Snapshot; includeDrafts?: boolean } }>(`${A}/tests`, async (req) => {
@@ -206,6 +206,27 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const check = checkTranslation(t.answer, answer);
     if (!check.ok) return reply.code(422).send({ error: `The translation was refused because ${check.reason}. Try again, or write it yourself.` });
     return { answer: t.answer, examples: t.examples };
+  });
+
+  /** Suggests new example questions for an entry, as a draft for a person to approve one by one. The questions already on the entry are never returned again. */
+  app.post<{ Body: { merchant: string; lang?: string; intentKey?: string; topic?: string; answer?: string; examples?: string[]; count?: number } }>(`${A}/suggest-questions`, async (req, reply) => {
+    const b = req.body ?? ({} as never);
+    if (!mayUse(req, b.merchant)) return forbidden(reply);
+    const langs = ['en', 'ms', 'zh', 'vi', 'th', 'tl'] as const; type L = (typeof langs)[number];
+    const lang = (b.lang ?? 'en') as L;
+    if (!langs.includes(lang)) return reply.code(400).send({ error: 'Choose a language (en, ms, zh, vi, th or tl).' });
+    const answer = String(b.answer ?? '').trim();
+    if (!answer) return reply.code(400).send({ error: 'Write the answer first: the AI writes questions that this answer fits.' });
+    if (!ctx.ai.canSuggest || !ctx.ai.suggestQuestions) return reply.code(409).send({ error: 'The AI is not set up yet. Add the Anthropic key to .env.' });
+    const examples = (Array.isArray(b.examples) ? b.examples : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 40);
+    const count = Math.max(1, Math.min(10, Math.round(Number(b.count) || 6)));
+    const name = (await tenants.get(b.merchant))?.name ?? b.merchant;
+    const got = await ctx.ai.suggestQuestions({ merchant: b.merchant, merchantName: name, lang, intentKey: String(b.intentKey ?? '').slice(0, 80), topic: String(b.topic ?? '').slice(0, 60), answer: answer.slice(0, 3000), examples, count });
+    if (!got) return reply.code(502).send({ error: 'The AI could not make suggestions. Try again in a moment.' });
+    const seen = new Set(examples.map((x) => x.toLowerCase()));
+    const questions = got.filter((x) => x.length >= 2 && x.length <= 120 && !/[<>]/.test(x) && !seen.has(x.toLowerCase()) && (seen.add(x.toLowerCase()), true)).slice(0, count);
+    if (!questions.length) return reply.code(422).send({ error: 'The AI only gave questions the entry already has. Try again, or add your own.' });
+    return { questions };
   });
 
   /* ---------- messages the bot did not understand ---------- */
