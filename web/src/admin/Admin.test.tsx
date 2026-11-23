@@ -14,7 +14,7 @@ let withKb = false;
 const kbEntry = (id: number, key: string, status: 'live' | 'draft', answer: string) => ({ id, merchant: 'B', category: 'General', intent_key: key, topic: 'deposit', aspect: null, topic_optional: false, status, translations: { en: { question_examples: [key + ' one', key + ' two', key + ' three'], answer_text: answer } } });
 const kbList = () => (withKb ? [kbEntry(1, 'dep_how', 'live', 'Go to Wallet.'), kbEntry(2, 'dep_time', 'live', 'Five minutes.'), kbEntry(3, 'dep_limit', 'draft', 'RM30 to RM30,000.'), kbEntry(4, 'dep_bonus', 'draft', 'TO WRITE: the bonus rules')] : []);
 const state = (role: 'admin' | 'staff') => ({
-  versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
+  versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode, languages: langsA }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true },
   snapshot: {
     kb: kbList(), aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
@@ -25,6 +25,7 @@ const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolve
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
 const REPORT = { chatsBy: { members: 12, visitors: 30 }, from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let botMode: 'listening' | 'answering' = 'answering';
+let langsA: string | null = null;                       // the languages LuckyPay has switched on (null: it never chose)
 let importedMsgs: { chat: string; from: string; text: string }[] = [];
 const LEARN = () => ({ mode: botMode, since: '2026-11-01T00:00:00Z', days: 12, pairs: 40, chats: 18, withReply: 31, groups: [
   { key: 'topic:deposit', kind: 'topic', label: 'deposit', topic: 'deposit', intent: null, count: 14, withReply: 12, customers: [{ text: 'deposit not in yet', n: 6 }, { text: 'depo pending', n: 3 }], replies: [{ text: 'Please send your receipt, we check in 5 min.', n: 9 }] },
@@ -126,10 +127,22 @@ describe('Control panel', () => {
     expect(screen.queryByRole('button', { name: /Translate to Vietnamese/ })).toBeNull();               // one button on the English tab, not two
     await userEvent.click(screen.getByRole('tab', { name: /^EN/ }));
     await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
-    expect(await screen.findByText(/Malay and Chinese already have an answer/)).toBeTruthy();         // nothing is translated over text that is there
+    expect(await screen.findByText(/Every language this merchant uses already has an answer/)).toBeTruthy();         // nothing is translated over text that is there
     cleanup(); open('admin', '/admin/kb', false);
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
     expect((screen.getByRole('button', { name: 'Translate the empty languages with AI' }) as HTMLButtonElement).disabled).toBe(true);
+  });
+  it('the one translate button fills the languages the merchant has switched on (Malay and Chinese when it never chose)', async () => {
+    langsA = 'en,ms,vi,th';
+    try {
+      open('admin', '/admin/kb');
+      await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+      await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
+      await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
+      expect(await screen.findByText(/Translated to MS, VI, TH\./)).toBeTruthy();                       // not Chinese: this merchant switched it off
+      await userEvent.click(screen.getByRole('tab', { name: /^ZH/ }));
+      expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('');
+    } finally { langsA = null; }
   });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');

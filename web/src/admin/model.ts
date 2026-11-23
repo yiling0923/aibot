@@ -14,7 +14,7 @@ export const emptyWords = (): Record<string, string[]> => Object.fromEntries(LAN
 /** A knowledge base entry as the panel edits it: the server fields plus two display-only ones. */
 export type Entry = SnapEntry & { dirty?: boolean };
 export interface Draft extends Omit<Snapshot, 'kb'> { kb: Entry[] }
-export interface MerchantRowAdmin { code: string; name: string; tone?: string; default_language?: string; bot_mode?: 'listening' | 'answering'; listening_since?: string | null }
+export interface MerchantRowAdmin { code: string; name: string; tone?: string; default_language?: string; languages?: string | null; bot_mode?: 'listening' | 'answering'; listening_since?: string | null }
 export interface Me { username: string; role: 'admin' | 'staff'; merchant: string | null }
 export interface HistoryItem { kind: 'merchant' | 'shared'; merchant: string | null; version: number; actor: string; summary: string; ago: string }
 export interface AiFlags { pick: boolean; write: boolean; describe: boolean; translate: boolean }

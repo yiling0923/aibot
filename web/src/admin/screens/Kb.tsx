@@ -18,6 +18,8 @@ const tProblem = (t: (s: string, v?: Record<string, string | number>) => string,
   const m = x.match(/^Only (\d+) example questions?\. /);
   return m ? t(m[1] === '1' ? 'Only 1 example question. Add at least 3, with slang, so the bot finds it more often.' : 'Only {n} example questions. Add at least 3, with slang, so the bot finds it more often.', { n: m[1] }) : t(x);
 };
+/** The languages the one translate button fills: the ones this merchant has switched on in Merchant settings, except English. A merchant that never chose gets Malay and Chinese. */
+const merchantLangs = (v?: string | null): string[] => { const on = String(v ?? '').split(',').map((x) => x.trim()).filter((x) => (LANGS as readonly string[]).includes(x) && x !== 'en'); return on.length ? on : ['ms', 'zh']; };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
 export default function Kb() {
@@ -116,8 +118,8 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   /** Asks the AI to translate the English answer and examples into other languages. The result is only a draft in the editor: nothing is saved until "Save to draft". */
   /** The one button on the English tab: translates Malay and Chinese, but only the ones that are still empty. */
   const translateEmpty = () => {
-    const empty = ['ms', 'zh'].filter((l) => !trOf(ed, l).answer_text.trim());
-    if (!empty.length) return p.toast(t('Malay and Chinese already have an answer. Open a language tab to translate that one again.'));
+    const empty = merchantLangs(p.M.languages).filter((l) => !trOf(ed, l).answer_text.trim());
+    if (!empty.length) return p.toast(t('Every language this merchant uses already has an answer. Open a language tab to translate that one again.'));
     void translateTo(empty);
   };
   const translateTo = async (langs: string[]) => {
@@ -137,7 +139,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
     }
     setEd({ ...ed, translations: next as Entry['translations'] }); setBusy(false);
     if (failed.length) p.toast(failed[0]);
-    else if (done.length) p.toast(t('Translated to {l}. Please check the wording, then save.', { l: done.join(t(' and ')) }));
+    else if (done.length) p.toast(t('Translated to {l}. Please check the wording, then save.', { l: done.length <= 2 ? done.join(t(' and ')) : done.join(', ') }));
   };
 
   const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, v] } } }); };
@@ -199,9 +201,9 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <label className="fld"><span>{t('Answer in {l} (facts only; the bot adds the tone)', { l: LN[ed.tab] })}</span><textarea lang={ed.tab} value={tx.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
       <div className="tools" style={{ marginTop: -4 }}>
         {ed.tab === 'en'
-          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={t(p.ai.translate ? 'Fills Malay and Chinese when they are empty. Open another language tab to translate that one.' : 'The AI is off. Add the Anthropic key to .env.')} onClick={() => translateEmpty()}>{t(busy ? 'Translating…' : 'Translate the empty languages with AI')}</button>
+          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={t(p.ai.translate ? 'Fills the languages this merchant uses when they are empty. Open a language tab to translate just that one.' : 'The AI is off. Add the Anthropic key to .env.')} onClick={() => translateEmpty()}>{t(busy ? 'Translating…' : 'Translate the empty languages with AI')}</button>
           : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : t('The AI is off. Add the Anthropic key to .env.')} onClick={() => translateTo([ed.tab])}>{busy ? t('Translating…') : t('Translate from English to {l}', { l: LN[ed.tab] })}</button>}
-        <span className="sub">{p.ai.translate ? (ed.tab === 'en' ? t('Fills Malay and Chinese when they are empty, never over text you wrote. For Vietnamese, Thai or Filipino open that tab. ') : '') + t('The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.') : t('Translating needs the AI. Add the Anthropic key to .env.')}</span>
+        <span className="sub">{p.ai.translate ? (ed.tab === 'en' ? t('Fills the languages this merchant uses (Merchant settings → General) when they are empty, never over text you wrote. Without a choice there, it fills Malay and Chinese. ') : '') + t('The AI writes a draft from the English answer and examples. Menu names stay as written. Please check it before saving.') : t('Translating needs the AI. Add the Anthropic key to .env.')}</span>
       </div>
       <div className="kbsec"><b>4</b> {t('How customers ask for it')}</div>
       <div><h3>{t('Example questions')} ({tx.question_examples.length}) <span className={'pill ' + (tx.question_examples.length >= 3 ? 'ok' : 'warn')}>{tx.question_examples.length >= 3 ? t('enough') : t('add {n} more', { n: 3 - tx.question_examples.length })}</span> <span className="sub">{t('at least 3, include slang')}</span></h3>
