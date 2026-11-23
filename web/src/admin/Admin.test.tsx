@@ -735,6 +735,23 @@ describe('Control panel', () => {
     await waitFor(() => expect(document.querySelector('#kwlists')?.textContent).toMatch(/support/));
     localStorage.removeItem('topicsView');
   });
+  it('Import table: a pasted CSV fills the rows, a many-line answer stays one answer, and Clear table empties it', async () => {
+    open('admin', '/admin/imp', false);
+    const csv = 'intent_key,topic,question_type,language,question_examples,answer_text\nlive_bonus,promotion,,en,"a bonus | b bonus | c bonus","Terms\n👉Valid for new members only.\n🎯Minimum deposit: $30."\n';
+    fireEvent.paste(await screen.findByLabelText('Entry name, row 1'), { clipboardData: { getData: () => csv } });
+    expect((screen.getByLabelText('Entry name, row 1') as HTMLInputElement).value).toBe('live_bonus');
+    expect((screen.getByLabelText('Answer, row 1') as HTMLTextAreaElement).value).toBe('Terms\n👉Valid for new members only.\n🎯Minimum deposit: $30.');
+    expect((screen.getByLabelText('Questions, row 1') as HTMLTextAreaElement).value).toBe('a bonus | b bonus | c bonus');
+    expect((screen.getByLabelText('Entry name, row 2') as HTMLInputElement).value).toBe('');           // not one row for each line
+    fireEvent.paste(screen.getByLabelText('Answer, row 2'), { clipboardData: { getData: () => 'Line one\nLine two\nLine three' } });
+    expect((screen.getByLabelText('Answer, row 2') as HTMLTextAreaElement).value).toBe('Line one\nLine two\nLine three');
+    expect((screen.getByLabelText('Answer, row 3') as HTMLTextAreaElement).value).toBe('');
+    vi.spyOn(window, 'confirm').mockReturnValue(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Clear table' }));
+    expect((screen.getByLabelText('Entry name, row 1') as HTMLInputElement).value).toBe('');
+    expect((screen.getByLabelText('Answer, row 2') as HTMLTextAreaElement).value).toBe('');
+    vi.restoreAllMocks();
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

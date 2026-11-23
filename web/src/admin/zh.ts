@@ -1202,4 +1202,5 @@ export const ZH: Record<string, string> = {
   'Every language this merchant uses already has an answer. Open a language tab to translate that one again.': '这个商户使用的每种语言都已经有答案了。要重新翻译，请打开该语言的标签。',
   'Fills the languages this merchant uses when they are empty. Open a language tab to translate just that one.': '会填写这个商户使用的、还是空的语言。要只翻译某一种，请打开该语言的标签。',
   'Fills the languages this merchant uses (Merchant settings → General) when they are empty, never over text you wrote. Without a choice there, it fills Malay and Chinese. ': '会填写这个商户使用的（商户设置 → 常规）、还是空的语言，不会覆盖你写的内容。如果那里没有选择，则填写马来文和中文。',
+  'Clear the whole table?': '清空整个表格吗？',
 };

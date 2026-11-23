@@ -35,11 +35,21 @@ export default function ImportGrid({ start, onCsv }: { start: string; onCsv: (cs
     box.current?.querySelectorAll<HTMLTextAreaElement>('textarea.gcell').forEach((t) => { t.style.height = 'auto'; t.style.height = Math.max(38, t.scrollHeight) + 'px'; });
   });
   const commit = (n: GridRow[]) => { setRows(n); onCsv(gridToCsv(n)); };
+  const clearAll = () => { if (gridToCsv(rows) && !window.confirm(T('Clear the whole table?'))) return; commit(Array.from({ length: 8 }, blank)); };
   const set = (y: number, f: keyof GridRow, v: string) => commit(rows.map((r, j) => (j === y ? { ...r, [f]: v } : r)));
 
   const paste = (e: ClipboardEvent, y: number, x: number) => {
     const text = e.clipboardData.getData('text/plain'); if (!text.includes('\t') && !text.includes('\n')) return;      // one plain word: let the cell take it
     e.preventDefault();
+    const used = rows.filter((r) => r.key.trim() || r.topic.trim() || r.q.trim() || r.a.trim());
+    const first = text.split(/\r?\n/, 1)[0];
+    if (!text.includes('\t') && /intent_key/i.test(first) && first.includes(',')) {                                  // a whole CSV with its header line (the same text as in the Upload a file box): its rows are added under what is already typed
+      const g = csvToGrid(text); if (g.length) { commit([...used, ...g, blank(), blank()]); return; }
+    }
+    if (!text.includes('\t') && (x === 3 || x === 4)) {                                                              // text with line breaks pasted into a Questions or Answer cell is ONE cell (an answer with several lines), not one cell for each line
+      const f = FIELDS[x]; const v = text.replace(/\r/g, '').trim();
+      commit(rows.map((r, j) => (j === y ? { ...r, [f]: f === 'q' ? v.replace(/\n+/g, ' | ') : v } : r))); return;
+    }
     let cells: string[][] = text.includes('\t') ? parseTable(text) : text.replace(/\r/g, '').split('\n').filter((l, k, a) => l !== '' || k < a.length - 1).map((l) => [l]);   // one column copied: one cell per line
     if (cells.length && isHeader(cells[0])) { cells = cells.slice(1); x = 0; }
     const n = rows.map((r) => ({ ...r }));
@@ -54,6 +64,7 @@ export default function ImportGrid({ start, onCsv }: { start: string; onCsv: (cs
   return (
     <div className="igrid" ref={box}>
       <div className="sub">{zh ? <>在单元格里输入，或从 Excel 或 Google Sheets 复制单元格后粘贴到这里（点击第一个单元格，然后按 Ctrl+V）。先写英文。条目的每种语言单独一行，使用<b>相同的条目名称</b>。</> : <>Type in the cells, or copy cells from Excel or Google Sheets and paste them here (click the first cell, then press Ctrl+V). Write English first. Each language of an entry is its own row with the <b>same entry name</b>.</>}</div>
+      <div className="tools" style={{ justifyContent: 'flex-end', margin: '6px 0' }}><button className="btn sm" type="button" onClick={clearAll}>{T('Clear table')}</button></div>
       <div className="gridbox"><div className="scroll"><table><thead><tr><th className="rn">#</th>{COLS.map((c) => <th key={c}>{T(c)}</th>)}<th /></tr></thead><tbody>
         {rows.map((r, y) => (
           <tr key={y}><td className="rn">{y + 1}</td>
@@ -64,8 +75,7 @@ export default function ImportGrid({ start, onCsv }: { start: string; onCsv: (cs
             <td><textarea className="gcell" rows={1} aria-label={T('Answer, row {n}', { n: y + 1 })} value={r.a} placeholder={y === 0 ? 'Deposits are credited within 5 minutes.' : ''} onChange={(e) => set(y, 'a', e.target.value)} onPaste={(e) => paste(e, y, 4)} /></td>
             <td className="del"><button className="btn sm ghost" type="button" aria-label={T('Clear row {n}', { n: y + 1 })} title={T('Clear this row')} onClick={() => commit(rows.length > 1 ? rows.filter((_, j) => j !== y) : [blank()])}>×</button></td></tr>
         ))}</tbody></table></div></div>
-      <div className="tools"><button className="btn sm ghost" type="button" onClick={() => setRows([...rows, blank(), blank(), blank(), blank(), blank()])}>＋ {T('Add 5 rows')}</button>
-        <button className="btn sm ghost" type="button" onClick={() => commit(Array.from({ length: 8 }, blank))}>{T('Clear table')}</button></div>
+      <div className="tools"><button className="btn sm ghost" type="button" onClick={() => setRows([...rows, blank(), blank(), blank(), blank(), blank()])}>＋ {T('Add 5 rows')}</button></div>
     </div>
   );
 }
