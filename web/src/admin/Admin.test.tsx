@@ -707,6 +707,21 @@ describe('Control panel', () => {
     expect(tChange('zh', 'Something new')).toBe('Something new');
     localStorage.removeItem('panelLang'); localStorage.removeItem('kbView');
   });
+  it('Import with AI translation keeps the imported entry and its new topic (the translation must not wipe them)', async () => {
+    withKb = true; localStorage.setItem('topicsView', 'list');
+    open('admin', '/admin/imp');
+    await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'opening_hours'); await userEvent.type(screen.getByLabelText('Topic, row 1'), 'support');
+    await userEvent.type(screen.getByLabelText('Questions, row 1'), 'a | b | c'); await userEvent.type(screen.getByLabelText('Answer, row 1'), 'We are open.');
+    await userEvent.click(await screen.findByRole('button', { name: /Import 1 entry to draft/ }));
+    expect(await screen.findByText(/Knowledge base · /)).toBeTruthy(); await new Promise((r) => setTimeout(r, 500));
+    expect(screen.getByText('opening_hours')).toBeTruthy();                                        // the entry is still there after the translation
+    await userEvent.click(screen.getByRole('button', { name: /What changed/ }));
+    const lines = [...document.querySelectorAll('.pubbar-list li')].map((x) => x.textContent ?? '');
+    expect(lines.some((x) => /Added topic word "support"/.test(x))).toBe(true); expect(lines.some((x) => /AI translated/.test(x))).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'Topics' }));
+    await waitFor(() => expect(document.querySelector('#kwlists')?.textContent).toMatch(/support/));
+    localStorage.removeItem('topicsView');
+  });
   it('has a guide for the marketing team, open to staff', async () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();

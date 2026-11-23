@@ -73,13 +73,19 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
 
   useEffect(() => { load().then(() => { if (restored.current) onToast('Restored your unpublished changes'); }).catch((e: Error) => setError(e.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
 
+  // The newest draft, changes and server state. An edit that waits for something (the AI translating after an import) is called from an old screen,
+  // so it must start from the newest draft, not the one that screen saw: otherwise it would wipe what was added in between.
+  const latest = useRef({ draft, changes, srv });
+  latest.current = { draft, changes, srv };
   const edit: Panel['edit'] = useCallback((fn) => {
-    if (!draft || !srv) return;
-    const next = clone(draft); const notes: string[] = [];
+    const { draft: cur, changes: curC, srv: s0 } = latest.current;
+    if (!cur || !s0) return;
+    const next = clone(cur); const notes: string[] = [];
     fn(next, (t) => notes.push(t));
-    const nc = [...changes, ...notes.filter((n, i) => !changes.includes(n) && notes.indexOf(n) === i)];   // the same line is listed once (typing in a box must not add a line for every letter)
-    setDraft(next); setChanges(nc); setTestsRun(false); save(next, nc, srv.stamp);
-  }, [draft, changes, srv]);
+    const nc = [...curC, ...notes.filter((n, i) => !curC.includes(n) && notes.indexOf(n) === i)];   // the same line is listed once (typing in a box must not add a line for every letter)
+    latest.current = { draft: next, changes: nc, srv: s0 };
+    setDraft(next); setChanges(nc); setTestsRun(false); save(next, nc, s0.stamp);
+  }, []);
 
   const setMerchant = (code: string) => {
     setMerchantState(code); setKw([]);
