@@ -168,6 +168,19 @@ describe('Control panel', () => {
     expect(await screen.findByText('AI suggestions · need your approval')).toBeTruthy();                    // the old simple variations
     expect(screen.getByText('daily limit pls')).toBeTruthy();
   });
+  it('Entry editor: Save and publish saves the entry and opens the Publish window, and does nothing when a field is missing', async () => {
+    open('admin', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(await screen.findByText('Give the entry a name first')).toBeTruthy();                                // not saved, so no Publish window
+    expect(screen.queryByRole('dialog', { name: 'Publish' })).toBeNull();
+    await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'daily_limit');
+    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'You can withdraw up to MYR 50,000 a day.');
+    await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
+    expect(await screen.findByRole('dialog', { name: 'Publish' })).toBeTruthy();                                // saved, and the Publish window follows
+    await userEvent.click(screen.getByRole('button', { name: /Close|Cancel/ }));
+  });
   it('Learning: the AI drafts an answer from the staff replies, a person edits it, and it is added as a draft entry', async () => {
     botMode = 'listening'; withKb = true;
     open('admin', '/admin/learn');

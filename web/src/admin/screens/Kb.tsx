@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import KbGrid from './KbGrid';
@@ -162,7 +163,9 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
     set({ sug: { ...ed.sug, [ed.tab]: out } });
   };
 
-  const save = () => {
+  const nav = useNavigate();
+  /** Saves the entry to the draft. With `thenPublish` the Publish window opens next (only when the entry saved), so changing one answer is: type, Save and publish. */
+  const save = (thenPublish = false) => {
     if (!ed.intent_key.trim()) return p.toast(t('Give the entry a name first'));
     if (!trOf(ed, 'en').answer_text.trim()) return p.toast(t('Add the English answer first'));
     let topic = ed.topic; let newTopic = '';
@@ -180,7 +183,8 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
       else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
     });
-    onClose(); const left = entryProblems(clean); p.toast(left.length ? t('Saved to draft, but the bot cannot use it yet: ') + tProblem(t, left[0]) : t('Saved to draft. Press Publish to make it live.'));
+    onClose(); if (thenPublish) nav('/admin/kb', { state: { publish: true } });
+    const left = entryProblems(clean); p.toast(left.length ? t('Saved to draft, but the bot cannot use it yet: ') + tProblem(t, left[0]) : t('Saved to draft. Press Publish to make it live.'));
   };
   const del = () => {
     p.edit((d, note) => { d.kb = d.kb.filter((e) => e.id !== ed.id); note('Deleted entry "' + ed.intent_key + '" (' + p.M.name + ')'); });
@@ -236,7 +240,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
         </div>))}
       <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
       {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>{t('Before the bot can use this answer:')}</b><ul className="plain">{pr.map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>{t('✓ Ready: Live, with an answer and example questions. Save it, then Publish.')}</div>; })()}
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn pri" type="button" onClick={save}>{t('Save to draft')}</button></span></div>
+      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn" type="button" onClick={() => save(false)}>{t('Save to draft')}</button><button className="btn pri" type="button" onClick={() => save(true)}>{t('Save and publish')}</button></span></div>
     </Modal>
   );
 }
