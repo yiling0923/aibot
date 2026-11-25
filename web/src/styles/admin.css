@@ -963,4 +963,5 @@ details.moreopt{background:none;padding:0}
 .kbtabs{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .kbmiss{margin-left:auto;white-space:nowrap}
 .gnrow{display:flex;align-items:center;justify-content:space-between;gap:6px}
-.kbgrid .gnrow .ibtn{width:26px;height:26px;flex:none}.kbgrid .gnrow .ibtn svg{width:15px;height:15px}
+.kbgrid .gnrow .ibtn{width:36px;height:36px;flex:none}.kbgrid .gnrow .ibtn svg{width:20px;height:20px}
+.kbgrid .glive .switch .track{transform:scale(1.1)}
