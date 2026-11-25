@@ -978,7 +978,7 @@ details.moreopt{background:none;padding:0}
 .note.viewonly{margin-bottom:12px;background:var(--infobg)}
 .kbtabs{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .kbmiss{margin-left:auto;white-space:nowrap}
-.gnrow{display:flex;align-items:center;gap:10px}.gnrow .gnname{flex:1;min-width:0;text-align:left;overflow-wrap:anywhere}.gnrow .ibtn{margin-left:auto}
+.gnrow{display:flex;align-items:center;gap:10px}.gnrow .gnname{flex:1;min-width:0;text-align:left;overflow-wrap:anywhere}.gnrow .ibtn{margin-left:0}
 .kbgrid .gnrow .ibtn{width:36px;height:36px;flex:none}.kbgrid .gnrow .ibtn svg{width:20px;height:20px}
 
 /* List view: the Live switch, the status text and the pencil share one line with the entry name */
