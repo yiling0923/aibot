@@ -342,6 +342,20 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 
 On **Keyword ranking**, the **Suggest topics** button looks at the new words nobody has decided on yet (the 15 most used). For each word it reads the customer messages the word was written in, and suggests the topic whose words sit in the same messages most often (for example *topup* next to *depo* → `deposit`). It does not guess when no topic shows up or two topics tie. You can untick a word or change its topic, then press **Add**: the words are added to the draft as keywords of that topic (publish to use them). No AI is used and nothing is saved before you press Add.
 
+## Languages and automatic translation (Knowledge base)
+
+**Knowledge base → Languages** (a tab next to **Entries**) holds, for the merchant chosen at the top:
+- the **country** (the timezone follows it, for example Malaysia → Asia/Kuala_Lumpur UTC+8). If none is chosen, the panel suggests one from the money sign (RM → Malaysia). The country also offers a language set (Malaysia: EN, MS, ZH) that you can apply with one click;
+- the **source language**: the language your staff type in (the merchant's main language);
+- the **languages the merchant uses** (tick boxes). Customers writing in a language that is off get the main language;
+- **Translate automatically** (on by default) and **Translate all**.
+
+Only admins change the tab; staff see it read-only. The **Merchants list** shows each merchant's country and languages.
+
+**Automatic translation:** there are no translate buttons per entry. When you save an entry in the editor, or leave the source-language cell in the table, the AI fills the languages of the merchant that are still empty (the answer and the example questions). A language is also refreshed when its text was written by the AI and no person changed it after. **A text a person wrote is never overwritten.** Texts made by the AI are marked **AI draft** (purple) until a person edits them. The entry keeps its status (live or draft), and nothing reaches customers before you publish, so check the AI drafts first. The AI keeps the numbers, links and menu paths of the answer (a translation that changes them is refused). Nothing happens when the switch is off or the AI has no key.
+
+**Translate all** (on the Entries tab and on the Languages tab) shows how many entries and translations it would make, then fills every empty language of every entry one by one. The same rules apply.
+
 ## Table view (Knowledge base)
 
 **Knowledge base → Table** (the first view, opened by default) shows the entries as a table you edit in place, one row per entry: a **Live** box, the **answer** in English, Malay and Chinese (the **VI / TH / TL** buttons add Vietnamese, Thai and Filipino columns) and the **English example questions**, one per line. It uses the same filters and search as the list (for example *Needs work*, or one topic), so you can show only the entries that still say `TO WRITE` and write them one after the other.
