@@ -342,11 +342,11 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 
 On **Keyword ranking**, the **Suggest topics** button looks at the new words nobody has decided on yet (the 15 most used). For each word it reads the customer messages the word was written in, and suggests the topic whose words sit in the same messages most often (for example *topup* next to *depo* → `deposit`). It does not guess when no topic shows up or two topics tie. You can untick a word or change its topic, then press **Add**: the words are added to the draft as keywords of that topic (publish to use them). No AI is used and nothing is saved before you press Add.
 
-## Table edit (Knowledge base)
+## Table view (Knowledge base)
 
-**Knowledge base → Table edit** shows the entries as a table you edit in place, one row per entry: a **Live** box, the **answer** in English, Malay and Chinese (the **VI / TH / TL** buttons add Vietnamese, Thai and Filipino columns) and the **English example questions**, one per line. It uses the same filters and search as the list (for example *Needs work*, or one topic), so you can show only the entries that still say `TO WRITE` and write them one after the other.
+**Knowledge base → Table** (the first view, opened by default) shows the entries as a table you edit in place, one row per entry: a **Live** box, the **answer** in English, Malay and Chinese (the **VI / TH / TL** buttons add Vietnamese, Thai and Filipino columns) and the **English example questions**, one per line. It uses the same filters and search as the list (for example *Needs work*, or one topic), so you can show only the entries that still say `TO WRITE` and write them one after the other.
 
-- Type in a cell and **leave it** (Tab or a click elsewhere) to save it to the draft. **Ctrl+Enter** saves and goes down one row in the same column. **Esc** puts the old text back without saving. The panel keeps the choice (List or Table edit).
+- Type in a cell and **leave it** (Tab or a click elsewhere) to save it to the draft. **Ctrl+Enter** saves and goes down one row in the same column. **Esc** puts the old text back without saving. The panel keeps the choice (Table or List).
 - A cell is red when the English answer is empty or still says `TO WRITE`, or when there are fewer than 3 example questions. Example questions: empty lines and repeats are dropped.
 - Everything goes into the draft, as with the full editor; nothing is live until **Publish**. All the cells of one entry count as **one** change in the Publish count. The entry name opens the full editor (topic, question type, entry type, end date, guided questions).
 - Code: `web/src/admin/screens/KbGrid.tsx`.

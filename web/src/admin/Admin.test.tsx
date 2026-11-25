@@ -82,7 +82,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { botMode = 'answering'; localStorage.clear(); localStorage.setItem('topicsView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { botMode = 'answering'; localStorage.clear(); localStorage.setItem('topicsView', 'list'); localStorage.setItem('kbView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -769,7 +769,7 @@ describe('Control panel', () => {
     localStorage.setItem('panelLang', 'zh');
     open('admin', '/admin/kb');
     expect(await screen.findByText(/知识库 · LuckyPay/)).toBeTruthy();
-    expect(screen.getByRole('button', { name: '添加条目' })).toBeTruthy(); expect(screen.getByRole('button', { name: '表格编辑' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: '添加条目' })).toBeTruthy(); expect(screen.getByRole('button', { name: '表格' })).toBeTruthy();
     expect(screen.getByPlaceholderText('搜索条目或答案')).toBeTruthy(); expect(screen.getByText('答案（英文）')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
@@ -841,10 +841,10 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: '新聊天' })).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
-  it('Chinese: the Table edit view and the change-log lines are translated', async () => {
+  it('Chinese: the Table view and the change-log lines are translated', async () => {
     localStorage.setItem('panelLang', 'zh'); withKb = true;
     open('admin', '/admin/kb');
-    await userEvent.click(await screen.findByRole('button', { name: '表格编辑' }));
+    await userEvent.click(await screen.findByRole('button', { name: '表格' }));
     expect(await screen.findByLabelText('表格编辑器')).toBeTruthy(); expect(screen.getByText('示例问题（英文）', { exact: false })).toBeTruthy();
     const { tChange } = await import('./changes');
     expect(tChange('zh', 'Set 3 entries live (LuckyPay)')).toBe('已把 3 个条目设为启用（LuckyPay）');
@@ -995,10 +995,17 @@ describe('Control panel', () => {
     expect((await screen.findByRole('region', { name: 'Selected entries' })).textContent).toMatch(/1 selected/);
     await userEvent.click(screen.getByRole('button', { name: 'Clear' })); expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();
   });
+  it('Knowledge base opens as a table by default, with Table first and List second', async () => {
+    localStorage.removeItem('kbView'); withKb = true; open('staff', '/admin/kb');
+    expect(await screen.findByLabelText('Table editor')).toBeTruthy();
+    const view = screen.getByRole('group', { name: 'View' });
+    expect(within(view).getAllByRole('button').map((b) => b.textContent)).toEqual(['Table', 'List']);
+    expect(within(view).getByRole('button', { name: 'Table' }).getAttribute('aria-pressed')).toBe('true');
+  });
   it('Knowledge base table edit: change answers and example questions in place, set live, and see it in the list and in the Publish count', async () => {
     withKb = true; open('staff', '/admin/kb');
     await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });
-    await userEvent.click(screen.getByRole('button', { name: 'Table edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Table' }));
     const grid = await screen.findByLabelText('Table editor');
     expect(grid.querySelector('.note')!.textContent).toMatch(/1 entry still says TO WRITE/);                // dep_bonus still says TO WRITE
     expect(within(grid).getByLabelText('Answer EN for dep_bonus').getAttribute('aria-invalid')).toBe('true');
@@ -1019,7 +1026,7 @@ describe('Control panel', () => {
   it('Knowledge base table edit: Esc puts the old text back, Ctrl+Enter saves and moves down, and the language buttons add columns', async () => {
     withKb = true; open('staff', '/admin/kb');
     await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });
-    await userEvent.click(screen.getByRole('button', { name: 'Table edit' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Table' }));
     const grid = await screen.findByLabelText('Table editor');
     const how = within(grid).getByLabelText('Answer EN for dep_how') as HTMLTextAreaElement;
     await userEvent.type(how, ' extra'); await userEvent.keyboard('{Escape}');

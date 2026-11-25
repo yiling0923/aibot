@@ -27,7 +27,7 @@ export default function Kb() {
   const p = usePanel(); const { t } = useT();
   const [q, setQ] = useState(''); const [status, setStatus] = useState('all'); const [topicF, setTopicF] = useState('all');
   const [ed, setEd] = useState<Ed | null>(null);
-  const [view, setViewState] = useState<'list' | 'table'>(() => { try { return localStorage.getItem('kbView') === 'table' ? 'table' : 'list'; } catch { return 'list'; } });
+  const [view, setViewState] = useState<'list' | 'table'>(() => { try { return localStorage.getItem('kbView') === 'list' ? 'list' : 'table'; } catch { return 'table'; } });
   const setView = (v: 'list' | 'table') => { setViewState(v); try { localStorage.setItem('kbView', v); } catch { /* ignore */ } };
   const [sel, setSel] = useState<Set<number>>(new Set());                 // entries ticked for a bulk action
   useEffect(() => { setSel(new Set()); }, [p.merchant]);
@@ -69,7 +69,7 @@ export default function Kb() {
   return (
     <>
       <div className="card"><div className="head"><div><h2>{t('Knowledge base')} · {p.M.name}</h2><div className="sub">{t('What the bot may answer for this merchant. Only live entries are used.')}</div></div>
-        <span className="tools"><span className="segs viewsw" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table edit')}</button></span>
+        <span className="tools"><span className="segs viewsw" role="group" aria-label="View"><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table')}</button><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button></span>
         <button className="btn pri" type="button" onClick={() => open(null)}>{t('Add entry')}</button></span></div>
         {miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
         <div className="filt-row" style={{ marginTop: 12 }}>

@@ -98,7 +98,7 @@ export const ZH: Record<string, string> = {
   'The bot goes silent again and only saves conversations. Staff answer every customer.': '机器人再次保持安静，只保存对话。由员工回答每一位客户。', 'Listen only': '只监听',
   // knowledge base list
     'What the bot may answer for this merchant. Only live entries are used.': '机器人可以为该商户回答的内容。只使用已启用的条目。',
-  'List': '列表', 'Table edit': '表格编辑', 'Edit the answers and example questions in a table': '用表格编辑答案和示例问题', 'Add entry': '添加条目',
+  'List': '列表', 'Table': '表格', 'Edit the answers and example questions in a table': '用表格编辑答案和示例问题', 'Add entry': '添加条目',
   'Entries missing an answer or 3+ examples in a main language': '主要语言中缺少答案或少于 3 个示例的条目', 'missing a language or examples': '缺少语言或示例',
   'All': '全部', 'Live': '已启用', 'Draft': '草稿', 'Needs work': '待完善', 'Search entries or answers': '搜索条目或答案', 'All topics': '所有主题', 'shown': '条显示',
   'Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts.': '有答案且至少有 3 个示例问题的草稿。仍写着 TO WRITE 的条目会保留为草稿。',
