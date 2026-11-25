@@ -69,7 +69,7 @@ export default function Kb() {
   return (
     <>
       <div className="card"><div className="head"><div><h2>{t('Knowledge base')} · {p.M.name}</h2><div className="sub">{t('What the bot may answer for this merchant. Only live entries are used.')}</div></div>
-        <span className="tools"><span className="segs" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table edit')}</button></span>
+        <span className="tools"><span className="segs viewsw" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table edit')}</button></span>
         <button className="btn pri" type="button" onClick={() => open(null)}>{t('Add entry')}</button></span></div>
         {miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
         <div className="filt-row" style={{ marginTop: 12 }}>

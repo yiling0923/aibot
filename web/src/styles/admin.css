@@ -915,3 +915,9 @@ details.moreopt{background:none;padding:0}
 .kwlegend{display:flex;flex-wrap:wrap;gap:6px 18px;align-items:center;margin:8px 0 2px;font-size:12.5px;color:var(--muted)}
 .kwlegend>span{display:inline-flex;align-items:center;gap:6px}
 .kwlegend .chip{pointer-events:none;animation:none}
+/* List / Table edit: one joined switch, same height and corners as the buttons next to it */
+.segs.viewsw{display:inline-flex;gap:0;flex-wrap:nowrap;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.segs.viewsw button{border:0;border-radius:0;padding:7px 14px;background:transparent;color:var(--muted);font-weight:600}
+.segs.viewsw button+button{border-left:1px solid var(--line)}
+.segs.viewsw button:hover:not([aria-pressed="true"]){background:color-mix(in srgb,var(--accent) 8%,var(--surface));color:var(--fg)}
+.segs.viewsw button[aria-pressed="true"]{background:var(--accent);color:var(--accentfg)}
