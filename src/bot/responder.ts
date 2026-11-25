@@ -180,6 +180,35 @@ export class Bot {
     return turn && this.finish(s, turn, (turn.log?.lang ?? (turn.trace.lang as Lang | undefined) ?? this.cfg(s).defaultLanguage) as Lang);
   }
 
+  /**
+   * A message that asks two or three different things ("how long does deposit take and what is the withdraw limit"): each part is read on its own, and when every part
+   * is clearly a different live answer, the reply holds those answers one after the other, word for word. Nothing is added or mixed. If any part is unclear, a
+   * "needs staff" entry, or the same answer again, this does nothing and the bot behaves as before (asks which one).
+   */
+  private twoQuestions(s: Session, text: string, r: AnalyzeResult): Turn | null {
+    const parts = text.split(/\s*(?:\?|;|\n|,|&|\b(?:and|dan|serta|plus|then|also)\b|以及|还有|并且|然后|和)\s*/i).map((x) => x.trim()).filter((x) => /[\p{L}\p{N}]/u.test(x));
+    if (parts.length < 2 || parts.length > 3) return null;
+    const lang = r.lang, found: { id: number; intent: string; topic: string }[] = [];
+    for (const part of parts) {
+      const a = this.engine.analyze(part, s.merchant, 0);
+      if (a.decision !== 'ANSWER' || a.guard || a.abuseHit.length || a.account || !a.top?.intent) return null;
+      const e = this.engine.entry(s.merchant, a.top.intent);
+      if (!e || e.entryType === 'needs_staff' || found.some((f) => f.intent === a.top.intent)) return null;
+      found.push({ id: a.top.id, intent: a.top.intent, topic: e.topic });
+    }
+    const texts = found.map((f) => this.ans(s.merchant, f.intent, lang));
+    if (texts.some((x) => !x?.trim())) return null;
+    s.clarifyCount = 0; s.pending = null; s.askKind = null; s.misses = 0;
+    const first = found[0];
+    if (/^(deposit|withdraw)/.test(first.intent)) s.lastTopic = first.intent.startsWith('deposit') ? 'deposit' : 'withdraw';
+    return {
+      messages: [{ kind: 'bot', text: this.wrap(s, texts.join('\n\n'), lang) }], buttons: null, locked: false, status: null, cacheable: false,
+      trace: { kind: 'message', decision: 'ANSWER', via: 'keywords', conf: 0.9, lang, why: `The message asks ${found.length} different things, and each part matches its own answer, so the bot gives them one after the other: ${found.map((f) => f.intent).join(', ')}.`,
+        raw: text, normalized: r.normalized, hits: r.hits, topic: first.topic, answerId: first.id, top: { id: first.id, intent: first.intent, score: 1, example: '(' + found.length + ' questions)' }, compound: found.map((f) => f.intent), kbAnswer: texts.join('\n\n') },
+      log: { text, lang, decision: 'ANSWER', notUnderstood: false },
+    };
+  }
+
   /** At most the merchant's number of choices (3 or fewer; "Talk to an agent" is extra and not counted), then the line after them. */
   private finish(s: Session, turn: Turn, lang: Lang): Turn {
     s.lang = lang; s.choices = null;
@@ -269,6 +298,7 @@ export class Bot {
     s.pending = null;
     let r = this.engine.analyze(query, s.merchant, s.clarifyCount, { lastTopic: s.lastTopic }); r.raw = text;
     { const cfgL = this.cfg(s); if (cfgL.languages?.length && !cfgL.languages.includes(r.lang)) r.lang = cfgL.defaultLanguage; }      // a language switched off for this merchant: reply in its main language
+    if (query === text && (r.decision === 'CHOICE' || r.decision === 'CLARIFY' || (r.decision === 'ANSWER' && !r.account)) && !r.guard && !r.abuseHit.length) { const both = this.twoQuestions(s, text, r); if (both) return both; }     // "how long does deposit take and what is the withdraw limit": both answers
     // A second chance for a message no keyword matched: Claude may know which entry it is about. Its pick is checked
     // against the real entry list, and a low confidence is ignored, so the bot then asks again or hands off as before.
     let aiInfo: Record<string, unknown> | null = null;

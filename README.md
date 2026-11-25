@@ -414,6 +414,10 @@ The page has one **Save to draft** button (top right, and in the "unsaved change
 
 On the English tab, **Translate the empty languages with AI** fills every language the merchant has switched on (Merchant settings → General → "Languages the bot answers in"), except English, but only the ones that are still empty and never over text that is there. A merchant that never chose its languages gets Malay and Chinese. On another language's tab, the button translates just that one language (and asks before it replaces an answer).
 
+### Two questions in one message
+
+When one message asks two or three different things ("how long does deposit take and what is the withdraw limit"), the bot reads each part on its own (parts are split at "and", "dan", a comma, "&", "?", ";", "和", "还有" and similar). If **every** part is clearly a different **live** answer, the reply holds those answers one after the other, word for word, in the order asked, with the merchant's usual greeting at the start and the closing line at the end. Nothing is added or mixed and the AI is not used. It does nothing (the bot behaves as before) when a part is unclear or only a topic ("deposit and withdraw" still asks which one), when two parts mean the same answer, when an answer is marked "needs staff", or when the message asks for a person, is rude or asks for account data. The reply is not kept by LiveChat by its words (`cacheable` false), and the Report counts it as answered (the first answer is the one recorded). The two answers are in `trace.compound`.
+
 ### A sentence that names two topics
 
 When a message holds words of two topics (for example "referral" and "bonus" in "i want referral bonus"), the bot no longer offers only the entries of whichever topic comes first. If one entry's example questions are clearly the closest to the whole message (at least as close as the merchant's answer level and 0.8, and 0.12 ahead of the next), it answers that entry. Otherwise it shows choices with the **closest entries first**, so the entry the customer means is never cut off by the number of choices. A single topic word ("bonus", "referral") still asks which one.
