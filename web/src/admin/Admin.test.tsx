@@ -258,6 +258,18 @@ describe('Control panel', () => {
       expect(screen.getByText(/1 older sample message already fails on the live version/)).toBeTruthy();
     } finally { testsOverride = null; }
   });
+  it('Topics list: a legend says what the outlined, grey and just-added words mean (not in the flowchart)', async () => {
+    localStorage.setItem('topicsView', 'list');
+    try {
+      open('admin', '/admin/kw');
+      const lg = await screen.findByRole('note', { name: 'What the words look like' });
+      expect(within(lg).getByText('LuckyPay only')).toBeTruthy(); expect(within(lg).getByText('Shared by all merchants')).toBeTruthy(); expect(within(lg).getByText('Just added to the draft')).toBeTruthy();
+      await userEvent.click(screen.getByRole('button', { name: 'Flowchart' }));
+      expect(screen.queryByRole('note', { name: 'What the words look like' })).toBeNull();
+      await userEvent.click(screen.getByRole('tab', { name: /Greetings/ }));
+      expect(screen.queryByRole('note', { name: 'What the words look like' })).toBeNull();                       // only the Topics tab has these words
+    } finally { localStorage.removeItem('topicsView'); }
+  });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');
     expect(await screen.findByText('70%')).toBeTruthy();                          // answered by the bot

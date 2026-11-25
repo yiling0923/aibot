@@ -164,6 +164,10 @@ export default function Topics() {
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
           <span className="sub">{shown} {T('words shown')}</span></div>}
       </div>
+      {cur === 'short' && !flow && <div className="kwlegend" role="note" aria-label={T('What the words look like')}>
+        <span><span className="chip ro mine" aria-hidden="true">{T('word|sample')}</span> {T('{m} only', { m: p.M.name })}</span>
+        <span><span className="chip ro" aria-hidden="true">{T('word|sample')}</span> {T('Shared by all merchants')}</span>
+        <span><span className="chip ro new" aria-hidden="true">{T('word|sample')}</span> {T('Just added to the draft')}</span></div>}
       {adding && <Modal label={T('Add a topic or keyword')} small wide onClose={() => setAdding(false)}>
         <div className="head"><h2>{T('Add a topic or keyword')}</h2><button className="btn sm" type="button" onClick={() => setAdding(false)}>{T('Close')}</button></div>
         <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={(msg, chip, word) => { done(msg, chip, word); setAdding(false); }} /></div></Modal>}

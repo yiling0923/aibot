@@ -1229,4 +1229,6 @@ export const ZH: Record<string, string> = {
   '{n} older sample messages already fail on the live version, so they are not caused by this change.': '有 {n} 条较早的示例消息在已发布的版本上就已经失败，所以不是这次更改造成的。',
   'All {total} sample messages pass.': '全部 {total} 条示例消息都通过。',
   'should be {a}, the bot gave {b}': '应该是 {a}，机器人给的是 {b}', 'Failed tests': '失败的测试',
+  'What the words look like': '词的外观说明', 'Just added to the draft': '刚加入草稿',
+  'word|sample': '词',
 };

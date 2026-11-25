@@ -402,6 +402,10 @@ Before publishing, the panel runs the sample customer messages on the draft **an
 
 The bot never used that number to route a chat (it only tells LiveChat to hand the chat to a person, and LiveChat chooses who gets it), so the box is removed from Merchant settings and from the Add merchant window, and the chat note now says only "Transferred to human agents". The stored numbers stay in the database and in the API (`handoff_group`), so nothing is lost and the box can come back if LiveChat ever routes by group.
 
+### Legend for the words on the Topics list
+
+Above the word list of the Topics tab (List view) a small legend shows the three kinds of word chip: **outlined** (this merchant's own word, "LuckyPay only"), **plain grey** (shared by all merchants, only an admin can change them) and **dashed green** (just added to the draft). The flowchart and the other tabs have no such legend.
+
 ### One Save on Merchant settings
 
 The page has one **Save to draft** button (top right, and in the "unsaved changes" bar) that saves everything you changed: the **basics** (name, token limit, money sign, how long chats are kept, languages: these apply at once) and the settings (replies, handoff, AI help, messages: these go to the draft). **Save and publish** does the same and then opens the Publish window, so a change is two clicks: change, then Save and publish. The old **Save basics** button is gone; a change to the basics also counts in the unsaved-changes bar, and **Discard** puts it back.
