@@ -928,3 +928,6 @@ details.moreopt{background:none;padding:0}
 @media (max-width:640px){.sgrow{grid-template-columns:auto 1fr}.sgrow select{grid-column:1/-1}}
 .kwfilter .filt .tog+.sub{margin-left:6px;white-space:nowrap}
 .kwfilter .filt .sugbtn{margin-left:auto;padding:7px 14px;font-size:13px;white-space:nowrap}
+.kbmore{border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
+.kbmore>summary{cursor:pointer;font-weight:700;font-size:13px;margin-bottom:8px}
+.kbmore[open]>summary{margin-bottom:6px}

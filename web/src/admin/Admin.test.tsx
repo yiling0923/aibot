@@ -145,8 +145,8 @@ describe('Control panel', () => {
       await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
       await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
       expect(await screen.findByText(/Translated to MS, VI, TH\./)).toBeTruthy();                       // not Chinese: this merchant switched it off
-      await userEvent.click(screen.getByRole('tab', { name: /^ZH/ }));
-      expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('');
+      expect(screen.queryByRole('tab', { name: /^ZH/ })).toBeNull();                                    // a language the merchant switched off has no tab
+      expect(screen.getByRole('tab', { name: /^VI/ })).toBeTruthy();
     } finally { langsA = null; }
   });
   it('Suggest with AI: the AI writes example questions, each needs approval, Approve all adds the rest; without the AI it adds simple variations', async () => {
