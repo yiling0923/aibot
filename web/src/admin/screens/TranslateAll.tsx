@@ -19,28 +19,29 @@ export function useTranslateJobs() {
 /** The window of the "Translate all" button: it says how much will be translated, then does it one entry at a time, and fills only the empty languages. */
 export default function TranslateAll({ onClose }: { onClose: () => void }) {
   const p = usePanel(); const { t } = useT(); const { jobs, src, targets, count, total } = useTranslateJobs();
-  const [run, setRun] = useState<{ n: number; done: number; error?: string } | null>(null); const stop = useRef(false);
+  const [run, setRun] = useState<{ n: number; done: number; error?: string; failed?: string[] } | null>(null); const stop = useRef(false); const failedJobs = useRef<typeof jobs>([]);
   const names = targets.filter((l) => jobs.some((j) => j.langs.includes(l))).map((l) => t(NAME[l] ?? l)).join(', ');
 
   /** Three entries are translated at the same time (each entry asks its languages at the same time too), so a long list is about three times faster than one by one. */
-  const go = async () => {
-    stop.current = false; setRun({ n: jobs.length, done: 0 });
+  const go = async (list = jobs) => {
+    stop.current = false; failedJobs.current = []; setRun({ n: list.length, done: 0 });
     let done = 0, error: string | undefined, next = 0;
     const worker = async () => {
       while (!stop.current && !(error && /not set up/i.test(error))) {
-        const j = jobs[next++]; if (!j) return;
+        const j = list[next++]; if (!j) return;
         const { made, error: er } = await translateEntry(p.merchant, j.e, src, j.langs);
         const ls = Object.keys(made);
+        if (er || ls.length < j.langs.length) failedJobs.current.push({ e: j.e, langs: j.langs.filter((l) => !made[l]) });
         if (ls.length) p.edit((d, note) => {
           const e = d.kb.find((x) => x.id === j.e.id && x.merchant === p.merchant); if (!e) return;
           const tr = e.translations as Record<string, unknown>; ls.forEach((l) => { tr[l] = made[l]; }); e.dirty = true;
           note(`Translated entry "${e.intent_key}" into ${ls.map((l) => LN[l]).join(', ')} with AI (${p.M.name})`);
         });
-        done++; if (er) error = error ?? er; setRun({ n: jobs.length, done, error });
+        done++; if (er) error = error ?? er; setRun({ n: list.length, done, error, failed: failedJobs.current.map((x) => x.e.intent_key) });
       }
     };
     await Promise.all([worker(), worker(), worker()]);
-    setRun({ n: jobs.length, done, error });
+    setRun({ n: list.length, done, error, failed: failedJobs.current.map((x) => x.e.intent_key) });
     p.toast(error ? error : t('Translated {n} entries. They are AI drafts: please check them, then publish.', { n: done }));
   };
 
@@ -53,9 +54,10 @@ export default function TranslateAll({ onClose }: { onClose: () => void }) {
         {!p.ai.translate && <div className="note" style={{ marginTop: 10, background: 'var(--warnbg)' }}>{t('The AI is off. Add the Anthropic key to .env.')}</div>}</> : <>
         <p role="status">{run.done < run.n && !run.error ? t('Translating {a} of {b}…', { a: run.done + 1, b: run.n }) : t('Done: {a} of {b} entries.', { a: run.done, b: run.n })}</p>
         <div className="cbar" role="progressbar" aria-valuenow={run.done} aria-valuemin={0} aria-valuemax={run.n}><i style={{ width: Math.round((run.done * 100) / run.n) + '%' }} /></div>
-        {run.error && <div className="note" style={{ marginTop: 10, background: 'var(--warnbg)' }}>{run.error}</div>}</>}
+        {run.error && <div className="note" style={{ marginTop: 10, background: 'var(--warnbg)' }}>{run.error}{run.failed && run.failed.length > 0 && <div style={{ marginTop: 6 }}><b>{t('Not translated:')}</b> {run.failed.join(', ')}</div>}</div>}</>}
       <div className="head" style={{ marginTop: 14 }}><button className="btn" type="button" onClick={() => { stop.current = true; onClose(); }}>{t(run && run.done >= run.n ? 'Close' : 'Cancel')}</button>
-        {count > 0 && !run && <button className="btn pri" type="button" disabled={!p.ai.translate} onClick={() => void go()}>{t('Translate')}</button>}</div>
+        {count > 0 && !run && <button className="btn pri" type="button" disabled={!p.ai.translate} onClick={() => void go()}>{t('Translate')}</button>}
+        {run && run.done >= run.n && failedJobs.current.length > 0 && <button className="btn pri" type="button" onClick={() => void go(failedJobs.current.slice())}>{t('Try the failed ones again')}</button>}</div>
     </Modal>
   );
 }

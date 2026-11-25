@@ -207,7 +207,7 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const examples = (Array.isArray(b.examples) ? b.examples : []).map((x) => String(x).trim()).filter(Boolean).slice(0, 20);
     const name = (await tenants.get(b.merchant))?.name ?? b.merchant;
     const t = await ctx.ai.translate({ merchant: b.merchant, style: typeof b.style === 'string' ? b.style.slice(0, 5000) : undefined, merchantName: name, from, to, answer: answer.slice(0, 4000), examples });
-    if (!t) return reply.code(502).send({ error: 'The translation could not be made. Try again in a moment.' });
+    if (!t) return reply.code(502).send({ error: 'The translation could not be made. Try again in a moment. If it keeps failing, check the AI key in .env and the monthly token limit of this merchant (Usage & billing).' });
     const check = checkTranslation(t.answer, answer);
     if (!check.ok) return reply.code(422).send({ error: `The translation was refused because ${check.reason}. Try again, or write it yourself.` });
     return { answer: t.answer, examples: t.examples };

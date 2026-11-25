@@ -71,8 +71,16 @@ Return the same number of examples, in the same order. If the list is empty retu
 
 /** Asks Claude to translate an answer and its example questions. A person checks the result before saving, and the caller checks the numbers. */
 export async function claudeTranslate(client: Anthropic, model: string, input: TranslateInput, used?: UsageHook): Promise<Translation | null> {
+  // Several translations run at the same time (Translate all), so a busy moment can refuse one: ask again once before giving up.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try { const r = await translateOnce(client, model, input, used); if (r) return r; } catch (e) { if (attempt === 1) throw e; }
+    await new Promise((r) => setTimeout(r, 800));
+  }
+  return null;
+}
+async function translateOnce(client: Anthropic, model: string, input: TranslateInput, used?: UsageHook): Promise<Translation | null> {
   const res = await client.messages.parse({
-    model, max_tokens: 2048, system: TRANSLATE_SYSTEM,
+    model, max_tokens: 4096, system: TRANSLATE_SYSTEM,
     messages: [{ role: 'user', content: `Merchant: ${input.merchantName}\nTranslate from ${LANG_NAME[input.from]} into ${LANG_NAME[input.to]}.\n<answer>${input.answer}</answer>\n<examples>${JSON.stringify(input.examples)}</examples>${styleBlock(input.style)}` }],
     output_config: { effort: 'low', format: zodOutputFormat(TranslationSchema) },
   });

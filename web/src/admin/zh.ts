@@ -89,6 +89,7 @@ export const ZH: Record<string, string> = {
   'AI draft · check': 'AI 草稿 · 请检查', 'Written by the AI. Edit it and the mark goes away.': '由 AI 写的。修改后标记会消失。', 'Type here. When you save, the empty languages of this merchant are filled in by the AI.': '在这里输入。保存时，这个商户的空白语言会由 AI 补上。',
   'Add the answer first: it is the one the other languages are made from.': '请先写答案：其他语言都从它翻译而来。', 'Saved to draft. Translation: ': '已存入草稿。翻译：', 'Saved, and translated into {l} (AI draft). Please check it, then publish.': '已保存，并翻译成 {l}（AI 草稿）。请检查后再发布。', 'Translated into {l} (AI draft). Please check it.': '已翻译成 {l}（AI 草稿）。请检查。',
   'The country, the languages and automatic translation are set in Knowledge base → Languages.': '国家、语言和自动翻译在“知识库 → 语言”中设置。', 'Open Languages': '打开语言设置',
+  'Not translated:': '未翻译：', 'Try the failed ones again': '重试失败的条目',
   'Suggest topics': '建议主题', 'Suggest topics for new keywords': '为新关键词建议主题', 'Look at the chats of the new words and suggest a topic for each': '查看新词所在的聊天，并为每个词建议主题',
   'For each new word, the bot looks at the customer messages it was written in. If a known topic is in the same messages, it is suggested. Check the list, change a topic if you want, then add. Nothing is saved until you press Add.': '对每个新词，机器人会查看它出现的客户消息。如果同一条消息里有已知主题，就会建议该主题。请检查列表，需要时更改主题，然后添加。在你按“添加”之前不会保存任何内容。',
   'Looking at the chats…': '正在查看聊天…', 'No new words to decide.': '没有需要决定的新词。', 'Seen with “{k}” in {a} of {b} chats': '在 {b} 条聊天中有 {a} 条与“{k}”一起出现', 'No clear topic in its chats': '它的聊天中没有明确的主题', 'Topic for {w}': '{w} 的主题', 'No topic': '无主题',
