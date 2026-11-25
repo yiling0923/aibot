@@ -98,6 +98,7 @@ export const ZH: Record<string, string> = {
   'View only.': '仅供查看。', 'This page shows the words customers wrote in the LiveChat chats linked to this bot. Nothing can be changed here. To decide what a word means, use the Topics page.': '此页显示客户在与这个机器人相连的 LiveChat 聊天中写的词。这里不能修改任何内容。要决定一个词的意思，请使用“主题”页面。',
   'Edit': '编辑', 'Edit {k}': '编辑 {k}',
   'What the bot says': '机器人说什么', 'The answers and the example questions of an existing entry are edited in the table (Knowledge base → Table). Here you change the name, status, topic and the optional questions.': '已有条目的答案和示例问题在表格里编辑（知识库 → 表格）。这里可以修改名称、状态、主题和可选问题。',
+  'Where the merchant is': '商户所在地', 'Languages the merchant uses': '商户使用的语言', 'Translation': '翻译', 'All saved': '已全部保存',
   'Suggest topics': '建议主题', 'Suggest topics for new keywords': '为新关键词建议主题', 'Look at the chats of the new words and suggest a topic for each': '查看新词所在的聊天，并为每个词建议主题',
   'For each new word, the bot looks at the customer messages it was written in. If a known topic is in the same messages, it is suggested. Check the list, change a topic if you want, then add. Nothing is saved until you press Add.': '对每个新词，机器人会查看它出现的客户消息。如果同一条消息里有已知主题，就会建议该主题。请检查列表，需要时更改主题，然后添加。在你按“添加”之前不会保存任何内容。',
   'Looking at the chats…': '正在查看聊天…', 'No new words to decide.': '没有需要决定的新词。', 'Seen with “{k}” in {a} of {b} chats': '在 {b} 条聊天中有 {a} 条与“{k}”一起出现', 'No clear topic in its chats': '它的聊天中没有明确的主题', 'Topic for {w}': '{w} 的主题', 'No topic': '无主题',
