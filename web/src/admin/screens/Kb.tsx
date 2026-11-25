@@ -214,7 +214,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
       </details>
       {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>{t('Before the bot can use this answer:')}</b><ul className="plain">{pr.map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>{t('✓ Ready: Live, with an answer and example questions. Save it, then Publish.')}</div>; })()}
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saving makes the change live for customers.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn pri" type="button" disabled={saving} onClick={() => void save()}>{t(saving ? 'Translating…' : 'Save')}</button></span></div>
+      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saving makes the change live for customers.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn pri" type="button" disabled={saving} onClick={() => void save()}>{t(saving ? 'Translating…' : 'Save and publish')}</button></span></div>
     </Modal>
   );
 }

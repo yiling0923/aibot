@@ -410,7 +410,7 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 ### Save publishes at once, and the Live switch needs no Publish
 
-A **new entry starts Live**. The entry editor has one **Save** button: it checks the entry, saves it and **publishes at once**, with no Publish window, so adding or changing one answer is: type, Save. (Pick Status **Draft** if the bot should not use it yet.) If a field is missing (a name, the answer in the source language, a topic), nothing is saved. If the entry is live but the bot cannot use it yet (for example no example questions), the message says why.
+A **new entry starts Live**. The entry editor has one **Save and publish** button: it checks the entry, saves it and **publishes at once**, with no Publish window, so adding or changing one answer is: type, Save and publish. (Pick Status **Draft** if the bot should not use it yet.) If a field is missing (a name, the answer in the source language, a topic), nothing is saved. If the entry is live but the bot cannot use it yet (for example no example questions), the message says why.
 
 The **Live switch** in the Knowledge base (table, list, the bulk **Set live** / **Set draft** buttons and **Set N ready drafts live**) also applies **at once**: no question, no Publish button. A switch publishes everything that is waiting in the draft (the number on the **Publish** button), not only that entry. The **Publish** button and its window (with the sample-message check) stay for everything else: keywords, topics, settings, imports and edits in the table cells.
 

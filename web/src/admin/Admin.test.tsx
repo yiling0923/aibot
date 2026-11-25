@@ -128,7 +128,7 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'wallet_deposit');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(await screen.findByText(/Translated into MS, ZH \(AI draft\)/)).toBeTruthy();
   });
   it('automatic translation does nothing when the switch is off or the AI is off', async () => {
@@ -137,14 +137,14 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'plain_one');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(await screen.findByText(/^Saved/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
     cleanup(); autoTr = true; open('admin', '/admin/kb', false);                                              // the switch is on, the AI is off
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'plain_two');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(await screen.findByText(/^Saved/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
   });
   it('a merchant that switched a language off gets no translation into it', async () => {
@@ -155,7 +155,7 @@ describe('Control panel', () => {
       await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'lang_check');
       await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
       await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+      await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
       expect(await screen.findByText(/Translated into MS, VI, TH \(AI draft\)/)).toBeTruthy();             // not Chinese: this merchant switched it off
     } finally { langsA = null; }
   });
@@ -223,13 +223,13 @@ describe('Control panel', () => {
     open('admin', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
     expect((screen.getByLabelText(/^Status/) as HTMLSelectElement).value).toBe('live');                            // live first
-    expect(screen.queryByRole('button', { name: 'Save and publish' })).toBeNull(); expect(screen.queryByRole('button', { name: 'Save to draft' })).toBeNull();   // one button: Save
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.queryByRole('button', { name: 'Save to draft' })).toBeNull();   // one button: Save and publish
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(await screen.findByText('Give the entry a name first')).toBeTruthy();                                // not saved
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'daily_limit');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'You can withdraw up to MYR 50,000 a day.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(await screen.findByText(/Saved, but the bot cannot use it yet|Saved and live/)).toBeTruthy();         // saved and published, the answer needs example questions to be found
     expect(screen.queryByRole('dialog', { name: 'Publish' })).toBeNull();                                       // no Publish window
   });
@@ -835,7 +835,7 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByRole('button', { name: '添加条目' }));
     expect(await screen.findByRole('heading', { name: '新条目' })).toBeTruthy();
     expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('主题（必填）')).toBeTruthy(); expect(screen.getByText('机器人用每种语言说什么')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '保存并发布' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
   it('Chinese: the Import page is translated, also the check messages', async () => {
