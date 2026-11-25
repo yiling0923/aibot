@@ -22,7 +22,7 @@ export interface AiFlags { pick: boolean; write: boolean; describe: boolean; tra
 export interface KwRow { w: string; n: number; lg: string; h: string; isNew?: boolean; ignored?: boolean; first?: string; last?: string; lastTs?: number; from?: string; guess?: string; live?: number }
 export interface RankRow { w: string; n: number; c: number; lg: string; h: string; series: number[]; live?: number }
 export interface RankData { rows: RankRow[]; total: number; from: string; to: string }
-export interface TestResult { message: string; merchant: string; expected: string; expIntent?: string; got: string; gotIntent?: string; ok: boolean }
+export interface TestResult { message: string; merchant: string; expected: string; expIntent?: string; got: string; gotIntent?: string; ok: boolean; wasOk?: boolean }
 
 export const ASPECT_LABEL: Record<string, string> = {
   time: 'time: how long it takes', limit: 'limit: minimum or maximum', how: 'how: how to do it', change: 'change: update or fix',

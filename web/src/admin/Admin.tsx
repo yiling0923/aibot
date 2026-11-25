@@ -137,7 +137,7 @@ function Shell() {
 /** Runs the sample messages on the draft, shows the result, then publishes. */
 function PublishDialog({ onClose }: { onClose: () => void }) {
   const p = usePanel(); const { t, lang } = useT();
-  const [res, setRes] = useState<{ pass: number; total: number; results: { message: string; merchant: string; expected: string; got: string; ok: boolean }[] } | null>(null);
+  const [res, setRes] = useState<{ pass: number; total: number; results: { message: string; merchant: string; expected: string; got: string; ok: boolean; wasOk?: boolean }[] } | null>(null);
   const [busy, setBusy] = useState(false);
   useEffect(() => {
     let alive = true;
@@ -156,7 +156,7 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
     } catch (e) { setBusy(false); p.toast(t('Publish failed: {e}', { e: (e as Error).message })); }
   };
   if (!res) return <Modal small label="Publish" onClose={onClose}><h2>{t('Checking your changes…')}</h2><div className="note">{t('Running the sample customer messages on your draft.')}</div></Modal>;
-  const fails = res.total - res.pass; const n = p.changes.length;
+  const n = p.changes.length;
   const risky = p.draft.kb.filter((e) => e.dirty).map((e) => ({ e, why: entryProblems(e) })).filter((x) => x.why.length);   // answers changed in this draft that the bot cannot use yet
   return (
     <Modal small label="Publish" onClose={onClose}>
@@ -165,8 +165,17 @@ function PublishDialog({ onClose }: { onClose: () => void }) {
       {risky.length > 0 && <div className="note" role="alert" style={{ background: 'var(--warnbg)' }}><b>{t('Check these answers first:')}</b>
         <ul className="plain">{risky.map(({ e, why }) => <li key={e.merchant + e.id}><b>{e.intent_key}</b> ({p.merchants.find((m) => m.code === e.merchant)?.name ?? e.merchant}): {why[0]}</li>)}</ul>
         <div className="sub">{t('You can still publish, but the bot will not use these answers well yet. Choose Cancel, then open Knowledge base to fix them.')}</div></div>}
-      <div className="note" style={fails ? { background: 'var(--warnbg)' } : undefined}>{t('Tests on the draft:')} <b>{t('{pass} of {total} passed', { pass: res.pass, total: res.total })}</b>{fails ? t('. {n} failed (listed below). You can still publish.', { n: fails }) : '.'} {t('The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.')}</div>
-      {fails > 0 && <ul className="plain" aria-label="Failed tests">{res.results.filter((t) => !t.ok).slice(0, 6).map((t, i) => <li key={i}><b>{p.merchants.find((m) => m.code === t.merchant)?.name ?? t.merchant}</b>: “{t.message}” should be {t.expected}, the bot gave {t.got}</li>)}{fails > 6 && <li className="sub">{t('and {n} more', { n: fails - 6 })}</li>}</ul>}
+      {(() => {
+        const failed = res.results.filter((x) => !x.ok), broke = failed.filter((x) => x.wasOk !== false), already = failed.length - broke.length;   // "broke": passed on the live version (or no live version to compare), fails on this draft
+        return <>
+          <div className="note" style={broke.length ? { background: 'var(--warnbg)' } : { background: 'var(--okbg)' }}>
+            {broke.length ? <b>{t(broke.length === 1 ? 'This change breaks 1 sample message:' : 'This change breaks {n} sample messages:', { n: broke.length })}</b> : <b>✓ {t('Nothing you changed broke a sample message.')}</b>}
+            {' '}{already > 0 ? t(already === 1 ? '1 older sample message already fails on the live version, so it is not caused by this change.' : '{n} older sample messages already fail on the live version, so they are not caused by this change.', { n: already }) : !broke.length ? t('All {total} sample messages pass.', { total: res.total }) : ''}
+            {' '}{t('The bot starts using the new version straight away. Each merchant keeps its own versions, so you can roll back one merchant from History.')}</div>
+          {broke.length > 0 && <ul className="plain" aria-label={t('Failed tests')}>{broke.slice(0, 6).map((x, i) => <li key={i}><b>{p.merchants.find((m) => m.code === x.merchant)?.name ?? x.merchant}</b>: “{x.message}” {t('should be {a}, the bot gave {b}', { a: x.expected, b: x.got })}</li>)}{broke.length > 6 && <li className="sub">{t('and {n} more', { n: broke.length - 6 })}</li>}</ul>}
+          <div className="sub">{t('Tests on the draft:')} {t('{pass} of {total} passed', { pass: res.pass, total: res.total })}</div>
+        </>;
+      })()}
       <div className="head"><button className="btn" type="button" onClick={onClose}>{t('Cancel')}</button><button className="btn pri" type="button" disabled={busy} onClick={publish}>{busy ? t('Publishing…') : t('Publish')}</button></div>
     </Modal>
   );

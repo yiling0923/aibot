@@ -394,6 +394,10 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 A **new entry starts as a Draft** (the bot ignores it until you set its Status to **Live**), so adding an answer never puts it in front of customers by accident. The entry editor has **Save to draft** and, once the Status is Live, **Save and publish**. Save and publish does the same check and save, then opens the Publish window, so changing one answer is: type, Save and publish, Publish. If a field is missing (a name, an English answer, a topic), nothing is saved and the Publish window does not open.
 
+### The Publish window shows only what the change broke
+
+Before publishing, the panel runs the sample customer messages on the draft **and** on the version that is live now. The Publish window lists only the messages that **passed on the live version and fail on the draft** (what this change broke), up to 6, with a count for the rest. Messages that already fail on the live version are not listed; the window says how many there are and that this change did not cause them. When nothing new fails it shows a green "Nothing you changed broke a sample message." The line "Tests on the draft: x of y passed" stays below. The server marks each result with `wasOk` (did it pass on the live version) in `POST /api/admin/tests`.
+
 ### One Save on Merchant settings
 
 The page has one **Save to draft** button (top right, and in the "unsaved changes" bar) that saves everything you changed: the **basics** (name, token limit, money sign, how long chats are kept, languages: these apply at once) and the settings (replies, handoff, AI help, messages: these go to the draft). **Save and publish** does the same and then opens the Publish window, so a change is two clicks: change, then Save and publish. The old **Save basics** button is gone; a change to the basics also counts in the unsaved-changes bar, and **Discard** puts it back.

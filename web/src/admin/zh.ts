@@ -1222,4 +1222,11 @@ export const ZH: Record<string, string> = {
   'Save and publish': '保存并发布',
   'Saved. Press Publish to make it live.': '已保存。按“发布”后即启用。',
   'Saved together with the other settings: use Save at the top.': '会和其他设置一起保存：请使用顶部的保存按钮。',
+  'This change breaks 1 sample message:': '这次更改弄坏了 1 条示例消息：',
+  'This change breaks {n} sample messages:': '这次更改弄坏了 {n} 条示例消息：',
+  'Nothing you changed broke a sample message.': '你的更改没有弄坏任何示例消息。',
+  '1 older sample message already fails on the live version, so it is not caused by this change.': '有 1 条较早的示例消息在已发布的版本上就已经失败，所以不是这次更改造成的。',
+  '{n} older sample messages already fail on the live version, so they are not caused by this change.': '有 {n} 条较早的示例消息在已发布的版本上就已经失败，所以不是这次更改造成的。',
+  'All {total} sample messages pass.': '全部 {total} 条示例消息都通过。',
+  'should be {a}, the bot gave {b}': '应该是 {a}，机器人给的是 {b}', 'Failed tests': '失败的测试',
 };

@@ -25,6 +25,7 @@ const UNMATCHED = [{ text: 'tarik duit lambat', language: 'ms', hits: 5, resolve
 const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) => ({ w, n: 50 - i * 9, c: i % 2 ? -12 : 20, lg: 'en', h: '', series: [1, 3, 2, 5, 4] })), total: 200, from: 'Nov 10', to: 'Nov 16' };
 const REPORT = { chatsBy: { members: 12, visitors: 30 }, from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let botMode: 'listening' | 'answering' = 'answering';
+let testsOverride: { results: object[]; pass: number; total: number } | null = null;     // what the sample-message check returns, when a test needs something else
 let langsA: string | null = null;                       // the languages LuckyPay has switched on (null: it never chose)
 let importedMsgs: { chat: string; from: string; text: string }[] = [];
 const LEARN = () => ({ mode: botMode, since: '2026-11-01T00:00:00Z', days: 12, pairs: 40, chats: 18, withReply: 31, groups: [
@@ -77,7 +78,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/translate') ? { answer: 'Translated answer', examples: ['translated question'] }
     : url.startsWith('/api/admin/ranking') ? RANKING
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
-    : url.startsWith('/api/admin/tests') ? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 } : []))));
+    : url.startsWith('/api/admin/tests') ? (testsOverride ?? { results: [{ merchant: 'A', message: 'depo how', expected: 'ANSWER', got: 'HANDOFF', ok: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true }], pass: 1, total: 2 }) : []))));
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
@@ -232,6 +233,30 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByLabelText(/^Monthly AI token limit/), '5');                                       // (the fake server keeps no change, so the page still shows one)
     await userEvent.click(screen.getAllByRole('button', { name: 'Save and publish' })[0]);
     expect(await screen.findByRole('dialog', { name: 'Publish' })).toBeTruthy();                                      // the Publish window opens after the save
+  });
+  it('Publish window: lists only what this change broke; messages that already fail on the live version are counted, not listed', async () => {
+    testsOverride = { results: [
+      { merchant: 'A', message: 'min dep berapa', expected: 'ANSWER', got: 'CHOICE', ok: false, wasOk: true },                      // broke now
+      { merchant: 'A', message: 'hi moi', expected: 'SMALLTALK', got: 'CLARIFY', ok: false, wasOk: false },                       // already failing on the live version
+      { merchant: 'A', message: 'saya nak beli kereta', expected: 'HANDOFF', got: 'CLARIFY', ok: false, wasOk: false },
+      { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true, wasOk: true }], pass: 1, total: 4 };
+    try {
+      open('admin', '/admin/kw');
+      await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
+      await userEvent.type(screen.getByPlaceholderText('e.g. depoo'), 'depoo'); await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+      await userEvent.click(screen.getByRole('button', { name: /^Publish/ }));
+      expect(await screen.findByText('This change breaks 1 sample message:')).toBeTruthy();
+      expect(screen.getByText(/min dep berapa/)).toBeTruthy();
+      expect(screen.queryByText(/hi moi/)).toBeNull(); expect(screen.queryByText(/saya nak beli kereta/)).toBeNull();           // old failures are not listed
+      expect(screen.getByText(/2 older sample messages already fail on the live version/)).toBeTruthy();
+      testsOverride = { results: [{ merchant: 'A', message: 'hi moi', expected: 'SMALLTALK', got: 'CLARIFY', ok: false, wasOk: false }, { merchant: 'A', message: 'wd', expected: 'CHOICE', got: 'CHOICE', ok: true, wasOk: true }], pass: 1, total: 2 };
+      cleanup(); open('admin', '/admin/kw');
+      await userEvent.click(await screen.findByText('＋ Add a topic or keyword'));
+      await userEvent.type(screen.getByPlaceholderText('e.g. depoo'), 'depoo'); await userEvent.click(screen.getAllByRole('button', { name: 'Add' })[0]);
+      await userEvent.click(screen.getByRole('button', { name: /^Publish/ }));
+      expect(await screen.findByText('✓ Nothing you changed broke a sample message.')).toBeTruthy();                             // green: nothing new
+      expect(screen.getByText(/1 older sample message already fails on the live version/)).toBeTruthy();
+    } finally { testsOverride = null; }
   });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');

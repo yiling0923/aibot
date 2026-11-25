@@ -34,6 +34,16 @@ describe.skipIf(!reachable)('Publish runs the sample messages only for the merch
     expect(r.total).toBeLessThan(all.total / 2);
   });
 
+  it('each result says whether the message already passed on the live version, so the Publish window can list only what the draft broke', async () => {
+    const r0 = (await call('POST', '/api/admin/tests', { snapshot: await state() })).json();
+    expect(r0.results.every((x: { ok: boolean; wasOk?: boolean }) => x.wasOk === x.ok)).toBe(true);              // nothing changed: nothing new fails
+    const s = await state(); s.kb.filter((e: { merchant: string; intent_key: string }) => e.merchant === 'MERCH_A' && e.intent_key.startsWith('deposit_')).forEach((e: { status: string }) => { e.status = 'draft'; });
+    const r = (await call('POST', '/api/admin/tests', { snapshot: s })).json();
+    const broke = r.results.filter((x: { ok: boolean; wasOk?: boolean }) => !x.ok && x.wasOk === true);
+    expect(broke.length).toBeGreaterThan(0);                                                                       // set to draft: messages that passed on the live version now fail
+    expect(broke.every((x: { merchant: string }) => x.merchant === 'MERCH_A')).toBe(true);
+  });
+
   it('a change to the shared word lists reaches every merchant, so every merchant is run', async () => {
     const s = await state(); s.aliases.deposit.en.push('zzdeposit');
     expect(merchantsOf((await call('POST', '/api/admin/tests', { snapshot: s })).json()).length).toBeGreaterThan(2);

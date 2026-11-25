@@ -98,8 +98,13 @@ export function adminRoutes(app: FastifyInstance, ctx: AdminCtx) {
     const user = req.user!;
     const current = await readSnapshot(pool);
     const snap = effectiveSnapshot(user, current, req.body.snapshot);
-    const all = await runTests(pool, await engineFor(pool, snap, !!req.body.includeDrafts, await readMerchants(pool)), merchantsToTest(snap, current));
-    const results = user.role === 'admin' ? all : all.filter((r) => r.merchant === user.merchant);
+    const metas = await readMerchants(pool), only = merchantsToTest(snap, current);
+    const all = await runTests(pool, await engineFor(pool, snap, !!req.body.includeDrafts, metas), only);
+    // The same messages on what is live now: a message that already failed there is not caused by this draft (`wasOk` false), so the Publish window can list only what the change broke.
+    const live = await runTests(pool, await engineFor(pool, current, !!req.body.includeDrafts, metas), only);
+    const before = new Map(live.map((r) => [r.merchant + '|' + r.language + '|' + r.message, r.ok] as const));
+    const marked = all.map((r) => { const w = before.get(r.merchant + '|' + r.language + '|' + r.message); return w === undefined ? r : { ...r, wasOk: w }; });
+    const results = user.role === 'admin' ? marked : marked.filter((r) => r.merchant === user.merchant);
     return { results, pass: results.filter((r) => r.ok).length, total: results.length };
   });
 
