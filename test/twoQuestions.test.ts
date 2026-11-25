@@ -28,6 +28,14 @@ describe('a message that asks two different things gets both answers, word for w
     expect((await say(b, 'how to deposit')).compound).toBeNull();                                        // a single question is as before
     expect((await say(b, 'how to deposit and blah blah')).compound).toBeNull();
   });
+  it('also straight after the bot asked a question: the repeated message is not glued to the earlier one, both answers come at once', async () => {
+    const b = bot(); const s = newSession('t-after', 'MERCH_A', null);
+    const first = (await b.message(s, 'deposit and withdraw'))!; expect(String(first.trace.decision)).toBe('CHOICE');                  // the bot asks which one
+    const second = (await b.message(s, 'how long does deposit take and what is the withdraw limit'))!;
+    expect(second.trace.compound).toEqual(['deposit_time', 'withdraw_limit']);
+    const s2 = newSession('t-twice2', 'MERCH_A', null); await b.message(s2, 'how long does deposit take and what is the withdraw limit');
+    expect((await b.message(s2, 'how long does deposit take and what is the withdraw limit'))!.trace.compound).toEqual(['deposit_time', 'withdraw_limit']);   // asking it twice gives the same
+  });
   it('never mixes in a person or a rude message: those keep their own rules', async () => {
     const b = bot();
     const a = await say(b, 'deposit time and talk to agent'); expect(a.d).toBe('HANDOFF'); expect(a.compound).toBeNull();
