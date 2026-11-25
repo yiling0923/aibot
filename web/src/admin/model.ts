@@ -265,3 +265,25 @@ export function findDuplicateEntries(list: Entry[]): DupPair[] {
   }
   return out.sort((x, y) => y.score - x.score);
 }
+
+/** Every word that already points to a topic (shared topics and this merchant's own), lower case. */
+export function topicWordMap(d: Draft, merchant: string): Map<string, string> {
+  const m = new Map<string, string>();
+  for (const [topic, byl] of Object.entries(d.aliases)) { m.set(topic.toLowerCase(), topic); for (const vs of Object.values(byl)) for (const v of vs) m.set(String(v).toLowerCase(), topic); }
+  for (const a of d.mAliases[merchant] ?? []) { m.set(a.variant.toLowerCase(), a.canonical); m.set(a.canonical.toLowerCase(), a.canonical); }
+  return m;
+}
+/** Which topic a new word probably belongs to: the topic whose words sit in the same customer messages most often. `null` when no topic shows up. */
+export function suggestTopic(word: string, samples: string[], words: Map<string, string>): { topic: string; hits: number; of: number } | null {
+  const w = word.toLowerCase(); const cjk = /[㐀-鿿฀-๿]/;
+  const msgs = samples.filter((s) => s.toLowerCase().includes(w)); if (!msgs.length) return null;
+  const count = new Map<string, number>();
+  for (const s of msgs) {
+    const low = s.toLowerCase(); const toks = new Set(low.split(/[^\p{L}\p{N}]+/u).filter(Boolean)); const found = new Set<string>();
+    for (const [v, topic] of words) { if (v === w || topic.toLowerCase() === w) continue; if (toks.has(v) || (cjk.test(v) && v.length >= 2 && low.includes(v))) found.add(topic); }
+    found.forEach((t) => count.set(t, (count.get(t) ?? 0) + 1));
+  }
+  const best = [...count.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  if (!best.length || (best[1] && best[1][1] === best[0][1])) return null;                       // no topic, or two topics equally often: do not guess
+  return { topic: best[0][0], hits: best[0][1], of: msgs.length };
+}

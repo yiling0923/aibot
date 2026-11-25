@@ -6,6 +6,7 @@ import type { RankData } from '../model';
 import { ChgPill, Medal, Pill, Spark } from '../ui';
 import { KeywordDrawer, RANK_TYPES } from './KeywordModals';
 import { useAssign } from './assign';
+import SuggestTopics from './SuggestTopics';
 import { useT, tStatus } from '../i18n';
 
 const TABS: [string, string][] = [['all', 'All'], ['new', 'New from chat'], ['unset', 'Needs a decision'], ['filler', 'Fillers'], ['slang', 'Abbreviations'], ['rude', 'Rude words'], ['meaning', 'Topics & other']];
@@ -17,7 +18,7 @@ export default function Ranking() {
   const [week, setWeek] = useState(0); const [cache, setCache] = useState<Record<string, RankData>>({});
   const [tab, setTab] = useState('all'); const [q, setQ] = useState(''); const [lang, setLang] = useState('all'); const [showEx, setShowEx] = useState(false);
   const [sort, setSort] = useState<{ k: string; d: number }>({ k: 'rank', d: 1 }); const [sel, setSel] = useState<Set<string>>(new Set());
-  const [drawer, setDrawer] = useState<string | null>(null);
+  const [drawer, setDrawer] = useState<string | null>(null); const [sug, setSug] = useState(false);
   const key = p.merchant + '|' + week; const data = cache[key];
 
   useEffect(() => { if (!cache[key]) api<RankData>(`/api/admin/ranking?merchant=${encodeURIComponent(p.merchant)}&week=${week}`).then((r) => setCache((c) => ({ ...c, [key]: r }))).catch((e: Error) => p.toast(T('Could not load: ') + e.message)); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [key]);
@@ -61,7 +62,8 @@ export default function Ranking() {
           <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => { setTab(k); setSel(new Set()); }}>{T(l)} <span className="n">{counts[k]}</span></button>)}</div>
           <div className="filt"><input type="search" placeholder={T('Filter keywords')} aria-label={T('Filter keywords')} value={q} onChange={(e) => setQ(e.target.value)} />
             <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">{T('All languages')}</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
-            <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> {T('Show excluded')}{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} {T('shown')}</span></div></div></div>
+            <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> {T('Show excluded')}{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} {T('shown')}</span>
+            {vis.some((r) => r.st.t === 'Not set yet' && !p.ignored.has(r.w)) && <button className="btn sm" type="button" title={T('Look at the chats of the new words and suggest a topic for each')} onClick={() => setSug(true)}>{T('Suggest topics')}</button>}</div></div></div>
       <div className="kwstats"><span className="st"><b>{total.toLocaleString()}</b> {T('words written this week')}</span><span className="st"><b>{vis.length}</b> {T('different keywords')}</span>
         <span className="st dim info" tabIndex={0} title={T('Count: how many times customers wrote it (repeats count). Share: its part of all keywords. Change: compared with the 7 days before. To decide what a word is, use the Keywords screen.')}>ⓘ {T('How to read this')}</span></div>
       {top.length > 0 && <>
@@ -81,6 +83,7 @@ export default function Ranking() {
                 <td><Pill c={ty[1]} title={T(TIPS[r.t])}>{T(ty[0])}</Pill></td><td><Spark v={r.series} w={110} h={28} /></td><td className="num"><b>{r.n}</b><div className="mbar"><i style={{ width: Math.max(4, Math.round((r.n * 100) / mxn)) + '%' }} /></div></td><td><ChgPill c={r.c} /></td><td><Pill c={r.st.c}>{tStatus(T, r.st.t)}</Pill></td>
                 <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>{ex ? <button className="btn sm" type="button" onClick={() => p.unignoreWord(r.w)}>{T('Restore')}</button> : null}</td></tr>); })}
           {!list.length && <tr><td colSpan={10}><div className="kwempty"><b>{T(vis.length ? 'No keyword matches this filter.' : 'No words this week.')}</b><span>{T(vis.length ? 'Try another tab, language or search.' : 'Customer messages appear here as soon as chats come in.')}</span></div></td></tr>}</tbody></table></div>
+      {sug && <SuggestTopics words={vis.filter((r) => r.st.t === 'Not set yet' && !p.ignored.has(r.w)).slice(0, 15).map((r) => ({ w: r.w, n: r.n }))} onClose={() => setSug(false)} />}
       {drawer && <KeywordDrawer word={drawer} count={vis.find((r) => r.w === drawer)?.n ?? p.kwMap[drawer]?.n ?? 0} share={vis.find((r) => r.w === drawer)?.share} onClose={() => setDrawer(null)} />}
     </>
   );
