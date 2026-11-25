@@ -112,7 +112,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   const tx = trOf(ed, ed.tab); const { t } = useT();
   const setTr = (patch: Partial<Tr>, lang = ed.tab) => setEd({ ...ed, translations: { ...ed.translations, [lang]: { ...trOf(ed, lang), ...patch, ai: undefined } } });          // a person edits it: it is no longer an AI draft
   const sug = ed.sug[ed.tab] || [];
-  const [saving, setSaving] = useState(false); const src = sourceLang(p.M);
+  const [saving, setSaving] = useState(false); const src = sourceLang(p.M); const isNew = !ed.id;
 
   const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, v], ai: undefined } } }); };
   const [sBusy, setSBusy] = useState(false);
@@ -137,7 +137,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   /** Saves the entry to the draft. With `thenPublish` the Publish window opens next (only when the entry saved), so changing one answer is: type, Save and publish. */
   const save = async () => {
     if (!ed.intent_key.trim()) return p.toast(t('Give the entry a name first'));
-    if (!trOf(ed, src).answer_text.trim()) return p.toast(t('Add the answer first: it is the one the other languages are made from.'));
+    if (!ed.id && !trOf(ed, src).answer_text.trim()) return p.toast(t('Add the answer first: it is the one the other languages are made from.'));
     let topic = ed.topic; let newTopic = '';
     if (topic === '__new') { newTopic = slug(ed.newTopic); if (!newTopic) return p.toast(t('Type a name for the new topic')); topic = newTopic; }
     if (!topic) return p.toast(t('Choose a topic first. It is required.'));
@@ -190,8 +190,8 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
           <label className="fld"><span>{t('Question type')}</span><select value={ed.aspect || ''} onChange={(e) => set({ aspect: e.target.value || null })}><option value="">{t('Choose a question type…')}</option>{Object.keys(p.draft.aspects).filter((x) => !['problem', 'help'].includes(x)).map((x) => <option key={x} value={x}>{ASPECT_LABEL[x] ? t(ASPECT_LABEL[x]) : x}</option>)}</select></label>
           {p.adv && <label className="tog full"><input type="checkbox" checked={ed.topic_optional} onChange={(e) => set({ topic_optional: e.target.checked })} /> {t('The question type alone is enough (no topic word needed), for example opening hours')}</label>}</>}
       </div>
-      <div className="kbsec"><b>3</b> {t('What the bot says, in each language')}</div>
-      <div className="tabs" role="tablist">{[src, ...targetLangs(p.M)].concat(LANGS.filter((l) => l !== src && !targetLangs(p.M).includes(l) && (l === ed.tab || trOf(ed, l).answer_text.trim() || trOf(ed, l).question_examples.length))).map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
+      {isNew ? <>
+      <div className="kbsec"><b>3</b> {t('What the bot says')}</div>
       <label className="fld"><span>{t('Answer in {l} (facts only; the bot adds the tone)', { l: LN[ed.tab] })}</span><textarea lang={ed.tab} className={tx.ai ? 'ai-tr' : undefined} value={tx.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
       <div className="sub" style={{ marginTop: -4 }}>{tx.ai ? <><span className="aibadge">{t('AI draft · check')}</span> {t('Written by the AI. Edit it and the mark goes away.')}</> : ed.tab === src ? (autoOn(p.M) && p.ai.translate ? t('Type here. When you save, the empty languages of this merchant are filled in by the AI.') : '') : ''}</div>
       <div className="kbsec"><b>4</b> {t('How customers ask for it')}</div>
@@ -202,6 +202,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
         <div className="it" key={i}><span>{x}</span><span>
           <button className="btn sm" type="button" onClick={() => setEd({ ...ed, sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) }, translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, x] } } })}>{t('Approve')}</button>{' '}
           <button className="btn sm" type="button" onClick={() => set({ sug: { ...ed.sug, [ed.tab]: sug.filter((_, j) => j !== i) } })}>{t('Dismiss')}</button></span></div>))}</div>}
+      </> : <div className="note">{t('The answers and the example questions of an existing entry are edited in the table (Knowledge base → Table). Here you change the name, status, topic and the optional questions.')}</div>}
       <details className="kbmore" open={(ed.steps ?? []).length > 0}><summary>{t('Optional: ask the customer for details after the answer')}</summary>
       <div className="sub">{t('The bot gives the answer, asks up to 3 questions one by one, then passes the chat to a person with the details as a note.')}</div>
       {(ed.steps ?? []).map((st, i) => (

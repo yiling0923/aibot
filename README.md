@@ -414,6 +414,10 @@ The Flowchart is now the first tab and what opens by default (the List is the se
 
 The Keywords page only shows what customers typed (counts, groups under each topic, the Ignored list, search and language filter). It has no Add keyword button, no action buttons (Make a main keyword, Add under one, Ignore, Restore), no tick boxes and no AI describe button. A click on a word opens the chats that used it. Words are added and sorted on the Topics page. The layout: four summary tiles (words heard, under a topic, not under a topic, ignored), one toolbar, a card for each topic (closed except the first; open it to see short forms, slang, same meaning and other languages as chips with counts), and a side column with the most-typed words that have no topic and the words with another job. The four word groups keep one colour each: short forms blue, slang orange, same meaning green, other languages purple.
 
+### The entry editor
+
+The texts (answers and example questions in each language) are edited in the **table**. The editor of an **existing** entry therefore has no language tabs and no answer box: it holds the name, status, type, end date, topic, question type and the optional questions to the customer. A **new** entry's editor has one answer box and one example-question list in the source language (no tabs); the other languages are filled in by the AI when you save.
+
 ### Save publishes at once, and the Live switch needs no Publish
 
 A **new entry starts Live**. The entry editor has one **Save and publish** button: it checks the entry, saves it and **publishes at once**, with no Publish window, so adding or changing one answer is: type, Save and publish. (Pick Status **Draft** if the bot should not use it yet.) If a field is missing (a name, the answer in the source language, a topic), nothing is saved. If the entry is live but the bot cannot use it yet (for example no example questions), the message says why.

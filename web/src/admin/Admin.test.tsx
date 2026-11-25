@@ -834,7 +834,7 @@ describe('Control panel', () => {
     open('admin', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: '添加条目' }));
     expect(await screen.findByRole('heading', { name: '新条目' })).toBeTruthy();
-    expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('主题（必填）')).toBeTruthy(); expect(screen.getByText('机器人用每种语言说什么')).toBeTruthy();
+    expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('主题（必填）')).toBeTruthy(); expect(screen.getByText('机器人说什么')).toBeTruthy();
     expect(screen.getByRole('button', { name: '保存并发布' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
@@ -1104,6 +1104,16 @@ describe('Control panel', () => {
     withKb = true; open('staff', '/admin/kb');
     const note = await screen.findByText(/missing a language or examples/);
     expect(note.closest('.kbtabs')).toBeTruthy(); expect(note.closest('.kbtabs')!.querySelector('.segs')).toBeTruthy();
+  });
+  it('the entry editor of an existing entry has no language tabs and no answer box: the text is edited in the table', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit dep_time' }));
+    expect(await screen.findByRole('heading', { name: 'Edit entry' })).toBeTruthy();
+    expect(screen.getByText(/edited in the table/)).toBeTruthy();
+    expect(screen.queryByRole('tab')).toBeNull(); expect(document.querySelector('.pane textarea')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Add entry' }));                                  // a new entry still has the answer box (one language, no tabs)
+    expect(document.querySelector('.pane textarea')).toBeTruthy(); expect(screen.queryByRole('tab')).toBeNull();
   });
   it('the list shows a dot only for the languages of the merchant, not all six', async () => {
     withKb = true; open('staff', '/admin/kb');
