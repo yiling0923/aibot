@@ -242,3 +242,26 @@ export function kbToCSV(entries: Entry[]): string {
   entries.forEach((e) => LANGS.forEach((l) => { const t = e.translations[l]; if (t && (t.answer_text || t.question_examples.length)) rows.push([e.intent_key, e.topic || '', e.aspect || '', l, t.question_examples.join(' | '), t.answer_text, e.status]); }));
   return rows.map((r) => r.map(csvCell).join(',')).join('\n');
 }
+
+export type DupPair = { a: Entry; b: Entry; reasons: string[]; score: number };
+/** Pairs of entries of one merchant that look like the same thing: same answer, same example question, or the same topic and question type. Nothing is changed. */
+export function findDuplicateEntries(list: Entry[]): DupPair[] {
+  type Tr = { question_examples?: string[]; answer_text?: string };
+  const words = (s: string) => new Set(s.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean));
+  const jac = (x: Set<string>, y: Set<string>) => { if (!x.size || !y.size) return 0; let n = 0; x.forEach((w) => { if (y.has(w)) n++; }); return n / (x.size + y.size - n); };
+  const info = list.map((e) => {
+    const trs = Object.values(e.translations as Record<string, Tr>);
+    return { e, qs: trs.flatMap((t) => t.question_examples || []).map((q) => q.trim()).filter(Boolean).map((q) => ({ n: [...words(q)].join(' '), w: words(q) })), as: trs.map((t) => (t.answer_text || '').trim()).filter((a) => a.length >= 20).map((a) => ({ n: [...words(a)].join(' '), w: words(a) })) };
+  });
+  const out: DupPair[] = [];
+  for (let i = 0; i < info.length; i++) for (let j = i + 1; j < info.length; j++) {
+    const A = info[i], B = info[j]; const reasons: string[] = []; let score = 0;
+    if (A.as.some((x) => B.as.some((y) => x.n === y.n))) { reasons.push('Same answer'); score += 3; }
+    else if (A.as.some((x) => B.as.some((y) => jac(x.w, y.w) >= 0.8))) { reasons.push('Almost the same answer'); score += 2; }
+    const shared = A.qs.filter((x) => B.qs.some((y) => x.n && x.n === y.n)).length;
+    if (shared) { reasons.push(shared === 1 ? 'Same example question' : shared + ' same example questions'); score += Math.min(3, shared); }
+    if (A.e.topic && A.e.topic === B.e.topic && A.e.aspect && A.e.aspect === B.e.aspect) { reasons.push('Same topic and question type'); score += 2; }
+    if (reasons.length) out.push({ a: A.e, b: B.e, reasons, score });
+  }
+  return out.sort((x, y) => y.score - x.score);
+}

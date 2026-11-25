@@ -923,3 +923,10 @@ details.moreopt{background:none;padding:0}
 .segs:not(.pills) button[aria-pressed="true"]{background:var(--accent);color:var(--accentfg)}
 /* buttons next to a joined switch have the same height */
 .tools>.btn.sm{padding:7px 12px;font-size:13px}
+.duplist{display:grid;gap:10px;margin-top:12px;max-height:60vh;overflow:auto}
+.dup{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface)}
+.dupreason{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.duprow{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.dupone{display:grid;gap:6px;align-content:start}
+.dupbtn{display:flex;gap:6px}
+@media (max-width:640px){.duprow{grid-template-columns:1fr}}
