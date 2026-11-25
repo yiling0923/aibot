@@ -208,6 +208,15 @@ describe('Control panel', () => {
     await userEvent.selectOptions(sel, '5'); expect(sel.value).toBe('5');
     localStorage.removeItem('settingsTab');
   });
+  it('Merchant settings: one button saves the basics and the settings, and Save and publish goes straight on to the Publish window', async () => {
+    open('admin', '/admin/set');
+    await userEvent.type(await screen.findByLabelText(/^Monthly AI token limit/), '0');
+    await userEvent.click(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByRole('button', { name: 'Save to draft' }));
+    expect(await screen.findByText('Saved. Press Publish to make it live.')).toBeTruthy();                           // basics and settings in one click
+    await userEvent.type(screen.getByLabelText(/^Monthly AI token limit/), '5');                                       // (the fake server keeps no change, so the page still shows one)
+    await userEvent.click(screen.getAllByRole('button', { name: 'Save and publish' })[0]);
+    expect(await screen.findByRole('dialog', { name: 'Publish' })).toBeTruthy();                                      // the Publish window opens after the save
+  });
   it('shows the report with the share of messages answered, not understood and handed over', async () => {
     open('admin', '/admin/report');
     expect(await screen.findByText('70%')).toBeTruthy();                          // answered by the bot
@@ -1092,9 +1101,10 @@ describe('Control panel', () => {
     expect(screen.getByText('81%')).toBeTruthy();                                                   // average confidence
     expect((await screen.findByLabelText(/^Monthly AI token limit/) as HTMLInputElement).value).toBe('500000');
     expect(screen.getByText(/Used this month: 12,400/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(true);          // nothing changed yet
+    expect(screen.queryByRole('button', { name: 'Save basics' })).toBeNull();                                          // one Save for the whole page
+    expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();                                      // nothing changed yet
     await userEvent.type(screen.getByLabelText(/^Monthly AI token limit/), '0');
-    expect((screen.getByRole('button', { name: 'Save basics' }) as HTMLButtonElement).disabled).toBe(false);
+    expect(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByText('1 unsaved change')).toBeTruthy();   // a change to the basics counts too
     expect((screen.getByRole('button', { name: 'English' }) as HTMLButtonElement).disabled).toBe(true);   // the main language stays on
     expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).value).toBe('90');   // on the General tab
     await userEvent.click(screen.getByRole('tab', { name: 'AI help' }));

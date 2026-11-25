@@ -1219,4 +1219,7 @@ export const ZH: Record<string, string> = {
   'Learned from what customers chose': '从客户的选择中学到的',
   'When the bot was not sure what a message meant, it showed choices, and the customer picked one. Approve to add the message to that answer as an example question, so next time the bot answers straight away. Nothing is added until you press Approve.': '当机器人不确定一条消息的意思时，它会显示选项，由客户选择其中一个。点击“批准”会把这条消息作为示例问题加到那个答案里，下次机器人就能直接回答。在你点击“批准”之前不会添加任何内容。',
   'What the customer wrote': '客户写了什么', 'The answer they chose': '他们选择的答案', 'Times': '次数',
+  'Save and publish': '保存并发布',
+  'Saved. Press Publish to make it live.': '已保存。按“发布”后即启用。',
+  'Saved together with the other settings: use Save at the top.': '会和其他设置一起保存：请使用顶部的保存按钮。',
 };

@@ -390,6 +390,10 @@ The Flowchart is now the first tab and what opens by default (the List is the se
 
 The Keywords page only shows what customers typed (counts, groups under each topic, the Ignored list, search and language filter). It has no Add keyword button, no action buttons (Make a main keyword, Add under one, Ignore, Restore), no tick boxes and no AI describe button. A click on a word opens the chats that used it. Words are added and sorted on the Topics page. The layout: four summary tiles (words heard, under a topic, not under a topic, ignored), one toolbar, a card for each topic (closed except the first; open it to see short forms, slang, same meaning and other languages as chips with counts), and a side column with the most-typed words that have no topic and the words with another job. The four word groups keep one colour each: short forms blue, slang orange, same meaning green, other languages purple.
 
+### One Save on Merchant settings
+
+The page has one **Save to draft** button (top right, and in the "unsaved changes" bar) that saves everything you changed: the **basics** (name, token limit, money sign, how long chats are kept, languages: these apply at once) and the settings (replies, handoff, AI help, messages: these go to the draft). **Save and publish** does the same and then opens the Publish window, so a change is two clicks: change, then Save and publish. The old **Save basics** button is gone; a change to the basics also counts in the unsaved-changes bar, and **Discard** puts it back.
+
 ### The translate button in the entry editor
 
 On the English tab, **Translate the empty languages with AI** fills every language the merchant has switched on (Merchant settings → General → "Languages the bot answers in"), except English, but only the ones that are still empty and never over text that is there. A merchant that never chose its languages gets Malay and Chinese. On another language's tab, the button translates just that one language (and asks before it replaces an answer).

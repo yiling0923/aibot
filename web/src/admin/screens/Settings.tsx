@@ -43,39 +43,49 @@ function Form() {
     try { const x = await api<Basics>(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`); setB(x); setF({ name: x.name, domain: x.domain, limit: x.monthlyTokenLimit === null ? '' : String(x.monthlyTokenLimit), retention: x.retentionDays ? String(x.retentionDays) : '', currency: x.currency || 'RM', languages: new Set(x.languages) }); } catch { setB(null); }
   }, [p.merchant]);
   useEffect(() => { void loadBasics(); }, [loadBasics]);
-  const saveBasics = async () => {
+  const saveBasics = async (quiet = false): Promise<boolean> => {
     setBusy(true);
     try {
       await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), retentionDays: f.retention.trim() === '' ? 0 : Number(f.retention), currency: f.currency.trim(), languages: [...f.languages] });
-      await loadBasics(); await p.reloadAll(); p.toast(T('Basics saved'));
-    } catch (e) { p.toast((e as Error).message); } finally { setBusy(false); }
+      await api(`/api/admin/merchants/${encodeURIComponent(p.merchant)}/basics`, { name: f.name, domain: f.domain, monthlyTokenLimit: f.limit.trim() === '' ? null : Number(f.limit), retentionDays: f.retention.trim() === '' ? 0 : Number(f.retention), currency: f.currency.trim(), languages: [...f.languages] });
+      return true;
+    } catch (e) { p.toast((e as Error).message); return false; } finally { setBusy(false); }
   };
   const addPreset = (line: string) => { const cur = s.ai_instructions ?? ''; if (cur.includes(line)) return; const next = (cur.trim() ? cur.replace(/\s+$/, '') + '\n' : '') + '- ' + line; if (next.length <= MAX_INSTRUCTIONS) up({ ai_instructions: next }); };
   const up = (patch: Partial<typeof s>) => setS({ ...s, ...patch });
   const msg = (k: 'kind' | 'closing' | 'handoff' | 'more_help', v: string) => up({ [k]: { ...s[k], [lang]: v } });
-  const save = () => {
+  const save = (withBasics = false) => {
     p.edit((d, note) => {
       const t = d.settings[p.merchant]; t.ai_instructions = (s.ai_instructions ?? '').slice(0, MAX_INSTRUCTIONS); t.trigger_phrases = s.trigger_phrases ?? ''; t.tone = s.tone; t.kind = s.kind; t.closing = s.closing; t.handoff = s.handoff; t.more_help = s.more_help; t.more_help_on = s.more_help_on;
       if (p.isAdmin) { t.handoff_complaint = s.handoff_complaint !== false; t.handoff_account = s.handoff_account !== false; t.handoff_group = s.handoff_group; t.answer = s.answer; t.clarify = s.clarify; t.tools = s.tools; t.abuse_close_after = Math.max(0, Math.min(10, +s.abuse_close_after || 0)); t.reask_times = Math.max(0, Math.min(3, Math.round(Number(s.reask_times ?? 1)))); t.max_choices = Math.max(1, Math.min(5, Math.round(+s.max_choices || 3))); }
       note('Changed settings for ' + p.M.name);
     });
-    base.current = clone(s); p.toast(T('Saved to draft'));
+    base.current = clone(s); p.toast(T(withBasics ? 'Saved. Press Publish to make it live.' : 'Saved to draft'));
+  };
+  /** One button for the whole page: the basics (saved at once) and the settings (saved to the draft). With `thenPublish` the Publish window opens next, so a change is two clicks: change, Save and publish. */
+  const saveAll = async (thenPublish = false) => {
+    let withBasics = false;
+    if (!lock && basicsDirty) { if (!(await saveBasics(true))) return; withBasics = true; }
+    save(withBasics);
+    if (thenPublish) nav('/admin/set', { state: { publish: true } });
   };
   /** The groups of settings that differ from the draft, by name, for the unsaved-changes bar. */
   const LABEL: Record<string, string> = { tone: 'Tone', answer: 'Match levels', clarify: 'Match levels', ai_instructions: 'Bot instructions', handoff_complaint: 'Complaint or dispute', handoff_account: 'Account details', trigger_phrases: 'Trigger phrases', tools: 'Account tools', max_choices: 'Choices', reask_times: 'Ask again', more_help_on: 'Line after choices', abuse_close_after: 'Rude messages', kind: 'Messages', closing: 'Messages', handoff: 'Messages', more_help: 'Messages', handoff_group: 'Human group' };
-  const changed = [...new Set((Object.keys(s) as (keyof typeof s)[]).filter((k) => JSON.stringify(s[k] ?? null) !== JSON.stringify(base.current[k] ?? null)).map((k) => LABEL[k as string] ?? String(k)))].map((x) => T(x));
-  const discard = () => { setS(clone(base.current)); p.toast(T('Changes discarded')); };
-  const basicsDirty = !!b && (f.name !== b.name || f.domain !== b.domain || f.limit !== (b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit)) || f.retention !== (b.retentionDays ? String(b.retentionDays) : '') || f.currency !== (b.currency || 'RM') || [...f.languages].sort().join() !== [...b.languages].sort().join());
+  const changed0 = [...new Set((Object.keys(s) as (keyof typeof s)[]).filter((k) => JSON.stringify(s[k] ?? null) !== JSON.stringify(base.current[k] ?? null)).map((k) => LABEL[k as string] ?? String(k)))].map((x) => T(x));
+  const changed = basicsDirty0() ? [...changed0, T('Basics')] : changed0;
+  const discard = () => { setS(clone(base.current)); if (b) setF({ name: b.name, domain: b.domain, limit: b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit), retention: b.retentionDays ? String(b.retentionDays) : '', currency: b.currency || 'RM', languages: new Set(b.languages) }); p.toast(T('Changes discarded')); };
+  const basicsDirty = basicsDirty0();
+  function basicsDirty0() { return !!b && (f.name !== b.name || f.domain !== b.domain || f.limit !== (b.monthlyTokenLimit === null ? '' : String(b.monthlyTokenLimit)) || f.retention !== (b.retentionDays ? String(b.retentionDays) : '') || f.currency !== (b.currency || 'RM') || [...f.languages].sort().join() !== [...b.languages].sort().join()); }
   const TABS: [string, string][] = [['general', T('General')], ['replies', T('Replies')], ['handoff', T('Handoff')], ['ai', T('AI help')], ['messages', T('Messages')]];
   const cur = TABS.some(([k]) => k === tab) ? tab : 'general';
   return (
     <>
-      <div className="head"><div><h2 style={{ margin: 0 }}>{T('Merchant settings')} · {p.M.name}</h2><div className="sub">{T('How the bot behaves for this merchant. The instructions and replies go to the draft, then Publish. The basics are saved at once.')}</div></div><button className="btn pri" type="button" onClick={save}>{T('Save to draft')}</button></div>
+      <div className="head"><div><h2 style={{ margin: 0 }}>{T('Merchant settings')} · {p.M.name}</h2><div className="sub">{T('How the bot behaves for this merchant. The instructions and replies go to the draft, then Publish. The basics are saved at once.')}</div></div><span className="tools"><button className="btn" type="button" onClick={() => void saveAll(false)}>{T('Save to draft')}</button><button className="btn pri" type="button" onClick={() => void saveAll(true)}>{T('Save and publish')}</button></span></div>
       {b && <div className="btiles"><div className="rptile"><i style={{ background: '#7fa8e8' }} /><small>{T('Answers (knowledge base)')}</small><b>{b.entries}</b></div><div className="rptile"><i style={{ background: '#7fc4a8' }} /><small>{T('Questions today')}</small><b>{b.questionsToday}</b></div>
         <div className="rptile"><i style={{ background: '#9b8bd8' }} /><small>{T('AI tokens today')}</small><b>{b.tokensToday.toLocaleString()}</b></div><div className="rptile"><i style={{ background: '#f0c27b' }} /><small>{T('Average confidence')}</small><b>{b.avgConfidence === null ? '—' : Math.round(b.avgConfidence * 100) + '%'}</b></div></div>}
       <div className="tabs" role="tablist" style={{ margin: '6px 0 14px' }}>{TABS.map(([k, l]) => <button key={k} type="button" role="tab" aria-selected={k === cur} onClick={() => setTab(k)}>{l}</button>)}</div>
       {cur === 'general' && (b ? <>
-      <div className="card"><div className="head"><h3 style={{ margin: 0 }}>{T('Basics')}</h3>{lock ? <span className="lock">{T('Only an admin can change these')}</span> : <button className={'btn' + (basicsDirty ? ' pri' : '')} type="button" disabled={busy || !basicsDirty} onClick={saveBasics}>{T(busy ? 'Saving…' : 'Save basics')}</button>}</div>
+      <div className="card"><div className="head"><h3 style={{ margin: 0 }}>{T('Basics')}</h3><span className="lock">{lock ? T('Only an admin can change these') : T('Saved together with the other settings: use Save at the top.')}</span></div>
         <div className="form" style={{ marginTop: 10 }}>
           <label className="fld"><span>{T('Name')}</span><input value={f.name} disabled={lock} onChange={(e) => setF({ ...f, name: e.target.value })} /></label>
           <label className="fld"><span>{T('Domain (optional)')}</span><input value={f.domain} placeholder="merchant-domain.com" disabled={lock} onChange={(e) => setF({ ...f, domain: e.target.value })} /></label>
@@ -141,7 +151,7 @@ function Form() {
           <label className="fld full"><span>{T('Message when transferring to a human')}</span><textarea lang={lang} value={s.handoff[lang] || ''} onChange={(e) => msg('handoff', e.target.value)} /></label></div></div>
       </>}
       {changed.length > 0 && <div className="ubar" role="region" aria-label={T('Unsaved changes')}><b>{T(changed.length === 1 ? '1 unsaved change' : '{n} unsaved changes', { n: changed.length })}</b><span className="ulist">{changed.join(' · ')}</span>
-        <span className="uact"><button className="btn" type="button" onClick={discard}>{T('Discard')}</button><button className="btn pri" type="button" onClick={save}>{T('Save to draft')}</button></span></div>}
+        <span className="uact"><button className="btn" type="button" onClick={discard}>{T('Discard')}</button><button className="btn" type="button" onClick={() => void saveAll(false)}>{T('Save to draft')}</button><button className="btn pri" type="button" onClick={() => void saveAll(true)}>{T('Save and publish')}</button></span></div>}
     </>
   );
 }
