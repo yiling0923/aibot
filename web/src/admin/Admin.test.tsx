@@ -14,7 +14,7 @@ let withKb = false;
 const kbEntry = (id: number, key: string, status: 'live' | 'draft', answer: string) => ({ id, merchant: 'B', category: 'General', intent_key: key, topic: 'deposit', aspect: null, topic_optional: false, status, translations: { en: { question_examples: [key + ' one', key + ' two', key + ' three'], answer_text: answer } } });
 const kbList = () => (withKb ? [kbEntry(1, 'dep_how', 'live', 'Go to Wallet.'), kbEntry(2, 'dep_time', 'live', 'Five minutes.'), kbEntry(3, 'dep_limit', 'draft', 'RM30 to RM30,000.'), kbEntry(4, 'dep_bonus', 'draft', 'TO WRITE: the bonus rules')] : []);
 const state = (role: 'admin' | 'staff') => ({
-  versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode, languages: langsA, auto_translate: autoTr ? 1 : 0 }, { code: 'B', name: 'SwiftWallet', auto_translate: autoTr ? 1 : 0 }] : [{ code: 'B', name: 'SwiftWallet', auto_translate: autoTr ? 1 : 0 }],
+  versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode, default_language: defA, languages: langsA, auto_translate: autoTr ? 1 : 0 }, { code: 'B', name: 'SwiftWallet', auto_translate: autoTr ? 1 : 0 }] : [{ code: 'B', name: 'SwiftWallet', auto_translate: autoTr ? 1 : 0 }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true, suggest: true },
   snapshot: {
     kb: kbList(), aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
@@ -27,6 +27,7 @@ const REPORT = { chatsBy: { members: 12, visitors: 30 }, from: '2026-11-01', to:
 let botMode: 'listening' | 'answering' = 'answering';
 let testsOverride: { results: object[]; pass: number; total: number } | null = null;     // what the sample-message check returns, when a test needs something else
 let autoTr = false;                                     // automatic translation of the merchants (off in most tests, so they see no extra changes)
+let defA: string | undefined;                          // the main language of LuckyPay (undefined: English)
 let langsA: string | null = null;                       // the languages LuckyPay has switched on (null: it never chose)
 let importedMsgs: { chat: string; from: string; text: string }[] = [];
 const LEARN = () => ({ mode: botMode, since: '2026-11-01T00:00:00Z', days: 12, pairs: 40, chats: 18, withReply: 31, groups: [
@@ -84,7 +85,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { autoTr = false; botMode = 'answering'; localStorage.clear(); localStorage.setItem('topicsView', 'list'); localStorage.setItem('kbView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { defA = undefined; autoTr = false; botMode = 'answering'; localStorage.clear(); localStorage.setItem('topicsView', 'list'); localStorage.setItem('kbView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -1114,6 +1115,14 @@ describe('Control panel', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Close' }));
     await userEvent.click(screen.getByRole('button', { name: 'Add entry' }));                                  // a new entry still has the answer box (one language, no tabs)
     expect(document.querySelector('.pane textarea')).toBeTruthy(); expect(screen.queryByRole('tab')).toBeNull();
+  });
+  it('Import table: new rows start in the main language of the merchant, and the list offers only its languages', async () => {
+    defA = 'vi'; langsA = 'vi,en'; open('admin', '/admin/imp');
+    const sel = await screen.findByLabelText('Language, row 1') as HTMLSelectElement;
+    expect(sel.value).toBe('vi');
+    expect([...sel.options].map((o) => o.value).sort()).toEqual(['en', 'vi']);                              // not all six languages
+    expect(screen.getByText(/Write in the main language \(Vietnamese\) first/)).toBeTruthy();
+    langsA = null;
   });
   it('the list shows a dot only for the languages of the merchant, not all six', async () => {
     withKb = true; open('staff', '/admin/kb');
