@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import KbGrid from './KbGrid';
+import KbLanguages from './KbLanguages';
+import TranslateAll, { useTranslateJobs } from './TranslateAll';
+import { autoOn, needsTranslation, sourceLang, targetLangs, translateEntry } from '../autotr';
 import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 import { useT } from '../i18n';
 
-type Tr = { question_examples: string[]; answer_text: string };
+type Tr = { question_examples: string[]; answer_text: string; ai?: boolean };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
 const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: {} });
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
@@ -19,8 +22,6 @@ const tProblem = (t: (s: string, v?: Record<string, string | number>) => string,
   const m = x.match(/^Only (\d+) example questions?\. /);
   return m ? t(m[1] === '1' ? 'Only 1 example question. Add at least 3, with slang, so the bot finds it more often.' : 'Only {n} example questions. Add at least 3, with slang, so the bot finds it more often.', { n: m[1] }) : t(x);
 };
-/** The languages the one translate button fills: the ones this merchant has switched on in Merchant settings, except English. A merchant that never chose gets Malay and Chinese. */
-const merchantLangs = (v?: string | null): string[] => { const on = String(v ?? '').split(',').map((x) => x.trim()).filter((x) => (LANGS as readonly string[]).includes(x) && x !== 'en'); return on.length ? on : ['ms', 'zh']; };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 
 export default function Kb() {
@@ -29,6 +30,7 @@ export default function Kb() {
   const [ed, setEd] = useState<Ed | null>(null);
   const [view, setViewState] = useState<'list' | 'table'>(() => { try { return localStorage.getItem('kbView') === 'list' ? 'list' : 'table'; } catch { return 'table'; } });
   const setView = (v: 'list' | 'table') => { setViewState(v); try { localStorage.setItem('kbView', v); } catch { /* ignore */ } };
+  const loc = useLocation(); const [tab, setTab] = useState<'entries' | 'languages'>(() => ((loc.state as { tab?: string } | null)?.tab === 'languages' ? 'languages' : 'entries')); const [trAll, setTrAll] = useState(false); const tj = useTranslateJobs();
   const [sel, setSel] = useState<Set<number>>(new Set());                 // entries ticked for a bulk action
   useEffect(() => { setSel(new Set()); }, [p.merchant]);
 
@@ -70,20 +72,22 @@ export default function Kb() {
     <>
       <div className="card"><div className="head"><div><h2>{t('Knowledge base')} · {p.M.name}</h2><div className="sub">{t('What the bot may answer for this merchant. Only live entries are used.')}</div></div>
         <span className="tools"><span className="segs viewsw" role="group" aria-label="View"><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table')}</button><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button></span>
+        {tj.count > 0 && <button className="btn" type="button" title={t(p.ai.translate ? 'Fill every empty language of every entry with the AI' : 'The AI is off. Add the Anthropic key to .env.')} onClick={() => setTrAll(true)}>{t('Translate all')} ({tj.count})</button>}
         <button className="btn pri" type="button" onClick={() => open(null)}>{t('Add entry')}</button></span></div>
-        {miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
-        <div className="filt-row" style={{ marginTop: 12 }}>
+        <div className="kbtabs"><div className="segs" role="group" aria-label={t('Knowledge base sections')}>{([['entries', 'Entries'], ['languages', 'Languages']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{t(l)}</button>)}</div></div>
+        {tab === 'entries' && miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
+        {tab === 'entries' && <div className="filt-row" style={{ marginTop: 12 }}>
           <div className="segs" role="group" aria-label="Show">{([['all', t('All'), all.length], ['live', t('Live'), live], ['draft', t('Draft'), drafts], ['needs', t('Needs work'), needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
           <input type="search" placeholder={t('Search entries or answers')} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" style={{ minWidth: 220 }} />
           <select aria-label="Topic" value={topicF} onChange={(e) => setTopicF(e.target.value)}><option value="all">{t('All topics')}</option>{topicsIn.map((x) => <option key={x} value={x}>{x}</option>)}</select>
           <span className="sub">{list.length} {t('shown')}</span>
-          {readyDrafts.length > 0 && <button className="btn sm pri" type="button" title={t('Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts.')} onClick={() => setStatusOf(new Set(readyDrafts.map((e) => e.id)), 'live')}>{t(readyDrafts.length === 1 ? 'Set 1 ready draft live' : 'Set {n} ready drafts live', { n: readyDrafts.length })}</button>}</div></div>
-      {view === 'list' && picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} {t('selected')}</b>
+          {readyDrafts.length > 0 && <button className="btn sm pri" type="button" title={t('Drafts that have an answer and at least 3 example questions. Entries that still say TO WRITE are left as drafts.')} onClick={() => setStatusOf(new Set(readyDrafts.map((e) => e.id)), 'live')}>{t(readyDrafts.length === 1 ? 'Set 1 ready draft live' : 'Set {n} ready drafts live', { n: readyDrafts.length })}</button>}</div>}</div>
+      {tab === 'entries' && view === 'list' && picked.length > 0 && <div className="bulkbar" role="region" aria-label="Selected entries"><b>{picked.length} {t('selected')}</b>
         <button className="btn sm pri" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'live')}>{t('Set live')}</button>
         <button className="btn sm" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'draft')}>{t('Set draft')}</button>
         <button className="btn sm bad" type="button" onClick={deleteSel}>{t('Delete')}</button>
         <button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>{t('Clear')}</button></div>}
-      {view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>{t('Entry')}</th><th>{t('Topic')}{p.adv ? ' · ' + t('question') : ''}</th><th>{t('Languages')}</th><th>{t('Questions')}</th><th>{t('Answer (English)')}</th><th>{t('Status')}</th></tr></thead><tbody>
+      {tab === 'languages' ? <KbLanguages onTranslateAll={() => setTrAll(true)} /> : view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>{t('Entry')}</th><th>{t('Topic')}{p.adv ? ' · ' + t('question') : ''}</th><th>{t('Languages')}</th><th>{t('Questions')}</th><th>{t('Answer (English)')}</th><th>{t('Status')}</th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
             <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
@@ -104,6 +108,7 @@ export default function Kb() {
         <div className="sub">{t('The change goes into the draft. Customers see it only after you press Publish.')}</div>
         <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>{t('Cancel')}</button><button className="btn pri" type="button" onClick={flipOne}>{t(ask.to === 'draft' ? 'Set to draft' : 'Set live')}</button></div></Modal>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
+      {trAll && <TranslateAll onClose={() => setTrAll(false)} />}
     </>
   );
 }
@@ -112,38 +117,11 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
   const p = usePanel();
   const set = (patch: Partial<Ed>) => setEd({ ...ed, ...patch });
   const tx = trOf(ed, ed.tab); const { t } = useT();
-  const setTr = (patch: Partial<Tr>, lang = ed.tab) => setEd({ ...ed, translations: { ...ed.translations, [lang]: { ...trOf(ed, lang), ...patch } } });
+  const setTr = (patch: Partial<Tr>, lang = ed.tab) => setEd({ ...ed, translations: { ...ed.translations, [lang]: { ...trOf(ed, lang), ...patch, ai: undefined } } });          // a person edits it: it is no longer an AI draft
   const sug = ed.sug[ed.tab] || [];
-  const [busy, setBusy] = useState(false);
+  const [saving, setSaving] = useState(false); const src = sourceLang(p.M);
 
-  /** Asks the AI to translate the English answer and examples into other languages. The result is only a draft in the editor: nothing is saved until "Save to draft". */
-  /** The one button on the English tab: translates Malay and Chinese, but only the ones that are still empty. */
-  const translateEmpty = () => {
-    const empty = merchantLangs(p.M.languages).filter((l) => !trOf(ed, l).answer_text.trim());
-    if (!empty.length) return p.toast(t('Every language this merchant uses already has an answer. Open a language tab to translate that one again.'));
-    void translateTo(empty);
-  };
-  const translateTo = async (langs: string[]) => {
-    const en = trOf(ed, 'en');
-    if (!en.answer_text.trim()) return p.toast(t('Write the English answer first, then translate it.'));
-    setBusy(true);
-    let next = { ...ed.translations } as Record<string, Tr>; const done: string[] = [], failed: string[] = [];
-    for (const l of langs) {
-      const cur = trOf({ ...ed, translations: next as Entry['translations'] }, l);
-      if (cur.answer_text.trim() && !confirm(t('Replace the current {l} answer with a new translation?', { l: LN[l] }))) continue;
-      try {
-        const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: l, answer: en.answer_text, examples: en.question_examples, style: p.draft.settings[p.merchant]?.ai_instructions ?? '' });
-        const have = new Set(cur.question_examples.map((x) => x.toLowerCase()));
-        next = { ...next, [l]: { answer_text: r.answer, question_examples: [...cur.question_examples, ...r.examples.filter((x) => !have.has(x.toLowerCase()))] } };
-        done.push(LN[l]);
-      } catch (e) { failed.push(`${LN[l]}: ${(e as Error).message}`); }
-    }
-    setEd({ ...ed, translations: next as Entry['translations'] }); setBusy(false);
-    if (failed.length) p.toast(failed[0]);
-    else if (done.length) p.toast(t('Translated to {l}. Please check the wording, then save.', { l: done.length <= 2 ? done.join(t(' and ')) : done.join(', ') }));
-  };
-
-  const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, v] } } }); };
+  const addEx = () => { const v = ed.newEx.trim(); if (v) setEd({ ...ed, newEx: '', translations: { ...ed.translations, [ed.tab]: { ...tx, question_examples: [...tx.question_examples, v], ai: undefined } } }); };
   const [sBusy, setSBusy] = useState(false);
   /** The "Suggest with AI" button: the AI writes new example questions for this entry in the language of the open tab. They go to the list below, and nothing is added until a person approves. Without the AI it adds a few simple variations of the first example. */
   const suggest = async () => {
@@ -165,9 +143,9 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
 
   const nav = useNavigate();
   /** Saves the entry to the draft. With `thenPublish` the Publish window opens next (only when the entry saved), so changing one answer is: type, Save and publish. */
-  const save = (thenPublish = false) => {
+  const save = async (thenPublish = false) => {
     if (!ed.intent_key.trim()) return p.toast(t('Give the entry a name first'));
-    if (!trOf(ed, 'en').answer_text.trim()) return p.toast(t('Add the English answer first'));
+    if (!trOf(ed, src).answer_text.trim()) return p.toast(t('Add the answer first: it is the one the other languages are made from.'));
     let topic = ed.topic; let newTopic = '';
     if (topic === '__new') { newTopic = slug(ed.newTopic); if (!newTopic) return p.toast(t('Type a name for the new topic')); topic = newTopic; }
     if (!topic) return p.toast(t('Choose a topic first. It is required.'));
@@ -175,16 +153,22 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
     const { useAspect, tab, sug: _s, newTopic: _n, newTopicW, newEx: _e, ...rest } = ed; void tab;
     const steps = (ed.steps ?? []).map((x) => ({ kind: x.kind, ask: Object.fromEntries(Object.entries(x.ask ?? {}).map(([l, v]) => [l, (v ?? '').trim()]).filter(([, v]) => v)) as Record<string, string> })).filter((x) => x.ask.en || Object.keys(x.ask).length);
     if (steps.some((x) => !x.ask.en)) return p.toast(t('Write the English text of each question to the customer (section 5), or remove it'));
-    const clean: Entry = { ...rest, steps: steps.length ? steps : undefined, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
+    let clean: Entry = { ...rest, steps: steps.length ? steps : undefined, intent_key: ed.intent_key.trim(), topic, aspect: useAspect ? ed.aspect : null, topic_optional: useAspect ? ed.topic_optional : false };
+    let made: string[] = [], terr = '';
+    if (autoOn(p.M) && p.ai.translate) {
+      const langs = needsTranslation(clean, src, targetLangs(p.M), true);
+      if (langs.length) { setSaving(true); const r = await translateEntry(p.merchant, clean, src, langs); setSaving(false); made = Object.keys(r.made); terr = r.error ?? ''; clean = { ...clean, translations: { ...clean.translations, ...r.made } as Entry['translations'] }; }
+    }
     p.edit((d, note) => {
       if (newTopic && !topicNames(d, p.merchant).includes(newTopic)) {                 // a topic made here belongs to this merchant (the plan: each client owns its topic list)
         addOwnTopic(d, p.merchant, newTopic, newTopicW.split(',').map((x) => x.trim().toLowerCase()).filter(Boolean)); note('Added topic "' + newTopic + '" (' + p.M.name + ')');
       }
-      if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
-      else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); }
+      if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); if (made.length) note('Translated entry "' + clean.intent_key + '" into ' + made.map((l) => LN[l]).join(', ') + ' with AI (' + p.M.name + ')'); }
+      else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); if (made.length) note('Translated entry "' + clean.intent_key + '" into ' + made.map((l) => LN[l]).join(', ') + ' with AI (' + p.M.name + ')'); }
     });
     onClose(); if (thenPublish) nav('/admin/kb', { state: { publish: true } });
-    const left = entryProblems(clean); p.toast(left.length ? t('Saved to draft, but the bot cannot use it yet: ') + tProblem(t, left[0]) : t('Saved to draft. Press Publish to make it live.'));
+    const left = entryProblems(clean);
+    p.toast(terr ? t('Saved to draft. Translation: ') + terr : made.length ? t('Saved, and translated into {l} (AI draft). Please check it, then publish.', { l: made.map((l) => LN[l]).join(', ') }) : left.length ? t('Saved to draft, but the bot cannot use it yet: ') + tProblem(t, left[0]) : t('Saved to draft. Press Publish to make it live.'));
   };
   const del = () => {
     p.edit((d, note) => { d.kb = d.kb.filter((e) => e.id !== ed.id); note('Deleted entry "' + ed.intent_key + '" (' + p.M.name + ')'); });
@@ -212,14 +196,9 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
           {p.adv && <label className="tog full"><input type="checkbox" checked={ed.topic_optional} onChange={(e) => set({ topic_optional: e.target.checked })} /> {t('The question type alone is enough (no topic word needed), for example opening hours')}</label>}</>}
       </div>
       <div className="kbsec"><b>3</b> {t('What the bot says, in each language')}</div>
-      <div className="tabs" role="tablist">{LANGS.filter((l) => l === 'en' || l === ed.tab || merchantLangs(p.M.languages).includes(l) || trOf(ed, l).answer_text.trim() || trOf(ed, l).question_examples.length).map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
-      <label className="fld"><span>{t('Answer in {l} (facts only; the bot adds the tone)', { l: LN[ed.tab] })}</span><textarea lang={ed.tab} value={tx.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
-      <div className="tools" style={{ marginTop: -4 }}>
-        {ed.tab === 'en'
-          ? <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={t(p.ai.translate ? 'Fills the languages this merchant uses when they are empty. Open a language tab to translate just that one.' : 'The AI is off. Add the Anthropic key to .env.')} onClick={() => translateEmpty()}>{t(busy ? 'Translating…' : 'Translate the empty languages with AI')}</button>
-          : <button className="btn sm" type="button" disabled={busy || !p.ai.translate} title={p.ai.translate ? '' : t('The AI is off. Add the Anthropic key to .env.')} onClick={() => translateTo([ed.tab])}>{busy ? t('Translating…') : t('Translate from English to {l}', { l: LN[ed.tab] })}</button>}
-        <span className="sub">{p.ai.translate ? t('The AI writes a draft. Please check it before saving.') : t('Translating needs the AI. Add the Anthropic key to .env.')}</span>
-      </div>
+      <div className="tabs" role="tablist">{LANGS.filter((l) => l === src || l === 'en' || l === ed.tab || targetLangs(p.M).includes(l) || trOf(ed, l).answer_text.trim() || trOf(ed, l).question_examples.length).map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
+      <label className="fld"><span>{t('Answer in {l} (facts only; the bot adds the tone)', { l: LN[ed.tab] })}</span><textarea lang={ed.tab} className={tx.ai ? 'ai-tr' : undefined} value={tx.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
+      <div className="sub" style={{ marginTop: -4 }}>{tx.ai ? <><span className="aibadge">{t('AI draft · check')}</span> {t('Written by the AI. Edit it and the mark goes away.')}</> : ed.tab === src ? (autoOn(p.M) && p.ai.translate ? t('Type here. When you save, the empty languages of this merchant are filled in by the AI.') : '') : ''}</div>
       <div className="kbsec"><b>4</b> {t('How customers ask for it')}</div>
       <div><h3>{t('Example questions')} ({tx.question_examples.length}) <span className={'pill ' + (tx.question_examples.length >= 3 ? 'ok' : 'warn')}>{tx.question_examples.length >= 3 ? t('enough') : t('add {n} more', { n: 3 - tx.question_examples.length })}</span> <span className="sub">{t('at least 3, include slang')}</span></h3>
         <div className="chips">{tx.question_examples.map((x, i) => <span className="chip" key={i}>{x}<button type="button" aria-label={t('Remove')} onClick={() => setTr({ question_examples: tx.question_examples.filter((_, j) => j !== i) })}>×</button></span>)}{!tx.question_examples.length && <span className="sub">{t('None yet')}</span>}</div>
@@ -240,7 +219,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
       </details>
       {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>{t('Before the bot can use this answer:')}</b><ul className="plain">{pr.map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>{t('✓ Ready: Live, with an answer and example questions. Save it, then Publish.')}</div>; })()}
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className={'btn' + (ed.status === 'live' ? '' : ' pri')} type="button" onClick={() => save(false)}>{t('Save to draft')}</button>{ed.status === 'live' && <button className="btn pri" type="button" onClick={() => save(true)}>{t('Save and publish')}</button>}</span></div>
+      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className={'btn' + (ed.status === 'live' ? '' : ' pri')} type="button" disabled={saving} onClick={() => void save(false)}>{t(saving ? 'Translating…' : 'Save to draft')}</button>{ed.status === 'live' && <button className="btn pri" type="button" disabled={saving} onClick={() => void save(true)}>{t('Save and publish')}</button>}</span></div>
     </Modal>
   );
 }

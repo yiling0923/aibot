@@ -20,7 +20,7 @@ export function basicsRoutes(app: FastifyInstance, ctx: BasicsCtx) {
 
   app.get<{ Params: { code: string } }>(P, async (req, reply) => {
     const { code } = req.params; if (!may(req, code)) return reply.code(403).send({ error: 'You can only work with your own merchant.' });
-    const [m] = await q(pool, "SELECT code, name, default_language, domain, monthly_token_limit, languages, retention_days, currency, livechat_account FROM merchants WHERE code = ? AND status = 'active'", [code]);
+    const [m] = await q(pool, "SELECT code, name, default_language, domain, monthly_token_limit, languages, retention_days, currency, livechat_account, country, auto_translate FROM merchants WHERE code = ? AND status = 'active'", [code]);
     const t = m ? await new Tenants(pool).get(code) : null; if (!m || !t) return reply.code(404).send({ error: 'There is no such merchant.' });
     ctx.limits.forget(code); const info = await ctx.limits.info(code);
     const [n] = await q(pool, `SELECT COUNT(*) AS n FROM ${tbl(t.db, 'kb_entries')}`);
@@ -31,12 +31,12 @@ export function basicsRoutes(app: FastifyInstance, ctx: BasicsCtx) {
     } catch { /* an older merchant database: the tiles show zero */ }
     return {
       name: m.name, domain: m.domain ?? '', defaultLanguage: m.default_language, languages: parseLangs(m.languages) ?? [...LANGS],
-      retentionDays: Number(m.retention_days ?? 0), currency: String(m.currency ?? 'RM'), accountInLiveChat: !!Number(m.livechat_account), monthlyTokenLimit: info.limit, tokensMonth: info.usedMonth, tokensToday: info.usedToday,
+      retentionDays: Number(m.retention_days ?? 0), currency: String(m.currency ?? 'RM'), country: m.country ? String(m.country) : null, autoTranslate: m.auto_translate === undefined || m.auto_translate === null ? true : !!Number(m.auto_translate), accountInLiveChat: !!Number(m.livechat_account), monthlyTokenLimit: info.limit, tokensMonth: info.usedMonth, tokensToday: info.usedToday,
       entries: Number(n?.n ?? 0), questionsToday: questions, avgConfidence: conf,
     };
   });
 
-  app.post<{ Params: { code: string }; Body: { name?: unknown; domain?: unknown; monthlyTokenLimit?: unknown; languages?: unknown; retentionDays?: unknown; currency?: unknown; accountInLiveChat?: unknown } }>(P, async (req, reply) => {
+  app.post<{ Params: { code: string }; Body: { name?: unknown; domain?: unknown; monthlyTokenLimit?: unknown; languages?: unknown; defaultLanguage?: unknown; country?: unknown; autoTranslate?: unknown; retentionDays?: unknown; currency?: unknown; accountInLiveChat?: unknown } }>(P, async (req, reply) => {
     const { code } = req.params;
     if (req.user?.role !== 'admin') return reply.code(403).send({ error: 'Only an admin can do this.' });
     const [m] = await q(pool, "SELECT id, default_language FROM merchants WHERE code = ? AND status = 'active'", [code]); if (!m) return reply.code(404).send({ error: 'There is no such merchant.' });
@@ -52,10 +52,21 @@ export function basicsRoutes(app: FastifyInstance, ctx: BasicsCtx) {
       if (b.monthlyTokenLimit === null || b.monthlyTokenLimit === '') { sets.push('monthly_token_limit = ?'); vals.push(null); }
       else { const v = Number(b.monthlyTokenLimit); if (!Number.isInteger(v) || v < 0 || v > 1e12) return bad('The token limit must be a whole number, or empty for no limit.'); sets.push('monthly_token_limit = ?'); vals.push(v); }
     }
+    let main: string = m.default_language;
+    if (b.defaultLanguage !== undefined) {
+      if (!(LANGS as readonly string[]).includes(String(b.defaultLanguage))) return bad('Choose a source language: en, ms, zh, vi, th or tl.');
+      main = String(b.defaultLanguage); sets.push('default_language = ?'); vals.push(main);
+    }
+    if (b.country !== undefined) {
+      if (b.country === null || b.country === '') { sets.push('country = ?'); vals.push(null); }
+      else if (/^[A-Za-z]{2}$/.test(String(b.country))) { sets.push('country = ?'); vals.push(String(b.country).toUpperCase()); }
+      else return bad('Choose a country from the list.');
+    }
+    if (b.autoTranslate !== undefined) { sets.push('auto_translate = ?'); vals.push(b.autoTranslate === true ? 1 : 0); }
     if (b.languages !== undefined) {
       const l = Array.isArray(b.languages) ? b.languages.map(String).filter((x) => (LANGS as readonly string[]).includes(x)) : [];
       if (!l.length) return bad('Switch on at least one language.');
-      if (!l.includes(m.default_language)) return bad('The main language of this merchant must stay on.');
+      if (!l.includes(main)) return bad('The source language of this merchant must stay on.');
       sets.push('languages = ?'); vals.push(l.length === LANGS.length ? null : LANGS.filter((x) => l.includes(x)).join(','));
     }
     if (b.retentionDays !== undefined) {

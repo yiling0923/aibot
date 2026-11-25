@@ -14,7 +14,7 @@ let withKb = false;
 const kbEntry = (id: number, key: string, status: 'live' | 'draft', answer: string) => ({ id, merchant: 'B', category: 'General', intent_key: key, topic: 'deposit', aspect: null, topic_optional: false, status, translations: { en: { question_examples: [key + ' one', key + ' two', key + ' three'], answer_text: answer } } });
 const kbList = () => (withKb ? [kbEntry(1, 'dep_how', 'live', 'Go to Wallet.'), kbEntry(2, 'dep_time', 'live', 'Five minutes.'), kbEntry(3, 'dep_limit', 'draft', 'RM30 to RM30,000.'), kbEntry(4, 'dep_bonus', 'draft', 'TO WRITE: the bonus rules')] : []);
 const state = (role: 'admin' | 'staff') => ({
-  versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode, languages: langsA }, { code: 'B', name: 'SwiftWallet' }] : [{ code: 'B', name: 'SwiftWallet' }],
+  versions: { A: 3, B: 2 }, sharedVer: 1, stamp: 9, merchants: role === 'admin' ? [{ code: 'A', name: 'LuckyPay', bot_mode: botMode, languages: langsA, auto_translate: autoTr ? 1 : 0 }, { code: 'B', name: 'SwiftWallet', auto_translate: autoTr ? 1 : 0 }] : [{ code: 'B', name: 'SwiftWallet', auto_translate: autoTr ? 1 : 0 }],
   history: [{ kind: 'merchant', merchant: role === 'admin' ? 'A' : 'B', version: 3, actor: 'admin', summary: 'Edited', ago: 'today' }], user: { username: 'u', role, merchant: role === 'admin' ? null : 'B' }, ai: { pick: false, write: false, describe: false, translate: true, suggest: true },
   snapshot: {
     kb: kbList(), aliases: { deposit: { en: ['deposit', 'dep', 'depo', 'dps'], ms: [], zh: ['充值'] } }, mAliases: { A: [], B: [] }, aspects: {}, smalltalk: {}, guard: { abuse: {}, abuse_soft: {} }, fillers: { en: ['lah'], ms: [], zh: [] },
@@ -26,6 +26,7 @@ const RANKING = { rows: ['dep', 'wd', 'lh', 'tolonglh', 'deposit'].map((w, i) =>
 const REPORT = { chatsBy: { members: 12, visitors: 30 }, from: '2026-11-01', to: '2026-11-07', topTopics: [{ topic: 'deposit', n: 9 }], handedByTopic: [{ topic: 'withdraw', handed: 3, total: 6 }], topKeywords: [{ word: 'depo', n: 5 }], accuracy: { right: 3, wrong: 1, checked: 4, wrongRate: 0.25 }, recent: [{ id: 7, question: 'how to deposit', answer: 'Go to Wallet.', topic: 'deposit', at: '2026-11-12 10:00', verdict: null }], days: 7, total: 100, helped: 70, notUnderstood: 10, handedOver: 15, rude: 5, byDecision: {}, tests: 3, daily: Array.from({ length: 7 }, (_, i) => ({ day: '2026-11-0' + (i + 1), total: 14, helped: 10, notUnderstood: 1, handedOver: 2 })), topAnswers: [{ intent: 'deposit_how', n: 30 }, { intent: 'withdraw_time', n: 12 }], topMissing: [{ text: 'tarik duit lambat', hits: 5 }], prev: { total: 80, helped: 50, notUnderstood: 10, handedOver: 20 }, topicRates: [{ topic: 'deposit', n: 9, rate: 0.8, prevRate: 0.7 }], languages: [{ lang: 'zh', n: 60, notUnderstood: 3 }, { lang: 'en', n: 40, notUnderstood: 7 }], reasons: [{ reason: 'Customer asked for a person', n: 9 }] };
 let botMode: 'listening' | 'answering' = 'answering';
 let testsOverride: { results: object[]; pass: number; total: number } | null = null;     // what the sample-message check returns, when a test needs something else
+let autoTr = false;                                     // automatic translation of the merchants (off in most tests, so they see no extra changes)
 let langsA: string | null = null;                       // the languages LuckyPay has switched on (null: it never chose)
 let importedMsgs: { chat: string; from: string; text: string }[] = [];
 const LEARN = () => ({ mode: botMode, since: '2026-11-01T00:00:00Z', days: 12, pairs: 40, chats: 18, withReply: 31, groups: [
@@ -82,7 +83,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
   return render(<MemoryRouter initialEntries={[route]}><Routes><Route path="/admin/*" element={<Admin />} /></Routes></MemoryRouter>);
 };
 
-beforeEach(() => { botMode = 'answering'; localStorage.clear(); localStorage.setItem('topicsView', 'list'); localStorage.setItem('kbView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
+beforeEach(() => { autoTr = false; botMode = 'answering'; localStorage.clear(); localStorage.setItem('topicsView', 'list'); localStorage.setItem('kbView', 'list'); withKb = false; setupDone = false; lcLines = []; lcRefuse = false; peopleBig = false; });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 
 describe('Control panel', () => {
@@ -119,35 +120,86 @@ describe('Control panel', () => {
     expect(await screen.findByText(/already a short form of "deposit"/)).toBeTruthy();
     expect((screen.getByRole('button', { name: /^Publish/ }) as HTMLButtonElement).disabled).toBe(true);
   });
-  it('translates the English answer into Malay and Chinese as a draft in the editor, and is switched off without AI', async () => {
-    open('admin', '/admin/kb');
+  it('automatic translation: saving an entry fills the empty languages with the AI (marked AI draft), and there is no translate button', async () => {
+    autoTr = true; open('admin', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
-    const answer = document.querySelector('.pane textarea') as HTMLTextAreaElement;
-    await userEvent.type(answer, 'Go to Wallet > Deposit.');
-    await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
-    expect(await screen.findByText(/Translated to MS and ZH/)).toBeTruthy();
-    await userEvent.click(screen.getByRole('tab', { name: /^MS/ }));
+    expect(screen.queryByRole('button', { name: /Translate/ })).toBeNull();                                // nothing to click: it happens when you save
+    await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'wallet_deposit');
+    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
+    await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
+    expect(await screen.findByText(/translated into MS, ZH \(AI draft\)/)).toBeTruthy();
+    await userEvent.click(await screen.findByText('wallet_deposit'));                                        // open the entry again
+    await userEvent.click(await screen.findByRole('tab', { name: /^MS/ }));
     expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');
-    expect(screen.getByText('depo macam mana')).toBeTruthy();
-    expect(screen.queryByRole('button', { name: /Translate to Vietnamese/ })).toBeNull();               // one button on the English tab, not two
-    await userEvent.click(screen.getByRole('tab', { name: /^EN/ }));
-    await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
-    expect(await screen.findByText(/Every language this merchant uses already has an answer/)).toBeTruthy();         // nothing is translated over text that is there
-    cleanup(); open('admin', '/admin/kb', false);
-    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
-    expect((screen.getByRole('button', { name: 'Translate the empty languages with AI' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText('AI draft · check')).toBeTruthy();
+    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, '!');              // a person edits it: the mark goes away
+    expect(screen.queryByText('AI draft · check')).toBeNull();
   });
-  it('the one translate button fills the languages the merchant has switched on (Malay and Chinese when it never chose)', async () => {
-    langsA = 'en,ms,vi,th';
+  it('automatic translation does nothing when the switch is off or the AI is off', async () => {
+    open('admin', '/admin/kb');                                                                               // the switch is off in this test
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'plain_one');
+    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
+    await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
+    expect(await screen.findByText(/Saved to draft/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
+    cleanup(); autoTr = true; open('admin', '/admin/kb', false);                                              // the switch is on, the AI is off
+    await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'plain_two');
+    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
+    await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
+    await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
+    expect(await screen.findByText(/Saved to draft/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
+  });
+  it('a merchant that switched a language off gets no translation into it', async () => {
+    autoTr = true; langsA = 'en,ms,vi,th';
     try {
       open('admin', '/admin/kb');
       await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+      await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'lang_check');
       await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
-      await userEvent.click(screen.getByRole('button', { name: 'Translate the empty languages with AI' }));
-      expect(await screen.findByText(/Translated to MS, VI, TH\./)).toBeTruthy();                       // not Chinese: this merchant switched it off
-      expect(screen.queryByRole('tab', { name: /^ZH/ })).toBeNull();                                    // a language the merchant switched off has no tab
-      expect(screen.getByRole('tab', { name: /^VI/ })).toBeTruthy();
+      await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
+      await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
+      expect(await screen.findByText(/translated into MS, VI, TH \(AI draft\)/)).toBeTruthy();             // not Chinese: this merchant switched it off
     } finally { langsA = null; }
+  });
+  it('Knowledge base → Languages tab: country, timezone and the switch (admin), and Translate all with a count first', async () => {
+    autoTr = true; open('admin', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'Languages' }));
+    expect(await screen.findByText('Languages for LuckyPay')).toBeTruthy();
+    await userEvent.selectOptions(screen.getByLabelText('Country'), 'MY');
+    expect((screen.getByLabelText('Timezone') as HTMLInputElement).value).toBe('Asia/Kuala_Lumpur · UTC+8');
+    expect(screen.getByRole('switch', { name: 'Translate automatically' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Save languages' })).toBeTruthy();
+    cleanup(); withKb = true; open('staff', '/admin/kb');                                                    // staff: read only, but Translate all works
+    await userEvent.click(await screen.findByRole('button', { name: 'Languages' }));
+    expect((await screen.findByLabelText('Country') as HTMLSelectElement).disabled).toBe(true); expect(screen.queryByRole('button', { name: 'Save languages' })).toBeNull();
+    await userEvent.click(screen.getAllByRole('button', { name: /^Translate all/ })[0]);
+    expect(await screen.findByText(/Translate 3 entries into/)).toBeTruthy();                               // it says how much first (the entry that still says TO WRITE is left out)
+  });
+  it('automatic translation in the table: leaving the source cell fills the empty languages, never a text a person wrote', async () => {
+    autoTr = true; withKb = true; localStorage.setItem('kbView', 'table'); open('staff', '/admin/kb');
+    const grid = await screen.findByLabelText('Table editor');
+    await userEvent.type(within(grid).getByLabelText('Answer MS for dep_how'), 'Pergi ke Dompet.'); await userEvent.tab();     // a person writes the Malay answer of dep_how
+    const en = within(grid).getByLabelText('Answer EN for dep_limit') as HTMLTextAreaElement;
+    await userEvent.clear(en); await userEvent.type(en, 'RM50 to RM50,000.'); await userEvent.tab();
+    expect(await screen.findByText(/Translated into MS, ZH \(AI draft\)/)).toBeTruthy();
+    expect((within(grid).getByLabelText('Answer MS for dep_limit') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');
+    expect(within(grid).getAllByText('AI draft · check').length).toBeGreaterThanOrEqual(2);                                        // Malay and Chinese of dep_limit
+    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Dompet.');          // the person's text stays
+    const dh = within(grid).getByLabelText('Answer EN for dep_how') as HTMLTextAreaElement;
+    await userEvent.clear(dh); await userEvent.type(dh, 'Open the wallet.'); await userEvent.tab();
+    await new Promise((r) => setTimeout(r, 300));
+    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Dompet.');          // still never overwritten
+  });
+  it('Translate all fills every empty language of every entry, one after the other, and says it is done', async () => {
+    autoTr = false; withKb = true; open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: /^Translate all \(3\)/ }));
+    expect(await screen.findByText(/Translate 3 entries into Malay, Chinese\? About 6 translations/)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Translate' }));
+    expect(await screen.findByText('Done: 3 of 3 entries.')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /^Translate all/ })).toBeNull();                                                  // nothing left to translate
   });
   it('Suggest with AI: the AI writes example questions, each needs approval, Approve all adds the rest; without the AI it adds simple variations', async () => {
     open('admin', '/admin/kb');
@@ -848,6 +900,7 @@ describe('Control panel', () => {
     expect(await screen.findByLabelText('表格编辑器')).toBeTruthy(); expect(screen.getByText('示例问题（英文）', { exact: false })).toBeTruthy();
     const { tChange } = await import('./changes');
     expect(tChange('zh', 'Set 3 entries live (LuckyPay)')).toBe('已把 3 个条目设为启用（LuckyPay）');
+    expect(tChange('zh', 'Translated entry "dep_limit" into MS, ZH with AI (LuckyPay)')).toBe('已用 AI 把条目“dep_limit”翻译成 MS, ZH（LuckyPay）');
     expect(tChange('zh', 'Added keyword "dp" to topic "deposit" (LuckyPay)')).toBe('已把关键词“dp”添加到主题“deposit”（LuckyPay）');
     expect(tChange('en', 'Set 3 entries live (LuckyPay)')).toBe('Set 3 entries live (LuckyPay)');
     expect(tChange('zh', 'Something new')).toBe('Something new');
@@ -1172,7 +1225,7 @@ describe('Control panel', () => {
     expect(screen.queryByRole('region', { name: 'Unsaved changes' })).toBeNull();                                      // nothing changed yet
     await userEvent.type(screen.getByLabelText(/^Monthly AI token limit/), '0');
     expect(within(screen.getByRole('region', { name: 'Unsaved changes' })).getByText('1 unsaved change')).toBeTruthy();   // a change to the basics counts too
-    expect((screen.getByRole('button', { name: 'English' }) as HTMLButtonElement).disabled).toBe(true);   // the main language stays on
+    expect(screen.getByRole('button', { name: 'Open Languages' })).toBeTruthy();                           // the languages moved to Knowledge base → Languages
     expect(((await screen.findByLabelText('Keep conversations for (days)')) as HTMLInputElement).value).toBe('90');   // on the General tab
     await userEvent.click(screen.getByRole('tab', { name: 'AI help' }));
     const box = screen.getByLabelText('Bot instructions') as HTMLTextAreaElement;

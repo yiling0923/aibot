@@ -86,6 +86,7 @@ export async function migrateMerchantDb(pool: Pool, db: string): Promise<string[
 const REQUIRED: { table: string; column: string; add: string; after?: string }[] = [
   { table: 'chat_sessions', column: 'source', add: "ADD COLUMN source VARCHAR(10) NOT NULL DEFAULT 'live' AFTER status" },
   { table: 'kb_entries', column: 'steps', add: 'ADD COLUMN steps TEXT NULL' },
+  { table: 'kb_translations', column: 'ai_draft', add: 'ADD COLUMN ai_draft TINYINT(1) NOT NULL DEFAULT 0' },
   { table: 'kb_entries', column: 'entry_type', add: "ADD COLUMN entry_type VARCHAR(20) NOT NULL DEFAULT 'answer'" },
   { table: 'aliases', column: 'kind', add: 'ADD COLUMN kind VARCHAR(10) NULL' },
   { table: 'settings', column: 'handoff_complaint', add: 'ADD COLUMN handoff_complaint TINYINT(1) NOT NULL DEFAULT 1' },

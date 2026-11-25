@@ -27,7 +27,7 @@ function group(list: RowDataPacket[], k: string, v: string): Words {
 }
 
 export async function readMerchants(pool: Pool): Promise<MerchantMeta[]> {
-  return (await rows(pool, "SELECT code, name, default_language, livechat_group_id, languages, bot_mode, DATE_FORMAT(listening_since, '%Y-%m-%dT%H:%i:%sZ') AS listening_since FROM merchants WHERE status = 'active' ORDER BY id")) as unknown as MerchantMeta[];
+  return (await rows(pool, "SELECT code, name, default_language, livechat_group_id, languages, country, auto_translate, bot_mode, DATE_FORMAT(listening_since, '%Y-%m-%dT%H:%i:%sZ') AS listening_since FROM merchants WHERE status = 'active' ORDER BY id")) as unknown as MerchantMeta[];
 }
 
 /** Reads the whole editable knowledge base, drafts included: every merchant from its own database, the shared word lists from the main one. */
@@ -56,7 +56,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     const [own, entries, trans, [st], tools] = await Promise.all([
       rows(pool, `SELECT language, variant, canonical, kind FROM ${D('aliases')} ORDER BY id`),
       rows(pool, `SELECT e.id, c.name AS category, e.intent_key, e.topic, e.aspect, e.topic_optional, e.status, e.updated_at, e.entry_type, e.steps, DATE_FORMAT(e.valid_to, '%Y-%m-%d') AS ends_on FROM ${D('kb_entries')} e LEFT JOIN ${D('kb_categories')} c ON c.id = e.category_id ORDER BY e.id`),
-      rows(pool, `SELECT kb_id, language, question_examples, answer_text FROM ${D('kb_translations')} ORDER BY id`),
+      rows(pool, `SELECT kb_id, language, question_examples, answer_text, ai_draft FROM ${D('kb_translations')} ORDER BY id`),
       rows(pool, `SELECT * FROM ${D('settings')} WHERE id = 1`),
       rows(pool, `SELECT tool, enabled FROM ${D('tools')}`),
     ]);
@@ -64,7 +64,7 @@ export async function readSnapshot(pool: Pool): Promise<Snapshot> {
     const byKb = new Map<number, SnapEntry['translations']>();
     for (const x of trans) {
       const m = byKb.get(Number(x.kb_id)) ?? {};
-      m[x.language as Lang] = { question_examples: asJson<string[]>(x.question_examples, []), answer_text: x.answer_text };
+      m[x.language as Lang] = { question_examples: asJson<string[]>(x.question_examples, []), answer_text: x.answer_text, ...(Number(x.ai_draft) ? { ai: true } : {}) };
       byKb.set(Number(x.kb_id), m);
     }
     for (const e of entries) snap.kb.push({
@@ -145,7 +145,7 @@ export async function writeSnapshot(pool: Pool, snap: Snapshot, scope: WriteScop
         await c.query(`DELETE FROM ${D('kb_translations')} WHERE kb_id=?`, [id]);
         for (const [lang, tr] of Object.entries(e.translations)) {
           if (!tr || (!(tr.answer_text || '').trim() && !(tr.question_examples || []).length)) continue;
-          await c.query(`INSERT INTO ${D('kb_translations')}(kb_id,language,question_examples,answer_text) VALUES(?,?,?,?)`, [id, lang, JSON.stringify(tr.question_examples || []), tr.answer_text || '']);
+          await c.query(`INSERT INTO ${D('kb_translations')}(kb_id,language,question_examples,answer_text,ai_draft) VALUES(?,?,?,?,?)`, [id, lang, JSON.stringify(tr.question_examples || []), tr.answer_text || '', tr.ai ? 1 : 0]);
         }
       }
       for (const r of await rows(c, `SELECT id, intent_key FROM ${D('kb_entries')}`)) if (!keep.has(r.intent_key)) await c.query(`DELETE FROM ${D('kb_entries')} WHERE id=?`, [r.id]);

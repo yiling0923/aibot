@@ -5,7 +5,7 @@
 const RULES: [RegExp, string][] = [
   [/^AI translated (\d+) answers? \((.*)\) for (.*)\. Check the wording before publishing$/, 'AI 翻译了 $1 个答案（$2），商户 $3。发布前请检查用词'],
   [/^Added answer "(.*)" to topic "(.*)" \((.*)\)$/, '已把答案“$1”添加到主题“$2”（$3）'],
-  [/^Added entry "(.*)" \((.*)\)$/, '已添加条目“$1”（$2）'], [/^Edited entry "(.*)" \((.*)\)$/, '已修改条目“$1”（$2）'], [/^Deleted entry "(.*)" \((.*)\)$/, '已删除条目“$1”（$2）'],
+  [/^Translated entry "(.*)" into (.*) with AI \((.*)\)$/, '已用 AI 把条目“$1”翻译成 $2（$3）'], [/^Added entry "(.*)" \((.*)\)$/, '已添加条目“$1”（$2）'], [/^Edited entry "(.*)" \((.*)\)$/, '已修改条目“$1”（$2）'], [/^Deleted entry "(.*)" \((.*)\)$/, '已删除条目“$1”（$2）'],
   [/^Deleted answer "(.*)" \((.*)\)$/, '已删除答案“$1”（$2）'], [/^Deleted topic "(.*)" \((.*)\)$/, '已删除主题“$1”（$2）'],
   [/^Deleted (\d+) entr(?:y|ies) \((.*)\)$/, '已删除 $1 个条目（$2）'],
   [/^Added filler word "(.*)"$/, '已添加填充词“$1”'], [/^Added greeting phrase "(.*)" \((.*)\)$/, '已添加问候语“$1”（$2）'], [/^Added greeting phrase "(.*)"$/, '已添加问候语“$1”'],

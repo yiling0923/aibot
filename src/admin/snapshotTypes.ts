@@ -11,7 +11,7 @@ export interface SnapEntry {
   ends_on?: string | null;
   /** Questions asked after the answer (guided answer), up to 3. */
   steps?: Step[];
-  translations: Partial<Record<Lang, { question_examples: string[]; answer_text: string }>>;
+  translations: Partial<Record<Lang, { question_examples: string[]; answer_text: string; /** made by the AI, not yet touched by a person */ ai?: boolean }>>;
 }
 export interface SnapSettings {
   tone: 'friendly' | 'formal'; handoff_group: number | null; answer: number; clarify: number; abuse_close_after: number;
@@ -29,4 +29,4 @@ export interface Snapshot {
   kb: SnapEntry[]; aliases: Words; mAliases: Record<string, { language: string; variant: string; canonical: string; kind?: string | null }[]>;
   aspects: Words; smalltalk: Words; guard: Words; fillers: Record<string, string[]>; settings: Record<string, SnapSettings>;
 }
-export interface MerchantMeta { code: string; name: string; default_language: Lang; livechat_group_id: number | null; languages?: string | null; bot_mode?: string; listening_since?: string | null }
+export interface MerchantMeta { code: string; name: string; default_language: Lang; livechat_group_id: number | null; languages?: string | null; country?: string | null; auto_translate?: number | boolean; bot_mode?: string; listening_since?: string | null }

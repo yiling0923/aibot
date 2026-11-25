@@ -66,6 +66,23 @@ describe.skipIf(!reachable)('merchant basics, token limit and style rules (needs
     await as(admin, 'POST', B, { name: 'LuckyPay' });
   });
 
+  it('keeps the country, the automatic translation switch and the source language; a translation made by the AI keeps its mark', async () => {
+    expect((await as(admin, 'POST', B, { country: 'my', autoTranslate: false })).statusCode).toBe(200);
+    expect(await as(staff, 'POST', B, { country: 'SG' }).then((r) => r.statusCode)).toBe(403);       // only an admin
+    expect((await as(admin, 'POST', B, { country: 'Malaysia' })).statusCode).toBe(400);
+    const g = (await as(staff, 'GET', B)).json(); expect(g.country).toBe('MY'); expect(g.autoTranslate).toBe(false);
+    expect((await as(admin, 'POST', B, { autoTranslate: true, country: null })).statusCode).toBe(200);
+    const h = (await as(admin, 'GET', B)).json(); expect(h.country).toBeNull(); expect(h.autoTranslate).toBe(true);
+    expect((await as(admin, 'POST', B, { defaultLanguage: 'xx' })).statusCode).toBe(400);
+    expect((await as(admin, 'POST', B, { defaultLanguage: 'ms' })).statusCode).toBe(200); expect((await as(admin, 'GET', B)).json().defaultLanguage).toBe('ms');
+    await as(admin, 'POST', B, { defaultLanguage: 'en' });
+    const list = (await as(admin, 'GET', '/api/admin/people')).json().merchants.find((x: { code: string }) => x.code === 'MERCH_A');
+    expect(list).toHaveProperty('country'); expect(Array.isArray(list.languages)).toBe(true);        // the Merchants list shows them
+    const snap = await readSnapshot(pool!); const e = snap.kb.find((k) => k.merchant === 'MERCH_A')!;
+    const next = JSON.parse(JSON.stringify(snap)); next.kb.find((k: { id: number }) => k.id === e.id).translations.ms = { question_examples: ['a b'], answer_text: 'Jawapan AI', ai: true };
+    await writeSnapshot(pool!, next, { merchants: ['MERCH_A'], shared: false });
+    expect((await readSnapshot(pool!)).kb.find((k) => k.id === e.id)!.translations.ms).toMatchObject({ answer_text: 'Jawapan AI', ai: true });
+  });
   it('the bot loads the languages that are on', async () => {
     await as(admin, 'POST', B, { languages: ['en', 'zh'] });
     const { loadKnowledge } = await import('../src/db/loadKnowledge');

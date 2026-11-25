@@ -4,8 +4,9 @@ import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import { IconBtn, Modal } from '../ui';
 import { useT } from '../i18n';
+import { countryOf } from '../countries';
 
-interface PeopleData { merchants: { code: string; name: string; tone: string; entries: number; chatsToday?: number; logins: string[]; link?: { hasKey: boolean; lastUsedAt: string | null } }[]; users: { username: string; role: string; merchant: string | null }[] }
+interface PeopleData { merchants: { code: string; name: string; tone: string; entries: number; chatsToday?: number; country?: string | null; languages?: string[]; logins: string[]; link?: { hasKey: boolean; lastUsedAt: string | null } }[]; users: { username: string; role: string; merchant: string | null }[] }
 /** "2h ago", "3d ago": how long since a time. */
 const ago = (iso: string | null, T: (s: string, v?: Record<string, string | number>) => string) => { if (!iso) return ''; const m = Math.max(0, Math.round((Date.now() - new Date(iso).getTime()) / 60000)); return m < 1 ? T('just now') : m < 60 ? T('{n} min ago', { n: m }) : m < 1440 ? T('{n}h ago', { n: Math.round(m / 60) }) : T('{n}d ago', { n: Math.round(m / 1440) }); };
 type Dlg = { kind: 'merchant' } | { kind: 'user' } | { kind: 'reset'; user: string } | null;
@@ -19,7 +20,7 @@ function Av({ name, seed }: { name: string; seed: string }) {
 }
 
 export default function People() {
-  const p = usePanel(); const nav = useNavigate(); const { t: T } = useT();
+  const p = usePanel(); const nav = useNavigate(); const { t: T, lang } = useT();
   const [P, setP] = useState<PeopleData>({ merchants: [], users: [] }); const [dlg, setDlg] = useState<Dlg>(null);
   const [view, setView] = useState<'merchants' | 'logins'>('merchants'); const [conn, setConn] = useState<'all' | 'on' | 'off'>('all');
   const [mq, setMq] = useState(''); const [role, setRole] = useState<'all' | 'admin' | 'staff'>('all');
@@ -40,14 +41,16 @@ export default function People() {
       {view === 'merchants' && <div className="card"><div className="head"><div><h2>{T('Merchants')} <span className="cnt2">{P.merchants.length}</span></h2><div className="sub">{T('Each merchant has its own answers, words and settings. Open a merchant to connect it to LiveChat and set its AI keys.')}</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'merchant' })}>＋ {T('Add merchant')}</button></div>
         <div className="pbar">{P.merchants.length > 5 && <input type="search" aria-label={T('Find a merchant')} placeholder={T('Find a merchant')} value={mq} onChange={(e) => setMq(e.target.value)} />}
           <div className="segs" role="group" aria-label={T('Show merchants')}>{([['all', 'All', P.merchants.length], ['on', 'Connected', connected], ['off', 'Needs a bot key', P.merchants.length - connected]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={conn === k} onClick={() => setConn(k)}>{T(l)} <span className="n">{n}</span></button>)}</div></div>
-        <table className="ptable"><thead><tr><th>{T('Merchant')}</th><th>{T('Tone')}</th><th className="num">{T('Answers')}</th><th>{T('Chats today')}</th><th>{T('LiveChat link')}</th><th></th></tr></thead><tbody>
+        <table className="ptable"><thead><tr><th>{T('Merchant')}</th><th>{T('Tone')}</th><th className="num">{T('Answers')}</th><th>{T('Country')}</th><th>{T('Languages')}</th><th>{T('Chats today')}</th><th>{T('LiveChat link')}</th><th></th></tr></thead><tbody>
           {merchants.map((m) => <tr key={m.code} className="row" onClick={() => nav('/admin/merchants/' + m.code)}>
             <td><div className="mcell"><Av name={m.name} seed={m.code} /><div><a className="mname" href={'/admin/merchants/' + m.code} onClick={(e) => { e.preventDefault(); e.stopPropagation(); nav('/admin/merchants/' + m.code); }}>{m.name}</a><span className="mcode">{m.code}{m.logins.length ? ' · ' + m.logins.join(', ') : ''}</span></div></div></td>
             <td><span className="pill">{T(m.tone)}</span></td><td className="num">{m.entries}</td>
+            <td>{(() => { const c = countryOf(m.country); return c ? <><span className="cc">{c.code}</span> {lang === 'zh' ? c.zh : c.name}<div className="mcode">{c.utc}</div></> : <span className="sub">{T('Not chosen')}</span>; })()}</td>
+            <td className="lgtags">{(m.languages ?? []).length && (m.languages ?? []).length < 6 ? (m.languages ?? []).map((l) => <span key={l}>{l.toUpperCase()}</span>) : <span className="sub">{T('All')}</span>}</td>
             <td><span className="tbar2"><i style={{ width: Math.round(((m.chatsToday ?? 0) * 100) / maxToday) + '%' }} /></span>{m.chatsToday ?? 0}</td>
             <td>{m.link?.hasKey ? <span className="pill ok">{T('Connected')}{m.link.lastUsedAt ? ' · ' + T('used {a}', { a: ago(m.link.lastUsedAt, T) }) : ' · ' + T('not used yet')}</span> : <><span className="pill warn">{T('No bot key yet')}</span> <span className="sub">· {T('Set up')} →</span></>}</td>
             <td className="num" onClick={(e) => e.stopPropagation()}><IconBtn tip={T('Open')} onClick={() => nav('/admin/merchants/' + m.code)}><path d="M5 12h14" /><path d="m13 6 6 6-6 6" /></IconBtn></td></tr>)}
-          {!merchants.length && <tr><td colSpan={6}><div className="kwempty"><b>{P.merchants.length ? T('No merchant matches “{q}”.', { q: mq.trim() }) : T('No merchants yet.')}</b><span>{T(P.merchants.length ? 'Check the spelling, or clear the search.' : 'Press “Add merchant” to create the first one.')}</span></div></td></tr>}</tbody></table></div>}
+          {!merchants.length && <tr><td colSpan={8}><div className="kwempty"><b>{P.merchants.length ? T('No merchant matches “{q}”.', { q: mq.trim() }) : T('No merchants yet.')}</b><span>{T(P.merchants.length ? 'Check the spelling, or clear the search.' : 'Press “Add merchant” to create the first one.')}</span></div></td></tr>}</tbody></table></div>}
       {view === 'logins' && <div className="card"><div className="head"><div><h2>{T('Logins')} <span className="cnt2">{P.users.length}</span></h2><div className="sub">{T('Staff can only see their own merchant. Admins see every merchant.')}</div></div><button className="btn pri" type="button" onClick={() => setDlg({ kind: 'user' })}>＋ {T('Add login')}</button></div>
         {P.users.length > 4 && <div className="pbar"><div className="segs" role="group" aria-label={T('Show logins')}>{([['all', 'All', P.users.length], ['admin', 'Admins', admins], ['staff', 'Staff', P.users.length - admins]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={role === k} onClick={() => setRole(k)}>{T(l)} <span className="n">{n}</span></button>)}</div></div>}
         <table className="ptable"><thead><tr><th>{T('Username')}</th><th>{T('Role')}</th><th>{T('Merchant')}</th><th></th></tr></thead><tbody>

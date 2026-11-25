@@ -2,21 +2,22 @@ import { useEffect, useRef, useState } from 'react';
 import { usePanel } from '../store';
 import { LANGS, LN, type Entry } from '../model';
 import { useT } from '../i18n';
+import { autoOn, needsTranslation, sourceLang, targetLangs, translateEntry } from '../autotr';
 
-type Tr = { question_examples: string[]; answer_text: string };
+type Tr = { question_examples: string[]; answer_text: string; ai?: boolean };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
 /** The languages that can be shown as columns. English is always there; Malay and Chinese start on. */
 const COLS = LANGS.filter((l) => l !== 'en');
 
 /** One cell: you type in it as long as you like, and the draft changes when you leave it (Tab, a click elsewhere, or Ctrl+Enter). Escape puts the old text back. */
-function Cell({ value, label, row, col, onCommit, invalid, placeholder }: { value: string; label: string; row: number; col: string; onCommit: (v: string) => void; invalid?: boolean; placeholder?: string }) {
+function Cell({ value, label, row, col, onCommit, invalid, placeholder, ai }: { value: string; label: string; row: number; col: string; onCommit: (v: string) => void; invalid?: boolean; placeholder?: string; ai?: boolean }) {
   const [text, setText] = useState(value);
   useEffect(() => { setText(value); }, [value]);                         // a change made elsewhere (the full editor, a bulk action) shows here
   const rows = Math.max(2, Math.min(9, text.split('\n').reduce((n, line) => n + Math.max(1, Math.ceil(line.length / 34)), 0)));
   const cancelled = useRef(false);                                        // Esc leaves the cell without saving what was typed
   const done = () => { if (cancelled.current) { cancelled.current = false; return; } if (text !== value) onCommit(text); };
   return (
-    <textarea className={'gcell' + (invalid ? ' bad' : '')} aria-label={label} aria-invalid={invalid || undefined} data-r={row} data-c={col} rows={rows} value={text} placeholder={placeholder}
+    <textarea className={'gcell' + (invalid ? ' bad' : '') + (ai ? ' ai' : '')} aria-label={label} aria-invalid={invalid || undefined} data-r={row} data-c={col} rows={rows} value={text} placeholder={placeholder}
       onChange={(e) => setText(e.target.value)} onBlur={done}
       onKeyDown={(e) => {
         if (e.key === 'Escape') { cancelled.current = true; setText(value); (e.target as HTMLTextAreaElement).blur(); }
@@ -32,7 +33,8 @@ function Cell({ value, label, row, col, onCommit, invalid, placeholder }: { valu
 export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: Entry) => void }) {
   const p = usePanel(); const { t: T, lang } = useT(); const zh = lang === 'zh';
   const [shown, setShown] = useState<Set<string>>(() => new Set(['ms', 'zh']));
-  const cols = ['en', ...COLS.filter((l) => shown.has(l))];
+  const src = sourceLang(p.M); const cols = [...new Set(['en', src, ...COLS.filter((l) => shown.has(l))])];
+  const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const mark = useRef<string>('');                                         // the entry last edited, for the "Saved to the draft" line
   const [saved, setSaved] = useState('');
 
@@ -44,8 +46,32 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
     });
     setSaved(mark.current);
   };
-  const setAnswer = (id: number, l: string, v: string) => change(id, (e) => { const t = e.translations as Record<string, Tr>; t[l] = { question_examples: t[l]?.question_examples ?? [], answer_text: v }; });
-  const setExamples = (id: number, v: string) => change(id, (e) => { const t = e.translations as Record<string, Tr>; const lines = [...new Set(v.split('\n').map((x) => x.trim()).filter(Boolean))].slice(0, 40); t.en = { question_examples: lines, answer_text: t.en?.answer_text ?? '' }; });
+  /** After the source text of an entry changed: the AI fills the empty languages and refreshes the ones it wrote before. A text a person wrote is never touched. */
+  const autoFill = async (id: number, patch: (e: Entry) => Entry) => {
+    if (!autoOn(p.M) || !p.ai.translate) return;
+    const cur = p.draft.kb.find((x) => x.id === id && x.merchant === p.merchant); if (!cur) return;
+    const e = patch(cur); const langs = needsTranslation(e, src, targetLangs(p.M), true); if (!langs.length) return;
+    setBusyIds((s) => new Set(s).add(id));
+    const { made, error } = await translateEntry(p.merchant, e, src, langs);
+    setBusyIds((s) => { const n = new Set(s); n.delete(id); return n; });
+    const ls = Object.keys(made);
+    if (ls.length) p.edit((d, note) => {
+      const x = d.kb.find((k) => k.id === id && k.merchant === p.merchant); if (!x) return;
+      const tr = x.translations as Record<string, Tr>; const put = ls.filter((l) => !(tr[l]?.answer_text ?? '').trim() || tr[l]?.ai);   // a person may have typed there meanwhile
+      put.forEach((l) => { tr[l] = made[l]; }); if (!put.length) return; x.dirty = true;
+      note(`Translated entry "${x.intent_key}" into ${put.map((l) => LN[l]).join(', ')} with AI (${p.M.name})`);
+    });
+    if (error) p.toast(error); else if (ls.length) p.toast(T('Translated into {l} (AI draft). Please check it.', { l: ls.map((l) => LN[l]).join(', ') }));
+  };
+  const setAnswer = (id: number, l: string, v: string) => {
+    change(id, (e) => { const t = e.translations as Record<string, Tr>; t[l] = { question_examples: t[l]?.question_examples ?? [], answer_text: v }; });      // a person typed it: no AI mark
+    if (l === src && v.trim()) void autoFill(id, (e) => ({ ...e, translations: { ...e.translations, [src]: { ...trOf(e, src), answer_text: v } } as Entry['translations'] }));
+  };
+  const setExamples = (id: number, v: string) => {
+    const lines = [...new Set(v.split('\n').map((x) => x.trim()).filter(Boolean))].slice(0, 40);
+    change(id, (e) => { const t = e.translations as Record<string, Tr>; t[src] = { question_examples: lines, answer_text: t[src]?.answer_text ?? '' }; });
+    void autoFill(id, (e) => ({ ...e, translations: { ...e.translations, [src]: { ...trOf(e, src), question_examples: lines } } as Entry['translations'] }));
+  };
   const setLive = (id: number, live: boolean) => change(id, (e) => { e.status = live ? 'live' : 'draft'; });
   const unwritten = list.filter((e) => /^\s*TO WRITE:/i.test(trOf(e, 'en').answer_text)).length;
 
@@ -63,8 +89,8 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
                 <tr key={e.id}>
                   <td className="gname"><button type="button" className="linklike" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><div className="sub">{e.topic || T('no topic')}</div></td>
                   <td className="glive"><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label></td>
-                  {cols.map((l) => <td key={l}><Cell value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === 'en' && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={T(l === 'en' ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} /></td>)}
-                  <td><Cell value={trOf(e, 'en').question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, 'en').question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
+                  {cols.map((l) => <td key={l}><Cell ai={!!trOf(e, l).ai} value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === 'en' && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={busyIds.has(e.id) && l !== src ? T('Translating…') : T(l === 'en' ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} />{trOf(e, l).ai && <span className="aibadge">{T('AI draft · check')}</span>}</td>)}
+                  <td><Cell value={trOf(e, src).question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, src).question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
                 </tr>);
             })}
             {!list.length && <tr><td colSpan={cols.length + 3} className="sub">{T('No entries match.')}</td></tr>}

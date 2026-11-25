@@ -95,9 +95,7 @@ function Form() {
           <div><label className="fld"><span>{T('Keep conversations for (days)')}</span><input type="number" min={0} max={3650} value={f.retention} placeholder="0" disabled={lock} onChange={(e) => setF({ ...f, retention: e.target.value })} /></label>
             <div className="sub" style={{ marginTop: 4 }}>{T('Chats older than this are deleted every day. Empty or 0 keeps them for ever. The Report only counts chats that are kept. The keyword counts are not changed.')}</div></div>
           <div className="full"><div className="fld"><span>{T('Languages the bot answers in')}</span></div>
-            <div className="segs pills" role="group" aria-label={T('Languages')}>{LANGS.map((l) => <button key={l} type="button" aria-pressed={f.languages.has(l)} disabled={lock || l === b.defaultLanguage} title={l === b.defaultLanguage ? T('The main language stays on') : ''}
-              onClick={() => setF((x) => { const n = new Set(x.languages); if (n.has(l)) n.delete(l); else n.add(l); return { ...x, languages: n }; })}>{T(LNAME[l] ?? l)}</button>)}</div>
-            <div className="sub" style={{ marginTop: 4 }}>{T("A customer writing in a language that is switched off gets this merchant's main language ({l}).", { l: T(LNAME[b.defaultLanguage] ?? b.defaultLanguage) })}</div></div>
+            <div className="sub">{T('The country, the languages and automatic translation are set in Knowledge base → Languages.')} <button className="btn sm" type="button" onClick={() => nav('/admin/kb', { state: { tab: 'languages' } })}>{T('Open Languages')}</button></div></div>
         </div></div>
       </> : <div className="card sub">{T('The basics could not be loaded.')}</div>)}
       {cur === 'replies' && <>
