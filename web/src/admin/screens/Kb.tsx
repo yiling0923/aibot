@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../../lib/api';
 import { usePanel } from '../store';
 import KbGrid from './KbGrid';
-import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, findDuplicateEntries, langState, slug, topicList, topicNames, type Entry } from '../model';
+import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 import { useT } from '../i18n';
 
@@ -48,8 +48,6 @@ export default function Kb() {
     p.edit((d, note) => { d.kb.forEach((e) => { if (ids.has(e.id) && e.merchant === p.merchant && e.status !== to) { e.status = to; e.dirty = true; } }); note(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} (${p.M.name})`); });
     setSel(new Set()); p.toast(t(n === 1 ? `Set 1 entry ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}` : `Set {n} entries ${to} in the draft. ${to === 'live' ? 'Press Publish to make them live for customers.' : 'Press Publish to take them off.'}`, { n }));
   };
-  const [dupOpen, setDupOpen] = useState(false);
-  const dups = dupOpen ? findDuplicateEntries(all) : [];
   const [ask, setAsk] = useState<{ e: Entry; to: 'live' | 'draft' } | null>(null);          // the on/off switch of one entry asks first
   const flipOne = () => {
     if (!ask) return; const { e, to } = ask; setAsk(null);
@@ -72,7 +70,6 @@ export default function Kb() {
     <>
       <div className="card"><div className="head"><div><h2>{t('Knowledge base')} · {p.M.name}</h2><div className="sub">{t('What the bot may answer for this merchant. Only live entries are used.')}</div></div>
         <span className="tools"><span className="segs viewsw" role="group" aria-label="View"><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table edit')}</button></span>
-        <button className="btn" type="button" title={t('Look for entries that say the same thing')} onClick={() => setDupOpen(true)}>{t('Find duplicates')}</button>
         <button className="btn pri" type="button" onClick={() => open(null)}>{t('Add entry')}</button></span></div>
         {miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
         <div className="filt-row" style={{ marginTop: 12 }}>
@@ -107,15 +104,6 @@ export default function Kb() {
         <div className="sub">{t('The change goes into the draft. Customers see it only after you press Publish.')}</div>
         <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>{t('Cancel')}</button><button className="btn pri" type="button" onClick={flipOne}>{t(ask.to === 'draft' ? 'Set to draft' : 'Set live')}</button></div></Modal>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
-      {dupOpen && <Modal label="Find duplicates" onClose={() => setDupOpen(false)}>
-        <h2>{t('Find duplicates')}</h2>
-        <div className="sub">{t('Entries that look like the same thing: the same answer, the same example question, or the same topic and question type. Nothing is changed until you choose.')}</div>
-        {!dups.length ? <div className="note" style={{ marginTop: 12 }}>{t('No duplicates found.')}</div> : <div className="duplist">{dups.map((d) => <div className="dup" key={d.a.id + '-' + d.b.id}>
-          <div className="dupreason">{d.reasons.map((r) => <Pill key={r} c="info">{t(r.replace(/^\d+ /, '{n} '), { n: r.match(/^\d+/)?.[0] ?? '' })}</Pill>)}</div>
-          <div className="duprow">{[d.a, d.b].map((e) => <div className="dupone" key={e.id}><b>{e.intent_key}</b> <span className="sub">{e.topic}</span> <Pill c={e.status === 'live' ? 'ok' : 'info'}>{t(e.status === 'live' ? 'Live' : 'Draft')}</Pill>
-            <div className="dupbtn"><button className="btn sm" type="button" onClick={() => { setDupOpen(false); open(e); }}>{t('Open')}</button>{e.status === 'live' && <button className="btn sm" type="button" onClick={() => setAsk({ e, to: 'draft' })}>{t('Set draft')}</button>}</div></div>)}</div>
-        </div>)}</div>}
-      </Modal>}
     </>
   );
 }

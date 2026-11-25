@@ -988,12 +988,6 @@ describe('Control panel', () => {
     expect((await screen.findByRole('region', { name: 'Selected entries' })).textContent).toMatch(/1 selected/);
     await userEvent.click(screen.getByRole('button', { name: 'Clear' })); expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();
   });
-  it('Knowledge base: Find duplicates lists entries with the same answer and says when there are none', async () => {
-    withKb = true; open('staff', '/admin/kb');
-    await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });
-    await userEvent.click(screen.getByRole('button', { name: 'Find duplicates' }));
-    expect(await screen.findByText('No duplicates found.')).toBeTruthy();
-  });
   it('Knowledge base table edit: change answers and example questions in place, set live, and see it in the list and in the Publish count', async () => {
     withKb = true; open('staff', '/admin/kb');
     await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });

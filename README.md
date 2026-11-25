@@ -342,10 +342,6 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 
 On **Keyword ranking**, the **Suggest topics** button looks at the new words nobody has decided on yet (the 15 most used). For each word it reads the customer messages the word was written in, and suggests the topic whose words sit in the same messages most often (for example *topup* next to *depo* → `deposit`). It does not guess when no topic shows up or two topics tie. You can untick a word or change its topic, then press **Add**: the words are added to the draft as keywords of that topic (publish to use them). No AI is used and nothing is saved before you press Add.
 
-## Find duplicates (Knowledge base)
-
-**Knowledge base → Find duplicates** looks at all entries of the merchant and lists pairs that look like the same thing: the **same answer** (or almost the same), the **same example question** (any language), or the **same topic and question type**. For each pair you can **Open** an entry or **Set draft** on a live one. Nothing is changed by the search itself, and nothing goes to customers until you publish.
-
 ## Table edit (Knowledge base)
 
 **Knowledge base → Table edit** shows the entries as a table you edit in place, one row per entry: a **Live** box, the **answer** in English, Malay and Chinese (the **VI / TH / TL** buttons add Vietnamese, Thai and Filipino columns) and the **English example questions**, one per line. It uses the same filters and search as the list (for example *Needs work*, or one topic), so you can show only the entries that still say `TO WRITE` and write them one after the other.
