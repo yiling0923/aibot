@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { api } from '../../lib/api';
-import { LANG_NAMES } from '../model';
+import { langOptions } from '../autotr';
 import { usePanel } from '../store';
 import type { RankData } from '../model';
 import { ChgPill, Medal, Pill, Spark } from '../ui';
@@ -51,7 +51,7 @@ export default function Ranking() {
         <div className="kwfilter">
           <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{T(l)} <span className="n">{counts[k]}</span></button>)}</div>
           <div className="filt"><input type="search" placeholder={T('Filter keywords')} aria-label={T('Filter keywords')} value={q} onChange={(e) => setQ(e.target.value)} />
-            <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">{T('All languages')}</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
+            <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">{T('All languages')}</option>{langOptions(p.M, (data?.rows ?? []).map((r) => r.lg)).map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
             <label className="tog" style={{ padding: 0 }}><input type="checkbox" checked={showEx} onChange={(e) => setShowEx(e.target.checked)} /> {T('Show excluded')}{p.ignored.size ? ' (' + p.ignored.size + ')' : ''}</label><span className="sub">{list.length} {T('shown')}</span>
 </div></div></div>
       <div className="kwstats"><span className="st"><b>{total.toLocaleString()}</b> {T('words written this week')}</span><span className="st"><b>{vis.length}</b> {T('different keywords')}</span>

@@ -4,6 +4,7 @@ import TopicFlow from './TopicFlow';
 import { Modal } from '../ui';
 import { useT } from '../i18n';
 import SuggestTopics from './SuggestTopics';
+import { langOptions, wordLang } from '../autotr';
 import { KW_PICK, LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, groupKeywords, guessLang, slug, topicNames } from '../model';
 
 const FOLD = 12;                                                              // words shown per group before "+N more"
@@ -163,7 +164,7 @@ export default function Topics() {
         {cur === 'short' && <div className="segs" role="group" aria-label="View">{([['flow', 'Flowchart'], ['list', 'List']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={view === k} className={view === k ? 'on' : ''} onClick={() => setView(k)}>{T(l)}</button>)}</div>}
         {(cur === 'small' || cur === 'filler' || cur === 'block') && <div className="segs" role="group" aria-label="View">{([[false, 'List'], [true, 'How it works']] as const).map(([k, l]) => <button key={l} type="button" aria-pressed={how === k} className={how === k ? 'on' : ''} onClick={() => setHow(k)}>{T(l)}</button>)}</div>}
         {!flow && !showHow && <div className="filt"><input type="search" placeholder={T('Filter words')} aria-label={T('Filter words')} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
-          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
+          <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...langOptions(p.M, [...Object.values(p.draft.aliases).flatMap((b) => Object.entries(b).filter(([, w]) => w.length).map(([l]) => l)), ...(p.draft.mAliases[p.merchant] ?? []).map((a) => a.language)])].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
           <span className="sub">{shown} {T('words shown')}</span></div>}
         {cur === 'short' && unset.length > 0 && <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} title={T('Look at the chats of the new words and suggest a topic for each')} onClick={() => setSug(true)}>{T('Suggest topics')} ({unset.length})</button>}
       </div>
@@ -208,7 +209,7 @@ function AddBox({ tab, dup, done }: { tab: string; dup: (v: string) => boolean; 
     const words = v('tp_w').split(',').map((x) => x.trim().toLowerCase()).filter(Boolean);
     if (shared) {                                                   // the template every merchant starts from (admin only)
       const byl: Record<string, string[]> = { ...emptyWords(), en: [n] };
-      words.forEach((w) => { const l = guessLang(w); if (!byl[l].includes(w)) byl[l].push(w); });
+      words.forEach((w) => { const l = wordLang(w, p.M); if (!byl[l].includes(w)) byl[l].push(w); });
       p.edit((x, note) => { x.aliases[n] = byl; note('Added topic "' + n + '" (all merchants)'); });
       done(T('Topic "{n}" created for all merchants. You can now assign it to entries.', { n }), T('topic') + ': ' + n + ' · ' + T('all merchants'));
     } else {                                                        // the usual case: the merchant owns its topic

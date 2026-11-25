@@ -408,10 +408,16 @@ describe('Control panel', () => {
     expect(screen.queryByRole('button', { name: 'Usage & billing' })).toBeNull();                 // not in the menu either
   });
 
-  it('offers Vietnamese, Thai and Filipino next to English, Malay and Chinese', async () => {
+  it('the language filter offers the languages of the merchant (main first), and any other language that has words', async () => {
     open('admin', '/admin/kw');
     const pick = ((await screen.findAllByLabelText('Language')) as HTMLSelectElement[]).find((x) => [...x.options].some((o) => o.textContent === 'All languages'))!;
-    expect([...pick.options].map((o) => o.textContent)).toEqual(['All languages', 'English', 'Malay', 'Chinese', 'Vietnamese', 'Thai', 'Filipino']);
+    expect([...pick.options].map((o) => o.textContent)).toEqual(['All languages', 'English', 'Malay', 'Chinese']);       // a merchant that never chose: English, Malay, Chinese
+    cleanup(); langsA = 'en,vi,th,tl'; defA = 'vi';
+    try {
+      open('admin', '/admin/kw');
+      const p2 = ((await screen.findAllByLabelText('Language')) as HTMLSelectElement[]).find((x) => [...x.options].some((o) => o.textContent === 'All languages'))!;
+      expect([...p2.options].map((o) => o.textContent).slice(0, 5)).toEqual(['All languages', 'Vietnamese', 'English', 'Thai', 'Filipino']);   // the main language first
+    } finally { langsA = null; defA = undefined; }
   });
   it('lets a new merchant use Vietnamese, Thai or Filipino as its main language', async () => {
     open('admin', '/admin/users');

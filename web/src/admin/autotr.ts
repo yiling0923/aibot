@@ -1,5 +1,5 @@
 import { api } from '../lib/api';
-import { LANGS, type Entry, type MerchantRowAdmin } from './model';
+import { LANGS, LANG_NAMES, guessLang, type Entry, type MerchantRowAdmin } from './model';
 
 export type Tr = { question_examples: string[]; answer_text: string; ai?: boolean };
 const trOf = (e: { translations: unknown }, l: string): Tr => ((e.translations as Record<string, Tr>)[l]) || { question_examples: [], answer_text: '' };
@@ -35,3 +35,11 @@ export async function translateEntry(merchant: string, e: Entry, src: string, la
   // keep the order of the languages the caller asked for
   return { made: Object.fromEntries(langs.filter((l) => made[l]).map((l) => [l, made[l]])), error };
 }
+
+/** The languages a language filter offers for a merchant: its own languages (main first), and any other language that has words on the page. */
+export const langOptions = (M: MerchantRowAdmin | undefined, present: Iterable<string> = []): [string, string][] => {
+  const own = [sourceLang(M), ...targetLangs(M)]; const extra = [...new Set(present)].filter((l) => !own.includes(l) && (LANGS as readonly string[]).includes(l));
+  return [...own, ...extra].map((l) => [l, LANG_NAMES.find(([k]) => k === l)?.[1] ?? l] as [string, string]);
+};
+/** The language of a new word: the letters decide (Chinese, Thai, accents); a plain Latin word (depo, wd) gets the merchant's main language when that is also written in plain Latin. */
+export const wordLang = (w: string, M?: MerchantRowAdmin): string => { const g = guessLang(w); const src = sourceLang(M); return g === 'en' && ['en', 'ms', 'tl'].includes(src) ? src : g; };

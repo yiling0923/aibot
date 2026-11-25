@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, type DragEvent, type PointerEvent as RPointerEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { usePanel } from '../store';
-import { addOwnTopic, findDup, guessLang, slug, topicNames, type Entry } from '../model';
+import { addOwnTopic, findDup, slug, topicNames, type Entry } from '../model';
+import { wordLang } from '../autotr';
 import { useAssign } from './assign';
 import { useT } from '../i18n';
 
@@ -91,7 +92,7 @@ export default function TopicFlow() {
   const addKeyword = (t: string, text: string) => {
     const w = text.trim().toLowerCase(); if (!w) return false;
     const dup = findDup(d, p.merchant, p.M.name, w); if (dup.length) { p.toast(T('"{v}" is already {w}. Nothing was added.', { v: w, w: dup[0] })); return false; }
-    p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: guessLang(w), variant: w, canonical: t }); note('Added keyword "' + w + '" to topic "' + t + '" (' + p.M.name + ')'); });
+    p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: wordLang(w, p.M), variant: w, canonical: t }); note('Added keyword "' + w + '" to topic "' + t + '" (' + p.M.name + ')'); });
     p.toast(T('"{w}" now means {t}', { w, t })); return true;
   };
   const createTopic = (id: number) => {
@@ -104,7 +105,7 @@ export default function TopicFlow() {
   const connectPending = (b: Pending, topic: string) => {
     const w = b.text.trim().toLowerCase(); if (!w) return p.toast(T('Type the keyword first'));
     const dup = findDup(d, p.merchant, p.M.name, w); if (dup.length) return p.toast(T('"{v}" is already {w}. Nothing was added.', { v: w, w: dup[0] }));
-    p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: guessLang(w), variant: w, canonical: topic }); note('Added keyword "' + w + '" to topic "' + topic + '" (' + p.M.name + ')'); });
+    p.edit((x, note) => { (x.mAliases[p.merchant] = x.mAliases[p.merchant] || []).push({ language: wordLang(w, p.M), variant: w, canonical: topic }); note('Added keyword "' + w + '" to topic "' + topic + '" (' + p.M.name + ')'); });
     setPend((l) => l.filter((x) => x.id !== b.id)); p.toast(T('"{w}" now means {t}', { w, t: topic }));
   };
   const trash = <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M3 6h18" /><path d="M8 6V4h8v2" /><path d="M6 6l1 14h10l1-14" /><path d="M10 11v6M14 11v6" /></svg>;

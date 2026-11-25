@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from 'react';
+import { langOptions } from '../autotr';
 import { KW_KINDS, KW_LABEL, LANG_NAMES, LN, groupKeywords, topicNames, wordTopic, type KwKind } from '../model';
 import { usePanel } from '../store';
 import { Pill } from '../ui';
@@ -67,7 +68,7 @@ export default function Keywords() {
       <div className="card kwbar2">
         <div className="segs" role="group" aria-label="Show">{TABS.map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{T(l)} <span className="n">{counts[k]}</span></button>)}</div>
         <input type="search" placeholder={T('Search a word')} aria-label={T('Filter keywords')} value={q} onChange={(e) => setQ(e.target.value)} />
-        <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">{T('All languages')}</option>{LANG_NAMES.map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
+        <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}><option value="all">{T('All languages')}</option>{langOptions(p.M, p.kw.map((k) => k.lg)).map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
         <label className="switch"><input type="checkbox" role="switch" checked={showAll} onChange={(e) => setShowAll(e.target.checked)} /><span className="track"><span className="thumb" /></span> {T('Show words nobody typed')}</label>
         <span className="sub">{list.length} {T('shown')}</span>
       </div>
