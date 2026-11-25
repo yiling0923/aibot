@@ -12,7 +12,7 @@ import { useT } from '../i18n';
 
 type Tr = { question_examples: string[]; answer_text: string; ai?: boolean };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
-const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: {} });
+const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'live', category: 'General', translations: {} });
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
 /** What a guided answer can ask the customer for after the answer. */
 const STEP_KINDS: [string, string][] = [['receipt', 'A receipt picture'], ['amount', 'An amount'], ['username', 'The username'], ['phone', 'A phone number'], ['text', 'A short reply']];
@@ -45,16 +45,15 @@ export default function Kb() {
   const toggle = (id: number) => setSel((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   /** A draft the bot could use if it were live: it has an answer and at least 3 example questions (no "TO WRITE", no other problem). */
   const readyDrafts = all.filter((e) => e.status === 'draft' && entryProblems({ ...e, status: 'live' }).length === 0);
-  const setStatusOf = (ids: Set<number>, to: 'live' | 'draft') => {
-    const n = all.filter((e) => ids.has(e.id) && e.status !== to).length; if (!n) return p.toast(t('Nothing to change: they are already ' + to));
+  /** Turns entries live or off and publishes at once: the switch needs no Publish button. (Everything else waiting in the draft is published with it.) */
+  const setStatusOf = async (ids: Set<number>, to: 'live' | 'draft') => {
+    const chosen = all.filter((e) => ids.has(e.id) && e.status !== to); const n = chosen.length; if (!n) return p.toast(t('Nothing to change: they are already ' + to));
     p.edit((d, note) => { d.kb.forEach((e) => { if (ids.has(e.id) && e.merchant === p.merchant && e.status !== to) { e.status = to; e.dirty = true; } }); note(`Set ${n} entr${n === 1 ? 'y' : 'ies'} ${to} (${p.M.name})`); });
-    setSel(new Set()); p.toast(t(n === 1 ? `Set 1 entry ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}` : `Set {n} entries ${to} in the draft. ${to === 'live' ? 'Press Publish to make them live for customers.' : 'Press Publish to take them off.'}`, { n }));
-  };
-  const [ask, setAsk] = useState<{ e: Entry; to: 'live' | 'draft' } | null>(null);          // the on/off switch of one entry asks first
-  const flipOne = () => {
-    if (!ask) return; const { e, to } = ask; setAsk(null);
-    p.edit((d, note) => { const x = d.kb.find((k) => k.id === e.id && k.merchant === p.merchant); if (x && x.status !== to) { x.status = to; x.dirty = true; note(`Set "${e.intent_key}" ${to} (${p.M.name})`); } });
-    p.toast(t(`“{k}” is ${to} in the draft. ${to === 'live' ? 'Press Publish to make it live for customers.' : 'Press Publish to take it off.'}`, { k: e.intent_key }));
+    setSel(new Set());
+    try {
+      await p.publishNow();
+      p.toast(n === 1 ? t(to === 'live' ? 'Live now: “{k}”' : 'Switched off: “{k}”', { k: chosen[0].intent_key }) : t(to === 'live' ? 'Live now: {n} entries' : 'Switched off: {n} entries', { n }));
+    } catch (e) { p.toast(t('Could not publish: {e}', { e: (e as Error).message })); }
   };
   const deleteSel = () => {
     if (!picked.length || !window.confirm(t(picked.length === 1 ? 'Delete 1 entry? You can still go back by not publishing, or from History.' : 'Delete {n} entries? You can still go back by not publishing, or from History.', { n: picked.length }))) return;
@@ -96,17 +95,11 @@ export default function Kb() {
             <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${t(s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty')}`}>{LN[l]}</span>; })}</div></td>
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={t(n < 3 ? 'Add at least 3 example questions' : 'Example questions in English')}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
-            <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={t(e.status === 'live' ? 'Live: the bot uses this answer. Switch off to make it a draft.' : 'Draft: the bot ignores this answer. Switch on to make it live.')}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => setAsk({ e, to: e.status === 'live' ? 'draft' : 'live' })} /><span className="track"><span className="thumb" /></span><span className="kbswt">{t(e.status === 'live' ? 'Live' : 'Draft')}</span></label>{e.steps?.length ? <> <Pill c="info">{t('asks')} {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{t(e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion')}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{t(e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended' : 'until')} {e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">{t('edited')}</Pill></> : null}</div></td>
+            <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={t(e.status === 'live' ? 'Live: the bot uses this answer. Switch it off and the bot stops using it at once.' : 'Off: the bot ignores this answer. Switch it on and the bot uses it at once.')}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => void setStatusOf(new Set([e.id]), e.status === 'live' ? 'draft' : 'live')} /><span className="track"><span className="thumb" /></span><span className="kbswt">{t(e.status === 'live' ? 'Live' : 'Draft')}</span></label>{e.steps?.length ? <> <Pill c="info">{t('asks')} {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{t(e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion')}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{t(e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended' : 'until')} {e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">{t('edited')}</Pill></> : null}</div></td>
           </tr>
         ))}
         {!list.length && <tr><td colSpan={7} className="sub">{t('No entries match.')}</td></tr>}
       </tbody></table></div>}
-      {ask && <Modal label={t('Change the status')} small onClose={() => setAsk(null)}>
-        <div className="head"><h2>{t(ask.to === 'draft' ? 'Set “{k}” to draft?' : 'Set “{k}” live?', { k: ask.e.intent_key })}</h2></div>
-        <p style={{ margin: '8px 0' }}>{t(ask.to === 'draft' ? 'The bot will ignore this answer after you publish. Questions about it will not get this answer.' : 'The bot will start using this answer after you publish.')}</p>
-        {ask.to === 'live' && entryProblems({ ...ask.e, status: 'live' }).length > 0 && <div className="note" style={{ background: 'var(--warnbg)' }}><b>{t('It is not ready yet:')}</b><ul className="plain">{entryProblems({ ...ask.e, status: 'live' }).map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div>}
-        <div className="sub">{t('The change goes into the draft. Customers see it only after you press Publish.')}</div>
-        <div className="tools" style={{ marginTop: 12, justifyContent: 'flex-end' }}><button className="btn" type="button" onClick={() => setAsk(null)}>{t('Cancel')}</button><button className="btn pri" type="button" onClick={flipOne}>{t(ask.to === 'draft' ? 'Set to draft' : 'Set live')}</button></div></Modal>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
       {trAll && <TranslateAll onClose={() => setTrAll(false)} />}
     </>
@@ -141,9 +134,8 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
     set({ sug: { ...ed.sug, [ed.tab]: out } });
   };
 
-  const nav = useNavigate();
   /** Saves the entry to the draft. With `thenPublish` the Publish window opens next (only when the entry saved), so changing one answer is: type, Save and publish. */
-  const save = async (thenPublish = false) => {
+  const save = async () => {
     if (!ed.intent_key.trim()) return p.toast(t('Give the entry a name first'));
     if (!trOf(ed, src).answer_text.trim()) return p.toast(t('Add the answer first: it is the one the other languages are made from.'));
     let topic = ed.topic; let newTopic = '';
@@ -166,9 +158,12 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       if (ed.id) { const i = d.kb.findIndex((e) => e.id === ed.id); d.kb[i] = { ...d.kb[i], ...clean, dirty: true }; note('Edited entry "' + clean.intent_key + '" (' + p.M.name + ')'); if (made.length) note('Translated entry "' + clean.intent_key + '" into ' + made.map((l) => LN[l]).join(', ') + ' with AI (' + p.M.name + ')'); }
       else { d.kb.push({ ...clean, id: Math.max(0, ...d.kb.map((e) => e.id)) + 1, dirty: true }); note('Added entry "' + clean.intent_key + '" (' + p.M.name + ')'); if (made.length) note('Translated entry "' + clean.intent_key + '" into ' + made.map((l) => LN[l]).join(', ') + ' with AI (' + p.M.name + ')'); }
     });
-    onClose(); if (thenPublish) nav('/admin/kb', { state: { publish: true } });
+    onClose();
+    let published = true, perr = '';
+    try { await p.publishNow(); } catch (e) { published = false; perr = (e as Error).message; }
     const left = entryProblems(clean);
-    p.toast(terr ? t('Saved to draft. Translation: ') + terr : made.length ? t('Saved, and translated into {l} (AI draft). Please check it, then publish.', { l: made.map((l) => LN[l]).join(', ') }) : left.length ? t('Saved to draft, but the bot cannot use it yet: ') + tProblem(t, left[0]) : t('Saved to draft. Press Publish to make it live.'));
+    const tail = terr ? ' ' + t('Translation: ') + terr : made.length ? ' ' + t('Translated into {l} (AI draft). Please check it.', { l: made.map((l) => LN[l]).join(', ') }) : '';
+    p.toast(!published ? t('Saved, but it could not be published: {e}', { e: perr }) : left.length ? t('Saved, but the bot cannot use it yet: ') + tProblem(t, left[0]) + tail : (clean.status === 'live' ? t('Saved and live.') : t('Saved as a draft: the bot ignores it.')) + tail);
   };
   const del = () => {
     p.edit((d, note) => { d.kb = d.kb.filter((e) => e.id !== ed.id); note('Deleted entry "' + ed.intent_key + '" (' + p.M.name + ')'); });
@@ -219,7 +214,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
       <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
       </details>
       {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>{t('Before the bot can use this answer:')}</b><ul className="plain">{pr.map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>{t('✓ Ready: Live, with an answer and example questions. Save it, then Publish.')}</div>; })()}
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className={'btn' + (ed.status === 'live' ? '' : ' pri')} type="button" disabled={saving} onClick={() => void save(false)}>{t(saving ? 'Translating…' : 'Save to draft')}</button>{ed.status === 'live' && <button className="btn pri" type="button" disabled={saving} onClick={() => void save(true)}>{t('Save and publish')}</button>}</span></div>
+      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saving makes the change live for customers.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn pri" type="button" disabled={saving} onClick={() => void save()}>{t(saving ? 'Translating…' : 'Save')}</button></span></div>
     </Modal>
   );
 }

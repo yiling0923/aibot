@@ -69,7 +69,12 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
     change(id, (e) => { const t = e.translations as Record<string, Tr>; t[src] = { question_examples: lines, answer_text: t[src]?.answer_text ?? '' }; });
     void autoFill(id, (e) => ({ ...e, translations: { ...e.translations, [src]: { ...trOf(e, src), question_examples: lines } } as Entry['translations'] }));
   };
-  const setLive = (id: number, live: boolean) => change(id, (e) => { e.status = live ? 'live' : 'draft'; });
+  /** The Live switch applies at once: no Publish button needed. */
+  const setLive = async (id: number, live: boolean) => {
+    const key = list.find((x) => x.id === id)?.intent_key ?? '';
+    change(id, (e) => { e.status = live ? 'live' : 'draft'; });
+    try { await p.publishNow(); p.toast(T(live ? 'Live now: “{k}”' : 'Switched off: “{k}”', { k: key })); } catch (e) { p.toast(T('Could not publish: {e}', { e: (e as Error).message })); }
+  };
   const unwritten = list.filter((e) => /^\s*TO WRITE:/i.test(trOf(e, 'en').answer_text)).length;
 
   return (

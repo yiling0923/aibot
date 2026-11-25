@@ -19,6 +19,8 @@ export interface Panel {
   status: (w: string) => Status; typeOf: (w: string) => string;
   tests: TestResult[]; testsRun: boolean; runTests: () => Promise<{ pass: number; total: number; results: TestResult[] }>;
   reloadAll: () => Promise<void>;
+  /** Publishes everything waiting in the draft at once, without the Publish window (used by Save and by the Live switch). Resolves with a short text for a toast; throws when the server refuses. */
+  publishNow: () => Promise<string>;
   /** Reads the merchant list again (for example after the bot mode changed) without touching the draft. */
   refreshMerchants: () => Promise<void>;
   toast: (text: string) => void;
@@ -96,6 +98,15 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
   const ignoreWord = (w: string) => { setIgnored((s) => new Set(s).add(w)); api('/api/admin/keywords/ignore', { merchant, words: [w], ignored: true }).catch(() => onToast('Could not save that')); };
   const unignoreWord = (w: string) => { setIgnored((s) => { const n = new Set(s); n.delete(w); return n; }); api('/api/admin/keywords/ignore', { merchant, words: [w], ignored: false }).catch(() => onToast('Could not save that')); };
 
+  const merchantRef = useRef(merchant); merchantRef.current = merchant;
+  const publishNow = useCallback(async (): Promise<string> => {
+    const { draft: d, changes: c } = latest.current; if (!d) return '';
+    const r = await api<{ published: { scope: string; code?: string; ver: number }[] }>('/api/admin/publish', { snapshot: snapshotOf(d), changes: c });
+    clearSaved(); await load({ merchant: merchantRef.current });
+    return r.published.length ? r.published.map((x) => (x.scope === 'shared' ? 'shared words' : x.code) + ' v' + x.ver).join(', ') : '';
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const runTests = useCallback(async () => {
     if (!draft) return { pass: 0, total: 0, results: [] };
     const r = await api<{ results: TestResult[]; pass: number; total: number }>('/api/admin/tests', { snapshot: snapshotOf(draft), includeDrafts: false });
@@ -112,7 +123,7 @@ export function PanelProvider({ children, onToast }: { children: ReactNode; onTo
       discard: () => { if (confirm('Throw away all unpublished changes?')) { clearSaved(); load({ merchant }).catch((e: Error) => onToast(e.message)); } },
       kw, kwMap, ignored, reloadKeywords: () => loadKeywordsFor(merchant), ignoreWord, unignoreWord, 
       status: (w) => kwStatus(draft, merchant, w), typeOf: (w) => classify(draft, merchant, kwMap, w),
-      tests, testsRun, runTests, reloadAll: async () => { clearSaved(); await load({ merchant }); },
+      tests, testsRun, runTests, publishNow, reloadAll: async () => { clearSaved(); await load({ merchant }); },
       refreshMerchants: async () => { const st = await api<ServerState>('/api/admin/state'); setSrv((o) => (o ? { ...o, merchants: st.merchants } : o)); }, toast: onToast,
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

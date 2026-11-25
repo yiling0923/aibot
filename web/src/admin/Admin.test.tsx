@@ -76,6 +76,7 @@ const open = (role: 'admin' | 'staff', route = '/admin/kw', translate = true) =>
     : url.startsWith('/api/admin/learning') ? LEARN()
     : /\/merchants\/[^/]+\/mode/.test(url) ? ((botMode = JSON.parse(String(init?.body)).mode), { ok: true })
     : url.startsWith('/api/admin/report') ? REPORT
+    : url.startsWith('/api/admin/publish') ? { published: [{ scope: 'merchant', code: 'A', ver: 4 }] }
     : url.startsWith('/api/admin/translate') ? { answer: 'Translated answer', examples: ['translated question'] }
     : url.startsWith('/api/admin/ranking') ? RANKING
     : url.startsWith('/api/admin/keywords?') ? [{ w: 'dep', lg: 'en', n: 5, ignored: false, h: '' }, { w: 'deposit', lg: 'en', n: 9, ignored: false, h: '' }, { w: '充值', lg: 'zh', n: 2, ignored: false, h: '' }, { w: 'xyzzy', lg: 'en', n: 3, ignored: false, h: '' }]
@@ -127,14 +128,8 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'wallet_deposit');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
-    expect(await screen.findByText(/translated into MS, ZH \(AI draft\)/)).toBeTruthy();
-    await userEvent.click(await screen.findByText('wallet_deposit'));                                        // open the entry again
-    await userEvent.click(await screen.findByRole('tab', { name: /^MS/ }));
-    expect((document.querySelector('.pane textarea') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');
-    expect(screen.getByText('AI draft · check')).toBeTruthy();
-    await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, '!');              // a person edits it: the mark goes away
-    expect(screen.queryByText('AI draft · check')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/Translated into MS, ZH \(AI draft\)/)).toBeTruthy();
   });
   it('automatic translation does nothing when the switch is off or the AI is off', async () => {
     open('admin', '/admin/kb');                                                                               // the switch is off in this test
@@ -142,15 +137,15 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'plain_one');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
-    expect(await screen.findByText(/Saved to draft/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/^Saved/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
     cleanup(); autoTr = true; open('admin', '/admin/kb', false);                                              // the switch is on, the AI is off
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'plain_two');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
-    expect(await screen.findByText(/Saved to draft/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/^Saved/)).toBeTruthy(); expect(screen.queryByText(/AI draft/)).toBeNull();
   });
   it('a merchant that switched a language off gets no translation into it', async () => {
     autoTr = true; langsA = 'en,ms,vi,th';
@@ -160,8 +155,8 @@ describe('Control panel', () => {
       await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'lang_check');
       await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'Go to Wallet > Deposit.');
       await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-      await userEvent.click(screen.getByRole('button', { name: 'Save to draft' }));
-      expect(await screen.findByText(/translated into MS, VI, TH \(AI draft\)/)).toBeTruthy();             // not Chinese: this merchant switched it off
+      await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+      expect(await screen.findByText(/Translated into MS, VI, TH \(AI draft\)/)).toBeTruthy();             // not Chinese: this merchant switched it off
     } finally { langsA = null; }
   });
   it('Knowledge base → Languages tab: country, timezone and the switch (admin), and Translate all with a count first', async () => {
@@ -224,21 +219,19 @@ describe('Control panel', () => {
     expect(await screen.findByText('AI suggestions · need your approval')).toBeTruthy();                    // the old simple variations
     expect(screen.getByText('daily limit pls')).toBeTruthy();
   });
-  it('Entry editor: a new entry starts as a draft (no Save and publish); set it Live and Save and publish saves it and opens the Publish window, and does nothing when a field is missing', async () => {
+  it('Entry editor: a new entry starts Live, and Save publishes at once (no Publish window), and does nothing when a field is missing', async () => {
     open('admin', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
-    expect((screen.getByLabelText(/^Status/) as HTMLSelectElement).value).toBe('draft');                          // not live first
-    expect(screen.queryByRole('button', { name: 'Save and publish' })).toBeNull();                                 // a draft is not published
-    await userEvent.selectOptions(screen.getByLabelText(/^Status/), 'live');
-    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
-    expect(await screen.findByText('Give the entry a name first')).toBeTruthy();                                // not saved, so no Publish window
-    expect(screen.queryByRole('dialog', { name: 'Publish' })).toBeNull();
+    expect((screen.getByLabelText(/^Status/) as HTMLSelectElement).value).toBe('live');                            // live first
+    expect(screen.queryByRole('button', { name: 'Save and publish' })).toBeNull(); expect(screen.queryByRole('button', { name: 'Save to draft' })).toBeNull();   // one button: Save
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText('Give the entry a name first')).toBeTruthy();                                // not saved
     await userEvent.type(screen.getByPlaceholderText('e.g. daily_withdraw_limit'), 'daily_limit');
     await userEvent.type(document.querySelector('.pane textarea') as HTMLTextAreaElement, 'You can withdraw up to MYR 50,000 a day.');
     await userEvent.selectOptions(screen.getByLabelText(/Topic \(required\)/), 'deposit');
-    await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
-    expect(await screen.findByRole('dialog', { name: 'Publish' })).toBeTruthy();                                // saved, and the Publish window follows
-    await userEvent.click(screen.getByRole('button', { name: /Close|Cancel/ }));
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(await screen.findByText(/Saved, but the bot cannot use it yet|Saved and live/)).toBeTruthy();         // saved and published, the answer needs example questions to be found
+    expect(screen.queryByRole('dialog', { name: 'Publish' })).toBeNull();                                       // no Publish window
   });
   it('Learning: the AI drafts an answer from the staff replies, a person edits it, and it is added as a draft entry', async () => {
     botMode = 'listening'; withKb = true;
@@ -842,7 +835,7 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByRole('button', { name: '添加条目' }));
     expect(await screen.findByRole('heading', { name: '新条目' })).toBeTruthy();
     expect(screen.getByText('条目名称')).toBeTruthy(); expect(screen.getByText('主题（必填）')).toBeTruthy(); expect(screen.getByText('机器人用每种语言说什么')).toBeTruthy();
-    expect(screen.getByRole('button', { name: '保存到草稿' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
+    expect(screen.getByRole('button', { name: '保存' })).toBeTruthy(); expect(screen.getByText('还没有答案文字。')).toBeTruthy();
     localStorage.removeItem('panelLang');
   });
   it('Chinese: the Import page is translated, also the check messages', async () => {
@@ -947,24 +940,14 @@ describe('Control panel', () => {
     expect(screen.getByRole('button', { name: 'Download example file' })).toBeTruthy();
     expect(screen.getByText(/Customers see the answers only after this/)).toBeTruthy(); expect(document.querySelectorAll('.gd-list li').length).toBe(5);
   });
-  it('Knowledge base: an on/off switch makes one entry live or draft, after a confirmation, and Cancel changes nothing', async () => {
+  it('Knowledge base: the Live switch applies at once: no question, no Publish button', async () => {
     withKb = true;
     open('staff', '/admin/kb');
     const sw = (await screen.findAllByRole('switch', { name: /^Live / }))[0] as HTMLInputElement;
     expect(sw.checked).toBe(true);
     await userEvent.click(sw);
-    const dlg = await screen.findByRole('dialog', { name: 'Change the status' });
-    expect(screen.queryByText('Edit entry')).toBeNull();                                               // the switch does not also open the entry
-    expect(within(dlg).getByRole('heading').textContent).toMatch(/to draft\?/); expect(dlg.textContent).toMatch(/ignore this answer after you publish/);
-    await userEvent.click(within(dlg).getByRole('button', { name: 'Cancel' }));
-    expect(screen.queryByRole('dialog', { name: 'Change the status' })).toBeNull(); expect((screen.getAllByRole('switch', { name: /^Live / })[0] as HTMLInputElement).checked).toBe(true);   // nothing changed
-    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).not.toMatch(/\d/);
-    await userEvent.click(screen.getAllByRole('switch', { name: /^Live / })[0]);
-    await userEvent.click(within(await screen.findByRole('dialog', { name: 'Change the status' })).getByRole('button', { name: 'Set to draft' }));
-    expect((screen.getAllByRole('switch', { name: /^Live / })[0] as HTMLInputElement).checked).toBe(false);
-    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                 // one change to publish
-    await userEvent.click(screen.getAllByRole('switch', { name: /^Live / })[0]);
-    expect((await screen.findByRole('dialog', { name: 'Change the status' })).textContent).toMatch(/start using this answer/);
+    expect(await screen.findByText(/Switched off: “dep_how”/)).toBeTruthy();                           // it was published straight away
+    expect(screen.queryByRole('dialog')).toBeNull(); expect(screen.queryByText('Edit entry')).toBeNull();   // no question, and the switch does not open the entry
   });
   it('lets an admin remove a shared keyword from the card', async () => {
     open('admin', '/admin/kw');
@@ -1040,13 +1023,12 @@ describe('Control panel', () => {
     const bar = await screen.findByRole('region', { name: 'Selected entries' });
     const total = Number(/(\d+) selected/.exec(bar.textContent ?? '')?.[1]); expect(total).toBe(4);
     await userEvent.click(within(bar).getByRole('button', { name: 'Set draft' }));
+    expect(await screen.findByText('Switched off: 2 entries')).toBeTruthy();                            // the two live ones were switched off and published at once
     expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();                       // the selection is cleared after the action
-    expect(screen.getByRole('button', { name: new RegExp('^Draft ' + total) })).toBeTruthy();            // all of them are drafts now
     const ready = await screen.findByRole('button', { name: /Set \d+ ready drafts? live/ });             // one button for the drafts the bot could use
-    const n = Number(/Set (\d+) ready/.exec(ready.textContent ?? '')?.[1]); expect(n).toBe(3);                                                                                // the one that still says TO WRITE is not offered
+    expect(ready.textContent).toMatch(/Set 1 ready draft live/);                                         // the one that still says TO WRITE is not offered
     await userEvent.click(ready);
-    expect(screen.getByRole('button', { name: /^Live 3$/ })).toBeTruthy(); expect(screen.getByRole('button', { name: /^Draft 1$/ })).toBeTruthy();   // dep_bonus stays a draft
-    expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/2/);                    // two changes to publish, not one per entry
+    expect(await screen.findByText(/Live now: “dep_limit”/)).toBeTruthy();
     await userEvent.click(screen.getAllByRole('checkbox', { name: /^Select (?!all)/ })[0]);
     expect((await screen.findByRole('region', { name: 'Selected entries' })).textContent).toMatch(/1 selected/);
     await userEvent.click(screen.getByRole('button', { name: 'Clear' })); expect(screen.queryByRole('region', { name: 'Selected entries' })).toBeNull();
@@ -1072,12 +1054,13 @@ describe('Control panel', () => {
     await userEvent.type(within(grid).getByLabelText('Answer MS for dep_limit'), 'RM50 hingga RM50,000.'); await userEvent.tab();
     const ex = within(grid).getByLabelText('Example questions for dep_limit') as HTMLTextAreaElement;
     await userEvent.clear(ex); await userEvent.type(ex, 'max deposit{enter}min deposit{enter}{enter}deposit limit{enter}max deposit'); await userEvent.tab();   // empty lines and a repeated one are dropped
-    await userEvent.click(within(grid).getByRole('switch', { name: 'Live dep_limit' }));
     expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                    // one entry changed, however many cells
     await userEvent.click(screen.getByRole('button', { name: 'List' }));
     const row = (await screen.findByText('dep_limit')).closest('tr')!;
-    expect(row.textContent).toContain('RM50 to RM50,000.'); expect(row.textContent).toMatch(/live/i);
+    expect(row.textContent).toContain('RM50 to RM50,000.');
     expect(row.querySelector('td.num')!.textContent).toBe('3');                                          // three different example questions
+    await userEvent.click(within(row).getByRole('switch', { name: 'Live dep_limit' }));                  // the Live switch publishes at once, with no Publish button
+    expect(await screen.findByText(/Live now|Switched off/)).toBeTruthy();
   });
   it('Knowledge base table edit: Esc puts the old text back, Ctrl+Enter saves and moves down, and the columns are the languages of the merchant', async () => {
     withKb = true; open('staff', '/admin/kb');
