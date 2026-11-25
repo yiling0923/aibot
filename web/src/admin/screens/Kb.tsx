@@ -9,7 +9,7 @@ import { useT } from '../i18n';
 
 type Tr = { question_examples: string[]; answer_text: string };
 type Ed = Entry & { useAspect: boolean; tab: string; sug: Record<string, string[]>; newTopic: string; newTopicW: string; newEx: string };
-const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'live', category: 'General', translations: {} });
+const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', topic: '', aspect: null, topic_optional: false, status: 'draft', category: 'General', translations: {} });
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
 /** What a guided answer can ask the customer for after the answer. */
 const STEP_KINDS: [string, string][] = [['receipt', 'A receipt picture'], ['amount', 'An amount'], ['username', 'The username'], ['phone', 'A phone number'], ['text', 'A short reply']];
@@ -240,7 +240,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
         </div>))}
       <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
       {(() => { const pr = entryProblems(ed); return pr.length ? <div className="note" role="status" style={{ background: 'var(--warnbg)' }}><b>{t('Before the bot can use this answer:')}</b><ul className="plain">{pr.map((x, i) => <li key={i}>{tProblem(t, x)}</li>)}</ul></div> : <div className="note" role="status" style={{ background: 'var(--okbg)' }}>{t('✓ Ready: Live, with an answer and example questions. Save it, then Publish.')}</div>; })()}
-      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className="btn" type="button" onClick={() => save(false)}>{t('Save to draft')}</button><button className="btn pri" type="button" onClick={() => save(true)}>{t('Save and publish')}</button></span></div>
+      <div className="head" style={{ marginTop: 'auto' }}><span className="sub">{t('Saved as a draft change until you publish.')}</span><span className="tools">{ed.id ? <button className="btn sm bad" type="button" onClick={del}>{t('Delete')}</button> : null}<button className={'btn' + (ed.status === 'live' ? '' : ' pri')} type="button" onClick={() => save(false)}>{t('Save to draft')}</button>{ed.status === 'live' && <button className="btn pri" type="button" onClick={() => save(true)}>{t('Save and publish')}</button>}</span></div>
     </Modal>
   );
 }

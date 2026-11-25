@@ -168,9 +168,12 @@ describe('Control panel', () => {
     expect(await screen.findByText('AI suggestions · need your approval')).toBeTruthy();                    // the old simple variations
     expect(screen.getByText('daily limit pls')).toBeTruthy();
   });
-  it('Entry editor: Save and publish saves the entry and opens the Publish window, and does nothing when a field is missing', async () => {
+  it('Entry editor: a new entry starts as a draft (no Save and publish); set it Live and Save and publish saves it and opens the Publish window, and does nothing when a field is missing', async () => {
     open('admin', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Add entry' }));
+    expect((screen.getByLabelText(/^Status/) as HTMLSelectElement).value).toBe('draft');                          // not live first
+    expect(screen.queryByRole('button', { name: 'Save and publish' })).toBeNull();                                 // a draft is not published
+    await userEvent.selectOptions(screen.getByLabelText(/^Status/), 'live');
     await userEvent.click(screen.getByRole('button', { name: 'Save and publish' }));
     expect(await screen.findByText('Give the entry a name first')).toBeTruthy();                                // not saved, so no Publish window
     expect(screen.queryByRole('dialog', { name: 'Publish' })).toBeNull();

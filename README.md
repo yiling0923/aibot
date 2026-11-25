@@ -392,7 +392,7 @@ The Keywords page only shows what customers typed (counts, groups under each top
 
 ### Save and publish in the entry editor
 
-The entry editor has **Save to draft** and **Save and publish**. Save and publish does the same check and save, then opens the Publish window, so changing one answer is: type, Save and publish, Publish. If a field is missing (a name, an English answer, a topic), nothing is saved and the Publish window does not open.
+A **new entry starts as a Draft** (the bot ignores it until you set its Status to **Live**), so adding an answer never puts it in front of customers by accident. The entry editor has **Save to draft** and, once the Status is Live, **Save and publish**. Save and publish does the same check and save, then opens the Publish window, so changing one answer is: type, Save and publish, Publish. If a field is missing (a name, an English answer, a topic), nothing is saved and the Publish window does not open.
 
 ### One Save on Merchant settings
 
