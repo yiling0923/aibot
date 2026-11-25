@@ -338,9 +338,13 @@ It adds the merchant to the local LiveChat, makes `admin@a.test` a member, makes
 
 **Why Publish was slow and what changed.** Saving 300 entries takes half a second. The time went on the sample messages (each merchant's test cases) that run on a draft: they ran for **every merchant** in the Publish window, and **again** inside the publish call. Now they run only for the merchants that changed (all merchants only when the shared word lists changed, or when nothing changed), and not a second time inside publish. A publish with about 300 entries went from about 6.6 seconds to about 0.5 seconds (the window's own check is about 1.5 seconds for a large merchant). The publish answer is now `{ published }` (the unused `pass` and `total` are gone). Tests: `test/publishScope.test.ts`.
 
-## Suggest topics for new keywords (Keyword ranking)
+## Keyword ranking is view only
 
-On **Keyword ranking**, the **Suggest topics** button looks at the new words nobody has decided on yet (the 15 most used). For each word it reads the customer messages the word was written in, and suggests the topic whose words sit in the same messages most often (for example *topup* next to *depo* → `deposit`). It does not guess when no topic shows up or two topics tie. You can untick a word or change its topic, then press **Add**: the words are added to the draft as keywords of that topic (publish to use them). No AI is used and nothing is saved before you press Add.
+The **Keyword ranking** page only shows what customers wrote in the LiveChat chats linked to the bot (counts, trend, status). A note at the top says **View only**: there are no tick boxes and no action buttons. What a word means is decided on the **Topics** page.
+
+## Suggest topics for new keywords (Topics page)
+
+On **Topics** (the Short forms tab), the **Suggest topics** button looks at the new words nobody has decided on yet (the 15 most used). For each word it reads the customer messages the word was written in, and suggests the topic whose words sit in the same messages most often (for example *topup* next to *depo* → `deposit`). It does not guess when no topic shows up or two topics tie. You can untick a word or change its topic, then press **Add**: the words are added to the draft as keywords of that topic (publish to use them). No AI is used and nothing is saved before you press Add.
 
 ## Languages and automatic translation (Knowledge base)
 

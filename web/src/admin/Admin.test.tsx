@@ -1078,6 +1078,18 @@ describe('Control panel', () => {
     expect(within(grid).queryByRole('button', { name: 'VI' })).toBeNull();                                  // the columns follow Knowledge base → Languages
     expect(within(grid).getByLabelText('Answer MS for dep_how')).toBeTruthy();
   });
+  it('Keyword ranking is view only: a note above, no tick boxes, no actions', async () => {
+    open('staff', '/admin/rank');
+    expect(await screen.findByText('View only.')).toBeTruthy();
+    expect(screen.getByText(/Nothing can be changed here/)).toBeTruthy();
+    await screen.findByText('wd');
+    expect(screen.queryAllByRole('checkbox', { name: /^Select / })).toHaveLength(0);                       // no tick boxes
+    expect(screen.queryByRole('button', { name: /Mark as filler|Exclude|Restore|Suggest topics/ })).toBeNull();
+  });
+  it('Suggest topics is on the Topics page, for the new words nobody has decided on', async () => {
+    open('staff', '/admin/kw');
+    expect(await screen.findByRole('button', { name: /^Suggest topics/ })).toBeTruthy();
+  });
   it('the list shows a dot only for the languages of the merchant, not all six', async () => {
     withKb = true; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'List' }));

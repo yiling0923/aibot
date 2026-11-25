@@ -3,6 +3,7 @@ import { usePanel } from '../store';
 import TopicFlow from './TopicFlow';
 import { Modal } from '../ui';
 import { useT } from '../i18n';
+import SuggestTopics from './SuggestTopics';
 import { KW_PICK, LANGS, LANG_NAMES, LN, addOwnTopic, emptyWords, findDup, groupKeywords, guessLang, slug, topicNames } from '../model';
 
 const FOLD = 12;                                                              // words shown per group before "+N more"
@@ -89,7 +90,8 @@ export default function Topics() {
 
   useEffect(() => { if (scroll.current) { scroll.current = false; setTimeout(() => (listRef.current?.querySelector('.chip.new') || document.querySelector('.note .chip.new'))?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }), 60); } });
 
-  const [adding, setAdding] = useState(false);
+  const [adding, setAdding] = useState(false); const [sug, setSug] = useState(false);
+  const unset = p.kw.filter((k) => p.status(k.w).t === 'Not set yet' && !p.ignored.has(k.w)).sort((a, b) => b.n - a.n).slice(0, 15).map((k) => ({ w: k.w, n: k.n }));      // the new words nobody has decided on
   const [exp, setExp] = useState<Set<string>>(new Set());                       // word groups opened to show every word
   const toggleExp = (k: string) => setExp((x) => { const n = new Set(x); if (n.has(k)) n.delete(k); else n.add(k); return n; });
   const done = (msg: string, chip: string, word?: string) => {
@@ -163,11 +165,13 @@ export default function Topics() {
         {!flow && !showHow && <div className="filt"><input type="search" placeholder={T('Filter words')} aria-label={T('Filter words')} value={q} onChange={(e) => setQ(e.target.value)} style={{ minWidth: 200 }} />
           <select aria-label="Language" value={lang} onChange={(e) => setLang(e.target.value)}>{[['all', 'All languages'], ...LANG_NAMES].map(([v, l]) => <option key={v} value={v}>{T(l)}</option>)}</select>
           <span className="sub">{shown} {T('words shown')}</span></div>}
+        {cur === 'short' && unset.length > 0 && <button className="btn sm" type="button" style={{ marginLeft: 'auto' }} title={T('Look at the chats of the new words and suggest a topic for each')} onClick={() => setSug(true)}>{T('Suggest topics')} ({unset.length})</button>}
       </div>
       {cur === 'short' && !flow && <div className="kwlegend" role="note" aria-label={T('What the words look like')}>
         <span><span className="chip ro mine" aria-hidden="true">{T('word|sample')}</span> {T('{m} only', { m: p.M.name })}</span>
         <span><span className="chip ro" aria-hidden="true">{T('word|sample')}</span> {T('Shared by all merchants')}</span>
         <span><span className="chip ro new" aria-hidden="true">{T('word|sample')}</span> {T('Just added to the draft')}</span></div>}
+      {sug && <SuggestTopics words={unset} onClose={() => setSug(false)} />}
       {adding && <Modal label={T('Add a topic or keyword')} small wide onClose={() => setAdding(false)}>
         <div className="head"><h2>{T('Add a topic or keyword')}</h2><button className="btn sm" type="button" onClick={() => setAdding(false)}>{T('Close')}</button></div>
         <div className="addbox" style={{ marginTop: 10 }}><AddBox tab={cur} dup={dup} done={(msg, chip, word) => { done(msg, chip, word); setAdding(false); }} /></div></Modal>}
