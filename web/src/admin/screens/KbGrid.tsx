@@ -77,7 +77,7 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
       <div className="gtools"><span className="sub">{zh ? <>在单元格里输入，离开它（按 Tab 或点击别处）就会保存到草稿。<b>Ctrl+Enter</b> 保存并下移一行。<b>Esc</b> 恢复原来的文字。完成后按“发布”。</> : <>Type in a cell and leave it (Tab or a click elsewhere) to save it to the draft. <b>Ctrl+Enter</b> saves and goes down one row. <b>Esc</b> puts the old text back. Press Publish when you are done.</>}</span>
         <span className="sub">{T('The columns are the languages of this merchant. Change them in the Languages tab.')}</span></div>
       {unwritten > 0 && <div className="note" style={{ marginTop: 8 }}>{zh ? <><b>{unwritten}</b> 个条目仍写着 <span className="mono">TO WRITE</span>（红色显示）。在写好答案之前，机器人会忽略它们。</> : <><b>{unwritten}</b> {unwritten === 1 ? 'entry still says' : 'entries still say'} <span className="mono">TO WRITE</span> (shown in red). The bot ignores {unwritten === 1 ? 'it' : 'them'} until the answer is written.</>}</div>}
-      <div className="scroll" style={{ marginTop: 10 }}>
+      <div className="scroll gscroll" style={{ marginTop: 10 }}>
         <table className="kbgrid"><thead><tr><th className="gname">{T('Entry')}</th><th className="glive">{T('Live')}</th>{cols.map((l) => <th key={l}>{T('Answer')} {LN[l]}</th>)}<th>{src === 'en' ? T('Example questions EN') : T('Example questions') + ' ' + LN[src]} <span className="sub">{T('(one per line)')}</span></th></tr></thead>
           <tbody>
             {list.map((e, r) => {
