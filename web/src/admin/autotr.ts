@@ -22,15 +22,16 @@ export const needsTranslation = (e: Entry, src: string, targets: string[], refre
   return targets.filter((l) => { const t = trOf(e, l); return !t.answer_text.trim() || (refresh && !!t.ai); });
 };
 
-/** Asks the AI for the translations of one entry. Returns the new texts (marked as AI drafts) and the first error, if any. */
+/** Asks the AI for the translations of one entry. The languages are asked at the same time, so an entry takes as long as its slowest language. Returns the new texts (marked as AI drafts) and the first error, if any. */
 export async function translateEntry(merchant: string, e: Entry, src: string, langs: string[]): Promise<{ made: Record<string, Tr>; error?: string }> {
   const s = trOf(e, src); const made: Record<string, Tr> = {}; let error: string | undefined;
-  for (const to of langs) {
+  await Promise.all(langs.map(async (to) => {
     try {
       const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant, from: src, to, answer: s.answer_text, examples: s.question_examples });
       const cur = trOf(e, to);
       made[to] = { answer_text: r.answer, question_examples: cur.ai || !cur.question_examples.length ? r.examples : cur.question_examples, ai: true };
-    } catch (x) { error = error ?? (x as Error).message; if (/AI is not set up/i.test((x as Error).message)) break; }
-  }
-  return { made, error };
+    } catch (x) { error = error ?? (x as Error).message; }
+  }));
+  // keep the order of the languages the caller asked for
+  return { made: Object.fromEntries(langs.filter((l) => made[l]).map((l) => [l, made[l]])), error };
 }

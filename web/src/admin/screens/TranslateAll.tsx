@@ -22,20 +22,24 @@ export default function TranslateAll({ onClose }: { onClose: () => void }) {
   const [run, setRun] = useState<{ n: number; done: number; error?: string } | null>(null); const stop = useRef(false);
   const names = targets.filter((l) => jobs.some((j) => j.langs.includes(l))).map((l) => t(NAME[l] ?? l)).join(', ');
 
+  /** Three entries are translated at the same time (each entry asks its languages at the same time too), so a long list is about three times faster than one by one. */
   const go = async () => {
     stop.current = false; setRun({ n: jobs.length, done: 0 });
-    let done = 0, error: string | undefined;
-    for (const j of jobs) {
-      if (stop.current) break;
-      const { made, error: er } = await translateEntry(p.merchant, j.e, src, j.langs);
-      const ls = Object.keys(made);
-      if (ls.length) p.edit((d, note) => {
-        const e = d.kb.find((x) => x.id === j.e.id && x.merchant === p.merchant); if (!e) return;
-        const tr = e.translations as Record<string, unknown>; ls.forEach((l) => { tr[l] = made[l]; }); e.dirty = true;
-        note(`Translated entry "${e.intent_key}" into ${ls.map((l) => LN[l]).join(', ')} with AI (${p.M.name})`);
-      });
-      done++; setRun({ n: jobs.length, done, error: er ?? error }); if (er) { error = er; if (!ls.length && /not set up/i.test(er)) break; }
-    }
+    let done = 0, error: string | undefined, next = 0;
+    const worker = async () => {
+      while (!stop.current && !(error && /not set up/i.test(error))) {
+        const j = jobs[next++]; if (!j) return;
+        const { made, error: er } = await translateEntry(p.merchant, j.e, src, j.langs);
+        const ls = Object.keys(made);
+        if (ls.length) p.edit((d, note) => {
+          const e = d.kb.find((x) => x.id === j.e.id && x.merchant === p.merchant); if (!e) return;
+          const tr = e.translations as Record<string, unknown>; ls.forEach((l) => { tr[l] = made[l]; }); e.dirty = true;
+          note(`Translated entry "${e.intent_key}" into ${ls.map((l) => LN[l]).join(', ')} with AI (${p.M.name})`);
+        });
+        done++; if (er) error = error ?? er; setRun({ n: jobs.length, done, error });
+      }
+    };
+    await Promise.all([worker(), worker(), worker()]);
     setRun({ n: jobs.length, done, error });
     p.toast(error ? error : t('Translated {n} entries. They are AI drafts: please check them, then publish.', { n: done }));
   };
