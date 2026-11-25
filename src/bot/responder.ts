@@ -200,7 +200,9 @@ export class Bot {
         const sp = a.ks.strong.filter((x) => x.aspect && a.ks.A.includes(x.aspect));
         const sc = new Map(a.cands.map((c) => [c.id, c.score] as const));
         // no entry without a question type may be a closer match than the one the question type points to (for example "deposit with tng" for "deposit tng")
-        if (sp.length === 1 && !a.ks.strong.some((x) => !x.aspect && (sc.get(x.id) ?? 0) > (sc.get(sp[0].id) ?? 0))) pick = { id: sp[0].id, intent: sp[0].intent };
+        const ranked = [...sp].sort((x, y) => (sc.get(y.id) ?? 0) - (sc.get(x.id) ?? 0));          // with several entries of that question type, the closest one must be clearly ahead
+        const best = ranked[0];
+        if (best && (ranked.length === 1 || (sc.get(best.id) ?? 0) - (sc.get(ranked[1].id) ?? 0) >= 0.15) && !a.ks.strong.some((x) => !x.aspect && (sc.get(x.id) ?? 0) > (sc.get(best.id) ?? 0))) pick = { id: best.id, intent: best.intent };
       }
       if (!pick) return null;
       const e = this.engine.entry(s.merchant, pick.intent);
