@@ -1090,6 +1090,16 @@ describe('Control panel', () => {
     open('staff', '/admin/kw');
     expect(await screen.findByRole('button', { name: /^Suggest topics/ })).toBeTruthy();
   });
+  it('the Knowledge base table and the list have an Edit button on every entry, so you need not click the name', async () => {
+    withKb = true; localStorage.setItem('kbView', 'table'); open('staff', '/admin/kb');
+    const grid = await screen.findByLabelText('Table editor');
+    await userEvent.click(within(grid).getByRole('button', { name: 'Edit dep_time' }));
+    expect(await screen.findByRole('heading', { name: 'Edit entry' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Close' }));
+    await userEvent.click(screen.getByRole('button', { name: 'List' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Edit dep_limit' }));
+    expect(await screen.findByRole('heading', { name: 'Edit entry' })).toBeTruthy();
+  });
   it('the list shows a dot only for the languages of the merchant, not all six', async () => {
     withKb = true; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'List' }));
@@ -1100,7 +1110,7 @@ describe('Control panel', () => {
     withKb = true; langsA = null; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Table' }));
     const grid = await screen.findByLabelText('Table editor');
-    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(2, 5)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
+    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(3, 6)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
   });
   it('Import: type entries in a table like Excel, see the check, and the AI translates the empty languages', async () => {
     autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)

@@ -86,7 +86,7 @@ export default function Kb() {
         <button className="btn sm" type="button" onClick={() => setStatusOf(new Set(picked.map((e) => e.id)), 'draft')}>{t('Set draft')}</button>
         <button className="btn sm bad" type="button" onClick={deleteSel}>{t('Delete')}</button>
         <button className="btn sm ghost" type="button" onClick={() => setSel(new Set())}>{t('Clear')}</button></div>}
-      {tab === 'languages' ? <KbLanguages onTranslateAll={() => setTrAll(true)} /> : view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>{t('Entry')}</th><th>{t('Topic')}{p.adv ? ' · ' + t('question') : ''}</th><th>{t('Languages')}</th><th>{t('Questions')}</th><th>{t('Answer (English)')}</th><th>{t('Status')}</th></tr></thead><tbody>
+      {tab === 'languages' ? <KbLanguages onTranslateAll={() => setTrAll(true)} /> : view === 'table' ? <KbGrid list={list} onOpen={open} /> : <div className="card scroll"><table><thead><tr><th style={{ width: 28 }}><input type="checkbox" aria-label="Select all shown" checked={allShown} onChange={() => setSel(allShown ? new Set() : new Set(list.map((e) => e.id)))} /></th><th>{t('Entry')}</th><th>{t('Topic')}{p.adv ? ' · ' + t('question') : ''}</th><th>{t('Languages')}</th><th>{t('Questions')}</th><th>{t('Answer (English)')}</th><th>{t('Status')}</th><th></th></tr></thead><tbody>
         {list.map((e) => (
           <tr className="row" key={e.id} onClick={() => open(e)}>
             <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
@@ -96,9 +96,10 @@ export default function Kb() {
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={t(n < 3 ? 'Add at least 3 example questions' : 'Example questions in English')}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
             <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={t(e.status === 'live' ? 'Live: the bot uses this answer. Switch it off and the bot stops using it at once.' : 'Off: the bot ignores this answer. Switch it on and the bot uses it at once.')}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => void setStatusOf(new Set([e.id]), e.status === 'live' ? 'draft' : 'live')} /><span className="track"><span className="thumb" /></span><span className="kbswt">{t(e.status === 'live' ? 'Live' : 'Draft')}</span></label>{e.steps?.length ? <> <Pill c="info">{t('asks')} {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{t(e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion')}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{t(e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended' : 'until')} {e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">{t('edited')}</Pill></> : null}</div></td>
+            <td onClick={(ev) => ev.stopPropagation()}><button type="button" className="btn sm" aria-label={t('Edit {k}', { k: e.intent_key })} onClick={() => open(e)}>{t('Edit')}</button></td>
           </tr>
         ))}
-        {!list.length && <tr><td colSpan={7} className="sub">{t('No entries match.')}</td></tr>}
+        {!list.length && <tr><td colSpan={8} className="sub">{t('No entries match.')}</td></tr>}
       </tbody></table></div>}
       {ed && <Editor ed={ed} setEd={setEd} onClose={() => setEd(null)} />}
       {trAll && <TranslateAll onClose={() => setTrAll(false)} />}
