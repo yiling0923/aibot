@@ -84,19 +84,18 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
         <span className="sub">{T('The columns are the languages of this merchant. Change them in the Languages tab.')}</span></div>
       {unwritten > 0 && <div className="note" style={{ marginTop: 8 }}>{zh ? <><b>{unwritten}</b> 个条目仍写着 <span className="mono">TO WRITE</span>（红色显示）。在写好答案之前，机器人会忽略它们。</> : <><b>{unwritten}</b> {unwritten === 1 ? 'entry still says' : 'entries still say'} <span className="mono">TO WRITE</span> (shown in red). The bot ignores {unwritten === 1 ? 'it' : 'them'} until the answer is written.</>}</div>}
       <div className="scroll gscroll" style={{ marginTop: 10 }}>
-        <table className="kbgrid"><thead><tr><th className="gname">{T('Entry')}</th><th className="glive">{T('Live')}</th>{cols.map((l) => <th key={l}>{T('Answer')} {LN[l]}</th>)}<th>{src === 'en' ? T('Example questions EN') : T('Example questions') + ' ' + LN[src]} <span className="sub">{T('(one per line)')}</span></th></tr></thead>
+        <table className="kbgrid"><thead><tr><th className="gname">{T('Live')} · {T('Entry')}</th>{cols.map((l) => <th key={l}>{T('Answer')} {LN[l]}</th>)}<th>{src === 'en' ? T('Example questions EN') : T('Example questions') + ' ' + LN[src]} <span className="sub">{T('(one per line)')}</span></th></tr></thead>
           <tbody>
             {list.map((e, r) => {
               const en = trOf(e, src).answer_text;
               return (
                 <tr key={e.id}>
-                  <td className="gname"><div className="gnrow"><button type="button" className="linklike" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><IconBtn tip={T('Edit {k}', { k: e.intent_key })} onClick={() => onOpen(e)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></IconBtn></div><div className="sub">{e.topic || T('no topic')}</div></td>
-                  <td className="glive"><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label></td>
+                  <td className="gname"><div className="gnrow"><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label><button type="button" className="linklike gnname" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><IconBtn tip={T('Edit {k}', { k: e.intent_key })} onClick={() => onOpen(e)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></IconBtn></div><div className="sub">{e.topic || T('no topic')}</div></td>
                   {cols.map((l) => <td key={l}><Cell ai={!!trOf(e, l).ai} value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === src && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={busyIds.has(e.id) && l !== src ? T('Translating…') : T(l === src ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} />{trOf(e, l).ai && <span className="aibadge">{T('AI draft · check')}</span>}</td>)}
                   <td><Cell value={trOf(e, src).question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, src).question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
                 </tr>);
             })}
-            {!list.length && <tr><td colSpan={cols.length + 3} className="sub">{T('No entries match.')}</td></tr>}
+            {!list.length && <tr><td colSpan={cols.length + 2} className="sub">{T('No entries match.')}</td></tr>}
           </tbody></table></div>
       {saved && <div className="sub" role="status" style={{ marginTop: 8 }}>{T('Saved to the draft: {k}. Press Publish to make the changes live.', { k: saved })}</div>}
     </div>

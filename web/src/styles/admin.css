@@ -596,7 +596,7 @@ tr.quiet td{color:var(--muted)}tr.quiet td b{color:var(--muted);font-weight:600}
 .bulkbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:8px 12px;margin-bottom:10px;position:sticky;top:8px;z-index:5}
 .gtools{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}.gcols{display:flex;gap:6px}.gcols .btn[aria-pressed="true"]{background:var(--accent);color:var(--accentfg);border-color:var(--accent)}
 .kbgrid{border-collapse:separate;border-spacing:0;min-width:900px}.kbgrid th{position:sticky;top:0;background:var(--surface);z-index:2;text-align:left;font-size:12px;padding:8px 8px}
-.kbgrid td{vertical-align:top;padding:6px 8px;border-top:1px solid var(--line)}.kbgrid .gname{position:sticky;left:0;background:var(--surface);z-index:1;min-width:150px;max-width:190px}.kbgrid th.gname{z-index:3}
+.kbgrid td{vertical-align:top;padding:6px 8px;border-top:1px solid var(--line)}.kbgrid .gname{position:sticky;left:0;background:var(--surface);z-index:1;min-width:230px;max-width:260px}.kbgrid th.gname{z-index:3}
 .kbgrid .glive{width:48px;text-align:center}.kbgrid td:not(.gname):not(.glive){min-width:260px}
 .linklike{background:none;border:0;padding:0;font:inherit;font-weight:700;color:var(--accent);cursor:pointer;text-align:left}.linklike:hover{text-decoration:underline}
 .gcell{width:100%;font:inherit;font-size:13px;line-height:1.4;padding:6px 8px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--fg);resize:vertical;min-height:52px}
@@ -978,5 +978,8 @@ details.moreopt{background:none;padding:0}
 .note.viewonly{margin-bottom:12px;background:var(--infobg)}
 .kbtabs{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .kbmiss{margin-left:auto;white-space:nowrap}
-.gnrow{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.gnrow{display:flex;align-items:center;gap:10px}.gnrow .gnname{flex:1;min-width:0;text-align:left;overflow-wrap:anywhere}.gnrow .ibtn{margin-left:auto}
 .kbgrid .gnrow .ibtn{width:36px;height:36px;flex:none}.kbgrid .gnrow .ibtn svg{width:20px;height:20px}
+
+/* List view: the Live switch, the status text and the pencil share one line with the entry name */
+.card.scroll table td{vertical-align:middle}.stcell{display:flex;align-items:center;gap:8px}

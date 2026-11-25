@@ -1148,7 +1148,7 @@ describe('Control panel', () => {
     withKb = true; langsA = null; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Table' }));
     const grid = await screen.findByLabelText('Table editor');
-    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(2, 5)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
+    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(1, 4)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
   });
   it('Import: type entries in a table like Excel, see the check, and the AI translates the empty languages', async () => {
     autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)
