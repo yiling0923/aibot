@@ -74,9 +74,6 @@ export default function MerchantPage() {
           <div className="rptile"><i style={{ background: '#7fa8e8' }} /><small>{T('Answers')}</small><b>{m.entries}</b></div><div className="rptile"><i style={{ background: '#9b8bd8' }} /><small>{T('Main language')}</small><b>{T(LANG[m.language] ?? m.language)}</b></div>
           <div className="rptile"><i style={{ background: '#f0c27b' }} /><small>{T('Tone')}</small><b>{T(m.tone[0].toUpperCase() + m.tone.slice(1))}</b></div><div className="rptile"><i style={{ background: '#7fc4a8' }} /><small>{T('Real chats, 7 days')}</small><b>{lc.liveChats7d}</b></div></div>
         <div className="mlinks">
-          <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/set'); }}>{T('Merchant settings')}</button>
-          <button className="btn sm" type="button" onClick={() => { p.setMerchant(m.code); nav('/admin/kb'); }}>{T('Knowledge base')}</button>
-          <button className="btn sm" type="button" onClick={() => nav('/admin/lchat')}>{T('LiveChat test')}</button>
           <span className="sub">{m.logins.length ? T('Staff login: {l}', { l: m.logins.join(', ') }) : T('No staff login yet')}</span>
         </div></div>
 
