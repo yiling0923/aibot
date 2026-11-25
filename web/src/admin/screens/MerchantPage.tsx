@@ -38,12 +38,13 @@ const LANG: Record<string, string> = { en: 'English', ms: 'Malay', zh: 'Chinese'
 export default function MerchantPage() {
   const p = usePanel(); const nav = useNavigate(); const { t: T, lang } = useT(); const zh = lang === 'zh'; const { code = '' } = useParams();
   const [c, setC] = useState<Conn | null>(null); const [err, setErr] = useState('');
+  const [tab, setTab] = useState<'conn' | 'ai' | 'logins'>('conn');
   const [fresh, setFresh] = useState<string | null>(null);        // a key just made: shown once
   const [test, setTest] = useState<LinkTest | null>(null); const [busy, setBusy] = useState('');
   const load = useCallback(async () => {
     try { setC(await api<Conn>(`/api/admin/merchants/${encodeURIComponent(code)}/connection`)); setErr(''); } catch (e) { setErr((e as Error).message); }
   }, [code]);
-  useEffect(() => { setC(null); setFresh(null); setTest(null); void load(); }, [load]);
+  useEffect(() => { setC(null); setFresh(null); setTest(null); setTab('conn'); void load(); }, [load]);
   const copy = async (text: string) => { try { await navigator.clipboard.writeText(text); p.toast(T('Copied')); } catch { p.toast(T('Could not copy. Select the text and copy it.')); } };
   const run = async (label: string, fn: () => Promise<void>) => { setBusy(label); try { await fn(); } catch (e) { p.toast((e as Error).message); } finally { setBusy(''); } };
 
@@ -69,7 +70,7 @@ export default function MerchantPage() {
       <div className="card"><div className="head"><div><h2>{m.name} <span className="mcodepill">{m.code}</span></h2>
         <div className="sub">{T("Everything LiveChat needs to reach this merchant's bot.")}</div></div>
         <button className="btn" type="button" onClick={() => nav('/admin/users')}>← {T('All merchants')}</button></div>
-        <div className="btiles" style={{ margin: '14px 0 4px' }}>
+        <div className="btiles compact" style={{ margin: '12px 0 4px' }}>
           <div className="rptile"><i style={{ background: '#7fa8e8' }} /><small>{T('Answers')}</small><b>{m.entries}</b></div><div className="rptile"><i style={{ background: '#9b8bd8' }} /><small>{T('Main language')}</small><b>{T(LANG[m.language] ?? m.language)}</b></div>
           <div className="rptile"><i style={{ background: '#f0c27b' }} /><small>{T('Tone')}</small><b>{T(m.tone[0].toUpperCase() + m.tone.slice(1))}</b></div><div className="rptile"><i style={{ background: '#7fc4a8' }} /><small>{T('Real chats, 7 days')}</small><b>{lc.liveChats7d}</b></div></div>
         <div className="mlinks">
@@ -79,10 +80,18 @@ export default function MerchantPage() {
           <span className="sub">{m.logins.length ? T('Staff login: {l}', { l: m.logins.join(', ') }) : T('No staff login yet')}</span>
         </div></div>
 
+      <div className="mtabs"><div className="segs" role="group" aria-label={T('Merchant sections')}>{([['conn', 'Connection'], ['ai', 'AI & usage'], ['logins', 'Logins']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{T(l)}</button>)}</div></div>
+      {tab === 'conn' && <>
       <Step n={1} done={!!key} title={T('LiveChat connection')} badge={T(key ? 'Bot key active' : 'No bot key yet')} tone={key ? 'ok' : 'warn'}
         sub={zh ? <>在 LiveChat 里打开这个商户的 <b>Chat → AI Bot</b> 页面，打开机器人，并粘贴下面两个值。</> : <>In LiveChat, open this merchant's <b>Chat → AI Bot</b> page, switch the bot on, and paste the two values below.</>}>
         <div className="mlbl">{T('1 · Bot address (LiveChat → "API URL")')}</div>
-        <div className="mrow"><input readOnly value={lc.baseUrl} onFocus={(e) => e.target.select()} style={{ flexGrow: 1 }} aria-label={T('Bot address')} /><button className="btn" type="button" onClick={() => void copy(lc.baseUrl)}>{T('Copy')}</button></div>
+        <div className="mrow"><input readOnly value={lc.baseUrl} onFocus={(e) => e.target.select()} style={{ flexGrow: 1 }} aria-label={T('Bot address')} /><button className="btn" type="button" onClick={() => void copy(lc.baseUrl)}>{T('Copy')}</button><button className="btn pri" type="button" disabled={busy === 'test'} title={T("Sends “Can you help?” to the bot the way LiveChat does, using this merchant's answers. It shows the bot's side only; it cannot see whether LiveChat can reach this address. Saved as a test chat.")} onClick={runTest}>{T(busy === 'test' ? 'Testing…' : 'Test the link')}</button></div>
+        {test && (
+          <div className="note" style={{ marginTop: 8, background: test.ok && test.hasKey ? 'var(--okbg)' : test.ok ? 'var(--warnbg)' : 'var(--badbg)' }}>
+            <b>{T('The bot answered in {ms} ms', { ms: test.ms })}</b> ({test.decision}).{!test.hasKey && ' ' + T('Warning: there is no active key yet, so LiveChat cannot get this answer.')}
+            <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{test.answer}</div>
+          </div>
+        )}
         <div className="sub" style={{ margin: '6px 0 14px' }}>{zh ? <>LiveChat 会自己加上 <span className="mono">/api/v1/ai/ask</span>。如果 LiveChat 运行在另一台电脑或 Docker 里，<span className="mono">localhost</span> 在那里不起作用：请使用那台电脑访问这个机器人的地址，或在 .env 里设置 <span className="mono">PUBLIC_URL</span>。</> : <>LiveChat adds <span className="mono">/api/v1/ai/ask</span> itself. If LiveChat runs on another computer or in Docker, <span className="mono">localhost</span> will not work from there: use the address that computer uses to reach this bot, or set <span className="mono">PUBLIC_URL</span> in .env.</>}</div>
         <div className="mlbl">{T('2 · Bot key (LiveChat → "API Key")')}</div>
         {fresh ? (
@@ -93,7 +102,7 @@ export default function MerchantPage() {
           </div>
         ) : key ? (
           <div className="keyline"><span className="mono">{key.prefix}…</span><Pill c="ok">{T('Active')}</Pill>
-            <span className="sub">{T('Made')} {when(key.createdAt, T)}{key.createdBy ? ' ' + T('by {u}', { u: key.createdBy }) : ''} · {T('last used by LiveChat:')} {when(key.lastUsedAt, T)}{lc.stoppedKeys ? ' · ' + T(lc.stoppedKeys > 1 ? '{n} older keys stopped' : '1 older key stopped', { n: lc.stoppedKeys }) : ''}</span></div>
+            <details className="kdet"><summary>{T('Details')}</summary><span className="sub">{T('Made')} {when(key.createdAt, T)}{key.createdBy ? ' ' + T('by {u}', { u: key.createdBy }) : ''} · {T('last used by LiveChat:')} {when(key.lastUsedAt, T)}{lc.stoppedKeys ? ' · ' + T(lc.stoppedKeys > 1 ? '{n} older keys stopped' : '1 older key stopped', { n: lc.stoppedKeys }) : ''}</span></details></div>
         ) : <div className="sub">{T('No key yet. LiveChat cannot use the bot until you make one.')}</div>}
         <div className="mrow" style={{ marginTop: 10 }}>
           <button className={'btn' + (key ? '' : ' pri')} type="button" disabled={busy === 'key'} onClick={makeKey}>{T(key ? 'Replace key' : 'Make key')}</button>
@@ -101,24 +110,19 @@ export default function MerchantPage() {
         </div>
       </Step>
 
-      <Step n={2} done={!!test?.ok} title={T('Test the link')} badge={test ? (test.ok ? T('Last test: OK · {ms} ms', { ms: test.ms }) : T('Last test failed')) : T('Not tested yet')} tone={test ? (test.ok ? 'ok' : 'bad') : ''}
-        sub={T("Sends “Can you help?” to the bot the way LiveChat does, using this merchant's answers. It shows the bot's side only; it cannot see whether LiveChat can reach this address. Saved as a test chat.")}>
-        <div className="mrow"><button className="btn pri" type="button" disabled={busy === 'test'} onClick={runTest}>{T(busy === 'test' ? 'Testing…' : 'Test the link')}</button></div>
-        {test && (
-          <div className="note" style={{ marginTop: 10, background: test.hasKey ? 'var(--okbg)' : 'var(--warnbg)' }}>
-            <b>{T('The bot answered in {ms} ms', { ms: test.ms })}</b> ({test.decision}).{!test.hasKey && ' ' + T('Warning: there is no active key yet, so LiveChat cannot get this answer.')}
-            <div style={{ whiteSpace: 'pre-wrap', marginTop: 6 }}>{test.answer}</div>
-          </div>
-        )}
-      </Step>
-
       <HandoffSync code={m.code} />
+      </>}
+      {tab === 'ai' && <>
 
-      <Step n={4} done={aiOwn || aiShared} title={T('AI keys')} badge={T(aiOwn ? 'Own key' : aiShared ? 'Using shared key' : 'AI off')} tone={aiOwn ? 'ok' : aiShared ? 'info' : ''}
+      <Step n={3} done={aiOwn || aiShared} title={T('AI keys')} badge={T(aiOwn ? 'Own key' : aiShared ? 'Using shared key' : 'AI off')} tone={aiOwn ? 'ok' : aiShared ? 'info' : ''}
         sub={zh ? <>可选。有自己的密钥时，这个商户的 AI 用量记在它自己的账户上。没有时，机器人使用 <span className="mono">.env</span> 里的共用密钥，或在没有 AI 的情况下运行。密钥加密保存，只会显示最后 4 个字符。</> : <>Optional. With its own key, this merchant's AI use is billed to its own account. Without one, the bot uses the shared key from <span className="mono">.env</span>, or runs without AI. Keys are saved encrypted and only the last 4 characters are ever shown.</>}>
         <AiKeyRow code={m.code} provider="anthropic" title="Claude (Anthropic)" help="Picks the right answer when no keyword matches, describes new keywords, and translates answers." row={c.ai.anthropic} onChange={load} />
         <AiKeyRow code={m.code} provider="openai" title="ChatGPT (OpenAI)" help="Only used to reword replies, and only if OPENAI_MODEL is set in .env." row={c.ai.openai} onChange={load} />
       </Step>
+      <div className="card"><div className="mrow sp2"><div><b>{T('Usage & billing')}</b><div className="sub">{T('Tokens, calls and cost for this merchant are on the Usage & billing page.')}</div></div><button className="btn" type="button" onClick={() => nav('/admin/billing')}>{T('Open Usage & billing')} →</button></div></div>
+      </>}
+      {tab === 'logins' && <div className="card"><div className="head"><div><h2>{T('Logins')}</h2><div className="sub">{T('Staff can only see their own merchant.')}</div></div><button className="btn" type="button" onClick={() => nav('/admin/users')}>{T('Manage logins')} →</button></div>
+        {m.logins.length ? <ul className="plain">{m.logins.map((l) => <li key={l}><b>{l}</b></li>)}</ul> : <div className="sub">{T('No staff login yet')}</div>}</div>}
     </>
   );
 }
@@ -139,11 +143,11 @@ function SetupChecklist({ s, code, onMakeKey }: { s: Setup; code: string; onMake
   const icon = (st: CheckItem['state']) => (st === 'done' ? '✓' : st === 'warn' ? '!' : st === 'optional' ? '–' : '');
   const pct = s.total ? Math.round((s.done / s.total) * 100) : 0;
   return (
-    <div className="card" aria-label={T('Setup checklist')}>
+    <div className={'card' + (complete && !open ? ' thin' : '')} aria-label={T('Setup checklist')}>
       <div className="head"><div><h2>{T('Setup checklist')} <span className={'pill ' + (complete ? 'ok' : 'warn')}>{complete ? T('complete') : T('{a} of {b} done', { a: s.done, b: s.total })}</span></h2>
-        <div className="sub">{T(complete ? 'Everything the bot needs is in place for this merchant.' : 'What this merchant still needs before its bot can answer real customers.')}</div></div>
+        {!(complete && !open) && <div className="sub">{T(complete ? 'Everything the bot needs is in place for this merchant.' : 'What this merchant still needs before its bot can answer real customers.')}</div>}</div>
         <button className="btn sm" type="button" aria-expanded={open} onClick={() => setOpen(!open)}>{T(open ? 'Hide' : 'Show the checklist')}</button></div>
-      <div className="cbar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={T('Setup progress')}><i style={{ width: pct + '%' }} /></div>
+      {!(complete && !open) && <div className="cbar" role="progressbar" aria-valuenow={pct} aria-valuemin={0} aria-valuemax={100} aria-label={T('Setup progress')}><i style={{ width: pct + '%' }} /></div>}
       {open && <ul className="checklist">{s.items.map((x) => (
         <li key={x.key} className={'chk ' + x.state}>
           <span className={'cdot ' + x.state} aria-hidden="true">{icon(x.state)}</span>
@@ -196,10 +200,10 @@ function HandoffSync({ code }: { code: string }) {
   const run = async (what: string, fn: () => Promise<LcLink>, ok: string) => { setBusy(what); setMsg(''); try { apply(await fn()); p.toast(T(ok)); } catch (e) { setMsg((e as Error).message); } finally { setBusy(''); } };
   useEffect(() => { api<LcLink>(base).then(apply).catch((e) => setMsg((e as Error).message)); }, [base]);
   const sub = <>{T('After this many bot replies, LiveChat asks the customer if they want a person (0 = never). It is one number: change it in LiveChat or here and the other follows. LiveChat is the source of truth: the bot copies it every minute and whenever this page opens. A change made here is sent to LiveChat first and saved only if LiveChat accepts it.')}</>;
-  if (!l) return <Step n={3} done={false} title={T('Human Handoff')} badge={T('Loading…')} tone="" sub={sub}><div className="sub">{msg || T('Loading…')}</div></Step>;
+  if (!l) return <Step n={2} done={false} title={T('Human Handoff')} badge={T('Loading…')} tone="" sub={sub}><div className="sub">{msg || T('Loading…')}</div></Step>;
   const badge = !l.configured ? T('Not connected') : l.error ? T('Last sync failed') : T('In sync · {n} replies', { n: l.handoffAfterReplies ?? '?' });
   return (
-    <Step n={3} done={l.configured && !l.error} title={T('Human Handoff')} badge={badge} tone={!l.configured ? '' : l.error ? 'bad' : 'ok'} sub={sub}>
+    <Step n={2} done={l.configured && !l.error} title={T('Human Handoff')} badge={badge} tone={!l.configured ? '' : l.error ? 'bad' : 'ok'} sub={sub}>
       {l.configured ? <>
         <div className="mrow" style={{ alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <label className="fld"><span>{T('Ask for a person after N replies')}</span><input type="number" min={0} max={100} value={n} onChange={(e) => setN(e.target.value)} style={{ width: 120 }} /></label>

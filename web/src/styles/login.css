@@ -25,3 +25,6 @@
 .login .btn.pri{padding:12px 14px;font-size:15px;border-radius:10px;margin-top:2px}
 .lg-help{margin:12px 0 0;text-align:center;color:var(--muted);font-size:12.5px}
 @media (max-width:860px){.login{grid-template-columns:1fr}.lg-brand{display:none}.lg-mini{display:flex}.lg-form{align-items:start;padding-top:12vh}}
+.lg-form{position:relative}
+.lg-lang{position:absolute;top:22px;right:26px}
+.lg-up{margin-top:28px;font-size:12.5px;opacity:.92}.lg-up i{display:inline-block;width:8px;height:8px;border-radius:50%;background:#7ee2a8;margin-right:7px}

@@ -295,12 +295,13 @@ describe('Control panel', () => {
   });
   it('shows the login actions as icon buttons with the words available on hover', async () => {
     open('admin', '/admin/users');
+    expect((await screen.findAllByRole('button', { name: 'Open' })).every((b) => b.textContent === '' && b.getAttribute('data-tip') === 'Open')).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: /^Logins/ }));
     const reset = await screen.findAllByRole('button', { name: 'Change password' });
     expect(reset).toHaveLength(2);                                                       // one per login
     expect(reset[0].textContent).toBe('');                                               // an icon, no words on the button
     expect(reset[0].getAttribute('data-tip')).toBe('Change password');                   // the words show when the mouse is over it
     expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);           // you cannot delete yourself
-    expect(screen.getAllByRole('button', { name: 'Open' }).every((b) => b.textContent === '' && b.getAttribute('data-tip') === 'Open')).toBe(true);
   });
 
   it('opens a merchant page with the LiveChat address, makes a key that is shown once, and keeps AI keys masked', async () => {
@@ -313,6 +314,7 @@ describe('Control panel', () => {
     await userEvent.click(screen.getAllByRole('button', { name: 'Make key' })[0]);
     expect(await screen.findByText('Copy this key now. It is shown only once.')).toBeTruthy();
     expect((screen.getByDisplayValue('aib_FRESHKEY1234567890') as HTMLInputElement).readOnly).toBe(true);
+    await userEvent.click(screen.getByRole('button', { name: 'AI & usage' }));                  // the AI keys have their own tab
     expect(screen.getByText('Own key ····wxyz')).toBeTruthy();                                 // only the last 4 characters of a saved AI key
     const save = screen.getByRole('button', { name: 'Save key' }) as HTMLButtonElement;        // ChatGPT has no key yet
     expect(save.disabled).toBe(true);
@@ -505,7 +507,7 @@ describe('Control panel', () => {
     expect(await screen.findByText('Human Handoff')).toBeTruthy();
     expect(screen.queryByText('Account data')).toBeNull(); expect(screen.queryByText('Sample customers only')).toBeNull();
     expect(screen.queryByText(/What the merchant's API must provide/)).toBeNull();
-    expect(screen.getByText('AI keys')).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'AI & usage' })); expect(screen.getByText('AI keys')).toBeTruthy();
   });
   it('LiveChat test: shows a picture an agent sent, and a plain link when it is not a picture', async () => {
     open('admin', '/admin/lchat');
@@ -567,12 +569,17 @@ describe('Control panel', () => {
   });
   it('Merchants and logins: avatars, counts in the titles, a clickable row, a merchant search and a role filter when the lists are long', async () => {
     peopleBig = true; open('admin', '/admin/users');
-    expect(await screen.findByRole('heading', { name: /Merchants\s*6/ })).toBeTruthy(); expect(screen.getByRole('heading', { name: /Logins\s*5/ })).toBeTruthy();
-    expect(document.querySelectorAll('.ptable .av').length).toBe(11);                                              // a round badge on every merchant and every login
+    expect(await screen.findByRole('heading', { name: /Merchants\s*6/ })).toBeTruthy();
+    expect(document.querySelectorAll('.ptable .av').length).toBe(6);                                               // a round badge on every merchant
+    const mf = screen.getByRole('group', { name: 'Show merchants' });                                              // filter: all / connected / needs a bot key
+    await userEvent.click(within(mf).getByRole('button', { name: /Needs a bot key/ })); expect(document.querySelectorAll('.ptable tbody tr').length).toBe(Number(within(mf).getByRole('button', { name: /Needs a bot key/ }).textContent!.match(/\d+/)![0]));
+    await userEvent.click(within(mf).getByRole('button', { name: /^All/ }));
     await userEvent.type(screen.getByLabelText('Find a merchant'), 'zzz');
     expect(await screen.findByText(/No merchant matches “zzz”/)).toBeTruthy();
     await userEvent.clear(screen.getByLabelText('Find a merchant')); await userEvent.type(screen.getByLabelText('Find a merchant'), 'brav');
     expect(screen.getAllByText('Bravo').length).toBeGreaterThan(0); expect(screen.queryByText('Echo')).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: /^Logins/ }));
+    expect(await screen.findByRole('heading', { name: /Logins\s*5/ })).toBeTruthy(); expect(document.querySelectorAll('.ptable .av').length).toBe(5);
     const roles = screen.getByRole('group', { name: 'Show logins' });
     await userEvent.click(within(roles).getByRole('button', { name: /Admins/ }));
     expect(screen.queryByText('alpha')).toBeNull(); expect(screen.getByText('boss')).toBeTruthy();
@@ -819,7 +826,7 @@ describe('Control panel', () => {
     localStorage.setItem('panelLang', 'zh');
     const { unmount } = open('admin', '/admin/users');
     expect(await screen.findByText('每个商户都有自己的答案、词库和设置。打开商户可连接 LiveChat 并设置它的 AI 密钥。')).toBeTruthy();
-    expect(screen.getByRole('button', { name: /添加商户/ })).toBeTruthy(); expect(screen.getByRole('columnheader', { name: '员工登录' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /添加商户/ })).toBeTruthy(); expect(screen.getByRole('columnheader', { name: '今天的聊天' })).toBeTruthy();
     unmount(); open('admin', '/admin/merchants/A');
     expect(await screen.findByLabelText('设置清单')).toBeTruthy(); expect(await screen.findByText('LiveChat 连接')).toBeTruthy();
     localStorage.removeItem('panelLang');

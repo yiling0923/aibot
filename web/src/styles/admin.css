@@ -931,3 +931,13 @@ details.moreopt{background:none;padding:0}
 .kbmore{border-top:1px solid var(--line);padding-top:10px;margin-top:6px}
 .kbmore>summary{cursor:pointer;font-weight:700;font-size:13px;margin-bottom:8px}
 .kbmore[open]>summary{margin-bottom:6px}
+.pview{margin-bottom:12px}
+.tbar2{display:inline-block;height:6px;width:70px;background:var(--surface2);border-radius:9px;vertical-align:middle;margin-right:8px;overflow:hidden}.tbar2 i{display:block;height:100%;background:#6bbf93}
+.ptable tr.row{cursor:pointer}.ptable tr.row:hover td{background:color-mix(in srgb,var(--accent) 5%,var(--surface))}
+/* Merchant page: thin finished checklist, compact numbers, tabs, folded key details */
+.card.thin{padding:10px 16px}.card.thin h2{font-size:15px}
+.btiles.compact{gap:10px}.btiles.compact .rptile{padding:8px 14px}.btiles.compact .rptile b{font-size:20px}
+.mtabs{margin:2px 0 12px}
+.kdet{display:inline-block;margin-left:6px}.kdet>summary{cursor:pointer;color:var(--muted);font-size:13px;font-weight:600}.kdet>.sub{display:block;margin-top:4px}
+.mrow.sp2{justify-content:space-between}
+.kdet>summary{background:none;border:0;padding:2px 4px}

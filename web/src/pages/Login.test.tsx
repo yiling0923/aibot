@@ -29,3 +29,13 @@ describe('Login page', () => {
     pw.dispatchEvent(ev); expect(await screen.findByText('Caps Lock is on')).toBeTruthy();
   });
 });
+
+describe('Login page language', () => {
+  it('switches to Chinese and remembers it for the panel', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => json(401, {})));
+    localStorage.removeItem('panelLang'); render(<Login />);
+    await userEvent.click(screen.getByRole('button', { name: '中文' }));
+    expect(screen.getByRole('button', { name: '登录' })).toBeTruthy(); expect(localStorage.getItem('panelLang')).toBe('zh');
+    localStorage.removeItem('panelLang');
+  });
+});
