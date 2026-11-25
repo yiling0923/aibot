@@ -1,10 +1,20 @@
 import { describe, it, expect } from 'vitest';
 import { Bot, newSession } from '../src/bot/responder';
 import { knowledgeFromSeed } from '../src/engine';
+import type { KbEntry } from '../src/engine/types';
 import { seedJson, accountsJson } from './helpers';
 
 const bot = () => new Bot(knowledgeFromSeed(seedJson, accountsJson));
 const say = async (b: Bot, text: string) => { const t = (await b.message(newSession('t' + Math.random(), 'MERCH_A', null), text))!; return { d: String(t.trace.decision), compound: (t.trace.compound as string[] | undefined) ?? null, text: t.messages.map((m) => m.text).join(' '), cacheable: !!t.cacheable }; };
+
+/** A merchant whose imported entries have a topic but no question type: every deposit word matches all of them. */
+const withImported = () => {
+  const k = knowledgeFromSeed(seedJson, accountsJson);
+  const e = (id: number, key: string, topic: string, ex: string[], a: string): KbEntry => ({ id, merchant: 'MERCH_A', category: 'x', intentKey: key, topic, aspect: null, topicOptional: false, entryType: 'answer', translations: { en: { questionExamples: ex, answerText: a } } });
+  k.kbEntries.push(e(9301, 'deposit_not_credited', 'deposit', ['deposit not received', 'my topup not in'], 'Send the full receipt.'), e(9302, 'deposit_tng', 'deposit', ['deposit with tng'], 'Use TnG.'),
+    e(9303, 'claim_receipt_once', 'deposit', ['receipt already used'], 'One claim per receipt.'), e(9304, 'withdraw_processing', 'withdraw', ['withdraw not in yet'], 'Wait 5 minutes.'), e(9305, 'withdraw_own_bank', 'withdraw', ['withdraw to friend bank'], 'Own bank only.'));
+  return new Bot(k);
+};
 
 describe('a message that asks two different things gets both answers, word for word', () => {
   it('answers a deposit question and a withdraw question one after the other', async () => {
@@ -35,6 +45,13 @@ describe('a message that asks two different things gets both answers, word for w
     expect(second.trace.compound).toEqual(['deposit_time', 'withdraw_limit']);
     const s2 = newSession('t-twice2', 'MERCH_A', null); await b.message(s2, 'how long does deposit take and what is the withdraw limit');
     expect((await b.message(s2, 'how long does deposit take and what is the withdraw limit'))!.trace.compound).toEqual(['deposit_time', 'withdraw_limit']);   // asking it twice gives the same
+  });
+  it('still works when the merchant has imported entries with no question type (they must not hide the one the question type points to)', async () => {
+    const b = withImported();
+    for (const q of ['how long does deposit take and what is the withdraw limit', 'deposit time and withdraw limit', '充值要多久和提款限额']) {
+      const r = await say(b, q); expect(r.compound, q).toEqual(['deposit_time', 'withdraw_limit']);
+    }
+    expect((await say(b, 'deposit and withdraw')).compound).toBeNull();                                  // topics only: still asks
   });
   it('never mixes in a person or a rude message: those keep their own rules', async () => {
     const b = bot();

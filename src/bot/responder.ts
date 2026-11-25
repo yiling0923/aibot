@@ -191,10 +191,21 @@ export class Bot {
     const lang = r.lang, found: { id: number; intent: string; topic: string }[] = [];
     for (const part of parts) {
       const a = this.engine.analyze(part, s.merchant, 0);
-      if (a.decision !== 'ANSWER' || a.guard || a.abuseHit.length || a.account || !a.top?.intent) return null;
-      const e = this.engine.entry(s.merchant, a.top.intent);
-      if (!e || e.entryType === 'needs_staff' || found.some((f) => f.intent === a.top.intent)) return null;
-      found.push({ id: a.top.id, intent: a.top.intent, topic: e.topic });
+      if (a.guard || a.abuseHit.length || a.account || !a.top?.intent) return null;
+      // A part is one answer when the rules answer it, or when they offer several entries of the topic but exactly one has the question type the part asks for
+      // ("how long" = time) and it is also the closest one by its example questions. Entries with no question type (for example imported ones) do not hide it.
+      let pick: { id: number; intent: string } | null = null;
+      if (a.decision === 'ANSWER') pick = { id: a.top.id, intent: a.top.intent };
+      else if ((a.decision === 'CHOICE' || a.decision === 'CLARIFY') && a.ks.A.length) {
+        const sp = a.ks.strong.filter((x) => x.aspect && a.ks.A.includes(x.aspect));
+        const sc = new Map(a.cands.map((c) => [c.id, c.score] as const));
+        // no entry without a question type may be a closer match than the one the question type points to (for example "deposit with tng" for "deposit tng")
+        if (sp.length === 1 && !a.ks.strong.some((x) => !x.aspect && (sc.get(x.id) ?? 0) > (sc.get(sp[0].id) ?? 0))) pick = { id: sp[0].id, intent: sp[0].intent };
+      }
+      if (!pick) return null;
+      const e = this.engine.entry(s.merchant, pick.intent);
+      if (!e || e.entryType === 'needs_staff' || found.some((f) => f.intent === pick!.intent)) return null;
+      found.push({ id: pick.id, intent: pick.intent, topic: e.topic });
     }
     const texts = found.map((f) => this.ans(s.merchant, f.intent, lang));
     if (texts.some((x) => !x?.trim())) return null;
