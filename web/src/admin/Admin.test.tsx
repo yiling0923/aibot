@@ -1077,6 +1077,12 @@ describe('Control panel', () => {
     expect(within(grid).queryByRole('button', { name: 'VI' })).toBeNull();                                  // the columns follow Knowledge base → Languages
     expect(within(grid).getByLabelText('Answer MS for dep_how')).toBeTruthy();
   });
+  it('the list shows a dot only for the languages of the merchant, not all six', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'List' }));
+    const row = (await screen.findByText('dep_how')).closest('tr')!;
+    expect([...row.querySelectorAll('.dots .dot')].map((d) => d.textContent)).toEqual(['EN', 'MS', 'ZH']);
+  });
   it('the table columns are the merchant languages with the main language first', async () => {
     withKb = true; langsA = null; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Table' }));

@@ -6,7 +6,7 @@ import KbGrid from './KbGrid';
 import KbLanguages from './KbLanguages';
 import TranslateAll, { useTranslateJobs } from './TranslateAll';
 import { autoOn, needsTranslation, sourceLang, targetLangs, translateEntry } from '../autotr';
-import { ASPECT_LABEL, CORE_LANGS, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
+import { ASPECT_LABEL, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
 import { Modal, Pill } from '../ui';
 import { useT } from '../i18n';
 
@@ -16,7 +16,6 @@ const blank = (merchant: string): Entry => ({ id: 0, merchant, intent_key: '', t
 const TYPE_NOTE: Record<string, string> = { answer: 'The bot answers with this text.', needs_staff: 'A person must answer this (for example the customer\'s own account). The bot hands the chat over instead of answering.', promotion: 'An answer that is only true for a while. Set an end date: after it the bot stops using this entry.' };
 /** What a guided answer can ask the customer for after the answer. */
 const STEP_KINDS: [string, string][] = [['receipt', 'A receipt picture'], ['amount', 'An amount'], ['username', 'The username'], ['phone', 'A phone number'], ['text', 'A short reply']];
-const STEP_LANGS = ['en', 'ms', 'zh'] as const;
 /** A problem text from entryProblems(), in the panel language. The one with a number is written out for both singular and plural. */
 const tProblem = (t: (s: string, v?: Record<string, string | number>) => string, x: string) => {
   const m = x.match(/^Only (\d+) example questions?\. /);
@@ -38,7 +37,8 @@ export default function Kb() {
   const needs = all.filter((e) => entryProblems(e).length).length; const drafts = all.length - all.filter((e) => e.status === 'live').length;
   const topicsIn = [...new Set(all.map((e) => e.topic).filter(Boolean))].sort();
   const list = all.filter((e) => (status === 'all' || (status === 'needs' ? entryProblems(e).length > 0 : e.status === status)) && (topicF === 'all' || e.topic === topicF) && (!q || (e.intent_key + ' ' + LANGS.map((l) => trOf(e, l).answer_text).join(' ')).toLowerCase().includes(q.toLowerCase())));
-  const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => CORE_LANGS.some((l) => langState(e, l) !== 'on')).length;
+  const mlangs = [sourceLang(p.M), ...targetLangs(p.M)];                                // the languages of this merchant (Languages tab)
+  const live = all.filter((e) => e.status === 'live').length, miss = all.filter((e) => mlangs.some((l) => langState(e, l) !== 'on')).length;
 
   const picked = list.filter((e) => sel.has(e.id));
   const allShown = list.length > 0 && list.every((e) => sel.has(e.id));
@@ -92,7 +92,7 @@ export default function Kb() {
             <td onClick={(ev) => ev.stopPropagation()}><input type="checkbox" aria-label={'Select ' + e.intent_key} checked={sel.has(e.id)} onChange={() => toggle(e.id)} /></td>
             <td><b>{e.intent_key}</b>{entryProblems(e).length ? <span className="pill warn" style={{ marginLeft: 8 }} title={entryProblems(e).map((x) => tProblem(t, x)).join(' ')}>{t('needs work')}</span> : null}</td>
             <td>{e.topic ? <Pill c="info">{e.topic}</Pill> : <Pill c="bad">{t('missing')}</Pill>}{p.adv && e.aspect ? <> <Pill>{e.aspect}{e.topic_optional ? ' ' + t('(alone)') : ''}</Pill></> : null}</td>
-            <td><div className="dots">{LANGS.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${t(s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty')}`}>{LN[l]}</span>; })}</div></td>
+            <td><div className="dots">{mlangs.map((l) => { const s = langState(e, l); return <span key={l} className={'dot ' + s} title={`${LN[l]}: ${t(s === 'on' ? 'complete' : s === 'part' ? 'needs 3+ examples or an answer' : 'empty')}`}>{LN[l]}</span>; })}</div></td>
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={t(n < 3 ? 'Add at least 3 example questions' : 'Example questions in English')}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
             <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={t(e.status === 'live' ? 'Live: the bot uses this answer. Switch it off and the bot stops using it at once.' : 'Off: the bot ignores this answer. Switch it on and the bot uses it at once.')}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => void setStatusOf(new Set([e.id]), e.status === 'live' ? 'draft' : 'live')} /><span className="track"><span className="thumb" /></span><span className="kbswt">{t(e.status === 'live' ? 'Live' : 'Draft')}</span></label>{e.steps?.length ? <> <Pill c="info">{t('asks')} {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{t(e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion')}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{t(e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended' : 'until')} {e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">{t('edited')}</Pill></> : null}</div></td>
@@ -209,7 +209,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
           <div className="head"><b>{t('Question {n}', { n: i + 1 })}</b><span className="tools">
             <label className="fld" style={{ margin: 0 }}><select aria-label={t('Question {n} asks for', { n: i + 1 })} value={st.kind} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, kind: e.target.value as typeof st.kind } : x)) })}>{STEP_KINDS.map(([k, l]) => <option key={k} value={k}>{t(l)}</option>)}</select></label>
             <button className="btn sm" type="button" aria-label={t('Remove question {n}', { n: i + 1 })} onClick={() => set({ steps: (ed.steps ?? []).filter((_, j) => j !== i) })}>{t('Remove')}</button></span></div>
-          <div className="form">{STEP_LANGS.map((l) => <label className="fld" key={l}><span>{LN[l]} {t(l === 'en' ? '(required)' : '(optional)')}</span><input type="text" lang={l} aria-label={t('Question {n} in {l}', { n: i + 1, l: LN[l] })} value={st.ask?.[l] ?? ''} placeholder={l === 'en' ? t(st.kind === 'receipt' ? 'e.g. Please send a picture of your receipt.' : st.kind === 'amount' ? 'e.g. How much did you deposit?' : 'Write the question') : ''} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, ask: { ...x.ask, [l]: e.target.value } } : x)) })} /></label>)}</div>
+          <div className="form">{(['en', ...[src, ...targetLangs(p.M)].filter((l) => l !== 'en')] as (keyof NonNullable<Entry['steps']>[number]['ask'])[]).map((l) => <label className="fld" key={l}><span>{LN[l]} {t(l === 'en' ? '(required)' : '(optional)')}</span><input type="text" lang={l} aria-label={t('Question {n} in {l}', { n: i + 1, l: LN[l] })} value={st.ask?.[l] ?? ''} placeholder={l === 'en' ? t(st.kind === 'receipt' ? 'e.g. Please send a picture of your receipt.' : st.kind === 'amount' ? 'e.g. How much did you deposit?' : 'Write the question') : ''} onChange={(e) => set({ steps: (ed.steps ?? []).map((x, j) => (j === i ? { ...x, ask: { ...x.ask, [l]: e.target.value } } : x)) })} /></label>)}</div>
         </div>))}
       <div><button className="btn sm" type="button" disabled={(ed.steps ?? []).length >= 3} onClick={() => set({ steps: [...(ed.steps ?? []), { kind: (ed.steps ?? []).length ? 'amount' : 'receipt', ask: { en: '' } }] })}>{t('+ Add a question')}{(ed.steps ?? []).length >= 3 ? ' ' + t('(the most is 3)') : ''}</button></div>
       </details>
