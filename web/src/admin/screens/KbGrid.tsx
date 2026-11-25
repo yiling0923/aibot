@@ -62,7 +62,7 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
               return (
                 <tr key={e.id}>
                   <td className="gname"><button type="button" className="linklike" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><div className="sub">{e.topic || T('no topic')}</div></td>
-                  <td className="glive"><input type="checkbox" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /></td>
+                  <td className="glive"><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label></td>
                   {cols.map((l) => <td key={l}><Cell value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === 'en' && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={T(l === 'en' ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} /></td>)}
                   <td><Cell value={trOf(e, 'en').question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, 'en').question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
                 </tr>);

@@ -1002,7 +1002,7 @@ describe('Control panel', () => {
     await userEvent.type(within(grid).getByLabelText('Answer MS for dep_limit'), 'RM50 hingga RM50,000.'); await userEvent.tab();
     const ex = within(grid).getByLabelText('Example questions for dep_limit') as HTMLTextAreaElement;
     await userEvent.clear(ex); await userEvent.type(ex, 'max deposit{enter}min deposit{enter}{enter}deposit limit{enter}max deposit'); await userEvent.tab();   // empty lines and a repeated one are dropped
-    await userEvent.click(within(grid).getByRole('checkbox', { name: 'Live dep_limit' }));
+    await userEvent.click(within(grid).getByRole('switch', { name: 'Live dep_limit' }));
     expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);                    // one entry changed, however many cells
     await userEvent.click(screen.getByRole('button', { name: 'List' }));
     const row = (await screen.findByText('dep_limit')).closest('tr')!;
