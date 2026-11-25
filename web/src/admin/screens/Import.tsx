@@ -9,6 +9,7 @@ import { TO_WRITE, STARTER_ENTRIES, STARTER_TAGS, STARTER_TOPICS_NEW, COVERED_EL
 import { LANGS, LN, SAMPLE_CSV, TPL_HEAD, analyzeImport, addOwnTopic, topicNames, kbToCSV, parseTable, type Entry, type ImportGroup } from '../model';
 import { Pill } from '../ui';
 import { useT } from '../i18n';
+import { autoOn, sourceLang, targetLangs } from '../autotr';
 
 type Tr = { question_examples: string[]; answer_text: string };
 
@@ -31,14 +32,15 @@ const tIssue = (T: TF, x: string): string => {
   if ((m = x.match(/^Missing column: (.*)\. Found: (.*)$/))) return T('Missing column: {a}. Found: {b}', { a: m[1], b: m[2] });
   return T(x);
 };
-const LANG_NAME: Record<string, string> = { ms: 'Malay', zh: 'Chinese', vi: 'Vietnamese', th: 'Thai', tl: 'Filipino' };
+const LANG_NAME: Record<string, string> = { en: 'English', ms: 'Malay', zh: 'Chinese', vi: 'Vietnamese', th: 'Thai', tl: 'Filipino' };
 
 export default function Import() {
   const p = usePanel(); const nav = useNavigate(); const { t: T, lang } = useT(); const zh = lang === 'zh';
   const [text, setText] = useState(''); const [name, setName] = useState(''); const [mode, setMode] = useState('update'); const [status, setStatus] = useState<'draft' | 'live'>('draft'); const [out, setOut] = useState('');
   const [menu, setMenu] = useState<'' | 'packs' | 'more'>('');
   const [view, setView] = useState<'table' | 'file'>('table'); const [tick, setTick] = useState(0);
-  const [trOn, setTrOn] = useState(true); const [trLangs, setTrLangs] = useState<Set<string>>(new Set(['ms', 'zh'])); const [busy, setBusy] = useState('');
+  const [trOn, setTrOn] = useState(() => autoOn(p.M)); const [busy, setBusy] = useState('');
+  const src = sourceLang(p.M); const trLangs = useMemo(() => new Set(targetLangs(p.M)), [p.M]);        // the languages come from Knowledge base → Languages
   const R = useMemo(() => analyzeImport(text, p.draft, p.merchant, p.M.name), [text, p.draft, p.merchant, p.M.name]);
   const ok = R.entries.filter((g) => !g.errors.length);
   const nNew = ok.filter((g) => !g.exists).length, nUpd = ok.filter((g) => g.exists).length, nErr = R.entries.length - ok.length;
@@ -50,10 +52,10 @@ export default function Import() {
   /** The translations the AI would make: only for languages left empty, from the English answer. Placeholders that still say TO WRITE are not translated. */
   const jobs = useMemo(() => (!trOn || !p.ai.translate ? [] : ok.filter((g) => !(g.exists && mode === 'skip')).flatMap((g) => {
     const ex = g.existing?.translations as Record<string, Tr> | undefined;
-    const en = g.langs.en?.answer || ex?.en?.answer_text || ''; if (!en.trim() || en.includes(TO_WRITE)) return [];
-    const exs = g.langs.en?.examples ?? ex?.en?.question_examples ?? [];
+    const en = g.langs[src]?.answer || ex?.[src]?.answer_text || ''; if (!en.trim() || en.includes(TO_WRITE)) return [];
+    const exs = g.langs[src]?.examples ?? ex?.[src]?.question_examples ?? [];
     return [...trLangs].filter((l) => !g.langs[l]?.answer && !ex?.[l]?.answer_text?.trim()).map((l) => ({ key: g.key, lang: l, answer: en, examples: exs }));
-  })), [ok, mode, trOn, trLangs, p.ai.translate]);
+  })), [ok, mode, trOn, trLangs, src, p.ai.translate]);
 
   const issuesOf = (g: ImportGroup) => g.issues.filter((x) => !jobs.some((j) => j.key === g.key && x === LN[j.lang] + ' is missing'));   // a language the AI will fill is not a problem
   const nWarn = ok.filter((g) => issuesOf(g).length).length;
@@ -76,7 +78,7 @@ export default function Import() {
     const worker = async () => {
       while (next < jobs.length) {
         const j = jobs[next++];
-        try { const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: 'en', to: j.lang, answer: j.answer, examples: j.examples, style: p.draft.settings[p.merchant]?.ai_instructions ?? '' }); got.push({ ...j, answer: r.answer, examples: r.examples }); }
+        try { const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant: p.merchant, from: src, to: j.lang, answer: j.answer, examples: j.examples, style: p.draft.settings[p.merchant]?.ai_instructions ?? '' }); got.push({ ...j, answer: r.answer, examples: r.examples }); }
         catch (e) { failed++; why = why || (e as Error).message; }
         setBusy(T('Translating {a} of {b}…', { a: ++done, b: jobs.length }));
       }
@@ -87,7 +89,7 @@ export default function Import() {
         const e = d.kb.find((x) => x.merchant === p.merchant && x.intent_key === r.key); if (!e) return;
         const t = e.translations as Record<string, Tr>; const cur = t[r.lang]; if (cur?.answer_text?.trim()) return;
         const have = new Set((cur?.question_examples ?? []).map((q) => q.toLowerCase()));
-        t[r.lang] = { answer_text: r.answer, question_examples: [...(cur?.question_examples ?? []), ...r.examples.filter((q) => !have.has(q.toLowerCase()))] }; e.dirty = true;
+        t[r.lang] = { answer_text: r.answer, question_examples: [...(cur?.question_examples ?? []), ...r.examples.filter((q) => !have.has(q.toLowerCase()))], ai: true } as Tr; e.dirty = true;
       });
       note('AI translated ' + got.length + ' answer' + (got.length === 1 ? '' : 's') + ' (' + [...new Set(got.map((g) => LANG_NAME[g.lang]))].join(', ') + ') for ' + p.M.name + '. Check the wording before publishing');
     });
@@ -184,8 +186,8 @@ export default function Import() {
           {busy && <div className="note" role="status" style={{ marginTop: 6 }}>{busy}</div>}
           {p.ai.translate ? <div className="trbox">
             <label className="trsw"><input type="checkbox" role="switch" checked={trOn} onChange={(e) => setTrOn(e.target.checked)} /><span className="track" aria-hidden="true" /><span><b>{T('Translate the empty languages with AI')}</b><small>{T('Only the languages you left empty are filled. You can read them before you publish.')}</small></span></label>
-            {trOn && <div className="chips" role="group" aria-label={T('Translate into')}><span className="l">{T('Translate into')}</span>{(['ms', 'zh', 'vi', 'th', 'tl'] as const).map((l) => <button key={l} type="button" className={'chip' + (trLangs.has(l) ? ' on' : '')} aria-pressed={trLangs.has(l)} onClick={() => setTrLangs((x) => { const n = new Set(x); if (n.has(l)) n.delete(l); else n.add(l); return n; })}>{T(LANG_NAME[l])}</button>)}</div>}
-            {trOn && <div className="sub">{jobs.length ? <><b>{jobs.length}</b> {T(jobs.length === 1 ? 'translation will be made from the English answers and questions. The AI is charged to this merchant.' : 'translations will be made from the English answers and questions. The AI is charged to this merchant.')}</> : T('Nothing to translate: every chosen language already has an answer, or there is no English answer.')}</div>}
+            {trOn && <div className="sub">{T('Translate into')}: <b>{[...trLangs].map((l) => T(LANG_NAME[l] ?? l)).join(', ')}</b> · {T('set in Knowledge base → Languages')}</div>}
+            {trOn && <div className="sub">{jobs.length ? <><b>{jobs.length}</b> {T(jobs.length === 1 ? 'translation will be made from the answers and questions in the source language. The AI is charged to this merchant.' : 'translations will be made from the answers and questions in the source language. The AI is charged to this merchant.')}</> : T('Nothing to translate: every language of this merchant already has an answer, or there is no answer in the source language.')}</div>}
           </div> : <div className="sub" style={{ marginTop: 6 }}>{T('AI translation is off (no AI key yet), so only the languages you wrote are imported. You can translate later inside each entry.')}</div>}
           <div className="tools" style={{ marginTop: 12 }}><button className="btn pri" type="button" disabled={!willImport || !!busy} onClick={() => run(false)}>{T(willImport === 1 ? 'Import 1 entry to draft' : 'Import {n} entries to draft', { n: willImport })}</button><button className="btn" type="button" disabled={!willImport || !!busy} title={T('Imports the entries as live, then opens the Publish window. Entries that still say TO WRITE are ignored by the bot until they are written.')} onClick={() => run(true)}>{T('Import and publish')}</button></div>
           <details className="moreopt"><summary>{T('More options')}</summary>

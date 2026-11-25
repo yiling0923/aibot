@@ -354,6 +354,8 @@ The **table** and the **entry editor** show exactly these languages, the main (s
 
 **Automatic translation:** there are no translate buttons per entry. When you save an entry in the editor, or leave the source-language cell in the table, the AI fills the languages of the merchant that are still empty (the answer and the example questions). A language is also refreshed when its text was written by the AI and no person changed it after. **A text a person wrote is never overwritten.** Texts made by the AI are marked **AI draft** (purple) until a person edits them. The entry keeps its status (live or draft), and nothing reaches customers before you publish, so check the AI drafts first. The AI keeps the numbers, links and menu paths of the answer (a translation that changes them is refused). Nothing happens when the switch is off or the AI has no key.
 
+**Import** uses the same settings: its **Translate the empty languages with AI** switch follows the merchant's automatic-translation switch, and it translates into the merchant's languages from the source language. There is no language choice on the Import page.
+
 **Translate all** (on the Entries tab and on the Languages tab) shows how many entries and translations it would make, then fills every empty language of every entry one by one. The same rules apply.
 
 ## Table view (Knowledge base)

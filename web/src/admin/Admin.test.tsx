@@ -903,6 +903,7 @@ describe('Control panel', () => {
     localStorage.removeItem('panelLang'); localStorage.removeItem('kbView');
   });
   it('Import with AI translation keeps the imported entry and its new topic (the translation must not wipe them)', async () => {
+    autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)
     withKb = true; localStorage.setItem('topicsView', 'list');
     open('admin', '/admin/imp');
     await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'opening_hours'); await userEvent.type(screen.getByLabelText('Topic, row 1'), 'support');
@@ -1090,6 +1091,7 @@ describe('Control panel', () => {
     expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(2, 5)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
   });
   it('Import: type entries in a table like Excel, see the check, and the AI translates the empty languages', async () => {
+    autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)
     open('staff', '/admin/imp');
     await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'deposit_time');
     await userEvent.type(screen.getByLabelText('Topic, row 1'), 'deposit');
@@ -1103,7 +1105,8 @@ describe('Control panel', () => {
     const calls = (fetch as unknown as { mock: { calls: [string, RequestInit][] } }).mock.calls.filter((c) => String(c[0]).startsWith('/api/admin/translate'));
     expect(calls.length).toBe(2); expect(calls.map((c) => JSON.parse(String(c[1].body)).to).sort()).toEqual(['ms', 'zh']);
   });
-  it('Import: one sentence explains the AI translation, the Check shows which languages the AI will fill, and language chips change the count', async () => {
+  it('Import: one sentence explains the AI translation, the Check shows which languages the AI will fill, and the languages come from the merchant settings', async () => {
+    autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)
     open('staff', '/admin/imp');
     expect(await screen.findByText(/Write in one language only/)).toBeTruthy();
     expect(screen.getByText(/The AI translates the other languages for you/)).toBeTruthy();
@@ -1113,16 +1116,15 @@ describe('Control panel', () => {
     await userEvent.type(screen.getByLabelText('Answer, row 1'), 'Within 5 minutes.');
     expect(await screen.findByText(/EN written/)).toBeTruthy(); expect(screen.getByText('MS by AI')).toBeTruthy(); expect(screen.getByText('ZH by AI')).toBeTruthy();
     expect(screen.getByText(/translations will be made/).textContent).toMatch(/^2 translations/);
-    await userEvent.click(screen.getByRole('button', { name: 'Chinese' }));                         // take Chinese off the list
-    expect(screen.getByText(/translation will be made/).textContent).toMatch(/^1 translation /); expect(screen.queryByText('ZH by AI')).toBeNull();
-    await userEvent.click(screen.getByRole('button', { name: 'Thai' }));
-    expect(screen.getByText(/translations will be made/).textContent).toMatch(/^2 translations/); expect(screen.getByText('TH by AI')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Chinese' })).toBeNull();                              // no language choice here: the languages come from Knowledge base → Languages
+    expect(screen.getByText(/set in Knowledge base → Languages/)).toBeTruthy();
     expect(screen.queryByText('MS is missing')).toBeNull();                                          // the AI will fill it, so it is not a problem
     await userEvent.click(screen.getByRole('switch', { name: /Translate the empty languages with AI/ }));
     expect(await screen.findByText('MS is missing')).toBeTruthy();                                   // with the switch off it is a warning again
     expect((screen.getByText('More options').closest('details') as HTMLDetailsElement).open).toBe(false);   // the two extra options are folded away
   });
   it('Import: the AI translation can be switched off, and then nothing is translated', async () => {
+    autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)
     open('staff', '/admin/imp');
     await userEvent.type(await screen.findByLabelText('Entry name, row 1'), 'deposit_time');
     await userEvent.type(screen.getByLabelText('Topic, row 1'), 'deposit');
