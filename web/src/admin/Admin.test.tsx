@@ -1174,7 +1174,7 @@ describe('Control panel', () => {
     const file = screen.getByRole('switch', { name: 'Picture or file sent' }) as HTMLInputElement; expect(file.checked).toBe(true); expect(file.disabled).toBe(true);        // always on now: a picture goes to a person
     await userEvent.type(screen.getByLabelText('Custom trigger phrases'), 'vip, urgent');
     expect((screen.getByLabelText('Custom trigger phrases') as HTMLInputElement).value).toBe('vip, urgent');
-    expect(screen.getByLabelText('Human group for handoff')).toBeTruthy();                           // moved here from Replies
+    expect(screen.queryByLabelText('Human group for handoff')).toBeNull();                           // the box is gone: the bot never used the number
     unmount();
     open('staff', '/admin/set');
     await userEvent.click(await screen.findByRole('tab', { name: 'Handoff' }));

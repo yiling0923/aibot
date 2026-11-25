@@ -86,7 +86,7 @@ export class Bot {
   }
   private handoff(s: Session, lang: Lang): { messages: BotMsg[]; status: string } {
     s.handed = true; const c = this.cfg(s);
-    return { messages: [{ kind: 'bot', text: c.handoff[lang] ?? c.handoff.en ?? '' }, { kind: 'sys warn', text: `Transferred to human agents · group ${c.handoffGroupId}` }], status: 'Agent joining…' };
+    return { messages: [{ kind: 'bot', text: c.handoff[lang] ?? c.handoff.en ?? '' }, { kind: 'sys warn', text: 'Transferred to human agents' }], status: 'Agent joining…' };
   }
   private kindReply(s: Session, lang: Lang, n: number) {
     const c = this.cfg(s); const custom = c.kindReply[lang]; if (custom && custom.trim()) return custom;

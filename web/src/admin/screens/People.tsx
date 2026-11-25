@@ -72,12 +72,12 @@ function FormDialog({ title, label, onClose, save, done, children }: { title: st
 
 function MerchantDialog({ onClose, onDone }: { onClose: () => void; onDone: () => Promise<void> }) {
   const nav = useNavigate(); const { t: T } = useT();
-  const [f, setF] = useState({ name: '', code: '', lang: 'en', tone: 'friendly', hg: '', lg: '', user: '', pass: '' });
+  const [f, setF] = useState({ name: '', code: '', lang: 'en', tone: 'friendly', lg: '', user: '', pass: '' });
   const on = (k: keyof typeof f) => (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value });
   const save = async () => {
     const name = f.name.trim(); const code = f.code.trim() || name.toUpperCase().replace(/[^A-Z0-9]+/g, '_').replace(/^_|_$/g, '').slice(0, 30);
     const login = f.user.trim() || f.pass ? { username: f.user.trim(), password: f.pass } : undefined;
-    await api('/api/admin/merchants', { name, code, language: f.lang, tone: f.tone, handoffGroup: f.hg.trim() || null, livechatGroup: f.lg.trim() || null, login });
+    await api('/api/admin/merchants', { name, code, language: f.lang, tone: f.tone, livechatGroup: f.lg.trim() || null, login });
     await onDone(); nav('/admin/merchants/' + code);                                  // the new merchant's page opens with its setup checklist
   };
   return (
@@ -88,7 +88,6 @@ function MerchantDialog({ onClose, onDone }: { onClose: () => void; onDone: () =
         <label className="fld"><span>{T('Code (letters and digits, optional)')}</span><input placeholder={T('made from the name')} value={f.code} onChange={on('code')} /></label>
         <label className="fld"><span>{T('Main language')}</span><select value={f.lang} onChange={on('lang')}><option value="en">English</option><option value="ms">Bahasa Melayu</option><option value="zh">中文</option><option value="vi">Tiếng Việt</option><option value="th">ไทย</option><option value="tl">Filipino</option></select></label>
         <label className="fld"><span>{T('Tone')}</span><select value={f.tone} onChange={on('tone')}><option value="friendly">{T('Friendly')}</option><option value="formal">{T('Formal')}</option></select></label>
-        <label className="fld"><span>{T('Human group for handoff (optional)')}</span><input type="number" value={f.hg} onChange={on('hg')} /></label>
         <label className="fld"><span>{T('LiveChat group (optional)')}</span><input type="number" value={f.lg} onChange={on('lg')} /></label>
         <label className="fld"><span>{T('First staff login (optional)')}</span><input autoComplete="off" placeholder={T('username')} value={f.user} onChange={on('user')} /></label>
         <label className="fld"><span>{T('Password for it')}</span><input type="password" autoComplete="new-password" placeholder={T('at least 6 characters')} value={f.pass} onChange={on('pass')} /></label></div>

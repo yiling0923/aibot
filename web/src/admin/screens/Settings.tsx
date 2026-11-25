@@ -129,7 +129,6 @@ function Form() {
           <div className="sub" style={{ marginTop: 4 }}>{T('Comma separated, any language. A message that contains one of these goes straight to a person.')}</div></div></div>
       <div className="card"><h3 style={{ margin: 0 }}>{T('Who takes over')}</h3>
         <div className="form" style={{ marginTop: 10 }}>
-          <label className="fld"><span>{T('Human group for handoff')} {lock ? T('(admin only)') : ''}</span><input type="number" value={s.handoff_group ?? ''} disabled={lock} onChange={(e) => up({ handoff_group: e.target.value === '' ? null : +e.target.value })} /></label>
           <div className="fld"><span>{T('Offer a person after N bot replies')}</span><div className="sub" style={{ textTransform: 'none', letterSpacing: 0, fontWeight: 400 }}>{T("Set on the merchant's page, step 3: it is synced with LiveChat.")}</div>
             <div><button className="btn sm" type="button" onClick={() => nav('/admin/merchants/' + p.merchant)}>{T('Open the merchant page')}</button></div></div>
         </div></div>

@@ -239,7 +239,7 @@ On **Merchant settings**, under *Handoff rules*, every on/off setting is a switc
 
 ## Merchant settings in tabs
 
-The Merchant settings page is grouped in tabs under the four tiles: **General** (name, domain, monthly AI token limit, keep conversations for N days, languages; saved at once with *Save basics*, which turns green when something changed), **Replies** (tone, match levels, the choices the bot offers, rude customers), **Handoff** (handoff rules, trigger phrases, human group, and a link to the Human Handoff number on the merchant page), **AI help** (bot instructions and presets), **Messages** (fixed messages per language). The page remembers the last tab. Everything except the General tab goes to the draft; when you change something a dark bar at the bottom shows how many unsaved changes there are and which groups (for example "Complaint or dispute · Trigger phrases") with **Discard** and **Save to draft**.
+The Merchant settings page is grouped in tabs under the four tiles: **General** (name, domain, monthly AI token limit, keep conversations for N days, languages; saved at once with *Save basics*, which turns green when something changed), **Replies** (tone, match levels, the choices the bot offers, rude customers), **Handoff** (handoff rules, trigger phrases, and a link to the Human Handoff number on the merchant page), **AI help** (bot instructions and presets), **Messages** (fixed messages per language). The page remembers the last tab. Everything except the General tab goes to the draft; when you change something a dark bar at the bottom shows how many unsaved changes there are and which groups (for example "Complaint or dispute · Trigger phrases") with **Discard** and **Save to draft**.
 
 ## LiveChat test (a chat window through LiveChat)
 
@@ -397,6 +397,10 @@ A **new entry starts as a Draft** (the bot ignores it until you set its Status t
 ### The Publish window shows only what the change broke
 
 Before publishing, the panel runs the sample customer messages on the draft **and** on the version that is live now. The Publish window lists only the messages that **passed on the live version and fail on the draft** (what this change broke), up to 6, with a count for the rest. Messages that already fail on the live version are not listed; the window says how many there are and that this change did not cause them. When nothing new fails it shows a green "Nothing you changed broke a sample message." The line "Tests on the draft: x of y passed" stays below. The server marks each result with `wasOk` (did it pass on the live version) in `POST /api/admin/tests`.
+
+### The "Human group for handoff" box is gone
+
+The bot never used that number to route a chat (it only tells LiveChat to hand the chat to a person, and LiveChat chooses who gets it), so the box is removed from Merchant settings and from the Add merchant window, and the chat note now says only "Transferred to human agents". The stored numbers stay in the database and in the API (`handoff_group`), so nothing is lost and the box can come back if LiveChat ever routes by group.
 
 ### One Save on Merchant settings
 
