@@ -170,6 +170,9 @@ describe('Control panel', () => {
     expect(await screen.findByText('Languages for LuckyPay')).toBeTruthy();
     await userEvent.selectOptions(screen.getByLabelText('Country'), 'MY');
     expect((screen.getByLabelText('Timezone') as HTMLInputElement).value).toBe('Asia/Kuala_Lumpur · UTC+8');
+    await userEvent.selectOptions(screen.getByLabelText('Country'), 'VN');                                  // Vietnam: the main language becomes Vietnamese, with English
+    expect((screen.getByLabelText(/^Source language/) as HTMLSelectElement).value).toBe('vi');
+    expect(screen.getByRole('button', { name: /Vietnamese/ }).getAttribute('aria-pressed')).toBe('true'); expect(screen.getByRole('button', { name: /Chinese/ }).getAttribute('aria-pressed')).toBe('false');
     expect(screen.getByRole('switch', { name: 'Translate automatically' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Save languages' })).toBeTruthy();
     cleanup(); withKb = true; open('staff', '/admin/kb');                                                    // staff: read only, but Translate all works

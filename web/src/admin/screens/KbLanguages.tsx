@@ -24,6 +24,11 @@ export default function KbLanguages({ onTranslateAll }: { onTranslateAll: () => 
   const set = (patch: Partial<Basics>) => setF({ ...f, ...patch });
   const on = new Set(f.languages);
   const toggle = (l: string) => { if (lock || l === f.defaultLanguage) return; const n = new Set(on); if (n.has(l)) n.delete(l); else n.add(l); set({ languages: [...n] }); };
+  /** Choosing a country sets its usual main language and ticks its usual languages. You can still change both. */
+  const setCountry = (code: string | null) => {
+    const c = countryOf(code); if (!c) return set({ country: code });
+    setF({ ...f, country: code, defaultLanguage: c.langs[0], languages: [...new Set([...c.langs, c.langs[0]])] });
+  };
   const setSource = (l: string) => set({ defaultLanguage: l, languages: [...new Set([...f.languages, l])] });
   const dirty = JSON.stringify([f.country, f.defaultLanguage, [...f.languages].sort(), f.autoTranslate]) !== JSON.stringify([b.country, b.defaultLanguage, [...b.languages].sort(), b.autoTranslate]);
   const suggest = cty?.langs ?? [];
@@ -40,7 +45,7 @@ export default function KbLanguages({ onTranslateAll }: { onTranslateAll: () => 
       <h3>{t('Languages for {m}', { m: p.M.name })}</h3>
       <div className="sub">{t("Tick the languages this merchant's customers use. You type in the source language, and the others are filled in for you.")}</div>
       <div className="klrow">
-        <label className="fld"><span>{t('Country')}</span><select value={f.country ?? ''} disabled={lock} onChange={(e) => set({ country: e.target.value || null })}><option value="">{t('Not chosen')}</option>{COUNTRIES.map((c) => <option key={c.code} value={c.code}>{cName(c)}</option>)}</select></label>
+        <label className="fld"><span>{t('Country')}</span><select value={f.country ?? ''} disabled={lock} onChange={(e) => setCountry(e.target.value || null)}><option value="">{t('Not chosen')}</option>{COUNTRIES.map((c) => <option key={c.code} value={c.code}>{cName(c)}</option>)}</select></label>
         <label className="fld"><span>{t('Timezone')}</span><input readOnly value={cty ? `${cty.tz} · ${cty.utc}` : '—'} aria-label={t('Timezone')} /></label>
         <label className="fld"><span>{t('Source language (your staff type in)')}</span><select value={f.defaultLanguage} disabled={lock} onChange={(e) => setSource(e.target.value)}>{LANG_NAMES.map(([k, n]) => <option key={k} value={k}>{t(n)}</option>)}</select></label></div>
       {guess && !lock && <div className="sub">{t('Suggested from the money sign ({c}): {n}.', { c: f.currency, n: cName(guess) })} <button className="btn sm" type="button" onClick={() => set({ country: guess.code })}>{t('Use {n}', { n: cName(guess) })}</button></div>}
