@@ -1100,6 +1100,11 @@ describe('Control panel', () => {
     await userEvent.click(await screen.findByRole('button', { name: 'Edit dep_limit' }));
     expect(await screen.findByRole('heading', { name: 'Edit entry' })).toBeTruthy();
   });
+  it('the "missing a language" note sits at the right of the Entries / Languages tabs, on the same line', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    const note = await screen.findByText(/missing a language or examples/);
+    expect(note.closest('.kbtabs')).toBeTruthy(); expect(note.closest('.kbtabs')!.querySelector('.segs')).toBeTruthy();
+  });
   it('the list shows a dot only for the languages of the merchant, not all six', async () => {
     withKb = true; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'List' }));
@@ -1110,7 +1115,7 @@ describe('Control panel', () => {
     withKb = true; langsA = null; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'Table' }));
     const grid = await screen.findByLabelText('Table editor');
-    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(3, 6)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
+    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(2, 5)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
   });
   it('Import: type entries in a table like Excel, see the check, and the AI translates the empty languages', async () => {
     autoTr = true;                                                                                    // automatic translation is on for the merchant (the Import page follows it)

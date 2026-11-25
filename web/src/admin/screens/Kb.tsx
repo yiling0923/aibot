@@ -7,7 +7,7 @@ import KbLanguages from './KbLanguages';
 import TranslateAll, { useTranslateJobs } from './TranslateAll';
 import { autoOn, needsTranslation, sourceLang, targetLangs, translateEntry } from '../autotr';
 import { ASPECT_LABEL, LANGS, LN, addOwnTopic, clone, entryProblems, langState, slug, topicList, topicNames, type Entry } from '../model';
-import { Modal, Pill } from '../ui';
+import { IconBtn, Modal, Pill } from '../ui';
 import { useT } from '../i18n';
 
 type Tr = { question_examples: string[]; answer_text: string; ai?: boolean };
@@ -73,8 +73,7 @@ export default function Kb() {
         <span className="tools"><span className="segs viewsw" role="group" aria-label="View"><button type="button" aria-pressed={view === 'table'} onClick={() => setView('table')} title={t('Edit the answers and example questions in a table')}>{t('Table')}</button><button type="button" aria-pressed={view === 'list'} onClick={() => setView('list')}>{t('List')}</button></span>
         {tj.count > 0 && <button className="btn" type="button" title={t(p.ai.translate ? 'Fill every empty language of every entry with the AI' : 'The AI is off. Add the Anthropic key to .env.')} onClick={() => setTrAll(true)}>{t('Translate all')} ({tj.count})</button>}
         <button className="btn pri" type="button" onClick={() => open(null)}>{t('Add entry')}</button></span></div>
-        <div className="kbtabs"><div className="segs" role="group" aria-label={t('Knowledge base sections')}>{([['entries', 'Entries'], ['languages', 'Languages']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{t(l)}</button>)}</div></div>
-        {tab === 'entries' && miss ? <div className="kwstats"><span className="st dim" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span></div> : null}
+        <div className="kbtabs"><div className="segs" role="group" aria-label={t('Knowledge base sections')}>{([['entries', 'Entries'], ['languages', 'Languages']] as const).map(([k, l]) => <button key={k} type="button" aria-pressed={tab === k} onClick={() => setTab(k)}>{t(l)}</button>)}</div>{tab === 'entries' && miss ? <span className="st dim kbmiss" title={t('Entries missing an answer or 3+ examples in a main language')}>{miss} {t('missing a language or examples')}</span> : null}</div>
         {tab === 'entries' && <div className="filt-row" style={{ marginTop: 12 }}>
           <div className="segs" role="group" aria-label="Show">{([['all', t('All'), all.length], ['live', t('Live'), live], ['draft', t('Draft'), drafts], ['needs', t('Needs work'), needs]] as const).map(([k, l, n]) => <button key={k} type="button" aria-pressed={status === k} onClick={() => setStatus(k)}>{l} <span className="n">{n}</span></button>)}</div>
           <input type="search" placeholder={t('Search entries or answers')} value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search" style={{ minWidth: 220 }} />
@@ -96,7 +95,7 @@ export default function Kb() {
             <td className="num">{(() => { const n = trOf(e, 'en').question_examples.length; return <span className={'pill' + (n < 3 ? ' warn' : '')} title={t(n < 3 ? 'Add at least 3 example questions' : 'Example questions in English')}>{n}</span>; })()}</td>
             <td><div className="clamp2">{trOf(e, 'en').answer_text}</div></td>
             <td><div className="stcell"><label className={'switch kbsw ' + (e.status === 'live' ? 'on' : 'off')} onClick={(ev) => ev.stopPropagation()} title={t(e.status === 'live' ? 'Live: the bot uses this answer. Switch it off and the bot stops using it at once.' : 'Off: the bot ignores this answer. Switch it on and the bot uses it at once.')}><input type="checkbox" role="switch" aria-label={'Live ' + e.intent_key} checked={e.status === 'live'} onChange={() => void setStatusOf(new Set([e.id]), e.status === 'live' ? 'draft' : 'live')} /><span className="track"><span className="thumb" /></span><span className="kbswt">{t(e.status === 'live' ? 'Live' : 'Draft')}</span></label>{e.steps?.length ? <> <Pill c="info">{t('asks')} {e.steps.length}</Pill></> : null}{e.entry_type && e.entry_type !== 'answer' ? <> <Pill c="info">{t(e.entry_type === 'needs_staff' ? 'needs staff' : 'promotion')}</Pill></> : null}{e.ends_on ? <> <Pill c={e.ends_on < new Date().toISOString().slice(0, 10) ? 'bad' : 'info'}>{t(e.ends_on < new Date().toISOString().slice(0, 10) ? 'ended' : 'until')} {e.ends_on}</Pill></> : null}{(e as Entry).dirty ? <> <Pill c="info">{t('edited')}</Pill></> : null}</div></td>
-            <td onClick={(ev) => ev.stopPropagation()}><button type="button" className="btn sm" aria-label={t('Edit {k}', { k: e.intent_key })} onClick={() => open(e)}>{t('Edit')}</button></td>
+            <td className="num" onClick={(ev) => ev.stopPropagation()}><IconBtn tip={t('Edit {k}', { k: e.intent_key })} onClick={() => open(e)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></IconBtn></td>
           </tr>
         ))}
         {!list.length && <tr><td colSpan={8} className="sub">{t('No entries match.')}</td></tr>}
