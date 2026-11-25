@@ -1130,6 +1130,14 @@ describe('Control panel', () => {
     expect(screen.getByText(/Write in the main language \(Vietnamese\) first/)).toBeTruthy();
     langsA = null;
   });
+  it('the Table / List switch shows only on the Entries tab', async () => {
+    withKb = true; open('staff', '/admin/kb');
+    expect(await screen.findByRole('group', { name: 'View' })).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: 'Languages' }));
+    expect(screen.queryByRole('group', { name: 'View' })).toBeNull();
+    await userEvent.click(screen.getByRole('button', { name: 'Entries' }));
+    expect(screen.getByRole('group', { name: 'View' })).toBeTruthy();
+  });
   it('the list shows a dot only for the languages of the merchant, not all six', async () => {
     withKb = true; open('staff', '/admin/kb');
     await userEvent.click(await screen.findByRole('button', { name: 'List' }));
