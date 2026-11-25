@@ -66,7 +66,7 @@ export default function Kb() {
   const open = (e: Entry | null) => {
     const src = e ? clone(e) : blank(p.merchant);
     LANGS.forEach((l) => { (src.translations as Record<string, Tr>)[l] = trOf(src, l); });
-    setEd({ ...src, useAspect: !!src.aspect, tab: 'en', sug: {}, newTopic: '', newTopicW: '', newEx: '' });
+    setEd({ ...src, useAspect: !!src.aspect, tab: sourceLang(p.M), sug: {}, newTopic: '', newTopicW: '', newEx: '' });
   };
   return (
     <>
@@ -196,7 +196,7 @@ function Editor({ ed, setEd, onClose }: { ed: Ed; setEd: (e: Ed) => void; onClos
           {p.adv && <label className="tog full"><input type="checkbox" checked={ed.topic_optional} onChange={(e) => set({ topic_optional: e.target.checked })} /> {t('The question type alone is enough (no topic word needed), for example opening hours')}</label>}</>}
       </div>
       <div className="kbsec"><b>3</b> {t('What the bot says, in each language')}</div>
-      <div className="tabs" role="tablist">{LANGS.filter((l) => l === src || l === 'en' || l === ed.tab || targetLangs(p.M).includes(l) || trOf(ed, l).answer_text.trim() || trOf(ed, l).question_examples.length).map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
+      <div className="tabs" role="tablist">{[src, ...targetLangs(p.M)].concat(LANGS.filter((l) => l !== src && !targetLangs(p.M).includes(l) && (l === ed.tab || trOf(ed, l).answer_text.trim() || trOf(ed, l).question_examples.length))).map((l) => { const s = langState(ed, l); return <button key={l} type="button" role="tab" aria-selected={l === ed.tab} onClick={() => set({ tab: l })}>{LN[l]} <span className={'dot ' + s}>{s === 'on' ? 'ok' : s === 'part' ? '!' : '—'}</span></button>; })}</div>
       <label className="fld"><span>{t('Answer in {l} (facts only; the bot adds the tone)', { l: LN[ed.tab] })}</span><textarea lang={ed.tab} className={tx.ai ? 'ai-tr' : undefined} value={tx.answer_text} onChange={(e) => setTr({ answer_text: e.target.value })} /></label>
       <div className="sub" style={{ marginTop: -4 }}>{tx.ai ? <><span className="aibadge">{t('AI draft · check')}</span> {t('Written by the AI. Edit it and the mark goes away.')}</> : ed.tab === src ? (autoOn(p.M) && p.ai.translate ? t('Type here. When you save, the empty languages of this merchant are filled in by the AI.') : '') : ''}</div>
       <div className="kbsec"><b>4</b> {t('How customers ask for it')}</div>

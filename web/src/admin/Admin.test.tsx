@@ -1079,7 +1079,7 @@ describe('Control panel', () => {
     expect(row.textContent).toContain('RM50 to RM50,000.'); expect(row.textContent).toMatch(/live/i);
     expect(row.querySelector('td.num')!.textContent).toBe('3');                                          // three different example questions
   });
-  it('Knowledge base table edit: Esc puts the old text back, Ctrl+Enter saves and moves down, and the language buttons add columns', async () => {
+  it('Knowledge base table edit: Esc puts the old text back, Ctrl+Enter saves and moves down, and the columns are the languages of the merchant', async () => {
     withKb = true; open('staff', '/admin/kb');
     await screen.findAllByRole('checkbox', { name: /^Select (?!all)/ });
     await userEvent.click(screen.getByRole('button', { name: 'Table' }));
@@ -1090,9 +1090,15 @@ describe('Control panel', () => {
     await userEvent.type(how, ' now'); await userEvent.keyboard('{Control>}{Enter}{/Control}');
     expect(document.activeElement).toBe(within(grid).getByLabelText('Answer EN for dep_time'));           // moved down one row, same column
     expect(screen.getByRole('button', { name: /^Publish/ }).textContent).toMatch(/1/);
-    expect(within(grid).queryByLabelText('Answer VI for dep_how')).toBeNull();
-    await userEvent.click(within(grid).getByRole('button', { name: 'VI' }));
-    expect(within(grid).getByLabelText('Answer VI for dep_how')).toBeTruthy();
+    expect(within(grid).queryByLabelText('Answer VI for dep_how')).toBeNull();                              // Vietnamese is not one of this merchant's languages
+    expect(within(grid).queryByRole('button', { name: 'VI' })).toBeNull();                                  // the columns follow Knowledge base → Languages
+    expect(within(grid).getByLabelText('Answer MS for dep_how')).toBeTruthy();
+  });
+  it('the table columns are the merchant languages with the main language first', async () => {
+    withKb = true; langsA = null; open('staff', '/admin/kb');
+    await userEvent.click(await screen.findByRole('button', { name: 'Table' }));
+    const grid = await screen.findByLabelText('Table editor');
+    expect(within(grid).getAllByRole('columnheader').map((h) => h.textContent).slice(2, 5)).toEqual(['Answer EN', 'Answer MS', 'Answer ZH']);
   });
   it('Import: type entries in a table like Excel, see the check, and the AI translates the empty languages', async () => {
     open('staff', '/admin/imp');

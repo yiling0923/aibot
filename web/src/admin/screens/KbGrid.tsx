@@ -1,13 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { usePanel } from '../store';
-import { LANGS, LN, type Entry } from '../model';
+import { LN, type Entry } from '../model';
 import { useT } from '../i18n';
 import { autoOn, needsTranslation, sourceLang, targetLangs, translateEntry } from '../autotr';
 
 type Tr = { question_examples: string[]; answer_text: string; ai?: boolean };
 const trOf = (e: Entry, l: string): Tr => (e.translations as Record<string, Tr>)[l] || { question_examples: [], answer_text: '' };
-/** The languages that can be shown as columns. English is always there; Malay and Chinese start on. */
-const COLS = LANGS.filter((l) => l !== 'en');
 
 /** One cell: you type in it as long as you like, and the draft changes when you leave it (Tab, a click elsewhere, or Ctrl+Enter). Escape puts the old text back. */
 function Cell({ value, label, row, col, onCommit, invalid, placeholder, ai }: { value: string; label: string; row: number; col: string; onCommit: (v: string) => void; invalid?: boolean; placeholder?: string; ai?: boolean }) {
@@ -32,8 +30,7 @@ function Cell({ value, label, row, col, onCommit, invalid, placeholder, ai }: { 
 /** The Knowledge base as a table you edit in place: the answers in each language and the English example questions, one row per entry. */
 export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: Entry) => void }) {
   const p = usePanel(); const { t: T, lang } = useT(); const zh = lang === 'zh';
-  const [shown, setShown] = useState<Set<string>>(() => new Set(['ms', 'zh']));
-  const src = sourceLang(p.M); const cols = [...new Set(['en', src, ...COLS.filter((l) => shown.has(l))])];
+  const src = sourceLang(p.M); const cols = [src, ...targetLangs(p.M)];                       // the languages of this merchant (Knowledge base → Languages), the main language first
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const mark = useRef<string>('');                                         // the entry last edited, for the "Saved to the draft" line
   const [saved, setSaved] = useState('');
@@ -78,18 +75,18 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
   return (
     <div className="card" aria-label={T('Table editor')}>
       <div className="gtools"><span className="sub">{zh ? <>在单元格里输入，离开它（按 Tab 或点击别处）就会保存到草稿。<b>Ctrl+Enter</b> 保存并下移一行。<b>Esc</b> 恢复原来的文字。完成后按“发布”。</> : <>Type in a cell and leave it (Tab or a click elsewhere) to save it to the draft. <b>Ctrl+Enter</b> saves and goes down one row. <b>Esc</b> puts the old text back. Press Publish when you are done.</>}</span>
-        <span className="gcols" role="group" aria-label={T('Languages shown')}>{COLS.map((l) => <button key={l} type="button" className="btn sm" aria-pressed={shown.has(l)} onClick={() => setShown((s) => { const n = new Set(s); if (n.has(l)) n.delete(l); else n.add(l); return n; })}>{LN[l]}</button>)}</span></div>
+        <span className="sub">{T('The columns are the languages of this merchant. Change them in the Languages tab.')}</span></div>
       {unwritten > 0 && <div className="note" style={{ marginTop: 8 }}>{zh ? <><b>{unwritten}</b> 个条目仍写着 <span className="mono">TO WRITE</span>（红色显示）。在写好答案之前，机器人会忽略它们。</> : <><b>{unwritten}</b> {unwritten === 1 ? 'entry still says' : 'entries still say'} <span className="mono">TO WRITE</span> (shown in red). The bot ignores {unwritten === 1 ? 'it' : 'them'} until the answer is written.</>}</div>}
       <div className="scroll" style={{ marginTop: 10 }}>
-        <table className="kbgrid"><thead><tr><th className="gname">{T('Entry')}</th><th className="glive">{T('Live')}</th>{cols.map((l) => <th key={l}>{T('Answer')} {LN[l]}</th>)}<th>{T('Example questions EN')} <span className="sub">{T('(one per line)')}</span></th></tr></thead>
+        <table className="kbgrid"><thead><tr><th className="gname">{T('Entry')}</th><th className="glive">{T('Live')}</th>{cols.map((l) => <th key={l}>{T('Answer')} {LN[l]}</th>)}<th>{src === 'en' ? T('Example questions EN') : T('Example questions') + ' ' + LN[src]} <span className="sub">{T('(one per line)')}</span></th></tr></thead>
           <tbody>
             {list.map((e, r) => {
-              const en = trOf(e, 'en').answer_text;
+              const en = trOf(e, src).answer_text;
               return (
                 <tr key={e.id}>
                   <td className="gname"><button type="button" className="linklike" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><div className="sub">{e.topic || T('no topic')}</div></td>
                   <td className="glive"><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label></td>
-                  {cols.map((l) => <td key={l}><Cell ai={!!trOf(e, l).ai} value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === 'en' && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={busyIds.has(e.id) && l !== src ? T('Translating…') : T(l === 'en' ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} />{trOf(e, l).ai && <span className="aibadge">{T('AI draft · check')}</span>}</td>)}
+                  {cols.map((l) => <td key={l}><Cell ai={!!trOf(e, l).ai} value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === src && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={busyIds.has(e.id) && l !== src ? T('Translating…') : T(l === src ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} />{trOf(e, l).ai && <span className="aibadge">{T('AI draft · check')}</span>}</td>)}
                   <td><Cell value={trOf(e, src).question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, src).question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
                 </tr>);
             })}

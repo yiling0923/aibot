@@ -350,7 +350,7 @@ On **Keyword ranking**, the **Suggest topics** button looks at the new words nob
 - the **languages the merchant uses** (tick boxes). Customers writing in a language that is off get the main language;
 - **Translate automatically** (on by default) and **Translate all**.
 
-Only admins change the tab; staff see it read-only. The **Merchants list** shows each merchant's country and languages.
+The **table** and the **entry editor** show exactly these languages, the main (source) language first. Only admins change the tab; staff see it read-only. The **Merchants list** shows each merchant's country and languages.
 
 **Automatic translation:** there are no translate buttons per entry. When you save an entry in the editor, or leave the source-language cell in the table, the AI fills the languages of the merchant that are still empty (the answer and the example questions). A language is also refreshed when its text was written by the AI and no person changed it after. **A text a person wrote is never overwritten.** Texts made by the AI are marked **AI draft** (purple) until a person edits them. The entry keeps its status (live or draft), and nothing reaches customers before you publish, so check the AI drafts first. The AI keeps the numbers, links and menu paths of the answer (a translation that changes them is refused). Nothing happens when the switch is off or the AI has no key.
 
