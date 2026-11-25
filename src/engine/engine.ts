@@ -32,6 +32,14 @@ const TH_PARTICLES = new RegExp(TH_PART, 'g');
 const escRe = (p: string) => p.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const GAP = 0.05;   // the best match must beat the second by this much (the answer / clarify limits are per merchant)
 // Kinds of question words. "problem" (rejected, failed, complaint) always goes to a human; "help" (what to do) is just noise.
+/** The one entry whose name (deposit_time -> "deposit time") is made of exactly the words of the message, if there is exactly one. */
+function namedEntry<T extends { intent: string }>(list: T[], text: string): T | null {
+  const w = (x: string) => [...new Set(x.toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean))].sort().join(' ');
+  const t = w(text); if (!t) return null;
+  const hit = list.filter((x) => w(x.intent) === t);
+  return hit.length === 1 ? hit[0] : null;
+}
+
 const ASPECT_ORDER = ['time', 'limit', 'change', 'hours', 'how', 'problem', 'help'];
 const ACCT_TOPICS = ['balance', 'transactions', 'points'];
 const TOOLNAME: Record<string, string> = { balance: 'get_balance', transactions: 'get_recent_transactions', points: 'get_points' };
@@ -346,6 +354,11 @@ export class Engine {
       // answer it, do not make the customer choose. "game" alone is NOT the same words as "credit missing in the game": that still asks.
       const s = ks.strong.find((x) => x.id === top.id)!; decision = 'ANSWER'; via = 'similarity'; topic = s.topic;
       why = `Several answers share the topic "${s.topic}", but the message has the same words as the example "${top.example}", so the bot answers it.`;
+    }
+    else if (ks.strong.length > 1 && namedEntry(ks.strong, n.text)) {
+      // The customer typed exactly the name of one entry ("deposit time" = the entry deposit_time): that is the entry they mean.
+      const s = namedEntry(ks.strong, n.text)!; decision = 'ANSWER'; via = 'keywords'; conf = 0.95; top = { id: s.id, intent: s.intent, score: 1, example: '(entry name)' }; topic = s.topic;
+      why = `The words in the message are the name of the entry "${s.intent}", so the bot answers it.`;
     }
     else if (ks.strong.length > 1 && new Set(ks.strong.map((s) => s.topic)).size > 1 && ks.strong.some((s) => s.id === top.id) && top.score >= Math.max(m.answerThreshold, 0.8) && top.score - second.score >= 0.12) {
       // The sentence names several topics ("referral" and "bonus"), but one entry's example questions are clearly the closest to the whole message: answer it,

@@ -59,3 +59,11 @@ describe('a message that asks two different things gets both answers, word for w
     const c = await say(b, 'deposit time and you are stupid'); expect(c.d).toBe('ABUSE'); expect(c.compound).toBeNull();
   });
 });
+
+describe('the name of an entry is a direct answer', () => {
+  it('"deposit time" answers the entry deposit_time even when other deposit entries are close', async () => {
+    const b = withImported();
+    const r = await say(b, 'deposit time'); expect(r.d).toBe('ANSWER'); 
+    expect(r.text).toMatch(/credited within 5 minutes/);
+  });
+});
