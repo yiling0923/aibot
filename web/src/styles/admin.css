@@ -983,3 +983,4 @@ details.moreopt{background:none;padding:0}
 
 /* List view: the Live switch, the status text and the pencil share one line with the entry name */
 .card.scroll table td{vertical-align:middle}.stcell{display:flex;align-items:center;gap:8px}
+.igrid .ghint{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:2px 0 8px}.igrid .ghint .sub{flex:1}.igrid .ghint .btn{flex:none;white-space:nowrap}

@@ -64,8 +64,7 @@ export default function ImportGrid({ start, onCsv, defaultLang = 'en', langs }: 
 
   return (
     <div className="igrid" ref={box}>
-      <div className="sub">{zh ? <>在单元格里输入，或从 Excel 或 Google Sheets 复制单元格后粘贴到这里（点击第一个单元格，然后按 Ctrl+V）。先用主要语言（{T(LANG_NAME[defaultLang] ?? defaultLang)}）写。其他语言会由 AI 补上。如果你自己写了其他语言，条目的每种语言单独一行，使用<b>相同的条目名称</b>。</> : <>Type in the cells, or copy cells from Excel or Google Sheets and paste them here (click the first cell, then press Ctrl+V). Write in the main language ({T(LANG_NAME[defaultLang] ?? defaultLang)}) first. The AI fills the others. If you write another language yourself, give it its own row with the <b>same entry name</b>.</>}</div>
-      <div className="tools" style={{ justifyContent: 'flex-end', margin: '6px 0' }}><button className="btn sm" type="button" onClick={clearAll}>{T('Clear table')}</button></div>
+      <div className="ghint"><div className="sub">{zh ? <>在单元格里输入，或从 Excel 或 Google Sheets 复制单元格后粘贴到这里（点击第一个单元格，然后按 Ctrl+V）。先用主要语言（{T(LANG_NAME[defaultLang] ?? defaultLang)}）写。其他语言会由 AI 补上。如果你自己写了其他语言，条目的每种语言单独一行，使用<b>相同的条目名称</b>。</> : <>Type in the cells, or copy cells from Excel or Google Sheets and paste them here (click the first cell, then press Ctrl+V). Write in the main language ({T(LANG_NAME[defaultLang] ?? defaultLang)}) first. The AI fills the others. If you write another language yourself, give it its own row with the <b>same entry name</b>.</>}</div><button className="btn sm" type="button" onClick={clearAll}>{T('Clear table')}</button></div>
       <div className="gridbox"><div className="scroll"><table><thead><tr><th className="rn">#</th>{COLS.map((c) => <th key={c}>{T(c)}</th>)}<th /></tr></thead><tbody>
         {rows.map((r, y) => (
           <tr key={y}><td className="rn">{y + 1}</td>
