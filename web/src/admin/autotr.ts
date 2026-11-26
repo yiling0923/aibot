@@ -23,13 +23,14 @@ export const needsTranslation = (e: Entry, src: string, targets: string[], refre
 };
 
 /** Asks the AI for the translations of one entry. The languages are asked at the same time, so an entry takes as long as its slowest language. Returns the new texts (marked as AI drafts) and the first error, if any. */
-export async function translateEntry(merchant: string, e: Entry, src: string, langs: string[]): Promise<{ made: Record<string, Tr>; error?: string }> {
+export async function translateEntry(merchant: string, e: Entry, src: string, langs: string[], opts: { answerOnly?: boolean } = {}): Promise<{ made: Record<string, Tr>; error?: string }> {
   const s = trOf(e, src); const made: Record<string, Tr> = {}; let error: string | undefined;
   await Promise.all(langs.map(async (to) => {
     try {
-      const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant, from: src, to, answer: s.answer_text, examples: s.question_examples });
       const cur = trOf(e, to);
-      made[to] = { answer_text: r.answer, question_examples: cur.ai || !cur.question_examples.length ? r.examples : cur.question_examples, ai: true };
+      const keep = opts.answerOnly && cur.question_examples.length > 0;          // only the answer changed and this language has its questions: send only the answer (shorter, so faster)
+      const r = await api<{ answer: string; examples: string[] }>('/api/admin/translate', { merchant, from: src, to, answer: s.answer_text, examples: keep ? [] : s.question_examples });
+      made[to] = { answer_text: r.answer, question_examples: keep ? cur.question_examples : cur.ai || !cur.question_examples.length ? r.examples : cur.question_examples, ai: true };
     } catch (x) { error = error ?? (x as Error).message; }
   }));
   // keep the order of the languages the caller asked for

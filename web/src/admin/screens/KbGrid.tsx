@@ -74,7 +74,7 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
     const e = { ...cur, translations: { ...cur.translations, [src]: { ...trOf(cur, src), answer_text: v } } as Entry['translations'] };
     const prev: Record<string, Tr | undefined> = Object.fromEntries(langs.map((l) => [l, (cur.translations as Record<string, Tr | undefined>)[l]]));
     setBusyIds((x) => new Set(x).add(id)); setUndo(null);
-    const { made, error } = await translateEntry(p.merchant, e, src, langs);
+    const { made, error } = await translateEntry(p.merchant, e, src, langs, { answerOnly: true });
     setBusyIds((x) => { const n = new Set(x); n.delete(id); return n; });
     const ls = Object.keys(made);
     if (ls.length) {
@@ -113,7 +113,7 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
               const en = trOf(e, src).answer_text;
               return (
                 <tr key={e.id}>
-                  <td className="gname"><div className="gnrow"><button type="button" className="linklike gnname" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label><IconBtn tip={T('Edit {k}', { k: e.intent_key })} onClick={() => onOpen(e)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></IconBtn></div><div className="sub">{e.topic || T('no topic')}</div></td>
+                  <td className="gname"><div className="gnrow"><button type="button" className="linklike gnname" title={T('Open the full editor')} onClick={() => onOpen(e)}>{e.intent_key}</button><label className="switch"><input type="checkbox" role="switch" aria-label={T('Live {k}', { k: e.intent_key })} checked={e.status === 'live'} onChange={(ev) => setLive(e.id, ev.target.checked)} /><span className="track"><span className="thumb" /></span></label><IconBtn tip={T('Edit {k}', { k: e.intent_key })} onClick={() => onOpen(e)}><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></IconBtn></div><div className="sub">{busyIds.has(e.id) ? <span className="gbusy"><i aria-hidden="true" />{T('Translating…')}</span> : (e.topic || T('no topic'))}</div></td>
                   {cols.map((l) => <td key={l}><Cell ai={!!trOf(e, l).ai} value={trOf(e, l).answer_text} label={T('Answer {l} for {k}', { l: LN[l], k: e.intent_key })} row={r} col={l} invalid={l === src && (!en.trim() && e.entry_type !== 'needs_staff' || /^\s*TO WRITE:/i.test(en))} placeholder={busyIds.has(e.id) && l !== src ? T('Translating…') : T(l === src ? (e.entry_type === 'needs_staff' ? 'A person answers this' : 'Write the answer') : 'Optional')} onCommit={(v) => setAnswer(e.id, l, v)} />{trOf(e, l).ai && <span className="aibadge">{T('AI draft · check')}</span>}</td>)}
                   <td><Cell value={trOf(e, src).question_examples.join('\n')} label={T('Example questions for {k}', { k: e.intent_key })} row={r} col="ex" invalid={trOf(e, src).question_examples.length < 3} placeholder={T('At least 3, with slang')} onCommit={(v) => setExamples(e.id, v)} /></td>
                 </tr>);
