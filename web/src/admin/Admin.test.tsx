@@ -177,34 +177,31 @@ describe('Control panel', () => {
     await userEvent.click(screen.getAllByRole('button', { name: /^Translate all/ })[0]);
     expect(await screen.findByText(/Translate 3 entries into/)).toBeTruthy();                               // it says how much first (the entry that still says TO WRITE is left out)
   });
-  it('automatic translation in the table: leaving the source cell fills the empty languages, never a text a person wrote', async () => {
+  it('automatic translation in the table: leaving the source cell fills the empty languages', async () => {
     autoTr = true; withKb = true; localStorage.setItem('kbView', 'table'); open('staff', '/admin/kb');
     const grid = await screen.findByLabelText('Table editor');
     await userEvent.type(within(grid).getByLabelText('Answer MS for dep_how'), 'Pergi ke Dompet.'); await userEvent.tab();     // a person writes the Malay answer of dep_how
     const en = within(grid).getByLabelText('Answer EN for dep_limit') as HTMLTextAreaElement;
     await userEvent.clear(en); await userEvent.type(en, 'RM50 to RM50,000.'); await userEvent.tab();
-    expect(await screen.findByText(/Translated into MS, ZH \(AI draft\)/)).toBeTruthy();
+    expect(await screen.findByText(/Updated MS, ZH from the new text/)).toBeTruthy();
     expect((within(grid).getByLabelText('Answer MS for dep_limit') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');
     expect(within(grid).getAllByText('AI draft · check').length).toBeGreaterThanOrEqual(2);                                        // Malay and Chinese of dep_limit
-    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Dompet.');          // the person's text stays
     const dh = within(grid).getByLabelText('Answer EN for dep_how') as HTMLTextAreaElement;
     await userEvent.clear(dh); await userEvent.type(dh, 'Open the wallet.'); await userEvent.tab();
-    await new Promise((r) => setTimeout(r, 300));
-    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Dompet.');          // still never overwritten
+    expect(await screen.findAllByText(/Updated MS, ZH from the new text/)).toBeTruthy();                                         // changing the source answer rewrites the others (the next test covers Undo)
   });
-  it('changing the source text asks before the AI replaces a text a person wrote in another language', async () => {
+  it('changing the source answer writes every other language again by itself, and Undo puts the old texts back', async () => {
     autoTr = true; withKb = true; localStorage.setItem('kbView', 'table'); open('staff', '/admin/kb');
     const grid = await screen.findByLabelText('Table editor');
     await userEvent.type(within(grid).getByLabelText('Answer MS for dep_how'), 'Pergi ke Dompet.'); await userEvent.tab();          // a person writes the Malay text
     const en = within(grid).getByLabelText('Answer EN for dep_how') as HTMLTextAreaElement;
     await userEvent.clear(en); await userEvent.type(en, 'Open the wallet now.'); await userEvent.tab();                              // then changes the source text
-    const bar = await screen.findByRole('alert');
-    expect(bar.textContent).toMatch(/Update MS from it with the AI/);
-    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Dompet.');            // nothing replaced yet
-    await userEvent.click(within(bar).getByRole('button', { name: 'Update' }));
-    expect(await screen.findByText(/Updated MS from the new text/)).toBeTruthy();
-    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');   // replaced, now an AI draft
-    expect(within(grid).getAllByText('AI draft · check').length).toBeGreaterThanOrEqual(1);
+    expect(await screen.findByText(/Updated MS, ZH from the new text/)).toBeTruthy();                                                // no question: it is done
+    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Wallet > Deposit.');   // the person's text was replaced, now an AI draft
+    expect(within(grid).getAllByText('AI draft · check').length).toBeGreaterThanOrEqual(2);
+    const bar = await screen.findByRole('status', { name: '' }).catch(() => null); void bar;
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));                                                      // one click puts the old text back
+    expect((within(grid).getByLabelText('Answer MS for dep_how') as HTMLTextAreaElement).value).toBe('Pergi ke Dompet.');
   });
   it('Translate all fills every empty language of every entry, one after the other, and says it is done', async () => {
     autoTr = false; withKb = true; open('staff', '/admin/kb');

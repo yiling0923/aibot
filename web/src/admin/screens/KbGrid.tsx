@@ -33,7 +33,7 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
   const p = usePanel(); const { t: T, lang } = useT(); const zh = lang === 'zh';
   const src = sourceLang(p.M); const cols = [src, ...targetLangs(p.M)];                       // the languages of this merchant (Knowledge base → Languages), the main language first
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
-  const [ask, setAsk] = useState<{ id: number; key: string; langs: string[] } | null>(null);        // asks before the AI replaces a text a person wrote
+  const [undo, setUndo] = useState<{ id: number; key: string; langs: string[]; prev: Record<string, Tr | undefined> } | null>(null);        // what the last automatic update replaced, so it can be put back
   const mark = useRef<string>('');                                         // the entry last edited, for the "Saved to the draft" line
   const [saved, setSaved] = useState('');
 
@@ -64,27 +64,29 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
   };
   const setAnswer = (id: number, l: string, v: string) => {
     change(id, (e) => { const t = e.translations as Record<string, Tr>; t[l] = { question_examples: t[l]?.question_examples ?? [], answer_text: v }; });      // a person typed it: no AI mark
-    if (l === src && v.trim()) {
-      void autoFill(id, (e) => ({ ...e, translations: { ...e.translations, [src]: { ...trOf(e, src), answer_text: v } } as Entry['translations'] }));
-      offerUpdate(id);
-    }
+    if (l === src && v.trim()) void updateAll(id, v);
   };
-  /** The other languages that a person wrote are never changed by themselves. After the source text changed, offer to update them (the person decides). */
-  const offerUpdate = (id: number) => {
+  /** The source answer changed: every other language of the merchant is written again from it, so nobody has to edit each language. The old texts are kept for one Undo. */
+  const updateAll = async (id: number, v: string) => {
     if (!autoOn(p.M) || !p.ai.translate) return;
     const cur = p.draft.kb.find((x) => x.id === id && x.merchant === p.merchant); if (!cur) return;
-    const langs = targetLangs(p.M).filter((l) => trOf(cur, l).answer_text.trim() && !trOf(cur, l).ai);
-    setAsk(langs.length ? { id, key: cur.intent_key, langs } : null);
-  };
-  const updateNow = async () => {
-    if (!ask) return; const { id, langs } = ask; setAsk(null);
-    const cur = p.draft.kb.find((x) => x.id === id && x.merchant === p.merchant); if (!cur) return;
-    setBusyIds((x) => new Set(x).add(id));
-    const { made, error } = await translateEntry(p.merchant, cur, src, langs);
+    const langs = targetLangs(p.M); if (!langs.length) return;
+    const e = { ...cur, translations: { ...cur.translations, [src]: { ...trOf(cur, src), answer_text: v } } as Entry['translations'] };
+    const prev: Record<string, Tr | undefined> = Object.fromEntries(langs.map((l) => [l, (cur.translations as Record<string, Tr | undefined>)[l]]));
+    setBusyIds((x) => new Set(x).add(id)); setUndo(null);
+    const { made, error } = await translateEntry(p.merchant, e, src, langs);
     setBusyIds((x) => { const n = new Set(x); n.delete(id); return n; });
     const ls = Object.keys(made);
-    if (ls.length) p.edit((d, note) => { const x = d.kb.find((k) => k.id === id && k.merchant === p.merchant); if (!x) return; const tr = x.translations as Record<string, Tr>; ls.forEach((l) => { tr[l] = made[l]; }); x.dirty = true; note(`Translated entry "${x.intent_key}" into ${ls.map((l) => LN[l]).join(', ')} with AI (${p.M.name})`); });
+    if (ls.length) {
+      p.edit((d, note) => { const x = d.kb.find((k) => k.id === id && k.merchant === p.merchant); if (!x) return; const tr = x.translations as Record<string, Tr>; ls.forEach((l) => { tr[l] = made[l]; }); x.dirty = true; note(`Translated entry "${x.intent_key}" into ${ls.map((l) => LN[l]).join(', ')} with AI (${p.M.name})`); });
+      if (ls.some((l) => prev[l]?.answer_text?.trim() && !prev[l]?.ai)) setUndo({ id, key: cur.intent_key, langs: ls, prev });      // only offer Undo when a text a person wrote was replaced
+    }
     p.toast(error ? error : T('Updated {l} from the new text (AI draft). Please check it.', { l: ls.map((l) => LN[l]).join(', ') }));
+  };
+  const undoNow = () => {
+    if (!undo) return; const u = undo; setUndo(null);
+    p.edit((d, note) => { const x = d.kb.find((k) => k.id === u.id && k.merchant === p.merchant); if (!x) return; const tr = x.translations as Record<string, Tr | undefined>; u.langs.forEach((l) => { if (u.prev[l]) tr[l] = u.prev[l]; else delete tr[l]; }); x.dirty = true; note(`Edited entry "${x.intent_key}" (${p.M.name})`); });
+    p.toast(T('Put the old texts back.'));
   };
   const setExamples = (id: number, v: string) => {
     const lines = [...new Set(v.split('\n').map((x) => x.trim()).filter(Boolean))].slice(0, 40);
@@ -118,7 +120,7 @@ export default function KbGrid({ list, onOpen }: { list: Entry[]; onOpen: (e: En
             })}
             {!list.length && <tr><td colSpan={cols.length + 2} className="sub">{T('No entries match.')}</td></tr>}
           </tbody></table></div>
-      {ask && <div className="note askupd" role="alert"><span>{T('You changed the {s} answer of “{k}”. Update {l} from it with the AI? Your own texts in {l} would be replaced.', { s: LN[src], k: ask.key, l: ask.langs.map((l) => LN[l]).join(', ') })}</span><span className="tools"><button className="btn pri sm" type="button" onClick={() => void updateNow()}>{T('Update')}</button><button className="btn sm" type="button" onClick={() => setAsk(null)}>{T('Keep them')}</button></span></div>}
+      {undo && <div className="note askupd" role="status"><span>{T('The other languages of “{k}” were written again from the new {s} answer (AI draft). Your old texts in {l} were replaced.', { k: undo.key, s: LN[src], l: undo.langs.map((l) => LN[l]).join(', ') })}</span><span className="tools"><button className="btn sm" type="button" onClick={undoNow}>{T('Undo')}</button><button className="btn sm ghost" type="button" onClick={() => setUndo(null)}>{T('Close')}</button></span></div>}
       {saved && <div className="sub" role="status" style={{ marginTop: 8 }}>{T('Saved to the draft: {k}. Press Publish to make the changes live.', { k: saved })}</div>}
     </div>
   );

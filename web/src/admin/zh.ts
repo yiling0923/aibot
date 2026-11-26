@@ -122,6 +122,7 @@ export const ZH: Record<string, string> = {
   'Entry name, topic, at least 3 questions with a | between them, and the answer. Write in the main language only.': '条目名称、主题、至少 3 个问题（用 | 隔开）和答案。只用主要语言写。',
   'Press Import and publish to go live at once, or Import to draft to check first.': '按“导入并发布”立即上线，或按“导入到草稿”先检查。',
   'In Knowledge base → Table, read the purple “AI draft” texts and fix what you want.': '在“知识库 → 表格”里，读一读紫色的“AI 草稿”文字，想改就改。',
+  'Put the old texts back.': '已恢复原来的文字。', 'The other languages of “{k}” were written again from the new {s} answer (AI draft). Your old texts in {l} were replaced.': '“{k}”的其他语言已根据新的{s}答案重新写过（AI 草稿）。你原来的 {l} 文字已被替换。', 'Undo': '撤销',
   'Suggest topics': '建议主题', 'Suggest topics for new keywords': '为新关键词建议主题', 'Look at the chats of the new words and suggest a topic for each': '查看新词所在的聊天，并为每个词建议主题',
   'For each new word, the bot looks at the customer messages it was written in. If a known topic is in the same messages, it is suggested. Check the list, change a topic if you want, then add. Nothing is saved until you press Add.': '对每个新词，机器人会查看它出现的客户消息。如果同一条消息里有已知主题，就会建议该主题。请检查列表，需要时更改主题，然后添加。在你按“添加”之前不会保存任何内容。',
   'Looking at the chats…': '正在查看聊天…', 'No new words to decide.': '没有需要决定的新词。', 'Seen with “{k}” in {a} of {b} chats': '在 {b} 条聊天中有 {a} 条与“{k}”一起出现', 'No clear topic in its chats': '它的聊天中没有明确的主题', 'Topic for {w}': '{w} 的主题', 'No topic': '无主题',
