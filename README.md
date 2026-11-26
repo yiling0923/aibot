@@ -362,6 +362,8 @@ The **table** and the **entry editor** show exactly these languages, the main (s
 
 **Import** uses the same settings: its **Translate the empty languages with AI** switch follows the merchant's automatic-translation switch, and it translates into the merchant's languages from the source language. There is no translation-language choice on the Import page. In **Type in a table**, every new row starts in the merchant's main language, and the row's **Language** list offers only the merchant's languages.
 
+When you change the **source** text of an entry that already has a text a person wrote in another language, the table shows a bar: *“You changed the … answer of … Update MS from it with the AI?”* with **Update** and **Keep them**. Nothing is replaced unless you press **Update**; the replaced texts become AI drafts.
+
 **Translate all** (on the Entries tab and on the Languages tab) shows how many entries and translations it would make, then fills every empty language of every entry one by one. The same rules apply.
 
 ## Table view (Knowledge base)

@@ -985,3 +985,4 @@ details.moreopt{background:none;padding:0}
 .card.scroll table td{vertical-align:middle}.stcell{display:flex;align-items:center;gap:8px}
 .igrid .ghint{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin:2px 0 8px}.igrid .ghint .sub{flex:1}.igrid .ghint .btn{flex:none;white-space:nowrap}
 .gd-sub{margin:6px 0 0;padding-left:18px;display:grid;gap:10px}.gd-list p{margin:6px 0}
+.askupd{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-top:8px;background:var(--warnbg)}
