@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import { writeXlsx } from '../xlsx';
 import { useT } from '../i18n';
 import { BLANK_ROWS, EXAMPLE_ROWS, WIDTHS } from '../importSamples';
@@ -13,21 +14,36 @@ const Tag = ({ children }: { children: React.ReactNode }) => <span className="gd
 
 /** How to import: the steps only, with the buttons drawn the way they look on the screen. */
 export default function Guide() {
-  const { t, lang } = useT(); const zh = lang === 'zh';
+  const { t } = useT(); const nav = useNavigate();
+  const step = (n: number, title: string, body: React.ReactNode) => (
+    <li><span className="gd-n" aria-hidden="true">{n}</span><div><b>{title}</b>{body}</div></li>
+  );
   return (
     <div className="guide">
       <section className="card gd-card">
         <h2>{t('How to import')}</h2>
-        <div className="sub">{t('Add many answers at one time. It takes about 5 minutes.')}</div>
+        <div className="sub">{t('Add many answers at one time. Write in one language only: the AI fills the other languages.')}</div>
         <ol className="gd-list">
-          <li><span className="gd-n" aria-hidden="true">1</span><div><b>{t('Get the Excel file')}</b><p>{t('Download it and open it in Excel.')}</p>
-            <div className="gd-btns"><button className="btn pri sm" type="button" onClick={() => save('knowledge_base_example.xlsx', writeXlsx(EXAMPLE_ROWS, WIDTHS, 'Knowledge base'))}>{t('Download example file')}</button>
-              <button className="btn sm" type="button" onClick={() => save('knowledge_base_blank.xlsx', writeXlsx(BLANK_ROWS, WIDTHS, 'Knowledge base'))}>{t('Download blank file')}</button></div></div></li>
-          <li><span className="gd-n" aria-hidden="true">2</span><div><b>{t('Fill it in')}</b><p>{t('One row for each question and its answer. English is enough.')}</p></div></li>
-          <li><span className="gd-n" aria-hidden="true">3</span><div><b>{t('Upload it')}</b><p>{zh ? <>打开 <b>导入</b> 页面，点击 <Tag>上传文件</Tag>，选择你的 Excel 文件。</> : <>Go to <b>Import</b>, press <Tag>Upload a file</Tag> and choose your Excel file.</>}</p></div></li>
-          <li><span className="gd-n" aria-hidden="true">4</span><div><b>{t('Import it')}</b><p>{zh ? <>检查列表，然后点击 <Tag>导入</Tag>。如果看到 <i>用 AI 翻译空白的语言</i>，请保持开启。</> : <>Check the list, then press <Tag>Import</Tag>. If you see <i>Translate the empty languages with AI</i>, keep it ticked.</>}</p></div></li>
-          <li><span className="gd-n" aria-hidden="true">5</span><div><b>{t('Publish it')}</b><p>{t('Press the button in the yellow bar at the top. Customers see the answers only after this.')}</p>
-            <div className="gd-bar" aria-hidden="true"><span><b>{t('Not live yet.')}</b> {t('5 changes are only in your draft.')}</span><span className="gd-tag solid">{t('Review and publish')}</span></div></div></li>
+          {step(1, t('Set the languages first (once)'), <>
+            <p>{t('Open Knowledge base → Languages. Choose the country (it sets the main language), tick the languages the merchant uses, and press Save languages.')}</p>
+            <div className="gd-btns"><button className="btn sm" type="button" onClick={() => nav('/admin/kb', { state: { tab: 'languages' } })}>{t('Open Languages')}</button></div></>)}
+          {step(2, t('Add your entries'), <>
+            <p>{t('On the Import page there are two ways. Choose one:')}</p>
+            <ul className="gd-sub">
+              <li><Tag>{t('Type in a table')}</Tag> {t('Type in the cells, or copy cells from Excel or Google Sheets and paste them (click the first cell, then press Ctrl+V). Use Add 5 rows for more rows and Clear table to start again.')}</li>
+              <li><Tag>{t('Upload a file')}</Tag> {t('Fill the Excel file and upload it.')}
+                <div className="gd-btns"><button className="btn pri sm" type="button" onClick={() => save('knowledge_base_example.xlsx', writeXlsx(EXAMPLE_ROWS, WIDTHS, 'Knowledge base'))}>{t('Download example file')}</button>
+                  <button className="btn sm" type="button" onClick={() => save('knowledge_base_blank.xlsx', writeXlsx(BLANK_ROWS, WIDTHS, 'Knowledge base'))}>{t('Download blank file')}</button></div></li>
+            </ul></>)}
+          {step(3, t('Fill each row'), <>
+            <p>{t('Entry name: one short name with no spaces, for example deposit_time. Topic: the topic word, for example deposit (it must exist on the Topics page). Questions: at least 3 example questions, with a | between them, with the short forms customers really type. Answer: the answer text.')}</p>
+            <p>{t('Write in the main language only. The Language column starts with it. The AI writes the other languages for you. If you write another language yourself, put it in its own row with the same entry name.')}</p></>)}
+          {step(4, t('Check'), <p>{t('The Check step lists every entry and shows what is wrong, for example a missing topic or fewer than 3 questions. Fix it in the table, or leave it: the entry is still imported and you can fix it later.')}</p>)}
+          {step(5, t('Import'), <>
+            <p>{t('The switch “Translate the empty languages with AI” follows the merchant setting. It translates into the languages you ticked in step 1. Then choose:')}</p>
+            <div className="gd-btns"><span className="gd-tag solid">{t('Import and publish')}</span><span className="gd-tag">{t('Import entries to draft')}</span></div>
+            <p className="sub">{t('Import and publish makes the entries live at once. Import to draft only saves them: nothing changes for customers until you publish.')}</p></>)}
+          {step(6, t('Check the AI drafts'), <p>{t('In Knowledge base → Table, the texts written by the AI are purple and marked “AI draft · check”. Read them, fix what you want (the mark goes away), and use the Live switch to turn an entry on or off.')}</p>)}
         </ol>
         <div className="gd-end">✓ {t('Done. The bot now answers from your new entries.')}</div>
       </section>

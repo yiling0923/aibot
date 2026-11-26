@@ -392,7 +392,7 @@ After any change to the draft (keyword, topic, entry, setting), a yellow bar "No
 
 ### Import guide page
 
-The panel has a **Answers → Import guide** page (next to Import): how to write the knowledge base CSV (columns, examples, writing rules), a download of an example and a blank file, and the import steps. A copy as a web page is in `docs/MARKETING_IMPORT_GUIDE.html`.
+The panel has a **Answers → Import guide** page (next to Import): the six import steps: set the languages first (Knowledge base → Languages), add the entries (type in a table, or upload an Excel file; downloads of an example and a blank file), fill each row in the main language only (the AI fills the others), check, import (**Import and publish** or **Import to draft**), and check the **AI draft** texts. A copy as a web page is in `docs/MARKETING_IMPORT_GUIDE.html`.
 
 ### Report page
 
