@@ -960,7 +960,7 @@ describe('Control panel', () => {
     open('staff', '/admin/guide');
     expect(await screen.findByRole('heading', { name: /How to import/ })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Download example file' })).toBeTruthy();
-    expect(screen.getByText(/Import and publish makes the entries live at once/)).toBeTruthy(); expect(document.querySelectorAll('.gd-list > li').length).toBe(6);
+    expect(screen.getByText(/Press Import and publish to go live at once/)).toBeTruthy(); expect(document.querySelectorAll('.gd-list li').length).toBe(5);       // five short steps, no nested list
     expect(screen.getByText(/Write in the main language only/)).toBeTruthy(); expect(screen.getByRole('button', { name: 'Open Languages' })).toBeTruthy();
   });
   it('Knowledge base: the Live switch applies at once: no question, no Publish button', async () => {
